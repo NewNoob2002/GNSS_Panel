@@ -15,7 +15,7 @@ target_compile_definitions(hc32_project_options INTERFACE
     ARDUINO=111
     LV_CONF_INCLUDE_SIMPLE
     $<$<CONFIG:Debug>:__CORE_DEBUG>
-    MIDDLE_LOGO_USE
+    # MIDDLE_LOGO_USE
 )
 target_compile_options(hc32_project_options INTERFACE
     ${CPU_FLAGS}

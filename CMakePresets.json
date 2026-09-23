@@ -18,7 +18,8 @@
             "binaryDir": "${sourceDir}/build/gcc-release",
             "toolchainFile": "${sourceDir}/cmake/arm-none-eabi-gcc.cmake",
             "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Release"
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_COLOR_DIAGNOSTICS": "ON"
             }
         }
     ],
@@ -33,4 +34,3 @@
         }
     ]
 }
-

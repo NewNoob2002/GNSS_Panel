@@ -141,9 +141,9 @@ App_Update() {
         systemInfo.powerMonitor.batteryInfo.Temp_f = 10;
     }
 #else
-    if (systemInfo.powerMonitor.ExternalPowerChange) {
-        systemInfo.powerMonitor.ExternalPowerChange = 0;
-        NVIC_SystemReset();
-    }
+    // if (systemInfo.powerMonitor.ExternalPowerChange) {
+    //     systemInfo.powerMonitor.ExternalPowerChange = 0;
+    //     NVIC_SystemReset();
+    // }
 #endif
 }
