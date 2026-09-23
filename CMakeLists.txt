@@ -22,12 +22,12 @@ endif()
 file(MAKE_DIRECTORY "${CLANGD_DATABASE_DIR}")
 add_custom_target(clangd_database ALL
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${CMAKE_CURRENT_BINARY_DIR}/compile_commands.json"
-        "${CLANGD_DATABASE_DIR}/compile_commands.json"
+    "${CMAKE_CURRENT_BINARY_DIR}/compile_commands.json"
+    "${CLANGD_DATABASE_DIR}/compile_commands.json"
     COMMENT "clangd compilation database -> ${CMAKE_CURRENT_BINARY_DIR}"
 )
 
-set(PROJECT_VERSION 2.4.5)
+set(PROJECT_VERSION 2.4.6)
 configure_file(
     ${CMAKE_CURRENT_SOURCE_DIR}/Platform/Config/mcu_version_config.h.in
     ${CMAKE_CURRENT_BINARY_DIR}/generated/Platform/Config/mcu_version_config.h
@@ -133,7 +133,7 @@ target_compile_definitions(hc32_project_options INTERFACE
     ARDUINO=111
     LV_CONF_INCLUDE_SIMPLE
     $<$<CONFIG:Debug>:__CORE_DEBUG>
-    MIDDLE_LOGO_USE
+    # MIDDLE_LOGO_USE
 )
 target_compile_options(hc32_project_options INTERFACE
     ${CPU_FLAGS}

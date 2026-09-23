@@ -125,9 +125,9 @@ App_Update() {
     }
 #if defined(LVGL_SIMULATOR) || defined(_WIN32)
 #else
-    if (systemInfo.powerMonitor.ExternalPowerChange) {
-        systemInfo.powerMonitor.ExternalPowerChange = 0;
-        NVIC_SystemReset();
-    }
+    // if (systemInfo.powerMonitor.ExternalPowerChange) {
+    //     systemInfo.powerMonitor.ExternalPowerChange = 0;
+    //     NVIC_SystemReset();
+    // }
 #endif
 }
