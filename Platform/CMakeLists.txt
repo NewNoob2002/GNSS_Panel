@@ -8,7 +8,6 @@ target_include_directories(hc32_platform_headers INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/Drivers/inc
     ${CMAKE_CURRENT_SOURCE_DIR}/HAL
     ${CMAKE_CURRENT_SOURCE_DIR}/support
-    ${PROJECT_SOURCE_DIR}/Libraries/lvgl
 )
 target_link_libraries(hc32_platform_headers INTERFACE hc32_project_options)
 
@@ -42,26 +41,14 @@ add_library(hc32_platform OBJECT
 target_link_libraries(hc32_platform PUBLIC
     hc32_platform_headers
 )
+# 平台层三产品共用，不依赖显示库或界面代码。
 target_include_directories(hc32_platform PRIVATE
     ${PROJECT_SOURCE_DIR}/Arduino
     ${PROJECT_SOURCE_DIR}/Arduino/Core/avr
     ${PROJECT_SOURCE_DIR}/Arduino/Core/variants/hc32f460xx
     ${PROJECT_SOURCE_DIR}/Libraries
-    ${PROJECT_SOURCE_DIR}/Libraries/Adafruit-GFX-Library
-    ${PROJECT_SOURCE_DIR}/Libraries/Adafruit-ST7735-Library
-    ${PROJECT_SOURCE_DIR}/Libraries/Adafruit_BusIO
     ${PROJECT_SOURCE_DIR}/Libraries/Bq40z50
-    ${PROJECT_SOURCE_DIR}/Libraries/ButtonEvent
     ${PROJECT_SOURCE_DIR}/Libraries/MillisTaskManager
     ${PROJECT_SOURCE_DIR}/Libraries/Mp2762a
-    ${PROJECT_SOURCE_DIR}/Libraries/Parser/include
     ${PROJECT_SOURCE_DIR}/Libraries/easylogger/inc
-    ${PROJECT_SOURCE_DIR}/Libraries/lvgl
-    ${PROJECT_SOURCE_DIR}/Libraries/lvgl/porting
-    ${PROJECT_SOURCE_DIR}/Simulator/App
-    ${PROJECT_SOURCE_DIR}/Simulator/App/Common
-    ${PROJECT_SOURCE_DIR}/Simulator/App/Common/DataProc
-    ${PROJECT_SOURCE_DIR}/Simulator/App/Pages
-    ${PROJECT_SOURCE_DIR}/Simulator/App/Resource
-    ${PROJECT_SOURCE_DIR}/Simulator/App/Utils
 )

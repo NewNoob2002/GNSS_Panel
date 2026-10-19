@@ -1,4 +1,5 @@
 #include <errno.h>
+#include <stdint.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 
@@ -7,8 +8,9 @@
 //#include "usart.h"
 #endif
 
+// pi-lens-ignore: identifier
+extern char __HeapBase;
 extern char __HeapLimit;
-extern char __StackLimit;
 
 void
 DDL_AssertHandler(const char* file, int line) {
@@ -67,21 +69,26 @@ _read(int file, char* ptr, int len) {
 
 caddr_t
 _sbrk(int incr) {
-    static char* heap_end;
-    char* prev_heap_end;
-
-    if (heap_end == 0) {
-        heap_end = &__HeapLimit;
+    static uintptr_t heap_end;
+    // pi-lens-ignore: identifier
+    const uintptr_t base = (uintptr_t)&__HeapBase;
+    // pi-lens-ignore: identifier
+    const uintptr_t limit = (uintptr_t)&__HeapLimit;
+    if (heap_end == 0U) {
+        heap_end = base;
     }
-
-    prev_heap_end = heap_end;
-    if (heap_end + incr > &__StackLimit) {
+    const uintptr_t previous = heap_end;
+    if ((incr >= 0 && (uintptr_t)incr > limit - heap_end)
+        || (incr < 0 && (uintptr_t)(-(int64_t)incr) > heap_end - base)) {
         errno = ENOMEM;
         return (caddr_t)-1;
     }
-
-    heap_end += incr;
-    return (caddr_t)prev_heap_end;
+    if (incr >= 0) {
+        heap_end += (uintptr_t)incr;
+    } else {
+        heap_end -= (uintptr_t)(-(int64_t)incr);
+    }
+    return (caddr_t)previous;
 }
 
 int

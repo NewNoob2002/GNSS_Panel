@@ -1,25 +1,29 @@
 #pragma once
 #include "../support/support.h"
 #include "mcu_define.h"
+// 产品差异（名称、功能开关、带屏与否）由所选产品目录的 product_config.h 提供，见 Products/<产品>/。
+#include "product_config.h"
 
-#define FIRMWARE_NAME "PRO_Panel"
+#if !defined(PRODUCT_NAME) || !defined(PRODUCT_HAS_DISPLAY) || !defined(PRODUCT_LED_BATTERY_BEFORE_POWER_ON)          \
+    || !defined(PRODUCT_MONITOR_PERIOD_MS)
+#error "product_config.h is missing a required PRODUCT_* setting"
+#endif
+// 功能开关在 #if 中未定义会被当作 0 而静默关闭，带屏产品必须全部显式给出。
+#if PRODUCT_HAS_DISPLAY                                                                                                \
+    && (!defined(PRODUCT_PROTOCOL_WIFI_CONTROL) || !defined(PRODUCT_PROTOCOL_SATELLITE)                                \
+        || !defined(PRODUCT_PAGE_STAR_MAP) || !defined(PRODUCT_PAGE_BATTERY_WARNING)                                   \
+        || !defined(PRODUCT_SHUTDOWN_WIFI_BUTTON) || !defined(PRODUCT_RECORD_SETTINGS))
+#error "display product_config.h is missing a feature switch"
+#endif
+
 #if defined(__has_include)
 #if __has_include("mcu_version_config.h")
 #include "mcu_version_config.h"
 #endif
 #endif
 #ifndef SOFTWARE_VERSION
-#define SOFTWARE_VERSION "V2.4.1"
+#define SOFTWARE_VERSION "V0.0.0"
 #endif
-// 2.0 修复X1pro充电问题， 增加强制关机机制防止卡死无法关机
-// 2.0.1 增加关机充电提示和开机按键提示动画，增加设备信息页面
-// 2.1.0 使用新框架，优化响应速度和UI动画帧率
-// 2.2.1 增加不同关机情况的调试信息，需要使用新boot
-// 2.3.0 优化lvgl画面撕裂的情况
-// 2.3.3 修复电台配置界面显示不对应
-// 2.3.5 修复4G设置不成功
-// 2.4.0 增加静态记录采集设置
-// 2.4.1 增加英俄语言动态切换，完善Simulator独立编译，优化页面定时器和资源释放
 #define SOFTWARE_BUILD_DATE     __DATE__
 #define SOFTWARE_BUILD_TIME     __TIME__
 
@@ -66,6 +70,8 @@
 #define CHARGER_ADC_DETECT_PIN PA1
 
 #define USB_SWITCH_PIN         PB8
+
+#if PRODUCT_HAS_DISPLAY
 /* SPI Class */
 #define SPI_CLASS_3_ENABLE     1
 #if SPI_CLASS_3_ENABLE
@@ -100,3 +106,4 @@
 #define DMA_TX_TRIG_CH         (AOS_DMA1_0)
 
 #define SPI_TX_EVT_SRC         (EVT_SRC_SPI3_SPTI)
+#endif /* PRODUCT_HAS_DISPLAY */

@@ -1,0 +1,13 @@
+CompileFlags:
+  CompilationDatabase: ../build/host-tests
+---
+If:
+  PathMatch: .*\.(cpp|h)
+CompileFlags:
+  Compiler: g++
+  Add: [-x, c++, -std=c++17]
+---
+If:
+  PathMatch: .*\.c
+CompileFlags:
+  Compiler: gcc

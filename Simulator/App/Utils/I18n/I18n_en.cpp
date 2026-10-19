@@ -21,7 +21,7 @@ const char* const texts[] = {
     "GPS",
     "Latitude\nLongitude\nAltitude\n",
     "WIFI",
-    "Mode\nIp",
+    "Mode\nStatus\nIp",
     "Battery",
     "Usage\nVoltage\nTemperature\nStatus",
     "Storage",

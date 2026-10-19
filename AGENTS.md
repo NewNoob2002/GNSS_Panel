@@ -4,19 +4,25 @@
 
 This repository is an HC32F460xE firmware project migrated from Keil MDK toward CMake + `arm-none-eabi-gcc`.
 
-- `CMakeLists.txt` is the top-level orchestrator only: it adds subdirectories and links the final `proj_hc32.elf`.
-- `Platform/` contains CMSIS, startup, linker script, drivers, HAL, support code, and the legacy Keil project.
+One source tree builds three products on the same MCU and board family: `X1` (no screen), `X1Pro` and `XBase` (AMOLED + LVGL). Each CMake configure builds exactly one product, selected by the `PRODUCT` cache variable.
+
+- `CMakeLists.txt` is the top-level orchestrator only: it selects the product, adds subdirectories and links the final image (`<prefix>_<version>.elf`).
+- `Platform/` contains CMSIS, startup, linker script, drivers, the shared HAL (power policy, charger/gauge, LEDs, tick) and support code. It is shared by all products and must not depend on LVGL or `Simulator/App`.
 - `Arduino/` provides the Arduino-compatible core.
-- `Libraries/` contains LVGL, Adafruit components, parser, logger, and device libraries. Each component target owns its include paths.
-- `Simulator/App/` contains LVGL app pages, resources, and app utilities reused by firmware.
-- `USER/` contains the firmware entry point and board-specific application logic.
+- `Libraries/` contains third-party and device libraries. Display-only targets (LVGL, Adafruit, ButtonEvent) are built only when the product has a display; `MultiButton` only for X1.
+- `Shared/Comm/` is the I2C slave transport and panel frame-protocol core used by every product.
+- `Shared/Display/` is shared by X1Pro and XBase: display entry point, display protocol table, display/encoder HAL and the LVGL-backed `operator new`.
+- `Simulator/App/` contains LVGL app pages, resources, and app utilities reused by the display products and the PC simulator.
+- `Products/<Product>/` holds `product.cmake` (version, image prefix, display flag), `product_config.h` (feature switches included through `mcu_config.h`) and product-only sources (X1: entry point, keys, SOC compensation, protocol table).
+
+Put a difference between products in `product_config.h` as a `PRODUCT_*` switch, or in product-only sources, never as a copy of shared code. Shared code reaches product behavior through those switches or weak `HAL::` hooks (`Power_ProductInit/Update`, `Power_AdjustPercent`). See `docs/product_structure.md`.
 
 ## Build, Test, and Development Commands
 
-- `cmake --preset gcc-debug` configures a Debug GCC build and generates `build/gcc-debug/compile_commands.json` for clangd.
-- `cmake --build --preset gcc-debug` builds Debug firmware, plus `.elf`, `.hex`, `.bin`, and `.map`.
-- `cmake --preset gcc-release` configures an optimized Release build.
-- `cmake --build --preset gcc-release` builds the Release firmware image.
+- `cmake --preset <product>-debug` / `<product>-release` configures one product, where `<product>` is `x1`, `x1pro` or `xbase`; build with `cmake --build --preset <same name>`. Outputs go to `build/<preset>/` (`.elf`, `.map`) and `build/<preset>/generated/` (`.hex`, `.bin`).
+- `gcc-debug` / `gcc-release` remain as aliases for X1Pro and provide `build/gcc-debug/compile_commands.json` for clangd; `.clangd` uses `build/x1-debug` for `Products/X1/`.
+- `cmake -S Simulator -B build/simulator -DSIM_PRODUCT=X1Pro|XBase` builds the PC simulator for a display product.
+- `cmake -S tests -B build/host-tests && cmake --build build/host-tests && ctest --test-dir build/host-tests` runs the host regression tests (protocol, transport, power, per-product tables).
 
 The legacy Keil project remains at `Platform/project/proj_hc32.uvprojx` for reference.
 
@@ -28,10 +34,12 @@ Follow existing naming: lower_snake_case for C-style functions such as `slave_i2
 
 ## Testing Guidelines
 
-There is no unit test suite yet. Treat successful GCC builds as the minimum validation:
+Host regression tests live in `tests/` (sanitizers enabled). Treat successful GCC builds of every affected product plus the host tests as the minimum validation:
 
-- `cmake --build --preset gcc-debug`
-- `cmake --build --preset gcc-release`
+- `cmake --build --preset x1-debug`, `x1pro-debug`, `xbase-debug` (and the matching `-release` presets)
+- `ctest --test-dir build/host-tests`
+
+Changes in `Platform/`, `Shared/Comm/` or `Libraries/` affect all three products and must be built for all of them.
 
 For UI or LVGL page changes, also validate the simulator path if it is relevant to the change.
 

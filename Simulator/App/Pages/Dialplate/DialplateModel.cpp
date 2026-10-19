@@ -19,6 +19,7 @@ DialplateModel::Deinit() {
 
 int
 DialplateModel::onEvent(Account* account, Account::EventParam_t* param) {
+    (void)account;
     if (param->event != Account::EVENT_PUB_PUBLISH) {
         return Account::RES_UNSUPPORTED_REQUEST;
     }
@@ -33,10 +34,8 @@ DialplateModel::RecorderCommand(const RecCmd_t cmd) const {
     statInfo.cmd = DataProc::STATUS_BAR_CMD_SET_LABEL_REC;
 
     switch (cmd) {
-        case REC_START: statInfo.param.record_active = true;
-            break;
-        case REC_STOP: statInfo.param.record_active = false;
-            break;
+        case REC_START: statInfo.param.record_active = true; break;
+        case REC_STOP: statInfo.param.record_active = false; break;
         default: break;
     }
 

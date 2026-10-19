@@ -87,10 +87,22 @@ sempCustomReadHeader(SEMP_PARSE_STATE* parse, uint8_t data) {
     auto* scratchPad = static_cast<SEMP_SCRATCH_PAD*>(parse->scratchPad);
 
     if (parse->length >= sizeof(SEMP_CUSTOM_HEADER)) {
-        // The header is complete, read the message data next
-        const auto* header = reinterpret_cast<SEMP_CUSTOM_HEADER*>(parse->buffer);
-        scratchPad->custom.bytesRemaining = header->messageLength;
-        parse->state = sempCustomReadData;
+        const uint16_t payload_length =
+            static_cast<uint16_t>(parse->buffer[12]) | (static_cast<uint16_t>(parse->buffer[13]) << 8);
+        if (parse->buffer[3] != sizeof(SEMP_CUSTOM_HEADER)
+            || static_cast<uint32_t>(sizeof(SEMP_CUSTOM_HEADER)) + payload_length + 4U > parse->bufferLength) {
+            parse->state = sempFirstByte;
+            return false;
+        }
+        scratchPad->custom.bytesRemaining = payload_length;
+        if (payload_length == 0U) {
+            scratchPad->custom.bytesRemaining = 4U;
+            parse->crc ^= 0xFFFFFFFFU;
+            scratchPad->custom.crc = parse->crc;
+            parse->state = sempCustomReadCrc;
+        } else {
+            parse->state = sempCustomReadData;
+        }
     }
     return true;
 }

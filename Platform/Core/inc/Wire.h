@@ -13,6 +13,7 @@
 #define I2C_ADDR_MD_10BIT (0U)
 
 #define I2C_ADDR_MD       (I2C_ADDR_MD_7BIT)
+
 /**
  * @brief I2C peripheral configuration
  */
@@ -20,7 +21,7 @@ struct i2c_peripheral_config_t {
     /**
      * @brief I2C peripheral register base address
      */
-    CM_I2C_TypeDef *register_base;
+    CM_I2C_TypeDef* register_base;
 
     /**
      * @brief I2C peripheral clock id
@@ -39,21 +40,17 @@ struct i2c_peripheral_config_t {
     uint16_t sda_pin_function;
 };
 
-typedef enum slave_work_mode_t {
-    SLAVE_MODE_RX,
-    SLAVE_MODE_TX
-} slave_work_mode_t;
+typedef enum slave_work_mode_t { SLAVE_MODE_RX, SLAVE_MODE_TX } slave_work_mode_t;
 
-class TwoWire
-{
-public:
-    TwoWire(i2c_peripheral_config_t *config, gpio_pin_t scl_pin, gpio_pin_t sda_pin);
+class TwoWire {
+  public:
+    TwoWire(i2c_peripheral_config_t* config, gpio_pin_t scl_pin, gpio_pin_t sda_pin);
 
     int begin(uint32_t clockFreq = 100 * 1000);
     void end();
 
-    void setClock(uint32_t clockFreq)
-    {
+    void
+    setClock(uint32_t clockFreq) {
         this->_clock_frequency = clockFreq;
     }
 
@@ -61,20 +58,22 @@ public:
     uint8_t endTransmission(bool stopBit = true);
 
     size_t write(uint8_t data);
-    size_t write(const uint8_t *data, size_t quantity);
-    size_t requestFrom(uint8_t address, uint8_t register_address, uint8_t *buffer, uint8_t quantity, bool sendStop = true);
+    size_t write(const uint8_t* data, size_t quantity);
+    size_t requestFrom(uint8_t address, uint8_t register_address, uint8_t* buffer, uint8_t quantity,
+                       bool sendStop = true);
 
     bool isDeviceOnline(uint8_t address);
     int scanDeivces(voidFuncPtrWithArg callback = nullptr);
 
-private:
-    i2c_peripheral_config_t *_config = nullptr;
-    bool isInitliased                = false;
+  private:
+    i2c_peripheral_config_t* _config = nullptr;
+    bool isInitliased = false;
 
     gpio_pin_t _scl_pin;
     gpio_pin_t _sda_pin;
 
-    uint32_t _clock_frequency;
+    int32_t _transaction_status = LL_ERR;
+    uint32_t _clock_frequency = 100000U;
 };
 
 extern TwoWire Wire;

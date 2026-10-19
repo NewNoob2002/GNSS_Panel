@@ -3,6 +3,7 @@ Platform/project/*.bin
 build/
 
 # Build outputs and generated reports
+.omx/
 *.axf
 *.elf
 *.hex

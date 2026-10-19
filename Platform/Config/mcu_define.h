@@ -2,23 +2,6 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include "../../Simulator/App/Common/DataProc/DataProc_Def.h"
-
-#define SHARED_MAGIC_LIVE  0x55AAAA55 // 正常运行/请求状态
-#define SHARED_MAGIC_CRASH 0xDEADBEEF // 发生崩溃状态
-
-enum BootCommand {
-    CMD_NORMAL_BOOT = 0x10, // 正常启动
-    CMD_ENTER_IAP = 0x20,   // App 请求进入升级模式
-    CMD_SKIP_DELAY = 0x30   // 跳过 Boot 延时，直接跳 App
-};
-
-typedef struct {
-    uint32_t magic;    // 魔数，用来判断数据是否有效（如 0x55AAAA55）
-    uint32_t command;  // 命令：1-进入升级模式, 2-跳过延时, 3-App崩溃了
-    uint32_t crash_pc; // 记录崩溃时的 PC 地址
-    uint32_t reset_count;
-} SharedData_t;
 
 typedef struct ledState_t {
     uint32_t lastToggleTime;
@@ -105,7 +88,6 @@ typedef struct BatteryInfo_t {
     uint16_t Percent;
     uint16_t Temp;
     uint16_t Voltage;
-    uint16_t LowBatteryCount;
     uint8_t isOverTemp;
     uint8_t ChargerOverTempCount;
     uint8_t ChargerDisable;
@@ -113,6 +95,8 @@ typedef struct BatteryInfo_t {
     uint8_t ChargerPlugCount;
     uint8_t ChargerCurrent;
     uint8_t mp2762_cfg0;
+    bool sample_valid;
+    uint32_t last_sample_ms;
     Charger_Status_t chargeStatus;
 
 } BatteryInfo_t, *pBatteryInfo_t;
@@ -127,6 +111,7 @@ typedef struct Power_Monitor_t {
     bool ShutdownReq;
     bool ShutdownGoing;
     bool ShutdownEnsure;
+    bool ShutdownComplete;
 
     bool Force_ShutDown;
 
@@ -155,9 +140,6 @@ typedef struct RecordInfo_t {
     uint8_t record_op;
     uint8_t record_name[16];
     uint8_t record_change_flag;
-#if defined(__cplusplus)
-    DataProc::Recorder_Cmd_t cmd;
-#endif
 } RecordInfo_t;
 
 typedef struct RadioInfo_t {
@@ -174,7 +156,7 @@ typedef struct WifiInfo_t {
     On_Off_Status_t wifi_on_off_set;
     uint8_t wifi_change_flag;
     char wifi_ssid[16];
-    char wifi_ip[4];
+    uint8_t wifi_ip[4];
 } WifiInfo_t;
 
 typedef struct NtripInfo_t {
@@ -216,7 +198,6 @@ typedef struct MessageDecode_Count_t {
 
 typedef struct SystemInfo_t {
     bool eg25_overtime;
-    uint16_t i2c_communicate_err_count;
     uint16_t i2c__err_count;
     char software_version[16];
     char hardware_version[16];

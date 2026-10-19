@@ -3,22 +3,94 @@
     "configurePresets": [
         {
             "name": "gcc-debug",
-            "displayName": "GCC Debug",
+            "displayName": "GCC Debug (X1Pro)",
             "generator": "Ninja",
             "binaryDir": "${sourceDir}/build/gcc-debug",
             "toolchainFile": "${sourceDir}/cmake/arm-none-eabi-gcc.cmake",
             "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Debug"
+                "CMAKE_BUILD_TYPE": "Debug",
+                "PRODUCT": "X1Pro"
             }
         },
         {
             "name": "gcc-release",
-            "displayName": "GCC Release",
+            "displayName": "GCC Release (X1Pro)",
             "generator": "Ninja",
             "binaryDir": "${sourceDir}/build/gcc-release",
             "toolchainFile": "${sourceDir}/cmake/arm-none-eabi-gcc.cmake",
             "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Release"
+                "CMAKE_BUILD_TYPE": "Release",
+                "PRODUCT": "X1Pro",
+                "CMAKE_COLOR_DIAGNOSTICS": "ON"
+            }
+        },
+        {
+            "name": "x1-debug",
+            "displayName": "X1 Debug",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/x1-debug",
+            "toolchainFile": "${sourceDir}/cmake/arm-none-eabi-gcc.cmake",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "PRODUCT": "X1"
+            }
+        },
+        {
+            "name": "x1-release",
+            "displayName": "X1 Release",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/x1-release",
+            "toolchainFile": "${sourceDir}/cmake/arm-none-eabi-gcc.cmake",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "PRODUCT": "X1",
+                "CMAKE_COLOR_DIAGNOSTICS": "ON"
+            }
+        },
+        {
+            "name": "x1pro-debug",
+            "displayName": "X1Pro Debug",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/x1pro-debug",
+            "toolchainFile": "${sourceDir}/cmake/arm-none-eabi-gcc.cmake",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "PRODUCT": "X1Pro"
+            }
+        },
+        {
+            "name": "x1pro-release",
+            "displayName": "X1Pro Release",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/x1pro-release",
+            "toolchainFile": "${sourceDir}/cmake/arm-none-eabi-gcc.cmake",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "PRODUCT": "X1Pro",
+                "CMAKE_COLOR_DIAGNOSTICS": "ON"
+            }
+        },
+        {
+            "name": "xbase-debug",
+            "displayName": "XBase Debug",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/xbase-debug",
+            "toolchainFile": "${sourceDir}/cmake/arm-none-eabi-gcc.cmake",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "PRODUCT": "XBase"
+            }
+        },
+        {
+            "name": "xbase-release",
+            "displayName": "XBase Release",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/xbase-release",
+            "toolchainFile": "${sourceDir}/cmake/arm-none-eabi-gcc.cmake",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "PRODUCT": "XBase",
+                "CMAKE_COLOR_DIAGNOSTICS": "ON"
             }
         }
     ],
@@ -30,7 +102,30 @@
         {
             "name": "gcc-release",
             "configurePreset": "gcc-release"
+        },
+        {
+            "name": "x1-debug",
+            "configurePreset": "x1-debug"
+        },
+        {
+            "name": "x1-release",
+            "configurePreset": "x1-release"
+        },
+        {
+            "name": "x1pro-debug",
+            "configurePreset": "x1pro-debug"
+        },
+        {
+            "name": "x1pro-release",
+            "configurePreset": "x1pro-release"
+        },
+        {
+            "name": "xbase-debug",
+            "configurePreset": "xbase-debug"
+        },
+        {
+            "name": "xbase-release",
+            "configurePreset": "xbase-release"
         }
     ]
 }
-

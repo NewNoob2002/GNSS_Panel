@@ -5,25 +5,31 @@ typedef Adafruit_ST7789 SCREEN_CLASS;
 
 static SCREEN_CLASS screen(&CONFIG_SCREEN_SPI, CONFIG_SCREEN_CS_PIN, CONFIG_SCREEN_DC_PIN, CONFIG_SCREEN_RST_PIN);
 
-#define SCREEN_BUFFER_SIZE (CONFIG_SCREEN_HOR_RES * CONFIG_SCREEN_VER_RES)
+// 逻辑横屏宽度为 CONFIG_SCREEN_HOR_RES；42 行使 126 行高的整屏正好分 3 块刷新。
+#define SCREEN_BUFFER_ROWS 42U
+#define SCREEN_BUFFER_SIZE (CONFIG_SCREEN_HOR_RES * SCREEN_BUFFER_ROWS)
+static_assert(SCREEN_BUFFER_SIZE * sizeof(lv_color_t) <= UINT16_MAX, "DMA 单次传输计数不能超过 65535");
 
-static lv_disp_drv_t* disp_drv_p = nullptr;
 static lv_disp_drv_t disp_drv; /*Descriptor of a display driver*/
 
-/* Example for 1) */
-//    static lv_disp_draw_buf_t draw_buf_dsc_1;
-//    static lv_color_t buf_1[SCREEN_BUFFER_SIZE] __attribute__((aligned(4)));
-//    lv_disp_draw_buf_init(&draw_buf_dsc_1, buf_1, NULL, SCREEN_BUFFER_SIZE);   /*Initialize the display buffer*/
-/* Example for 2) */
-static lv_disp_draw_buf_t draw_buf_dsc_2;
-static lv_color_t buf_2_1[SCREEN_BUFFER_SIZE / 4] __attribute__((aligned(4))); /*A buffer for 10 rows*/
-static lv_color_t buf_2_2[SCREEN_BUFFER_SIZE / 4] __attribute__((aligned(4))); /*An other buffer for 10 rows*/
+/* LVGL 单缓冲渲染，旋转后的数据放入独立的 DMA 发送缓冲。
+ * LVGL 自带 sw_rotate 会强制“渲染→旋转→发送”串行执行，这里自行旋转，
+ * 让下一块的渲染与上一块的 DMA 发送并行。 */
+static lv_disp_draw_buf_t draw_buf_dsc;
+static lv_color_t draw_buf[SCREEN_BUFFER_SIZE] __attribute__((aligned(4)));
+static lv_color_t tx_buf[SCREEN_BUFFER_SIZE] __attribute__((aligned(4)));
+static volatile bool dma_done;
+static bool flush_active;
+static uint32_t flush_started_ms;
+volatile uint32_t display_dma_timeouts;
 
 void
 spi_dma_trans(void* buf, uint16_t len) {
     if (SPI_CLASS_3_SPI->CR1 & SPI_CR1_SPE) {
         SPI_Cmd(SPI_CLASS_3_SPI, DISABLE);
     }
+    DMA_ChCmd(DMA_UNIT, DMA_TX_CH, DISABLE);
+    DMA_ClearTransCompleteStatus(DMA_UNIT, DMA_FLAG_TC_CH0);
     DMA_SetSrcAddr(DMA_UNIT, DMA_TX_CH, (uint32_t)buf);
     DMA_SetTransCount(DMA_UNIT, DMA_TX_CH, len);
 
@@ -42,24 +48,70 @@ my_rounder_cb(lv_disp_drv_t* disp_drv, lv_area_t* area) {
 }
 
 static void
+wait_flush_idle() {
+    while (flush_active) {
+        lv_port_disp_poll();
+    }
+}
+
+// 与 LVGL 8.3 sw_rotate 的 LV_DISP_ROT_90 映射一致：逻辑 (x, y) -> 物理 (y, H - 1 - x)。
+static void
+rotate_90(const lv_color_t* src, lv_coord_t w, lv_coord_t h, lv_color_t* dst) {
+    for (lv_coord_t y = 0; y < h; ++y) {
+        lv_color_t* out = dst + (uint32_t)(w - 1) * h + y;
+        for (lv_coord_t x = 0; x < w; ++x) {
+            *out = *src++;
+            out -= h;
+        }
+    }
+}
+
+static void
 disp_flush(lv_disp_drv_t* disp_drv, const lv_area_t* area, lv_color_t* color_p) {
-    disp_drv_p = disp_drv;
+    // tx_buf 仍可能被上一块 DMA 读取，必须等发送结束后才能覆写。
+    wait_flush_idle();
 
-    const lv_coord_t w = (area->x2 - area->x1 + 1);
-    const lv_coord_t h = (area->y2 - area->y1 + 1);
-    const uint32_t len = w * h;
+    const lv_coord_t w = lv_area_get_width(area);
+    const lv_coord_t h = lv_area_get_height(area);
+    rotate_90(color_p, w, h, tx_buf);
+    // 数据已复制到 tx_buf，立即归还绘制缓冲，LVGL 可在 DMA 期间渲染下一块。
+    lv_disp_flush_ready(disp_drv);
 
-    screen.setAddrWindow(area->x1, area->y1, w, h);
+    dma_done = false;
+    flush_active = true;
+    flush_started_ms = millis();
+
+    // setAddrWindow() 不操作 CS；上一块结束时 CS 已拉高，必须先选中屏幕，
+    // 否则 CASET/RASET/RAMWR 被丢弃，像素数据会写到旧窗口。
     digitalWrite(CONFIG_SCREEN_CS_PIN, LOW);
+    screen.setAddrWindow(area->y1, screen.height() - 1 - area->x2, h, w);
     digitalWrite(CONFIG_SCREEN_DC_PIN, HIGH);
-    spi_dma_trans((uint16_t*)color_p, len * 2);
+    spi_dma_trans(tx_buf, (uint32_t)w * h * sizeof(lv_color_t));
 }
 
 static void
 DMA_TransCompleteCallback(void) {
     DMA_ClearTransCompleteStatus(DMA_UNIT, DMA_FLAG_TC_CH0);
 
-    lv_disp_flush_ready(disp_drv_p);
+    dma_done = true;
+}
+
+void
+lv_port_disp_poll() {
+    if (!flush_active) {
+        return;
+    }
+    const bool expired = millis() - flush_started_ms >= 100U;
+    // IDLNF 为 1 表示 SPI 仍忙；DMA 结束时最后一个字节可能还在移位。
+    if ((dma_done && (SPI_CLASS_3_SPI->SR & SPI_FLAG_IDLE) == 0U) || expired) {
+        DMA_ChCmd(DMA_UNIT, DMA_TX_CH, DISABLE);
+        SPI_Cmd(SPI_CLASS_3_SPI, DISABLE);
+        digitalWrite(CONFIG_SCREEN_CS_PIN, HIGH);
+        flush_active = false;
+        if (expired) {
+            ++display_dma_timeouts;
+        }
+    }
 }
 
 void
@@ -93,7 +145,7 @@ lv_port_disp_init() {
     NVIC_EnableIRQ(stcIrqSignConfig.enIRQn);
 
     DMA_Cmd(DMA_UNIT, ENABLE);
-    DMA_ChCmd(DMA_UNIT, DMA_TX_CH, ENABLE);
+    DMA_ChCmd(DMA_UNIT, DMA_TX_CH, DISABLE);
 
     screen.init(CONFIG_SCREEN_VER_RES, CONFIG_SCREEN_HOR_RES);
     screen.fillScreen(ST77XX_BLACK);
@@ -101,7 +153,7 @@ lv_port_disp_init() {
     pinMode(CONFIG_SCREEN_BLK_PIN, OUTPUT);
     digitalWrite(CONFIG_SCREEN_BLK_PIN, LOW);
 #endif
-    lv_disp_draw_buf_init(&draw_buf_dsc_2, buf_2_1, buf_2_2, SCREEN_BUFFER_SIZE / 4); /*Initialize the display buffer*/
+    lv_disp_draw_buf_init(&draw_buf_dsc, draw_buf, NULL, SCREEN_BUFFER_SIZE);
     /*-----------------------------------
      * Register the display in LVGL
      *----------------------------------*/
@@ -110,9 +162,9 @@ lv_port_disp_init() {
 
     /*Set up the functions to access to your display*/
 
-    /*Set the resolution of the display*/
-    disp_drv.hor_res = screen.width();
-    disp_drv.ver_res = screen.height();
+    /*面板物理竖屏，LVGL 使用横屏逻辑坐标，旋转在 disp_flush() 中完成。*/
+    disp_drv.hor_res = screen.height();
+    disp_drv.ver_res = screen.width();
 
     /*Used to copy the buffer's content to the display*/
     disp_drv.flush_cb = disp_flush;
@@ -120,12 +172,7 @@ lv_port_disp_init() {
     disp_drv.rounder_cb = my_rounder_cb;
 
     /*Set a display buffer*/
-    disp_drv.draw_buf = &draw_buf_dsc_2;
-
-    disp_drv.sw_rotate = 1;
-    disp_drv.rotated = LV_DISP_ROT_90;
-    /*Required for Example 3)*/
-    //    disp_drv.full_refresh = 1;
+    disp_drv.draw_buf = &draw_buf_dsc;
 
     /*Finally register the driver*/
     lv_disp_drv_register(&disp_drv);
@@ -133,6 +180,8 @@ lv_port_disp_init() {
 
 void
 lv_port_reset() {
+    // 重新初始化会发送命令，必须先让在途的 DMA 帧结束。
+    wait_flush_idle();
     screen.init(CONFIG_SCREEN_VER_RES, CONFIG_SCREEN_HOR_RES);
     screen.fillScreen(ST77XX_BLACK);
 }

@@ -197,18 +197,18 @@ SECTIONS
         __bss_end_ret_ram__ = .;
     } >RET_RAM
 
-    .heap_stack (COPY) :
+    .heap_stack (NOLOAD) :
     {
         . = ALIGN(8);
         __end__ = .;
         PROVIDE(end = .);
         PROVIDE(_end = .);
-        *(.heap*)
+        KEEP(*(.heap*))
         . = ALIGN(8);
         __HeapLimit = .;
 
         __StackLimit = .;
-        *(.stack*)
+        KEEP(*(.stack*))
         . = ALIGN(8);
         __StackTop = .;
     } >RAM
@@ -227,5 +227,7 @@ SECTIONS
     PROVIDE(_Min_Stack_Size = __StackTop - __StackLimit);
 
     __RamEnd = ORIGIN(RAM) + LENGTH(RAM);
+    ASSERT(__HeapLimit > __HeapBase, "C heap reservation is missing")
+    ASSERT(__StackTop > __StackLimit, "stack reservation is missing")
     ASSERT(__StackTop <= __RamEnd, "region RAM overflowed with stack")
 }

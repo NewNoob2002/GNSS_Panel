@@ -1,26 +1,28 @@
 CompileFlags:
+  # Reuse the complete include list from the firmware build, then translate the
+  # target-specific parts to the desktop simulator environment.
+  CompilationDatabase: ../build/gcc-debug
+  Compiler: /usr/bin/g++
   Remove:
     - "--target=*"
-    - "-U__clang__"
+    - "-mcpu=*"
+    - "-mthumb"
+    - "-mfpu=*"
+    - "-mfloat-abi=*"
+    - "-DHC32F460"
     - "-D__PROGRAM_START=*"
-    - "-std:c++17"
-    - "-Ic:\\Users\\gtc\\AppData\\Local\\Keil_v5\\ARM\\ARMCLANG/include"
-    - "-Ic:\\Users\\gtc\\AppData\\Local\\Keil_v5\\ARM\\ARMCLANG/include/libcxx"
-    - "-IC:\\Users\\gtc\\AppData\\Local\\Keil_v5\\ARM\\ARMCLANG/include"
-    - "-IC:\\Users\\gtc\\AppData\\Local\\Keil_v5\\ARM\\ARMCLANG/include/libcxx"
-    - "-IE:\\LLVM\\lib\\clang\\21\\include"
-    - "-D_WIN32"
-    - "-D_WIN64"
-    - "-D_MSC_VER=*"
-    - "-D_MSVC_LANG=*"
-    - "-fms-*"
-    - "-fdelayed-template-parsing"
-  Compiler: /usr/bin/g++
+    - "-I*/Platform"
+    - "-I*/Platform/*"
+    - "-I*/Libraries/lvgl"
+    - "-I*/Libraries/lvgl/*"
   Add:
     - "--target=x86_64-linux-gnu"
-    - "-Wno-implicit-int"
     - "-DLVGL_SIMULATOR"
-  CompilationDatabase: build
+    - "-I../../Simulator"
+    - "-I../../Simulator/lvgl"
+    - "-I../../Simulator/HAL"
+    - "-I../../Platform/Config"
+    - "-I../../Platform/support"
 Index:
   Background: Build
 Diagnostics:

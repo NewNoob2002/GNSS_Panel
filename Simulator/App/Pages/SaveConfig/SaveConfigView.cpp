@@ -23,6 +23,8 @@ GetBrandName() {
     return APP_BRAND_NAME;
 #elif defined(RGK_LOGO_USE)
     return "RGK";
+#elif defined(MIDDLE_LOGO_USE)
+    return "X";
 #else
     return "SINGULARXYZ";
 #endif

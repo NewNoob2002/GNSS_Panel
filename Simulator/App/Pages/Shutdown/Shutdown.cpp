@@ -50,7 +50,12 @@ Shutdown::onViewLoad() {
     lv_anim_set_user_data(&View.ui.shutdown.bar.anim, this);
 
     AttachEvent(View.ui.shutdown.btnPress);
+#if PRODUCT_SHUTDOWN_WIFI_BUTTON
     AttachEvent(View.ui.shutdown.btnWifi);
+#else
+    // 主控不支持由面板开关 Wi-Fi 的产品隐藏该按钮。
+    lv_obj_add_flag(View.ui.shutdown.btnWifi, LV_OBJ_FLAG_HIDDEN);
+#endif
     AttachEvent(View.ui.shutdown.btnLanguage);
 }
 
@@ -65,7 +70,9 @@ Shutdown::onViewWillAppear() {
     lv_group_t* group = lv_group_get_default();
     LV_ASSERT_NULL(group);
     lv_group_add_obj(group, View.ui.shutdown.btnPress);
+#if PRODUCT_SHUTDOWN_WIFI_BUTTON
     lv_group_add_obj(group, View.ui.shutdown.btnWifi);
+#endif
     lv_group_add_obj(group, View.ui.shutdown.btnLanguage);
     lv_group_focus_obj(View.ui.shutdown.btnPress);
 
@@ -128,7 +135,7 @@ Shutdown::AttachEvent(lv_obj_t* obj) {
 void
 Shutdown::Update() {
     View.SetWifiStatus(systemInfo.wifiInfo.wifi_status);
-    if (wifiChangePending && systemInfo.messageDecode.InfoWifi_count != wifiMessageCount) {
+    if (wifiChangePending && systemInfo.wifiInfo.wifi_status == systemInfo.wifiInfo.wifi_on_off_set) {
         wifiChangePending = false;
         wifiLoadingStep = 0;
         View.SetWifiLoading(false);

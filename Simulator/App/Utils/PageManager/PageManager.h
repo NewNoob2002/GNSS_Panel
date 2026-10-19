@@ -96,6 +96,7 @@ class PageManager {
   public:
     explicit PageManager(PageFactory* factory = nullptr);
     ~PageManager();
+    void Clear();
 
     /* Loader */
     bool Install(const char* className, const char* appName);

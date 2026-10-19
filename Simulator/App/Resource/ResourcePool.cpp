@@ -64,6 +64,8 @@ Resource_Init() {
     IMPORT_IMG(NationalFlag_RU);
 #if defined(RGK_LOGO_USE)
     IMPORT_IMG(RGKLogo);
+#elif defined(MIDDLE_LOGO_USE)
+    IMPORT_IMG(MiddleLogo);
 #else
     IMPORT_IMG(startupLogo);
 #endif // RGK_LOGO_USE

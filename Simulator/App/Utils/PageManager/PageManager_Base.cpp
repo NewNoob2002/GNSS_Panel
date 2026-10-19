@@ -24,7 +24,6 @@
 #include "PM_Log.h"
 #include "PageManager.h"
 
-
 #define PM_EMPTY_PAGE_NAME "EMPTY_PAGE"
 
 /**
@@ -43,7 +42,10 @@ PageManager::PageManager(PageFactory* factory)
   * @param
   * @retval None
   */
-PageManager::~PageManager() {
+PageManager::~PageManager() { Clear(); }
+
+void
+PageManager::Clear() {
     SetStackClear();
 
     for (PageBase* base : PagePool) {
@@ -53,6 +55,8 @@ PageManager::~PageManager() {
         delete base;
     }
     PagePool.clear();
+    PagePrev = nullptr;
+    PageCurrent = nullptr;
 }
 
 /**

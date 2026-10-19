@@ -47,7 +47,7 @@ Adafruit_ST7789::Adafruit_ST7789(SPIClass *spiClass, int8_t cs, int8_t dc,
 
 // clang-format off
 
-static const uint8_t PROGMEM
+const uint8_t PROGMEM
   generic_st7789[] =  {                // Init commands for 7789 screens
     9,                              //  9 commands in list:
     ST77XX_SWRESET,   ST_CMD_DELAY, //  1: Software reset, no args, w/delay
@@ -76,7 +76,7 @@ static const uint8_t PROGMEM
     ST77XX_DISPON ,   ST_CMD_DELAY, //  9: Main screen turn on, no args, delay
       10 };                          //    10 ms delay
 
-static const uint8_t PROGMEM
+const uint8_t PROGMEM
   generic_RM690A0[] =  {                // Init commands for 7789 screens
     11,                              
     0x01, ST_CMD_DELAY,

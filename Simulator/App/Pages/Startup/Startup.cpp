@@ -25,9 +25,10 @@ lv_anim_arc_set_value(void* obj, int32_t value) {
         lv_obj_set_style_arc_color(static_cast<lv_obj_t*>(obj), lv_color_hex(0x70e958), LV_PART_MAIN);
 
         if (!systemInfo.powerMonitor.panel_power_on) {
+#if defined(LVGL_SIMULATOR) || defined(_WIN32)
             systemInfo.powerMonitor.panel_power_on = true;
             systemInfo.powerMonitor.pannel_power_on_time = lv_tick_get();
-            instance->pageManager->Push("Pages/HardwareCheck");
+#endif
         }
     }
 }
@@ -117,6 +118,9 @@ Startup::onEvent(lv_event_t* event) {
     }
 
     const lv_event_code_t code = lv_event_get_code(event);
+    if (code != LV_EVENT_PRESSED && code != LV_EVENT_RELEASED && code != LV_EVENT_PRESS_LOST) {
+        return;
+    }
 
     // 获取当前进度，用于断点续传或回退
     const int16_t current_value = lv_arc_get_value(instance->View.ui.arc);

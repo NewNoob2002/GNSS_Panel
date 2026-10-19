@@ -1,0 +1,4 @@
+# X1Pro 产品定义：由顶层 CMakeLists.txt 在 PRODUCT=X1Pro 时包含。
+set(PRODUCT_VERSION 2.4.4)
+set(PRODUCT_IMAGE_PREFIX MCU_PRO)
+set(PRODUCT_HAS_DISPLAY ON)

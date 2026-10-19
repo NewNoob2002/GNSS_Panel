@@ -37,7 +37,7 @@
 */
                 .equ        Stack_Size, 0x00002000
 
-                .section    .stack
+                .section    .stack, "aw", %nobits
                 .align      3
                 .globl      __StackTop
                 .globl      __StackLimit
@@ -56,7 +56,7 @@ __StackTop:
                 .equ        Heap_Size, 0x00002000
 
                 .if         Heap_Size != 0                     /* Heap is provided */
-                .section    .heap
+                .section    .heap, "aw", %nobits
                 .align      3
                 .globl      __HeapBase
                 .globl      __HeapLimit
@@ -354,10 +354,10 @@ SetSRAM3Wait:
                 mov         r1, #0x76
                 str         r1, [r0]
 
+                /* Enable FPU and set VTOR before C++ constructors can use them. */
+                bl          SystemInit
                 /* Call static constructors */
                 bl          __libc_init_array
-                /* Call the clock system initialization function. */
-                bl          SystemInit
                 /* Call the application's entry point. */
                 bl          main
                 bx          lr

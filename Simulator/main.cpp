@@ -13,6 +13,7 @@
 #include <cstdlib>
 #include <cstring>
 #include "App/App.h"
+#include "HAL/HAL.h"
 #include "elog.h"
 
 /*********************
@@ -88,7 +89,9 @@ main(const int argc, char** argv) {
     elog_set_fmt(ELOG_LVL_VERBOSE, ELOG_FMT_ALL & ~(ELOG_FMT_FUNC | ELOG_FMT_T_INFO | ELOG_FMT_P_INFO));
     /* start EasyLogger */
     elog_start();
+    HAL::HAL_Init();
     App_Init();
+    std::atexit(App_Deinit);
     // lv_timer_t *timer = lv_timer_create(timer_callback, 50, nullptr);
     // lv_timer_ready(timer);
     // systemInfo.powerMonitor.batteryInfo.chargeStatus = normalCharge;
@@ -103,17 +106,18 @@ main(const int argc, char** argv) {
     while (true) {
         /* Periodically call the lv_task handler.
          * It could be done in a timer interrupt or an OS task too.*/
+        HAL::HAL_Update();
         App_Update();
         lv_timer_handler();
         // if (systemInfo.powerMonitor.PowerKey_PressCount < 100) {
         //     systemInfo.powerMonitor.PowerKey_PressCount++;
         // }
+        if (systemInfo.powerMonitor.ShutdownComplete) {
+            break;
+        }
 #if defined(_WIN32)
         Sleep(5);
 #else
-        if (systemInfo.powerMonitor.ShutdownEnsure) {
-            break;
-        }
         usleep(5 * 1000);
 #endif
     }

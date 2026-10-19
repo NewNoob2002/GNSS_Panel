@@ -1,5 +1,7 @@
 #include "SPI.h"
-#include "lv_port.h"
+
+// SPI DMA 发送由显示驱动实现（Libraries/lvgl/porting），只有 begin(true) 的实例会调用。
+extern "C" void spi_dma_trans(void* buf, uint16_t len);
 
 SPIClass::SPIClass(CM_SPI_TypeDef* spix, gpio_pin_t sclk, gpio_pin_t mosi, gpio_pin_t miso)
     : SPIx(spix), sclk_pin(sclk), mosi_pin(mosi), miso_pin(miso), enable_dma(false) {

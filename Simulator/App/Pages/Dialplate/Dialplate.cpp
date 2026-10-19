@@ -22,7 +22,9 @@ Dialplate::onViewLoad() {
     AttachEvent(View.ui.btnCont.btnRec);
     AttachEvent(View.ui.btnCont.btnMenu);
     AttachEvent(View.ui.btnCont.btnShutdown);
+#if PRODUCT_PAGE_STAR_MAP
     AttachEvent(View.ui.topInfo.icon_satellite);
+#endif
 }
 
 void
@@ -40,7 +42,9 @@ Dialplate::onViewWillAppear() {
     lv_group_add_obj(group, View.ui.btnCont.btnRec);
     lv_group_add_obj(group, View.ui.btnCont.btnMenu);
     lv_group_add_obj(group, View.ui.btnCont.btnShutdown);
+#if PRODUCT_PAGE_STAR_MAP
     lv_group_add_obj(group, View.ui.topInfo.icon_satellite);
+#endif
 
     if (lastFocus) {
         lv_group_focus_obj(lastFocus);
@@ -152,9 +156,12 @@ Dialplate::onBtnClicked(const lv_obj_t* btn, const lv_event_code_t& code) const 
             pageManager->Push("Pages/Shutdown");
         } else if (btn == View.ui.btnCont.btnRec) {
             pageManager->Push("Pages/RecordConfig");
-        } else if (btn == View.ui.topInfo.icon_satellite) {
+        }
+#if PRODUCT_PAGE_STAR_MAP
+        else if (btn == View.ui.topInfo.icon_satellite) {
             pageManager->Push("Pages/StarMap");
         }
+#endif
     }
 }
 

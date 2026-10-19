@@ -1,0 +1,4 @@
+# XBase 产品定义：由顶层 CMakeLists.txt 在 PRODUCT=XBase 时包含。
+set(PRODUCT_VERSION 2.4.6)
+set(PRODUCT_IMAGE_PREFIX MCU_XBASE)
+set(PRODUCT_HAS_DISPLAY ON)
