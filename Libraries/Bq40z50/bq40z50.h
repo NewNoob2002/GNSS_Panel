@@ -34,6 +34,7 @@ bool bq40z50Begin(TwoWire* i2cBus);
 
 uint8_t bq40z50ReadRegister8(uint8_t reg);
 
+bool bq40z50ReadRegister16Checked(uint8_t reg, uint16_t* value);
 uint16_t bq40z50ReadRegister16(uint8_t reg);
 
 uint16_t bq40z50getTemperatureC();

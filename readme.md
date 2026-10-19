@@ -47,17 +47,17 @@
 
 > ├── Libraries         # 第三方库 (LVGL, 字体, 图像资源)
 
-> ├── Platform          # 硬件抽象层 (HAL) 与驱动定义
+> ├── Platform          # 硬件抽象层 (HAL) 与驱动定义，三产品共用
 
-> ├── Simulator         # PC 端仿真器环境
+> ├── Shared            # 产品共用业务
 
-> ├── USER              # 业务代码
+> │   ├── Comm          # 与主控的 I2C 从机通信、面板帧协议核心（全部产品）
 
-> │   ├── App           # UI 页面逻辑与应用生命周期管理
+> │   └── Display       # 带屏产品入口、显示协议表、显示/编码器 HAL（X1Pro、XBase）
 
-> │   └── Resource      # 静态资源文件
+> ├── Products          # 产品配置与专属代码：X1（无屏）、X1Pro、XBase
 
-> └── main.cpp          # 系统初始化与内核调度入口
+> └── Simulator         # PC 端仿真器环境；Simulator/App 为带屏产品共用的 LVGL 页面
 
 ## 🛠 技术深度 (Technical Stack)
 

@@ -1,6 +1,6 @@
 #ifndef __SYSTEM_H__
 #define __SYSTEM_H__
-#include "lvgl.h"
+#include <stdint.h>
 #ifdef __cplusplus
 extern "C" {
 #endif

@@ -27,6 +27,8 @@ extern "C" {
 
 bool mp2762aBegin(TwoWire* i2cBus);
 
+bool mp2762aReadRegister8Checked(uint8_t reg, uint8_t* value);
+bool mp2762aReadRegister16Checked(uint8_t reg, uint16_t* value);
 uint8_t mp2762aReadRegister8(uint8_t reg);
 
 uint16_t mp2762aReadRegister16(uint8_t reg);
@@ -59,6 +61,7 @@ float mp2762getInputCurrentMa();
 
 void mp2762resetSafetyTimer();
 
+bool mp2762setChargerEnabled(bool enabled, uint8_t* config);
 uint8_t mp2762disableCharger();
 
 uint8_t mp2762enableCharger();

@@ -5,9 +5,16 @@ set(CMAKE_CXX_STANDARD 17) #C17
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-file(STRINGS "${CMAKE_CURRENT_LIST_DIR}/../CMakeLists.txt" PROJECT_VERSION_LINE
-    REGEX "^set\\(PROJECT_VERSION [0-9]+\\.[0-9]+\\.[0-9]+\\)")
-string(REGEX REPLACE "^set\\(PROJECT_VERSION ([0-9]+\\.[0-9]+\\.[0-9]+)\\)" "\\1" PROJECT_VERSION "${PROJECT_VERSION_LINE}")
+# 模拟器只运行带屏产品的界面，默认 X1Pro。
+set(SIM_PRODUCT "X1Pro" CACHE STRING "Display product to simulate: X1Pro or XBase")
+set_property(CACHE SIM_PRODUCT PROPERTY STRINGS X1Pro XBase)
+if(NOT SIM_PRODUCT MATCHES "^(X1Pro|XBase)$")
+    message(FATAL_ERROR "SIM_PRODUCT must be X1Pro or XBase")
+endif()
+set(SIM_PRODUCT_DIR ${CMAKE_CURRENT_LIST_DIR}/../Products/${SIM_PRODUCT})
+file(STRINGS "${SIM_PRODUCT_DIR}/product.cmake" PROJECT_VERSION_LINE
+    REGEX "^set\\(PRODUCT_VERSION [0-9.]+\\)")
+string(REGEX REPLACE "^set\\(PRODUCT_VERSION ([0-9.]+)\\)" "\\1" PROJECT_VERSION "${PROJECT_VERSION_LINE}")
 configure_file(
     ${CMAKE_CURRENT_LIST_DIR}/../Platform/Config/mcu_version_config.h.in
     ${CMAKE_CURRENT_BINARY_DIR}/generated/Platform/Config/mcu_version_config.h
@@ -44,6 +51,7 @@ include_directories(
     ${CMAKE_CURRENT_BINARY_DIR}/generated/Platform/Config
     ${CMAKE_CURRENT_LIST_DIR}/../Platform/support
     ${CMAKE_CURRENT_LIST_DIR}/../Platform/Config
+    ${SIM_PRODUCT_DIR}
     ${CMAKE_CURRENT_LIST_DIR}/HAL
     ${CMAKE_CURRENT_LIST_DIR}/../Libraries/easylogger/inc
 )

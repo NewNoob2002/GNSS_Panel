@@ -1,5 +1,4 @@
 #include "HAL.h"
-#include "lvgl.h"
 #include "mcu_define.h"
 
 typedef struct {
@@ -70,9 +69,9 @@ HardFault_HandlerC(uint32_t* stack_frame, uint32_t exc_return) {
                       (unsigned long)g_hardfault_info.stacked.r0, (unsigned long)g_hardfault_info.stacked.r1,
                       (unsigned long)g_hardfault_info.stacked.r2, (unsigned long)g_hardfault_info.stacked.r3,
                       (unsigned long)g_hardfault_info.stacked.r12);
-    CORE_DEBUG_PRINTF("MSP=0x%08lx PSP=0x%08lx CONTROL=0x%08lx IPSR=0x%08lx\r\n",
-                      (unsigned long)g_hardfault_info.msp, (unsigned long)g_hardfault_info.psp,
-                      (unsigned long)g_hardfault_info.control, (unsigned long)g_hardfault_info.ipsr);
+    CORE_DEBUG_PRINTF("MSP=0x%08lx PSP=0x%08lx CONTROL=0x%08lx IPSR=0x%08lx\r\n", (unsigned long)g_hardfault_info.msp,
+                      (unsigned long)g_hardfault_info.psp, (unsigned long)g_hardfault_info.control,
+                      (unsigned long)g_hardfault_info.ipsr);
     CORE_DEBUG_PRINTF("HFSR=0x%08lx CFSR=0x%08lx DFSR=0x%08lx AFSR=0x%08lx SHCSR=0x%08lx\r\n",
                       (unsigned long)g_hardfault_info.hfsr, (unsigned long)g_hardfault_info.cfsr,
                       (unsigned long)g_hardfault_info.dfsr, (unsigned long)g_hardfault_info.afsr,
@@ -205,6 +204,4 @@ HardFault_Handler(void) {
 void
 SysTick_Handler() {
     HAL_IncTick();
-    lv_tick_inc(1);
-    systemInfo.i2c_communicate_err_count++;
 }

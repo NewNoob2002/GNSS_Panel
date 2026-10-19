@@ -36,6 +36,22 @@ extern "C" {
 
 typedef enum { SLAVE_RX = 0, SLAVE_RX_DONE, SLAVE_TX, SLAVE_TX_DONE } SLAVE_I2C_STATE;
 
+typedef struct {
+    uint32_t rx_bytes;
+    uint32_t tx_bytes;
+    uint32_t complete_reads;
+    uint32_t partial_reads;
+    uint32_t response_busy;
+    uint32_t rx_overflow;
+    uint32_t arbitration_lost;
+    uint32_t parser_timeouts;
+    uint32_t recoveries;
+    uint32_t init_failures;
+    uint32_t last_recovery_sr;
+} SlaveI2cDiagnostics;
+
+extern volatile SlaveI2cDiagnostics slave_i2c_diagnostics;
+
 int32_t slave_i2c_init();
 void slave_i2c_update();
 

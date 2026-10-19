@@ -21,10 +21,18 @@ RecordConfig::onViewLoad() {
     Model.Init();
     View.Create(_root);
     //lv_obj_fade_in(_root, 300, 0);
+#if PRODUCT_RECORD_SETTINGS
     AttachEvent(View.ui.roller.left_roller.btnUp);
     AttachEvent(View.ui.roller.left_roller.btnDown);
     AttachEvent(View.ui.roller.right_roller.btnUp);
     AttachEvent(View.ui.roller.right_roller.btnDown);
+#else
+    // 录制类型/间隔不可调的产品只显示当前值。
+    lv_obj_clear_flag(View.ui.roller.left_roller.btnUp, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_clear_flag(View.ui.roller.left_roller.btnDown, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_clear_flag(View.ui.roller.right_roller.btnUp, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_clear_flag(View.ui.roller.right_roller.btnDown, LV_OBJ_FLAG_CLICKABLE);
+#endif
 
     AttachEvent(View.ui.btnCont.btnRecord);
     AttachEvent(View.ui.btnCont.btnReturn);
@@ -45,10 +53,12 @@ RecordConfig::onViewWillAppear() {
 
     lv_group_set_wrap(group, true);
 
+#if PRODUCT_RECORD_SETTINGS
     lv_group_add_obj(group, View.ui.roller.left_roller.btnUp);
     lv_group_add_obj(group, View.ui.roller.left_roller.btnDown);
     lv_group_add_obj(group, View.ui.roller.right_roller.btnUp);
     lv_group_add_obj(group, View.ui.roller.right_roller.btnDown);
+#endif
 
     lv_group_add_obj(group, View.ui.btnCont.btnRecord);
     lv_group_add_obj(group, View.ui.btnCont.btnReturn);

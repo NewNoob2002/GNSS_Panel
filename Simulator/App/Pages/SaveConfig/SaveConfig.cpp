@@ -4,29 +4,6 @@
 
 using namespace Page;
 
-static void
-syncbar_timer_callback(lv_timer_t* timer) {
-    const auto* instance = static_cast<SaveConfig*>(timer->user_data);
-    LV_ASSERT_NULL(instance);
-    memset(&systemInfo, 0, sizeof(systemInfo));
-#if defined(LVGL_SIMULATOR) || defined(_WIN32)
-    LV_LOG_USER("Shutdonw done\n");
-    systemInfo.powerMonitor.ShutdownEnsure = true;
-    return;
-#else
-    NVIC_SystemReset();
-#endif
-}
-
-static void
-syncbar_anim_done_callback(lv_anim_t* a) {
-    auto* instance = static_cast<SaveConfig*>(lv_anim_get_user_data(a));
-    LV_ASSERT_NULL(instance);
-    HAL::Power_Shutdown(true);
-    lv_timer_t* timer = lv_timer_create(syncbar_timer_callback, 1000, instance);
-    lv_timer_set_repeat_count(timer, 1);
-}
-
 void
 SaveConfig::onCustomAttrConfig() {
     LV_LOG_USER("onCustomAttrConfig");
@@ -40,8 +17,6 @@ SaveConfig::onViewLoad() {
     View.Create(_root);
     Model.SetStatusBarDisappear(false);
     UpdatePowerOffCauseText();
-    lv_anim_set_deleted_cb(&View.ui.sync.bar.anim, syncbar_anim_done_callback);
-    lv_anim_set_user_data(&View.ui.sync.bar.anim, this);
     lv_anim_timeline_start(View.ui.anim_timeline);
     lv_anim_start(&View.ui.sync.bar.anim);
 }

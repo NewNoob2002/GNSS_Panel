@@ -1,4 +1,5 @@
 #include "delay.h"
+#include "HAL.h"
 #include "dwt.h"
 #include "yield.h"
 
@@ -13,7 +14,21 @@ millis(void) {
 // Interrupt-compatible version of micros
 uint32_t
 micros(void) {
-    return 0;
+    // pi-lens-ignore: identifier
+    const uint32_t irq_state = __get_PRIMASK();
+    // pi-lens-ignore: identifier
+    __disable_irq();
+    uint32_t tick = HAL_GetTick();
+    uint32_t remaining = SysTick->VAL;
+    const uint32_t period = SysTick->LOAD + 1U;
+    if (SCB->ICSR & SCB_ICSR_PENDSTSET_Msk) {
+        tick += HAL_GetTickFreq();
+        remaining = SysTick->VAL;
+    }
+    // pi-lens-ignore: identifier
+    __set_PRIMASK(irq_state);
+    const uint32_t cycles_per_us = SystemCoreClock / 1000000U;
+    return tick * 1000U + (cycles_per_us ? (period - remaining) / cycles_per_us : 0U);
 }
 
 void
@@ -30,10 +45,14 @@ void
 delay_us(uint32_t us) {
 #if defined(DWT_BASE)
     if (dwt_getStatus()) {
-        int32_t start = dwt_getCycles();
-        int32_t cycles = us * (SystemCoreClock / 1000000);
-        while ((int32_t)dwt_getCycles() - start < cycles)
-            ;
+        const uint32_t cycles_per_us = SystemCoreClock / 1000000U;
+        while (us != 0U) {
+            const uint32_t chunk = us > 1000000U ? 1000000U : us;
+            const uint32_t start = dwt_getCycles();
+            const uint32_t cycles = chunk * cycles_per_us;
+            while ((uint32_t)(dwt_getCycles() - start) < cycles) {}
+            us -= chunk;
+        }
     } else {
         /* 2 NO OPERATION instructions */
         __asm volatile(" nop      \n\t"

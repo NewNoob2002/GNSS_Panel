@@ -1,74 +1,34 @@
-#include "message_decode.h"
-#include <cstdint>
-#include <cstdio>
+#include "display_protocol.h"
+#include <cmath>
 #include <cstring>
 #include "core_debug.h"
 #include "mcu_define.h"
+#include "product_config.h"
 
-static uint32_t
-calculate_crc(const char* msg, unsigned int len) {
-    if (msg == nullptr || len == 0) {
-        return 0;
-    }
-    unsigned long crc = 0xFFFFFFFF;
-    for (unsigned int n = 0; n < len; n++) {
-        crc = semp_crc32Table[(crc ^ msg[n]) & 0xff] ^ (crc >> 8);
-    }
-    return crc ^ 0xFFFFFFFF;
+/* 响应编码时的字段快照：完整读出后与当前值比较，期间有新变化则保留变更标志。 */
+static struct {
+    RadioInfo_t radio;
+    WorkMode_t workMode;
+    NtripInfo_t ntrip;
+    RecordInfo_t record;
+    WifiInfo_t wifi;
+    uint8_t poweroffFlag;
+} response_snapshot;
+
+static uint8_t pending_reset;
+static uint8_t pending_shutdown_confirmation;
+
+static bool
+valid_position(uint8_t value) {
+    return value == 0U || value == 1U || value == 4U || value == 5U || value == 7U;
 }
-
-static uint16_t
-read_u16_le(const uint8_t* data) {
-    return static_cast<uint16_t>(data[0] | (static_cast<uint16_t>(data[1]) << 8));
-}
-
-static uint16_t
-request_message_id(const SEMP_PARSE_STATE* parse) {
-    return read_u16_le(&parse->buffer[NM_PROTOCOL_MSG_ID_INDEX_L]);
-}
-
-static uint16_t
-request_payload_length(const SEMP_PARSE_STATE* parse) {
-    return read_u16_le(&parse->buffer[NM_PROTOCOL_MSG_LEN_INDEX_L]);
-}
-
-static void
-write_u16_le(uint8_t* data, const uint16_t value) {
-    data[0] = static_cast<uint8_t>(value & 0x00FF);
-    data[1] = static_cast<uint8_t>((value >> 8) & 0x00FF);
-}
-
-static void
-write_crc(uint8_t* msg, const uint16_t crcIndex) {
-    const uint32_t crc = calculate_crc(reinterpret_cast<const char*>(msg), crcIndex);
-    msg[crcIndex + 0] = static_cast<uint8_t>(crc & 0x000000FF);
-    msg[crcIndex + 1] = static_cast<uint8_t>((crc >> 8) & 0x000000FF);
-    msg[crcIndex + 2] = static_cast<uint8_t>((crc >> 16) & 0x000000FF);
-    msg[crcIndex + 3] = static_cast<uint8_t>((crc >> 24) & 0x000000FF);
-}
-
-static void
-write_success_payload(uint8_t* msg) {
-    msg[NM_PROTOCOL_HEADER_LEN + 0] = 1;
-    msg[NM_PROTOCOL_HEADER_LEN + 1] = 0;
-}
-
-typedef void (*PacketHandler)(const SEMP_PARSE_STATE* parse, uint8_t* msg);
-
-typedef struct {
-    uint16_t messageId;
-    uint16_t minRequestPayloadLength;
-    uint16_t responsePayloadLength;
-    uint8_t responseType;
-    PacketHandler handler;
-} PacketDescriptor;
 
 static void
 fill_info1_response(const SEMP_PARSE_STATE* parse, uint8_t* msg) {
     (void)parse;
     systemInfo.messageDecode.Info1_count++;
-    memcpy(&msg[NM_PROTOCOL_HEADER_LEN + 0], systemInfo.hardware_version, strlen(systemInfo.hardware_version));
-    memcpy(&msg[NM_PROTOCOL_HEADER_LEN + 8], systemInfo.software_version, strlen(systemInfo.software_version));
+    memcpy(&msg[NM_PROTOCOL_HEADER_LEN + 0], systemInfo.hardware_version, strnlen(systemInfo.hardware_version, 8));
+    memcpy(&msg[NM_PROTOCOL_HEADER_LEN + 8], systemInfo.software_version, strnlen(systemInfo.software_version, 10));
     memcpy(&msg[NM_PROTOCOL_HEADER_LEN + 18], &systemInfo.powerMonitor.batteryInfo.Percent, 2);
     memcpy(&msg[NM_PROTOCOL_HEADER_LEN + 20], &systemInfo.powerMonitor.batteryInfo.Temp, 2);
     memcpy(&msg[NM_PROTOCOL_HEADER_LEN + 22], &systemInfo.powerMonitor.batteryInfo.Voltage, 2);
@@ -83,7 +43,13 @@ fill_info2_response(const SEMP_PARSE_STATE* parse, uint8_t* msg) {
     msg[NM_PROTOCOL_HEADER_LEN + 2] = systemInfo.recordInfo.record_status;
     msg[NM_PROTOCOL_HEADER_LEN + 3] = systemInfo.recordInfo.record_op;
     msg[NM_PROTOCOL_HEADER_LEN + 4] = systemInfo.powerMonitor.batteryInfo.chargeStatus != notCharge;
-    if (systemInfo.powerMonitor.poweroff_flag == 1) {
+    response_snapshot.poweroffFlag = systemInfo.powerMonitor.poweroff_flag;
+}
+
+// 主控完整读到关机请求即视为确认（旧版 X1Pro/XBase 语义），与 0x05 确认二选一均可。
+static void
+info2_read_complete() {
+    if (response_snapshot.poweroffFlag) {
         systemInfo.powerMonitor.poweroff_flag = 0;
         systemInfo.powerMonitor.ShutdownEnsure = true;
         CORE_DEBUG_PRINTF("Shutdown Sync");
@@ -109,8 +75,18 @@ fill_info3_response(const SEMP_PARSE_STATE* parse, uint8_t* msg) {
     msg[NM_PROTOCOL_HEADER_LEN + 84] = systemInfo.radioInfo.radio_mode;
     msg[NM_PROTOCOL_HEADER_LEN + 85] = systemInfo.radioInfo.radio_protocol;
     msg[NM_PROTOCOL_HEADER_LEN + 86] = systemInfo.radioInfo.radio_channel;
+    response_snapshot.radio = systemInfo.radioInfo;
+    response_snapshot.workMode = systemInfo.work_mode;
+    response_snapshot.ntrip = systemInfo.ntripInfo;
+}
 
-    systemInfo.radioInfo.radio_change_flag = 0;
+static void
+info3_read_complete() {
+    if (memcmp(&systemInfo.radioInfo, &response_snapshot.radio, sizeof(RadioInfo_t)) == 0
+        && systemInfo.work_mode == response_snapshot.workMode
+        && memcmp(&systemInfo.ntripInfo, &response_snapshot.ntrip, sizeof(NtripInfo_t)) == 0) {
+        systemInfo.radioInfo.radio_change_flag = 0;
+    }
 }
 
 static void
@@ -124,27 +100,76 @@ fill_info4_response(const SEMP_PARSE_STATE* parse, uint8_t* msg) {
     msg[NM_PROTOCOL_HEADER_LEN + 24] = systemInfo.recordInfo.record_type;
     msg[NM_PROTOCOL_HEADER_LEN + 25] = systemInfo.recordInfo.record_interval;
     msg[NM_PROTOCOL_HEADER_LEN + 26] = systemInfo.recordInfo.record_change_flag;
-    if (systemInfo.recordInfo.record_change_flag) {
+    response_snapshot.record = systemInfo.recordInfo;
+}
+
+static void
+info4_read_complete() {
+    if (memcmp(&systemInfo.recordInfo, &response_snapshot.record, sizeof(RecordInfo_t)) == 0) {
         systemInfo.recordInfo.record_change_flag = 0;
-    }
-    if (systemInfo.recordInfo.record_op) {
         systemInfo.recordInfo.record_op = 0;
     }
 }
 
+#if PRODUCT_PROTOCOL_WIFI_CONTROL
 static void
 fill_wifi_info_response(const SEMP_PARSE_STATE* parse, uint8_t* msg) {
     (void)parse;
     systemInfo.messageDecode.InfoWifi_count++;
     msg[NM_PROTOCOL_HEADER_LEN + 0] = systemInfo.wifiInfo.wifi_on_off_set;
     msg[NM_PROTOCOL_HEADER_LEN + 3] = systemInfo.wifiInfo.wifi_change_flag;
-    systemInfo.wifiInfo.wifi_change_flag = 0;
+    response_snapshot.wifi = systemInfo.wifiInfo;
+}
+
+static void
+wifi_info_read_complete() {
+    if (memcmp(&systemInfo.wifiInfo, &response_snapshot.wifi, sizeof(WifiInfo_t)) == 0) {
+        systemInfo.wifiInfo.wifi_change_flag = 0;
+    }
+}
+#endif
+
+static bool
+validate_flag(const uint8_t* payload, uint16_t payloadLength) {
+    (void)payloadLength;
+    return payload[0] <= 1U;
 }
 
 static void
 handle_reset_request(const SEMP_PARSE_STATE* parse, uint8_t* msg) {
-    systemInfo.powerMonitor.reset_flag = parse->buffer[NM_PROTOCOL_HEADER_LEN];
-    write_success_payload(msg);
+    pending_reset = parse->buffer[NM_PROTOCOL_HEADER_LEN];
+    CORE_DEBUG_PRINTF("Reset Panel request: %u", pending_reset);
+    panel_write_success_payload(msg);
+}
+
+static void
+reset_read_complete() {
+    systemInfo.powerMonitor.reset_flag = pending_reset;
+}
+
+static void
+handle_shutdown_confirmation(const SEMP_PARSE_STATE* parse, uint8_t* msg) {
+    pending_shutdown_confirmation = parse->buffer[NM_PROTOCOL_HEADER_LEN];
+    msg[NM_PROTOCOL_HEADER_LEN] = pending_shutdown_confirmation;
+}
+
+static void
+shutdown_confirmation_read_complete() {
+    if (pending_shutdown_confirmation) {
+        systemInfo.powerMonitor.poweroff_flag = 0;
+        systemInfo.powerMonitor.ShutdownEnsure = true;
+        if (!systemInfo.powerMonitor.ShutdownGoing) {
+            systemInfo.powerMonitor.LinuxPowerOff = true;
+        }
+    }
+}
+
+static bool
+validate_set1(const uint8_t* payload, uint16_t payloadLength) {
+    (void)payloadLength;
+    return payload[0] <= autobase_mode && valid_position(payload[2]) && payload[3] <= 1U && payload[4] <= 1U
+           && payload[5] <= 1U && payload[6] <= 1U && payload[8] <= 1U && payload[84] <= radio_mode_bridge
+           && payload[87] <= 1U;
 }
 
 static void
@@ -182,7 +207,18 @@ handle_set1_request(const SEMP_PARSE_STATE* parse, uint8_t* msg) {
             systemInfo.powerMonitor.LinuxPowerOff = true;
         }
     }
-    write_success_payload(msg);
+    panel_write_success_payload(msg);
+}
+
+static bool
+validate_set3(const uint8_t* payload, uint16_t payloadLength) {
+    (void)payloadLength;
+    double longitude, latitude, altitude;
+    memcpy(&longitude, payload + 4, sizeof(longitude));
+    memcpy(&latitude, payload + 12, sizeof(latitude));
+    memcpy(&altitude, payload + 20, sizeof(altitude));
+    return valid_position(payload[0]) && std::isfinite(longitude) && longitude >= -180.0 && longitude <= 180.0
+           && std::isfinite(latitude) && latitude >= -90.0 && latitude <= 90.0 && std::isfinite(altitude);
 }
 
 static void
@@ -193,7 +229,15 @@ handle_set3_request(const SEMP_PARSE_STATE* parse, uint8_t* msg) {
     memcpy(&systemInfo.positionInfo.coordinate_lon, &parse->buffer[NM_PROTOCOL_HEADER_LEN + 4], 8);
     memcpy(&systemInfo.positionInfo.coordinate_lat, &parse->buffer[NM_PROTOCOL_HEADER_LEN + 12], 8);
     memcpy(&systemInfo.positionInfo.coordinate_alt, &parse->buffer[NM_PROTOCOL_HEADER_LEN + 20], 8);
-    write_success_payload(msg);
+    panel_write_success_payload(msg);
+}
+
+static bool
+validate_set6(const uint8_t* payload, uint16_t payloadLength) {
+    (void)payloadLength;
+    float space;
+    memcpy(&space, payload + 4, sizeof(space));
+    return payload[0] <= 1U && std::isfinite(space) && space >= 0.0f;
 }
 
 static void
@@ -207,21 +251,29 @@ handle_set6_request(const SEMP_PARSE_STATE* parse, uint8_t* msg) {
         systemInfo.recordInfo.record_interval = parse->buffer[NM_PROTOCOL_HEADER_LEN + 25];
         systemInfo.recordInfo.record_change_flag = parse->buffer[NM_PROTOCOL_HEADER_LEN + 26];
     }
-    write_success_payload(msg);
+    panel_write_success_payload(msg);
+}
+
+static bool
+validate_set_wifi(const uint8_t* payload, uint16_t payloadLength) {
+    (void)payloadLength;
+    return payload[0] <= 1U && payload[1] <= 1U;
 }
 
 static void
 handle_set_wifi_request(const SEMP_PARSE_STATE* parse, uint8_t* msg) {
     systemInfo.messageDecode.SetWifi_count++;
+    // 无 Wi-Fi 控制的产品不会置位 wifi_change_flag，状态总是直接同步。
     if (systemInfo.wifiInfo.wifi_change_flag == 0) {
         systemInfo.wifiInfo.wifi_status = static_cast<On_Off_Status_t>(parse->buffer[NM_PROTOCOL_HEADER_LEN + 0]);
         systemInfo.wifiInfo.wifi_mode = parse->buffer[NM_PROTOCOL_HEADER_LEN + 1];
         memcpy(&systemInfo.wifiInfo.wifi_ip, &parse->buffer[NM_PROTOCOL_HEADER_LEN + 4], 4);
         memcpy(&systemInfo.wifiInfo.wifi_ssid, &parse->buffer[NM_PROTOCOL_HEADER_LEN + 8], 16);
     }
-    write_success_payload(msg);
+    panel_write_success_payload(msg);
 }
 
+#if PRODUCT_PROTOCOL_SATELLITE
 static void
 handle_set_satellite_request(const SEMP_PARSE_STATE* parse, uint8_t* msg) {
     systemInfo.messageDecode.SetSatellite_count++;
@@ -233,109 +285,39 @@ handle_set_satellite_request(const SEMP_PARSE_STATE* parse, uint8_t* msg) {
     systemInfo.starMapInfo.numberQZSS = parse->buffer[NM_PROTOCOL_HEADER_LEN + 5];
     systemInfo.starMapInfo.numberIRNSS = parse->buffer[NM_PROTOCOL_HEADER_LEN + 6];
     systemInfo.starMapInfo.syncStatus = true;
-    write_success_payload(msg);
+    panel_write_success_payload(msg);
 }
+#endif
 
-static const PacketDescriptor packetTable[] = {
-    {NM_PANEL_INFO1_ID, 0, NM_PROTOCOL_INFO1_MSG_LEN, NM_MSG_QUERY_RES_TYPE, fill_info1_response},
-    {NM_PANEL_INFO2_ID, 0, NM_PROTOCOL_INFO2_MSG_LEN, NM_MSG_QUERY_RES_TYPE, fill_info2_response},
-    {NM_PANEL_INFO3_ID, 0, NM_PROTOCOL_INFO3_MSG_LEN, NM_MSG_QUERY_RES_TYPE, fill_info3_response},
-    {NM_PANEL_INFO4_ID, 0, NM_PROTOCOL_INFO4_MSG_LEN, NM_MSG_QUERY_RES_TYPE, fill_info4_response},
-    {NM_PANEL_WIFI_SET_ID, 0, NM_PROTOCOL_WIFI_SET_MSG_LEN, NM_MSG_QUERY_RES_TYPE, fill_wifi_info_response},
-    {NM_PANEL_RST_ID, 1, NM_PROTOCOL_RST_RESP_MSG_LEN, NM_MSG_SET_RES_TYPE, handle_reset_request},
-    {NM_PANEL_SET1_ID, 88, NM_PROTOCOL_SET_MSG_LEN, NM_MSG_SET_RES_TYPE, handle_set1_request},
-    {NM_PANEL_SET3_ID, 28, NM_PROTOCOL_SET_MSG_LEN, NM_MSG_SET_RES_TYPE, handle_set3_request},
-    {NM_PANEL_SET6_ID, 27, NM_PROTOCOL_SET_MSG_LEN, NM_MSG_SET_RES_TYPE, handle_set6_request},
-    {NM_PANEL_SET_WIFI_ID, 24, NM_PROTOCOL_SET_MSG_LEN, NM_MSG_SET_RES_TYPE, handle_set_wifi_request},
-    {NM_PANEL_SET_SATELLITE_ID, 7, NM_PROTOCOL_SET_MSG_LEN, NM_MSG_SET_RES_TYPE, handle_set_satellite_request},
+static const PanelPacket packetTable[] = {
+    {NM_PANEL_INFO1_ID, 0, NM_PROTOCOL_INFO1_MSG_LEN, NM_MSG_QUERY_RES_TYPE, fill_info1_response, nullptr, nullptr},
+    {NM_PANEL_INFO2_ID, 0, NM_PROTOCOL_INFO2_MSG_LEN, NM_MSG_QUERY_RES_TYPE, fill_info2_response, nullptr,
+     info2_read_complete},
+    {NM_PANEL_INFO3_ID, 0, NM_PROTOCOL_INFO3_MSG_LEN, NM_MSG_QUERY_RES_TYPE, fill_info3_response, nullptr,
+     info3_read_complete},
+    {NM_PANEL_INFO4_ID, 0, NM_PROTOCOL_INFO4_MSG_LEN, NM_MSG_QUERY_RES_TYPE, fill_info4_response, nullptr,
+     info4_read_complete},
+#if PRODUCT_PROTOCOL_WIFI_CONTROL
+    {NM_PANEL_WIFI_SET_ID, 0, NM_PROTOCOL_WIFI_SET_MSG_LEN, NM_MSG_QUERY_RES_TYPE, fill_wifi_info_response, nullptr,
+     wifi_info_read_complete},
+#endif
+    {NM_PANEL_SHUTDOWN_CONFIRM_ID, 1, NM_PROTOCOL_SET_MSG_LEN, NM_MSG_SET_RES_TYPE, handle_shutdown_confirmation,
+     validate_flag, shutdown_confirmation_read_complete},
+    {NM_PANEL_RST_ID, 1, NM_PROTOCOL_RST_RESP_MSG_LEN, NM_MSG_SET_RES_TYPE, handle_reset_request, validate_flag,
+     reset_read_complete},
+    {NM_PANEL_SET1_ID, 88, NM_PROTOCOL_SET_MSG_LEN, NM_MSG_SET_RES_TYPE, handle_set1_request, validate_set1, nullptr},
+    {NM_PANEL_SET3_ID, 28, NM_PROTOCOL_SET_MSG_LEN, NM_MSG_SET_RES_TYPE, handle_set3_request, validate_set3, nullptr},
+    {NM_PANEL_SET6_ID, 27, NM_PROTOCOL_SET_MSG_LEN, NM_MSG_SET_RES_TYPE, handle_set6_request, validate_set6, nullptr},
+    {NM_PANEL_SET_WIFI_ID, 24, NM_PROTOCOL_SET_MSG_LEN, NM_MSG_SET_RES_TYPE, handle_set_wifi_request, validate_set_wifi,
+     nullptr},
+#if PRODUCT_PROTOCOL_SATELLITE
+    {NM_PANEL_SET_SATELLITE_ID, 7, NM_PROTOCOL_SET_MSG_LEN, NM_MSG_SET_RES_TYPE, handle_set_satellite_request, nullptr,
+     nullptr},
+#endif
 };
 
-static const PacketDescriptor*
-find_packet_descriptor(const uint16_t messageId) {
-    for (unsigned int i = 0; i < (sizeof(packetTable) / sizeof(packetTable[0])); i++) {
-        if (packetTable[i].messageId == messageId) {
-            return &packetTable[i];
-        }
-    }
-    return nullptr;
-}
-
-static bool
-validate_request(const SEMP_PARSE_STATE* parse, const PacketDescriptor* descriptor) {
-    if (parse->length < (NM_PROTOCOL_HEADER_LEN + NM_PROTOCOL_CRC_LEN)) {
-        return false;
-    }
-
-    const uint16_t payloadLength = request_payload_length(parse);
-    if (payloadLength < descriptor->minRequestPayloadLength) {
-        return false;
-    }
-
-    const uint32_t expectedLength = static_cast<uint32_t>(NM_PROTOCOL_HEADER_LEN) + payloadLength + NM_PROTOCOL_CRC_LEN;
-    return parse->length >= expectedLength;
-}
-
-static int
-encode_response(const SEMP_PARSE_STATE* parse, const PacketDescriptor* descriptor, uint8_t* txBuffer,
-                const uint16_t txBufferSize) {
-    const uint16_t packetLength =
-        static_cast<uint16_t>(NM_PROTOCOL_HEADER_LEN + descriptor->responsePayloadLength + NM_PROTOCOL_CRC_LEN);
-    if (packetLength > txBufferSize) {
-        CORE_DEBUG_PRINTF("response too long: id=0x%04X, len=%u, buffer=%u", descriptor->messageId, packetLength,
-                          txBufferSize);
-        return 0;
-    }
-
-    memset(txBuffer, 0, packetLength);
-    txBuffer[0] = NM_PROTOCOL_SYN_BYTE1;
-    txBuffer[1] = NM_PROTOCOL_SYN_BYTE2;
-    txBuffer[2] = NM_PROTOCOL_SYN_BYTE3;
-    txBuffer[3] = NM_PROTOCOL_HEADER_LEN;
-    txBuffer[NM_PROTOCOL_MSG_ID_INDEX_L] = parse->buffer[NM_PROTOCOL_MSG_ID_INDEX_L];
-    txBuffer[NM_PROTOCOL_MSG_ID_INDEX_H] = parse->buffer[NM_PROTOCOL_MSG_ID_INDEX_H];
-    write_u16_le(&txBuffer[NM_PROTOCOL_MSG_LEN_INDEX_L], descriptor->responsePayloadLength);
-    txBuffer[NM_PROTOCOL_MSG_SENDER_INDEX] = NM_PROTOCOL_MSG_SENDER_PANEL;
-    txBuffer[NM_PROTOCOL_MSG_TYPE_INDEX] = descriptor->responseType;
-
-    descriptor->handler(parse, txBuffer);
-    write_crc(txBuffer, NM_PROTOCOL_HEADER_LEN + descriptor->responsePayloadLength);
-    return packetLength;
-}
-
-int
-message_decode(SEMP_PARSE_STATE* parse, uint8_t* txBuffer, const uint16_t txBufferSize) {
-    DDL_ASSERT(parse != nullptr);
-    DDL_ASSERT(txBuffer != nullptr);
-
-    if (!systemInfo.online_device.eg25_board) {
-        systemInfo.online_device.eg25_board = 1;
-        systemInfo.i2c__err_count = 0;
-    }
-
-    if (parse->length < NM_PROTOCOL_HEADER_LEN) {
-        systemInfo.messageDecode.error_count++;
-        CORE_DEBUG_PRINTF("short message len: %d", parse->length);
-        return 0;
-    }
-
-    const uint16_t messageId = request_message_id(parse);
-    const PacketDescriptor* descriptor = find_packet_descriptor(messageId);
-    if (descriptor == nullptr) {
-        systemInfo.messageDecode.error_count++;
-        CORE_DEBUG_PRINTF("unknown message id: 0x%04X, len: %d", messageId, parse->length);
-        return 0;
-    }
-
-    if (!validate_request(parse, descriptor)) {
-        systemInfo.messageDecode.error_count++;
-        CORE_DEBUG_PRINTF("invalid message: id=0x%04X, payload=%u, len=%d", messageId, request_payload_length(parse),
-                          parse->length);
-        return 0;
-    }
-
-    if (messageId == NM_PANEL_RST_ID) {
-        CORE_DEBUG_PRINTF("[%d] Reset Panel", messageId);
-    }
-
-    return encode_response(parse, descriptor, txBuffer, txBufferSize);
+const PanelPacket*
+panel_protocol_packets(size_t* count) {
+    *count = sizeof(packetTable) / sizeof(packetTable[0]);
+    return packetTable;
 }

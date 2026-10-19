@@ -18,6 +18,7 @@ lv_obj_t* warningLabel = nullptr;
 lv_obj_t* warningMarker = nullptr;
 lv_obj_t* warningShine = nullptr;
 bool warningActive = false;
+float displayedTemperature = -1000.0f;
 
 void
 SetBannerOpacity(void* obj, const int32_t opacity) {
@@ -45,8 +46,8 @@ UpdateWarningText() {
         return;
     }
 
-    lv_label_set_text_fmt(warningLabel, I18n::Text(I18n::TextId::BatteryTemperatureCritical),
-                          systemInfo.powerMonitor.batteryInfo.Temp_f);
+    displayedTemperature = systemInfo.powerMonitor.batteryInfo.Temp_f;
+    lv_label_set_text_fmt(warningLabel, I18n::Text(I18n::TextId::BatteryTemperatureCritical), displayedTemperature);
 }
 
 void
@@ -182,7 +183,7 @@ Page::BatteryWarning_Update() {
         return;
     }
 
-    if (warningActive) {
+    if (warningActive && temperatureC != displayedTemperature) {
         UpdateWarningText();
     }
 }

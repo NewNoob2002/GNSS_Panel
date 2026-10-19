@@ -84,7 +84,9 @@ App_Init() {
 
     /* Initialize status bar */
     Page::StatusBar_Create(lv_layer_top());
+#if PRODUCT_PAGE_BATTERY_WARNING
     Page::BatteryWarning_Create(lv_layer_top());
+#endif
 
     /* Initialize pages */
     manager.Install("Startup", "Pages/Startup");
@@ -95,7 +97,9 @@ App_Init() {
     manager.Install("SystemInfos", "Pages/SystemInfos");
     manager.Install("Shutdown", "Pages/Shutdown");
     manager.Install("SaveConfig", "Pages/SaveConfig");
+#if PRODUCT_PAGE_STAR_MAP
     manager.Install("StarMap", "Pages/StarMap");
+#endif
 
     manager.SetGlobalLoadAnimType(PageManager::LOAD_ANIM_OVER_TOP);
 
@@ -110,7 +114,9 @@ App_SetLanguage(const I18n::Language language) {
 
     manager.NotifyLanguageChanged();
     Page::StatusBar_ApplyLanguage();
+#if PRODUCT_PAGE_BATTERY_WARNING
     Page::BatteryWarning_ApplyLanguage();
+#endif
     return true;
 }
 
@@ -120,15 +126,39 @@ App_GetLanguage() {
 }
 
 void
-App_Update() {
-    Page::BatteryWarning_Update();
+App_Deinit() {
+    manager.Clear();
+}
 
+void
+App_Update() {
+#if PRODUCT_PAGE_BATTERY_WARNING
+    Page::BatteryWarning_Update();
+#endif
+
+    PageBase* current = manager.GetCurrentPage();
+    const bool onStartup = current && strcmp(current->pageName, "Pages/Startup") == 0;
+    if (systemInfo.powerMonitor.panel_power_on && onStartup) {
+        manager.Push("Pages/HardwareCheck");
+    }
+    // 外部供电关机驻留：回到栈底的待机页 Startup，等待长按电源键开机（开机由 HAL 判定）。
+    static bool standby_shown = false;
+    if (!systemInfo.powerMonitor.ShutdownComplete) {
+        standby_shown = false;
+    } else if (!standby_shown && (onStartup || manager.BackHome())) {
+        standby_shown = true;
+        Shutdown_pushed = false;
+#if !defined(LVGL_SIMULATOR) && !defined(_WIN32)
+        // 关机页在动画结束时禁用了编码器，待机页需要按键事件驱动开机进度。
+        HAL::Encoder_SetEnable(true);
+#endif
+    }
     if (systemInfo.powerMonitor.Force_ShutDown || systemInfo.powerMonitor.LowBatteryPowerOff
-        || systemInfo.powerMonitor.LinuxPowerOff) {
+        || systemInfo.powerMonitor.LinuxPowerOff || systemInfo.powerMonitor.ShutdownReq
+        || systemInfo.powerMonitor.ShutdownGoing) {
         if (!Shutdown_pushed) {
-            Shutdown_pushed = true;
-            HAL::Power_Shutdown(false);
-            manager.Push("Pages/SaveConfig");
+            Shutdown_pushed =
+                (current && strcmp(current->pageName, "Pages/SaveConfig") == 0) || manager.Push("Pages/SaveConfig");
         }
     }
 #if defined(LVGL_SIMULATOR) || defined(_WIN32)

@@ -6,10 +6,10 @@
 #include "HAL_CONFIG.h"
 #include "mcu_config.h"
 
-extern volatile SharedData_t shared_info;
-
+// pi-lens-ignore: identifier
 #ifdef __cplusplus
 namespace HAL {
+void ResetInterruptController();
 void HAL_Init();
 void HAL_Update();
 
@@ -19,7 +19,7 @@ int I2C_Scan();
 
 /* Power */
 void Power_Init();
-void Power_OnCheck();
+void Power_OnCheck(void (*idle)() = nullptr);
 void Power_Shutdown(bool en);
 void Power_PowerOffMonitor();
 bool Power_ShutdownEnsure();
@@ -31,6 +31,10 @@ void Power_Update();
 void Power_EnableCharger(BatteryInfo_t* pBatteryState);
 void Power_DisableCharger(BatteryInfo_t* pBatteryState);
 void Power_GetInfo(Power_Monitor_t* info);
+/* 产品电源扩展点（弱符号默认实现） */
+void Power_ProductInit();
+void Power_ProductUpdate();
+uint16_t Power_AdjustPercent(uint16_t actualPercent);
 const char* Power_GetPowerOffCause();
 void WatchDog_Feed();
 /* KEY */

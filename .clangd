@@ -3,6 +3,12 @@ CompileFlags:
   Add:
     - -D__PROGRAM_START=Reset_Handler
 ---
+# X1 专属源码只出现在 X1 的编译数据库中（先执行 cmake --preset x1-debug）。
+If:
+  PathMatch: Products/X1/.*
+CompileFlags:
+  CompilationDatabase: build/x1-debug
+---
 If:
   PathMatch: .*\.cpp
 CompileFlags:
@@ -12,3 +18,13 @@ If:
   PathMatch: .*\.c
 CompileFlags:
   Compiler: arm-none-eabi-gcc
+---
+If:
+  PathMatch: Libraries/lvgl/src/core/lv_event\.h
+CompileFlags:
+  Add: [-include, lvgl.h]
+---
+If:
+  PathMatch: Libraries/Adafruit-GFX-Library/gfxfont\.h
+CompileFlags:
+  Add: [-include, stdint.h]

@@ -28,7 +28,6 @@
 
 #include <elog.h>
 
-#include "lvgl/lvgl.h"
 #if defined(_WIN32)
 #include <windows.h>
 static HANDLE output_lock = NULL;
@@ -38,8 +37,13 @@ static HANDLE output_lock = NULL;
 #include <time.h>
 #include <unistd.h>
 static pthread_mutex_t output_lock = PTHREAD_MUTEX_INITIALIZER;
-#elif defined(__CORE_DEBUG)
+#else
+#include <inttypes.h>
+#include <stdio.h>
+#include "delay.h"
+#if defined(__CORE_DEBUG)
 #include "SEGGER_RTT.h"
+#endif
 //#include "usart.h"
 #endif
 
@@ -104,8 +108,8 @@ elog_port_output(const char* log, size_t size) {
     usart_write_buffer(log, size);
 #endif
 #else
-    LV_UNUSED(log);
-    LV_UNUSED(size);
+    (void)log;
+    (void)size;
 #endif
 }
 
@@ -180,7 +184,7 @@ elog_port_get_time(void) {
     return cur_system_time;
 #else
 
-    lv_snprintf(buf, 32, "%" PRIu32, lv_tick_get());
+    snprintf(buf, 32, "%" PRIu32, millis());
     return buf;
 #endif
 }

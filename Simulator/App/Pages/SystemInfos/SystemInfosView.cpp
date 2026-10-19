@@ -209,7 +209,7 @@ SystemInfosView::SetGPS(const double lat, const double lng, const double alt) co
 void
 SystemInfosView::SetWifi(const WifiInfo_t& wifiInfo) const {
     lv_label_set_text_fmt(ui.wifi.labelData,
-                          "%s-%s\n"
+                          "%s-%.16s\n"
                           "%s\n"
                           "%d.%d.%d.%d",
                           wifiInfo.wifi_mode ? "STA" : "AP", wifiInfo.wifi_ssid,
@@ -237,7 +237,7 @@ SystemInfosView::SetStorage(const RecordInfo_t& recordInfo) const {
     if (recordInfo.record_status) {
         lv_label_set_text_fmt(ui.storage.labelData,
                               "ON\n"
-                              "%s\n"
+                              "%.16s\n"
                               "%0.1f M\n"
                               "%s\n"
                               "%0.2f %s",

@@ -17,7 +17,8 @@ target_include_directories(hc32_simulator_app_headers INTERFACE
 target_link_libraries(hc32_simulator_app_headers INTERFACE
     hc32_project_options
     hc32_platform_headers
-    hc32_libraries
+    hc32_libraries_headers
+    hc32_display_libraries
 )
 
 add_library(hc32_simulator_app OBJECT

@@ -2,31 +2,65 @@
 #include "Arduino.h"
 #include "MillisTaskManager/MillisTaskManager.h"
 #include "elog.h"
-#include "src/misc/lv_types.h"
+
+SystemInfo_t systemInfo;
 
 static MillisTaskManager taskManager;
-volatile SharedData_t shared_info __attribute__((section(".bss.NoInit"), used));
 
 static void
 HAL_MONITOR_TASK(void* e) {
-    LV_UNUSED(e);
+    (void)e;
     HAL::Power_PowerOffMonitor();
     HAL::Key_Update();
 }
 
 static void
 HAL_POWER_TASK(void* e) {
-    LV_UNUSED(e);
+    (void)e;
     HAL::Power_Update();
 }
 
 static void
 HAL_LED_TASK(void* e) {
-    LV_UNUSED(e);
+    (void)e;
     HAL::Led_Update();
 }
 
 void SystemClock_Config(void);
+
+// Boot 跳转后中断控制器可能残留 Boot 的配置，入口处统一复位。
+void
+HAL::ResetInterruptController() {
+    constexpr uint32_t irq_count = 128U;
+    constexpr uint32_t vector_irq_count = 16U;
+    constexpr uint32_t intc_sel_reset_value = 0x1FFUL;
+
+    __disable_irq();
+
+    for (uint32_t i = 0; i < irq_count / 32U; i++) {
+        NVIC->ICER[i] = 0xFFFFFFFFUL;
+        NVIC->ICPR[i] = 0xFFFFFFFFUL;
+    }
+
+    volatile uint32_t* const intc_sel = &CM_INTC->SEL0;
+    for (uint32_t i = 0; i < irq_count; i++) {
+        intc_sel[i] = intc_sel_reset_value;
+    }
+
+    volatile uint32_t* const intc_vssel = &CM_INTC->VSSEL128;
+    for (uint32_t i = 0; i < vector_irq_count; i++) {
+        intc_vssel[i] = 0UL;
+    }
+
+    CM_INTC->SWIER = 0UL;
+    CM_INTC->EVTER = 0UL;
+    CM_INTC->WUPEN = 0UL;
+    CM_INTC->EIFCR = 0xFFFFUL;
+
+    __DSB();
+    __ISB();
+    __enable_irq();
+}
 
 // namesapce HAL
 void
@@ -57,7 +91,7 @@ HAL::HAL_Init() {
     I2C_Scan();
     Key_Init();
 
-    taskManager.Register(HAL_MONITOR_TASK, 15);
+    taskManager.Register(HAL_MONITOR_TASK, PRODUCT_MONITOR_PERIOD_MS);
     taskManager.Register(HAL_LED_TASK, 100);
     taskManager.Register(HAL_POWER_TASK, 500);
 }
@@ -65,12 +99,18 @@ HAL::HAL_Init() {
 void
 HAL::HAL_Update() {
     taskManager.Running(millis());
-    if (HAL::Power_ShutdownSoftReset()) {
-        shared_info.command = CMD_ENTER_IAP;
-        delay_ms(1200);
+    static bool reset_pending = false;
+    static uint32_t reset_started_ms = 0;
+    if (!reset_pending && HAL::Power_ShutdownSoftReset()) {
+        reset_pending = true;
+        reset_started_ms = millis();
+    }
+    if (reset_pending && millis() - reset_started_ms >= 100U) {
+        // 当前 Boot 根据软件复位标志进入升级窗口，无共享 SRAM 命令。
+        __DSB();
         NVIC_SystemReset();
     }
-    if (lv_tick_get() - systemInfo.powerMonitor.pannel_power_on_time >= 30000 && !systemInfo.online_device.eg25_board) {
+    if (millis() - systemInfo.powerMonitor.pannel_power_on_time >= 30000 && !systemInfo.online_device.eg25_board) {
         systemInfo.eg25_overtime = true;
     }
 }
