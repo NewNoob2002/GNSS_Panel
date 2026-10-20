@@ -1,20 +1,18 @@
 {
-    // 使用 IntelliSense 了解相关属性。 
-    // 悬停以查看现有属性的描述。
-    // 欲了解更多信息，请访问: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-
         {
-            "name": "Cortex Debug",
+            "name": "Cortex Debug (J-Link)",
             "cwd": "${workspaceFolder}",
-            "executable": "${workspaceFolder}/build/debug/proj_hc32.axf",
+            // 由 CMake Tools 当前选中的 preset 给出 ELF（build/<preset>/<前缀>_<版本>.elf）
+            "executable": "${command:cmake.launchTargetPath}",
             "request": "launch",
             "type": "cortex-debug",
             "runToEntryPoint": "main",
             "servertype": "jlink",
-            "device" : "HC32F460xE",
-            "serverpath": "C:\\Program Files\\SEGGER\\JLink_V812g\\JLinkGDBServerCL.exe",
+            "device": "HC32F460xE",
+            "interface": "swd",
+            "svdFile": "${workspaceFolder}/Platform/CMSIS/Device/HDSC/hc32f4xx/Source/GCC/svd/HC32F460.svd",
             "rttConfig": {
                 "enabled": true,
                 "address": "auto",

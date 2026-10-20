@@ -4,37 +4,42 @@
         {
             "label": "build",
             "type": "shell",
-            "command": "${command:eide.project.build}",
-            "group": "build",
-            "problemMatcher": []
-        },
-        {
-            "label": "flash",
-            "type": "shell",
-            "command": "${command:eide.project.uploadToDevice}",
-            "group": "build",
-            "problemMatcher": []
-        },
-        {
-            "label": "build and flash",
-            "type": "shell",
-            "command": "${command:eide.project.buildAndFlash}",
-            "group": "build",
-            "problemMatcher": []
+            "command": "cmake --preset ${input:preset} && cmake --build --preset ${input:preset}",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": "$gcc"
         },
         {
             "label": "rebuild",
             "type": "shell",
-            "command": "${command:eide.project.rebuild}",
+            "command": "cmake --preset ${input:preset} && cmake --build --preset ${input:preset} --clean-first",
             "group": "build",
-            "problemMatcher": []
+            "problemMatcher": "$gcc"
         },
         {
-            "label": "clean",
+            "label": "host tests",
             "type": "shell",
-            "command": "${command:eide.project.clean}",
-            "group": "build",
-            "problemMatcher": []
+            "command": "cmake -S tests -B build/host-tests && cmake --build build/host-tests && ctest --test-dir build/host-tests --output-on-failure",
+            "group": "test",
+            "problemMatcher": "$gcc"
+        }
+    ],
+    "inputs": [
+        {
+            "id": "preset",
+            "type": "pickString",
+            "description": "CMake preset (product-buildType)",
+            "options": [
+                "x1-debug",
+                "x1-release",
+                "x1pro-debug",
+                "x1pro-release",
+                "xbase-debug",
+                "xbase-release"
+            ],
+            "default": "x1pro-debug"
         }
     ]
 }
