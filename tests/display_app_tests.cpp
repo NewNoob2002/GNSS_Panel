@@ -8,6 +8,7 @@
 
 #include "AppPlatform.h"
 #include "Arduino.h"
+#include "Common/SystemService.h"
 #include "HAL.h"
 #include "P4App.h"
 #include "Utils/I18n/I18n.h"
@@ -193,6 +194,118 @@ main() {
     }
     assert(on_page("Pages/Dialplate"));
 
+    // 设备数据：systemInfo 的主控编码 -> 页面选项索引；定长字段可能不以 NUL 结尾。
+    auto& radio = systemInfo.radioInfo;
+    auto& record = systemInfo.recordInfo;
+    systemInfo.work_mode = rover_mode;
+    radio.radio_status = On_Off_Status_ON;
+    radio.radio_protocol = 5; // TRANSEOT，索引 3
+    radio.radio_channel = 5;
+    record.record_type = 2;        // Rinex3.02，索引 1
+    record.record_interval = 0x01; // 60 min，索引 2
+    std::memcpy(record.record_name, "ABCDEFGHIJKLMNOP", sizeof(record.record_name));
+    std::snprintf(systemInfo.hardware_version, sizeof(systemInfo.hardware_version), "V1.5");
+    run(600);
+    {
+        const auto device = DeviceService::snapshot();
+        assert(device.work_mode == DataProc::WorkMode::Rover && device.radio_on);
+        assert(device.radio_protocol == 3 && device.radio_channel == 5);
+        assert(device.ntrip == DataProc::NtripRole::None);
+        assert(device.record_type == 1 && device.record_interval == 2 && !device.recording);
+        assert(std::strcmp(device.record_name.data(), "ABCDEFGHIJKLMNOP") == 0);
+        assert(std::strcmp(device.hardware.data(), "V1.5") == 0);
+        assert(device.power_valid && device.battery_voltage == 7.8f);
+    }
+
+    // WorkSettings：Base 以当前协议/信道下发（控件顺序 滚轮, Base, Rover, NTRIP, Return）。
+    assert(App_Get()->show_page("Pages/WorkSettings"));
+    run(800);
+    for (int i = 0; i < 3; ++i) { // Return -> NTRIP -> Rover -> Base
+        App_Get()->on_input(P4App::InputAction::PreviousFocus);
+    }
+    App_Get()->on_input(P4App::InputAction::Confirm);
+    run(800);
+    assert(on_page("Pages/Dialplate"));
+    assert(systemInfo.work_mode == autobase_mode && radio.radio_mode == radio_mode_tx);
+    assert(radio.radio_protocol == 5 && radio.radio_channel == 5 && radio.radio_change_flag == 1);
+    assert(systemInfo.ntripInfo.gprs_status == On_Off_Status_OFF);
+    assert(DeviceService::snapshot().work_mode == DataProc::WorkMode::Base);
+    // NTRIP：关闭电台，打开网络基站。
+    radio.radio_change_flag = 0;
+    assert(App_Get()->show_page("Pages/WorkSettings"));
+    run(800);
+    App_Get()->on_input(P4App::InputAction::PreviousFocus); // Return -> NTRIP
+    App_Get()->on_input(P4App::InputAction::Confirm);
+    run(800);
+    assert(on_page("Pages/Dialplate"));
+    assert(radio.radio_status == On_Off_Status_OFF && radio.radio_change_flag == 1);
+    assert(systemInfo.ntripInfo.gprs_status == On_Off_Status_ON);
+    assert(systemInfo.ntripInfo.NtripServer_status == On_Off_Status_ON);
+    assert(DeviceService::snapshot().ntrip == DataProc::NtripRole::Server && !DeviceService::snapshot().radio_on);
+    // Rover 选中 CUSTOM 信道（索引 0）：不下发，页面仍返回。
+    radio.radio_change_flag = 0;
+    radio.radio_channel = 0;
+    run(600);
+    assert(App_Get()->show_page("Pages/WorkSettings"));
+    run(800);
+    for (int i = 0; i < 2; ++i) { // Return -> NTRIP -> Rover
+        App_Get()->on_input(P4App::InputAction::PreviousFocus);
+    }
+    App_Get()->on_input(P4App::InputAction::Confirm);
+    run(800);
+    assert(on_page("Pages/Dialplate"));
+    assert(radio.radio_change_flag == 0 && systemInfo.work_mode == autobase_mode);
+
+    // RecordConfig：双击 Power（Commit）开始，单击（Confirm）停止。
+    assert(App_Get()->show_page("Pages/RecordConfig"));
+    run(800);
+    App_Get()->on_input(P4App::InputAction::PreviousFocus); // Return -> 录制按钮
+    App_Get()->on_input(P4App::InputAction::Confirm);       // 未录制时单击不开始
+    assert(record.record_change_flag == 0);
+    App_Get()->on_input(P4App::InputAction::Commit);
+    assert(record.record_status == On_Off_Status_ON && record.record_op == 1 && record.record_change_flag == 1);
+    assert(record.record_type == 2 && record.record_interval == 0x01);
+    assert(DeviceService::snapshot().recording);
+    run(100);
+    record.record_change_flag = 0;
+    App_Get()->on_input(P4App::InputAction::Confirm);
+    assert(record.record_status == On_Off_Status_OFF && record.record_change_flag == 1);
+    assert(App_Get()->back());
+    run(800);
+    assert(on_page("Pages/Dialplate"));
+
+    // Wi-Fi：发出设定后显示 "..."，主控回报一致后结束；主控不回报时 15 s 后放弃等待。
+    assert(SystemService::snapshot().wifi_available == (PRODUCT_SHUTDOWN_WIFI_BUTTON != 0));
+    // 无论能否切换，主控回报的状态都要显示。
+    systemInfo.wifiInfo.wifi_status = On_Off_Status_ON;
+    run(50);
+    assert(SystemService::snapshot().wifi_on && !SystemService::snapshot().wifi_pending);
+    systemInfo.wifiInfo.wifi_status = On_Off_Status_OFF;
+    run(50);
+    assert(!SystemService::snapshot().wifi_on);
+    if (PRODUCT_SHUTDOWN_WIFI_BUTTON) {
+        auto& wifi = systemInfo.wifiInfo;
+        assert(App_Get()->show_page("Pages/SystemSettings"));
+        run(800);
+        App_Get()->on_input(P4App::InputAction::NextFocus); // Language -> Wi-Fi
+        App_Get()->on_input(P4App::InputAction::Confirm);
+        assert(wifi.wifi_on_off_set == On_Off_Status_ON && wifi.wifi_change_flag == 1);
+        run(50);
+        assert(SystemService::snapshot().wifi_pending && find_text(lv_scr_act(), "..."));
+        wifi.wifi_status = On_Off_Status_ON;
+        run(50);
+        assert(!SystemService::snapshot().wifi_pending && SystemService::snapshot().wifi_on);
+        assert(!find_text(lv_scr_act(), "..."));
+        App_Get()->on_input(P4App::InputAction::Confirm);
+        assert(wifi.wifi_on_off_set == On_Off_Status_OFF);
+        run(14000);
+        assert(SystemService::snapshot().wifi_pending);
+        run(1500);
+        assert(!SystemService::snapshot().wifi_pending && SystemService::snapshot().wifi_on);
+        assert(App_Get()->back());
+        run(800);
+    }
+
     // 用户关机：SystemDash 电源弹窗（无 Reboot）→ SaveConfig 结束时向 HAL 发出一次关机请求。
     assert(App_Get()->show_page("Pages/SystemDash"));
     run(800);
@@ -221,8 +334,17 @@ main() {
     assert(shutdown_requests == 1);
     hal_enter_standby();
 
-    // 电池过温横幅：仅启用该功能的产品显示。
+    // V1.3 主板没有 MP2762A（GPIO 控制充电），充电初始化步骤不算失败。
+    systemInfo.online_device.mp2762 = false;
+    std::snprintf(systemInfo.hardware_version, sizeof(systemInfo.hardware_version), "V1.3");
     hal_power_on_and_boot();
+    {
+        const auto charger = SystemService::snapshot().initialization[2];
+        assert(charger.status == DataProc::InitializationStatus::Ok);
+        assert(std::strstr(charger.detail.data(), "GPIO charge control (board V1.3)"));
+    }
+
+    // 电池过温横幅：仅启用该功能的产品显示。
     systemInfo.powerMonitor.batteryInfo.Temp_f = 66.0f;
     run(400);
     assert((find_text(lv_layer_top(), "66.0") != nullptr) == (PRODUCT_PAGE_BATTERY_WARNING != 0));

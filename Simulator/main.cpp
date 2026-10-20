@@ -55,24 +55,49 @@ pointer_read(lv_indev_drv_t* driver, lv_indev_data_t* data) {
     data->state = pointer->state;
 }
 
+// 主板版本：V1.5 带 MP2762A，V1.3 没有（GPIO 控制充电）；与 HAL::I2C_Scan 的推断一致。
+void
+set_board(bool v15) {
+    systemInfo.online_device.mp2762 = v15;
+    std::snprintf(systemInfo.hardware_version, sizeof(systemInfo.hardware_version), "%s", v15 ? "V1.5" : "V1.3");
+}
+
 // 模拟主控已上报的数据：模拟器中的初始状态。
 void
 init_system_info() {
     std::memset(&systemInfo, 0, sizeof(systemInfo));
     std::snprintf(systemInfo.software_version, sizeof(systemInfo.software_version), "%s", SOFTWARE_VERSION);
-    std::snprintf(systemInfo.hardware_version, sizeof(systemInfo.hardware_version), "SIM");
+    set_board(true);
     systemInfo.online_device.bq40z50 = true;
-    systemInfo.online_device.mp2762 = true;
     auto& battery = systemInfo.powerMonitor.batteryInfo;
     battery.sample_valid = true;
     battery.Percent = 76;
     battery.Voltage_f = 7.92f;
     battery.Temp_f = 32.0f;
+    battery.Percent_f = 76.0f;
     battery.chargeStatus = notCharge;
-    systemInfo.positionInfo.coordinate_status = position_fix;
-    systemInfo.positionInfo.satellite_number_used = 18;
-    systemInfo.positionInfo.satellite_number_track = 26;
-    systemInfo.wifiInfo.wifi_status = On_Off_Status_ON;
+    systemInfo.powerMonitor.ExternalPower = 1;
+    auto& position = systemInfo.positionInfo;
+    position.coordinate_status = position_fix;
+    position.satellite_number_used = 18;
+    position.satellite_number_track = 26;
+    position.coordinate_lat = 31.230416;
+    position.coordinate_lon = 121.473701;
+    position.coordinate_alt = 12.5;
+    systemInfo.work_mode = rover_mode;
+    systemInfo.radioInfo = {radio_mode_rx, On_Off_Status_ON, 1, 3, 0}; // TRIMTALK，信道 3
+    auto& record = systemInfo.recordInfo;
+    record.record_type = 1;
+    record.record_interval = 0x00;
+    record.record_leftspace = 2048.0f;
+    std::memcpy(record.record_name, "SIM0001", 7);
+    auto& wifi = systemInfo.wifiInfo;
+    wifi.wifi_status = wifi.wifi_on_off_set = On_Off_Status_ON;
+    std::snprintf(wifi.wifi_ssid, sizeof(wifi.wifi_ssid), "%s-SIM", PRODUCT_NAME);
+    wifi.wifi_ip[0] = 192;
+    wifi.wifi_ip[1] = 168;
+    wifi.wifi_ip[2] = 10;
+    wifi.wifi_ip[3] = 1;
     systemInfo.starMapInfo.numberGPS = 8;
     systemInfo.starMapInfo.numberBDS = 14;
     systemInfo.starMapInfo.numberGLONASS = 6;
@@ -87,7 +112,42 @@ print_controls() {
     std::puts("Controls: arrows/wheel = focus, Enter/middle click = press/release (hold 2s on Startup),\n"
               "          Esc/right click = back, Ctrl+Enter = commit, left click = pointer, Q = quit.\n"
               "HC32 events: H = host shutdown request, L = low-battery shutdown, F = forced shutdown,\n"
-              "             T/G = battery temperature +5/-5 C, C = toggle charging, B/N = battery -10/+10%.");
+              "             T/G = battery temperature +5/-5 C, C = toggle charging, B/N = battery -10/+10%,\n"
+              "             V = toggle board V1.5/V1.3 (MP2762A present or not; checked at the next power-on).");
+}
+
+// 模拟主控：取走面板下发的设定（*_change_flag），1 s 后应用 Wi-Fi；每秒刷新一次星图数据。
+void
+simulate_host(uint32_t now) {
+    static uint32_t wifi_since = 0;
+    static uint32_t last_stars = 0;
+    auto& wifi = systemInfo.wifiInfo;
+    if (wifi.wifi_change_flag) {
+        wifi.wifi_change_flag = 0;
+        wifi_since = now;
+        std::printf("[sim] host: wifi set %s\n", wifi.wifi_on_off_set ? "on" : "off");
+    }
+    if (wifi.wifi_status != wifi.wifi_on_off_set && now - wifi_since >= 1000) {
+        wifi.wifi_status = wifi.wifi_on_off_set;
+    }
+    auto& radio = systemInfo.radioInfo;
+    if (radio.radio_change_flag) {
+        radio.radio_change_flag = 0;
+        std::printf("[sim] host: work mode %d, radio %s, protocol %u, channel %u, ntrip server %d\n",
+                    systemInfo.work_mode, radio.radio_status ? "on" : "off", radio.radio_protocol, radio.radio_channel,
+                    systemInfo.ntripInfo.NtripServer_status);
+    }
+    auto& record = systemInfo.recordInfo;
+    if (record.record_change_flag) {
+        record.record_change_flag = 0;
+        record.record_op = 0;
+        std::printf("[sim] host: record %s, type %u, interval 0x%02x\n", record.record_status ? "start" : "stop",
+                    record.record_type, record.record_interval);
+    }
+    if (now - last_stars >= 1000) {
+        last_stars = now;
+        systemInfo.starMapInfo.syncStatus = true;
+    }
 }
 
 // 模拟 HAL/主控事件，便于检查平台驱动的流程。
@@ -104,8 +164,13 @@ inject_event(SDL_Keycode key) {
         case SDLK_c: battery.chargeStatus = battery.chargeStatus == notCharge ? normalCharge : notCharge; break;
         case SDLK_b: battery.Percent = battery.Percent >= 10 ? battery.Percent - 10 : 0; break;
         case SDLK_n: battery.Percent = battery.Percent <= 90 ? battery.Percent + 10 : 100; break;
+        case SDLK_v:
+            set_board(!systemInfo.online_device.mp2762);
+            std::printf("[sim] board %s\n", systemInfo.hardware_version);
+            return;
         default: return;
     }
+    battery.Percent_f = battery.Percent; // SystemInfos 显示浮点电量
     std::printf("[sim] temperature %.1f C, battery %u%%, charging %d, shutdown flags host=%d low=%d forced=%d\n",
                 static_cast<double>(battery.Temp_f), battery.Percent, battery.chargeStatus != notCharge,
                 power.LinuxPowerOff, power.LowBatteryPowerOff, power.Force_ShutDown);
@@ -218,6 +283,7 @@ main() {
                 }
             }
             HAL::HAL_Update();
+            simulate_host(lv_tick_get());
             App_Update();
             lv_timer_handler();
             SDL_SetWindowTitle(window, app->current_page());
