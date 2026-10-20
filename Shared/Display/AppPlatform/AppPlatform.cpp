@@ -10,6 +10,7 @@
 #include "P4App.h"
 #include "PowerBridge.h"
 #include "StatusBridge.h"
+#include "SystemState.h"
 #include "Utils/Log/Log.h"
 #include "mcu_config.h"
 
@@ -62,8 +63,9 @@ bool
 system_backend::request_power_on() {
 #if defined(LVGL_SIMULATOR)
     // PC 模拟器没有电源键电平，界面长按即开机。
-    systemInfo.powerMonitor.panel_power_on = true;
-    systemInfo.powerMonitor.pannel_power_on_time = lv_tick_get();
+    // 模拟器中由此代替 HAL 电源策略置位开机。
+    State::Power().panel_power_on = true;
+    State::Power().pannel_power_on_time = lv_tick_get();
     return true;
 #else
     // 固件由 HAL 按 Power 键原始电平判定 2 s 长按（Power_OnCheck / Power_PowerOffMonitor），

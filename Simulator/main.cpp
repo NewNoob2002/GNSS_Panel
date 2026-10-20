@@ -12,9 +12,8 @@
 #include "AppPlatform.h"
 #include "HAL/HAL.h"
 #include "P4App.h"
+#include "SystemState.h"
 #include "mcu_version_config.h"
-
-SystemInfo_t systemInfo;
 
 namespace {
 constexpr int kWidth = 294;
@@ -58,53 +57,58 @@ pointer_read(lv_indev_drv_t* driver, lv_indev_data_t* data) {
 // 主板版本：V1.5 带 MP2762A，V1.3 没有（GPIO 控制充电）；与 HAL::I2C_Scan 的推断一致。
 void
 set_board(bool v15) {
-    systemInfo.online_device.mp2762 = v15;
-    std::snprintf(systemInfo.hardware_version, sizeof(systemInfo.hardware_version), "%s", v15 ? "V1.5" : "V1.3");
+    BoardInfo_t& board = State::Board();
+    board.online_device.mp2762 = v15;
+    std::snprintf(board.hardware_version, sizeof(board.hardware_version), "%s", v15 ? "V1.5" : "V1.3");
 }
 
-// 模拟主控已上报的数据：模拟器中的初始状态。
+// 模拟器中的初始状态：板卡与电池（代替 HAL）和主控已上报的数据（代替面板协议）。
 void
 init_system_info() {
-    std::memset(&systemInfo, 0, sizeof(systemInfo));
-    std::snprintf(systemInfo.software_version, sizeof(systemInfo.software_version), "%s", SOFTWARE_VERSION);
+    State::Reset();
+    BoardInfo_t& board = State::Board();
+    std::snprintf(board.software_version, sizeof(board.software_version), "%s", SOFTWARE_VERSION);
     set_board(true);
-    systemInfo.online_device.bq40z50 = true;
-    auto& battery = systemInfo.powerMonitor.batteryInfo;
+    board.online_device.bq40z50 = true;
+    auto& battery = State::Power().batteryInfo;
     battery.sample_valid = true;
     battery.Percent = 76;
     battery.Voltage_f = 7.92f;
     battery.Temp_f = 32.0f;
     battery.Percent_f = 76.0f;
     battery.chargeStatus = notCharge;
-    systemInfo.powerMonitor.ExternalPower = 1;
-    auto& position = systemInfo.positionInfo;
+    State::Power().ExternalPower = 1;
+    HostReport_t& host = State::Host();
+    host.online = true;
+    auto& position = host.position;
     position.coordinate_status = position_fix;
     position.satellite_number_used = 18;
     position.satellite_number_track = 26;
     position.coordinate_lat = 31.230416;
     position.coordinate_lon = 121.473701;
     position.coordinate_alt = 12.5;
-    systemInfo.work_mode = rover_mode;
-    systemInfo.radioInfo = {radio_mode_rx, On_Off_Status_ON, 1, 3, 0}; // TRIMTALK，信道 3
-    auto& record = systemInfo.recordInfo;
+    host.work = {rover_mode, On_Off_Status_ON,  radio_mode_rx,    1,
+                 3,          On_Off_Status_OFF, On_Off_Status_OFF}; // TRIMTALK，信道 3
+    auto& record = host.record;
     record.record_type = 1;
     record.record_interval = 0x00;
     record.record_leftspace = 2048.0f;
     std::memcpy(record.record_name, "SIM0001", 7);
-    auto& wifi = systemInfo.wifiInfo;
-    wifi.wifi_status = wifi.wifi_on_off_set = On_Off_Status_ON;
+    auto& wifi = host.wifi;
+    wifi.wifi_status = On_Off_Status_ON;
     std::snprintf(wifi.wifi_ssid, sizeof(wifi.wifi_ssid), "%s-SIM", PRODUCT_NAME);
     wifi.wifi_ip[0] = 192;
     wifi.wifi_ip[1] = 168;
     wifi.wifi_ip[2] = 10;
     wifi.wifi_ip[3] = 1;
-    systemInfo.starMapInfo.numberGPS = 8;
-    systemInfo.starMapInfo.numberBDS = 14;
-    systemInfo.starMapInfo.numberGLONASS = 6;
-    systemInfo.starMapInfo.numberGALILEO = 4;
-    systemInfo.starMapInfo.numberSBAS = 2;
-    systemInfo.starMapInfo.numberQZSS = 3;
-    systemInfo.starMapInfo.numberIRNSS = 1;
+    auto& stars = host.starMap;
+    stars.numberGPS = 8;
+    stars.numberBDS = 14;
+    stars.numberGLONASS = 6;
+    stars.numberGALILEO = 4;
+    stars.numberSBAS = 2;
+    stars.numberQZSS = 3;
+    stars.numberIRNSS = 1;
 }
 
 void
@@ -116,57 +120,60 @@ print_controls() {
               "             V = toggle board V1.5/V1.3 (MP2762A present or not; checked at the next power-on).");
 }
 
-// 模拟主控：取走面板下发的设定（*_change_flag），1 s 后应用 Wi-Fi；每秒刷新一次星图数据。
+// 模拟主控：读走面板请求即确认（代替协议的完整读出），1 s 后应用 Wi-Fi；每秒刷新一次星图数据。
 void
 simulate_host(uint32_t now) {
     static uint32_t wifi_since = 0;
+    static bool wifi_applying = false; // 已收到设定，1 s 后应用
     static uint32_t last_stars = 0;
-    auto& wifi = systemInfo.wifiInfo;
-    if (wifi.wifi_change_flag) {
-        wifi.wifi_change_flag = 0;
+    const PanelRequest_t& request = systemInfo.request;
+    HostReport_t& host = State::Host();
+    if (request.wifi_pending) {
+        State::Confirm_Wifi(State::Wifi_Revision());
         wifi_since = now;
-        std::printf("[sim] host: wifi set %s\n", wifi.wifi_on_off_set ? "on" : "off");
+        wifi_applying = true;
+        std::printf("[sim] host: wifi set %s\n", request.wifi_on ? "on" : "off");
     }
-    if (wifi.wifi_status != wifi.wifi_on_off_set && now - wifi_since >= 1000) {
-        wifi.wifi_status = wifi.wifi_on_off_set;
+    if (wifi_applying && now - wifi_since >= 1000) {
+        wifi_applying = false;
+        host.wifi.wifi_status = request.wifi_on;
     }
-    auto& radio = systemInfo.radioInfo;
-    if (radio.radio_change_flag) {
-        radio.radio_change_flag = 0;
-        std::printf("[sim] host: work mode %d, radio %s, protocol %u, channel %u, ntrip server %d\n",
-                    systemInfo.work_mode, radio.radio_status ? "on" : "off", radio.radio_protocol, radio.radio_channel,
-                    systemInfo.ntripInfo.NtripServer_status);
+    if (request.work_pending) {
+        State::Confirm_Work(State::Work_Revision());
+        const WorkConfig_t& work = host.work;
+        std::printf("[sim] host: work mode %d, radio %s, protocol %u, channel %u, ntrip server %d\n", work.work_mode,
+                    work.radio_status ? "on" : "off", work.radio_protocol, work.radio_channel, work.NtripServer_status);
     }
-    auto& record = systemInfo.recordInfo;
-    if (record.record_change_flag) {
-        record.record_change_flag = 0;
-        record.record_op = 0;
+    if (request.record_op || request.record_settings_pending) {
+        State::Confirm_Record(State::Record_Revision(), true);
+        const RecordInfo_t& record = host.record;
         std::printf("[sim] host: record %s, type %u, interval 0x%02x\n", record.record_status ? "start" : "stop",
                     record.record_type, record.record_interval);
     }
     if (now - last_stars >= 1000) {
         last_stars = now;
-        systemInfo.starMapInfo.syncStatus = true;
+        ++host.starMap.sequence;
     }
 }
 
 // 模拟 HAL/主控事件，便于检查平台驱动的流程。
 void
 inject_event(SDL_Keycode key) {
-    auto& power = systemInfo.powerMonitor;
+    // 模拟器代替 HAL 与主控写入电源域。
+    auto& power = State::Power();
     auto& battery = power.batteryInfo;
     switch (key) {
-        case SDLK_h: power.LinuxPowerOff = true; break;
+        case SDLK_h: State::Host_ShutdownRequested(); break;
         case SDLK_l: power.LowBatteryPowerOff = true; break;
-        case SDLK_f: power.Force_ShutDown = true; break;
+        case SDLK_f: State::Request_ForcedShutdown(); break;
         case SDLK_t: battery.Temp_f += 5.0f; break;
         case SDLK_g: battery.Temp_f -= 5.0f; break;
         case SDLK_c: battery.chargeStatus = battery.chargeStatus == notCharge ? normalCharge : notCharge; break;
         case SDLK_b: battery.Percent = battery.Percent >= 10 ? battery.Percent - 10 : 0; break;
         case SDLK_n: battery.Percent = battery.Percent <= 90 ? battery.Percent + 10 : 100; break;
         case SDLK_v:
-            set_board(!systemInfo.online_device.mp2762);
-            std::printf("[sim] board %s\n", systemInfo.hardware_version);
+            set_board(!systemInfo.board.online_device.mp2762);
+            std::printf("[sim] board %s\n", systemInfo.board.hardware_version);
             return;
         default: return;
     }

@@ -1,6 +1,7 @@
 #include "Arduino.h"
 #include "HAL.h"
 #include "HoldTimer.h"
+#include "SystemState.h"
 
 // 所有产品共用：Function 键按住 2.5 s 强制关机（与旧 ButtonEvent 500 ms 长按 + 10 次 200 ms 重复一致）。
 // 单击/双击等操作由产品处理：带屏产品交给共享应用（AppPlatform），X1 见 Key_ProductInit()。
@@ -24,7 +25,7 @@ void
 HAL::Key_Update() {
     if (force_shutdown_hold.update(Key_FunctionPressed(), millis())) {
         CORE_DEBUG_PRINTF("[FuncKey] Force shutdown");
-        systemInfo.powerMonitor.Force_ShutDown = true;
+        State::Request_ForcedShutdown();
     }
     Key_ProductUpdate();
 }

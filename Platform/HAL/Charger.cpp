@@ -127,7 +127,7 @@ HAL::Charger::set_enabled(bool enabled, BatteryInfo_t& battery) {
 
 HAL::Charger&
 HAL::Charger_Get() {
-    if (systemInfo.online_device.mp2762) {
+    if (systemInfo.board.online_device.mp2762) {
         return mp2762_charger;
     }
     return gpio_charger;
@@ -139,7 +139,7 @@ HAL::Charger_Protect(BatteryInfo_t& battery) {
     if (!battery.sample_valid) {
         // 电量计从未识别时交由充电芯片自身保护充电：深度放电电池的电量计可能需要充电电压才能唤醒。
         // 电量计在线但样本失效或过期时，无法判断温度，禁止充电。
-        if (systemInfo.online_device.bq40z50) {
+        if (systemInfo.board.online_device.bq40z50) {
             charger.set_enabled(false, battery);
         } else {
             battery.ChargerOverTempCount = 0;

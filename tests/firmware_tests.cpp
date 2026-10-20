@@ -6,9 +6,10 @@
 #include <vector>
 #include "BlinkLed.h"
 #include "Charger.h"
-#include "HoldTimer.h"
 #include "HAL.h"
+#include "HoldTimer.h"
 #include "PowerPolicy.h"
+#include "SystemState.h"
 #include "Wire.h"
 #include "bq40z50.h"
 #include "display_protocol.h"
@@ -25,7 +26,6 @@ uint16_t fake_registers[128][256] = {};
 uint32_t fake_master_writes;
 int fake_pins[32] = {};
 uint32_t fake_system_resets;
-SystemInfo_t systemInfo = {};
 
 void
 HAL::HAL_Update() {}
@@ -114,10 +114,10 @@ test_slave_transactions() {
         slave_i2c_update();
     }
     assert(fake_slave_initializations == initializations);
-    systemInfo.radioInfo.radio_change_flag = 1;
+    State::Request_Work(systemInfo.host.work);
     write_request(frame(NM_PANEL_INFO3_ID));
     assert(txBufferAvailable() == NM_PROTOCOL_PINFO3_MSG_PACK_LEN);
-    assert(systemInfo.radioInfo.radio_change_flag == 1);
+    assert(systemInfo.request.work_pending);
     read_response(5);
     assert(slave_i2c_diagnostics.partial_reads == 1);
     assert(txBufferAvailable() == NM_PROTOCOL_PINFO3_MSG_PACK_LEN);
@@ -125,14 +125,14 @@ test_slave_transactions() {
     assert(slave_i2c_diagnostics.response_busy == 1);
     auto response = read_response(NM_PROTOCOL_PINFO3_MSG_PACK_LEN);
     assert(response[4] == NM_PANEL_INFO3_ID && crc_valid(response));
-    assert(systemInfo.radioInfo.radio_change_flag == 0);
+    assert(!systemInfo.request.work_pending);
     assert(txBufferAvailable() == 0);
 
     auto bad = frame(NM_PANEL_SET1_ID, std::vector<uint8_t>(88, 0), NM_MSG_SET_TYPE);
     bad.back() ^= 1;
-    const auto set_count = systemInfo.messageDecode.Set1_count;
+    const auto set_count = systemInfo.diag.messages.Set1_count;
     write_request(bad);
-    assert(txBufferAvailable() == 0 && systemInfo.messageDecode.Set1_count == set_count);
+    assert(txBufferAvailable() == 0 && systemInfo.diag.messages.Set1_count == set_count);
 
     write_request(frame(NM_PANEL_INFO1_ID));
     read_response(3, false);
@@ -166,30 +166,30 @@ test_slave_transactions() {
     assert(fake_primask == 1);
     fake_primask = 0;
     write_request(frame(NM_PANEL_RST_ID, {1}, NM_MSG_SET_TYPE));
-    assert(systemInfo.powerMonitor.reset_flag == 0);
+    assert(State::Power().reset_flag == 0);
     read_response(4);
-    assert(systemInfo.powerMonitor.reset_flag == 0);
+    assert(State::Power().reset_flag == 0);
     read_response(NM_PROTOCOL_RST_RESP_MSG_PACK_LEN);
-    assert(systemInfo.powerMonitor.reset_flag == 1);
-    systemInfo.powerMonitor.reset_flag = 0;
+    assert(State::Power().reset_flag == 1);
+    State::Power().reset_flag = 0;
 
     // 关机确认方式一：主控完整读到含关机标志的 INFO2；短读不算确认。
-    systemInfo.powerMonitor.poweroff_flag = 1;
+    State::Power().poweroff_flag = 1;
     write_request(frame(NM_PANEL_INFO2_ID));
     read_response(4);
-    assert(!systemInfo.powerMonitor.ShutdownEnsure && systemInfo.powerMonitor.poweroff_flag == 1);
+    assert(!systemInfo.power.ShutdownEnsure && State::Power().poweroff_flag == 1);
     read_response(NM_PROTOCOL_PINFO2_MSG_PACK_LEN);
-    assert(systemInfo.powerMonitor.ShutdownEnsure && systemInfo.powerMonitor.poweroff_flag == 0);
-    systemInfo.powerMonitor.ShutdownEnsure = false;
+    assert(systemInfo.power.ShutdownEnsure && State::Power().poweroff_flag == 0);
+    State::Power().ShutdownEnsure = false;
     // 方式二：主控发送 0x05=1，ACK 完整读出后确认。
-    systemInfo.powerMonitor.poweroff_flag = 1;
+    State::Power().poweroff_flag = 1;
     write_request(frame(NM_PANEL_SHUTDOWN_CONFIRM_ID, {1}, NM_MSG_SET_TYPE));
     read_response(4);
-    assert(!systemInfo.powerMonitor.ShutdownEnsure);
+    assert(!systemInfo.power.ShutdownEnsure);
     read_response(NM_PROTOCOL_SET_MSG_PACK_LEN);
-    assert(systemInfo.powerMonitor.ShutdownEnsure && systemInfo.powerMonitor.poweroff_flag == 0);
-    systemInfo.powerMonitor.ShutdownEnsure = false;
-    systemInfo.powerMonitor.LinuxPowerOff = false;
+    assert(systemInfo.power.ShutdownEnsure && State::Power().poweroff_flag == 0);
+    State::Power().ShutdownEnsure = false;
+    State::Power().LinuxPowerOff = false;
 
     write_request(frame(NM_PANEL_INFO1_ID));
     fake_slave_init_error = LL_ERR;
@@ -221,21 +221,24 @@ test_decoder_boundary() {
     bytes = frame(NM_PANEL_INFO1_ID);
     parse.buffer = bytes.data();
     parse.length = bytes.size();
-    memset(systemInfo.hardware_version, 'H', sizeof(systemInfo.hardware_version));
-    memset(systemInfo.software_version, 'S', sizeof(systemInfo.software_version));
+    memset(State::Board().hardware_version, 'H', sizeof(systemInfo.board.hardware_version));
+    memset(State::Board().software_version, 'S', sizeof(systemInfo.board.software_version));
     assert(message_decode(&parse, response, 4) == 0);
     assert(message_decode(&parse, response, sizeof(response)) == NM_PROTOCOL_INFO1_MSG_PACK_LEN);
     assert(response[20] == 'H' && response[27] == 'H' && response[28] == 'S' && response[37] == 'S');
     assert(message_decode(nullptr, response, sizeof(response)) == 0);
 
-    systemInfo.radioInfo.radio_change_flag = 1;
+    State::Request_Work(systemInfo.host.work);
     bytes = frame(NM_PANEL_INFO3_ID);
     parse.buffer = bytes.data();
     parse.length = bytes.size();
     assert(message_decode(&parse, response, sizeof(response)) > 0);
-    ++systemInfo.radioInfo.radio_channel;
+    // 读出期间面板又改了请求：本次读出不能确认新请求。
+    WorkConfig_t changed = systemInfo.request.work;
+    ++changed.radio_channel;
+    State::Request_Work(changed);
     message_response_complete(response, sizeof(response));
-    assert(systemInfo.radioInfo.radio_change_flag == 1);
+    assert(systemInfo.request.work_pending);
 }
 
 static int received_frames;
@@ -336,7 +339,7 @@ test_device_failures() {
     fake_io_error = 0;
     assert(Wire.beginTransmission(0x0b) && Wire.endTransmission() == 0);
 
-    systemInfo.online_device.mp2762 = false;
+    State::Board().online_device.mp2762 = false;
     battery.sample_valid = true;
     battery.Temp_f = 50.0f;
     for (int i = 0; i < 20; ++i) {
@@ -349,23 +352,81 @@ test_device_failures() {
     HAL::Charger_Protect(battery);
     assert(!battery.ChargerDisable && digitalRead(CHARGER_ENABLE_PIN) == HIGH);
     // 电量计在线但样本失效：禁止充电。
-    systemInfo.online_device.bq40z50 = true;
+    State::Board().online_device.bq40z50 = true;
     battery.sample_valid = false;
     HAL::Charger_Protect(battery);
     assert(battery.ChargerDisable && digitalRead(CHARGER_ENABLE_PIN) == LOW);
     // 电量计从未识别：交由充电芯片保护，恢复充电。
-    systemInfo.online_device.bq40z50 = false;
+    State::Board().online_device.bq40z50 = false;
     HAL::Charger_Protect(battery);
     assert(!battery.ChargerDisable && digitalRead(CHARGER_ENABLE_PIN) == HIGH);
-    systemInfo.online_device.mp2762 = true;
+    State::Board().online_device.mp2762 = true;
     assert(mp2762setChargerEnabled(false, &config));
     assert(mp2762setChargerEnabled(true, &config) && (config & 16));
+}
+
+// 面板请求与主控上报分开保存：请求待确认时显示请求值，确认按 revision 判定。
+static void
+test_state_requests() {
+    State::Reset();
+    HostReport_t& host = State::Host();
+    const PanelRequest_t& request = systemInfo.request;
+
+    // 工作模式：主控上报不改写待确认请求；确认后请求值写入主控上报。
+    host.work.work_mode = rover_mode;
+    WorkConfig_t work = host.work;
+    work.work_mode = autobase_mode;
+    State::Request_Work(work);
+    host.work.radio_channel = 7; // 主控在确认前的上报照常更新
+    assert(State::Effective_Work().work_mode == autobase_mode && State::Effective_Work().radio_channel == 0);
+    const uint32_t sent = State::Work_Revision();
+    State::Confirm_Work(sent - 1U); // 旧响应不能确认
+    assert(request.work_pending);
+    State::Confirm_Work(sent);
+    assert(!request.work_pending && host.work.work_mode == autobase_mode);
+    State::Confirm_Work(sent); // 重复确认无副作用
+    assert(!request.work_pending);
+    State::Echo_HostWork(); // 主控置位变更标志：把上报值作为请求回传
+    assert(request.work_pending && request.work.work_mode == autobase_mode);
+    State::Confirm_Work(State::Work_Revision());
+
+    // 录制：低电停止只在录制中发请求；X1 只确认启停，带屏确认同时清除设置待确认。
+    State::Request_RecordStop();
+    assert(!request.record_op);
+    host.record.record_status = On_Off_Status_ON;
+    State::Request_RecordStop();
+    assert(request.record_op && State::Effective_Record().record_status == On_Off_Status_OFF);
+    host.record.record_status = On_Off_Status_ON; // 主控尚未读走：显示仍为停止
+    assert(State::Effective_Record().record_status == On_Off_Status_OFF);
+    State::Confirm_Record(State::Record_Revision(), false);
+    assert(!request.record_op && host.record.record_status == On_Off_Status_OFF);
+    State::Request_Record(On_Off_Status_ON, 2, 0x04);
+    State::Confirm_Record(State::Record_Revision(), false); // 不带设置的确认不清除设置待确认
+    assert(!request.record_op && request.record_settings_pending);
+    assert(State::Effective_Record().record_interval == 0x04);
+    State::Confirm_Record(State::Record_Revision(), true);
+    assert(!request.record_settings_pending && host.record.record_type == 2 && host.record.record_interval == 0x04);
+
+    // Wi-Fi：设定值在确认后保留。
+    State::Request_Wifi(true);
+    State::Confirm_Wifi(State::Wifi_Revision());
+    assert(!request.wifi_pending && request.wifi_on == On_Off_Status_ON);
+
+    // 驻留后开机清除主控数据与请求；复位前的 revision 不能确认复位后的请求。
+    const uint32_t before = State::Work_Revision();
+    State::Request_Work(work);
+    State::Reset_HostData();
+    assert(!request.work_pending && !host.online && request.wifi_on == On_Off_Status_OFF);
+    State::Request_Work(work);
+    State::Confirm_Work(before + 1U);
+    assert(request.work_pending);
+    State::Reset();
 }
 
 // 两个主板版本：V1.3 无 MP2762A（GPIO 控制充电与 USB 通路），V1.5 经 MP2762A。
 static void
 test_charger_variants() {
-    systemInfo = {};
+    State::Reset();
     BatteryInfo_t battery = {};
     HAL::Charger& gpio = HAL::Charger_Get();
     assert(std::string(gpio.name()) == "GPIO");
@@ -379,7 +440,7 @@ test_charger_variants() {
     gpio.power_on();
     assert(fake_pins[USB_SWITCH_PIN] == LOW);
 
-    systemInfo.online_device.mp2762 = true;
+    State::Board().online_device.mp2762 = true;
     HAL::Charger& mp2762 = HAL::Charger_Get();
     assert(std::string(mp2762.name()) == "MP2762A");
     battery.chargeStatus = normalCharge;
@@ -395,7 +456,7 @@ test_charger_variants() {
     fake_io_error = 0;
     mp2762.set_enabled(true, battery);
     assert(!battery.ChargerDisable);
-    systemInfo = {};
+    State::Reset();
 }
 
 // 强制关机计时与指示灯闪烁：时间差需支持 tick 回绕。
@@ -454,49 +515,49 @@ test_power_policy() {
 // 外部供电关机后驻留：不复位、不自动开机；长按电源键 2 s 原地开机，状态与冷启动一致。
 static void
 test_resident_off() {
-    systemInfo = {};
-    systemInfo.powerMonitor.panel_power_on = true;
-    systemInfo.powerMonitor.Force_ShutDown = true;
-    systemInfo.online_device.eg25_board = true;
-    systemInfo.recordInfo.record_status = On_Off_Status_ON;
+    State::Reset();
+    State::Power().panel_power_on = true;
+    State::Power().Force_ShutDown = true;
+    State::Host().online = true;
+    State::Host().record.record_status = On_Off_Status_ON;
     fake_pins[POWER_KEY_PIN] = HIGH; // 关机时按键仍按住
     fake_ms = 1000;
     const uint32_t resets = fake_system_resets;
     HAL::Power_PowerOffMonitor();
-    assert(!systemInfo.powerMonitor.panel_power_on && fake_pins[POWER_CONTROL_PIN] == LOW);
-    assert(systemInfo.powerMonitor.ShutdownComplete && !systemInfo.powerMonitor.Force_ShutDown);
+    assert(!systemInfo.power.panel_power_on && fake_pins[POWER_CONTROL_PIN] == LOW);
+    assert(systemInfo.power.ShutdownComplete && !systemInfo.power.Force_ShutDown);
     assert(fake_pins[POWER_LED_PIN] == LOW && fake_pins[FUNCTION_LED_PIN] == LOW);
     fake_ms += 1000;
     HAL::Power_PowerOffMonitor();
-    assert(!systemInfo.powerMonitor.panel_power_on);
+    assert(!systemInfo.power.panel_power_on);
 
     // 驻留期间的强制关机请求不能带到下次开机。
-    systemInfo.powerMonitor.Force_ShutDown = true;
+    State::Power().Force_ShutDown = true;
     fake_pins[POWER_KEY_PIN] = LOW;
     fake_ms += 5000;
     HAL::Power_PowerOffMonitor();
-    assert(!systemInfo.powerMonitor.panel_power_on);
+    assert(!systemInfo.power.panel_power_on);
     fake_pins[POWER_KEY_PIN] = HIGH;
     HAL::Power_PowerOffMonitor();
     fake_ms += 1999;
     HAL::Power_PowerOffMonitor();
-    assert(!systemInfo.powerMonitor.panel_power_on);
+    assert(!systemInfo.power.panel_power_on);
     fake_ms += 1;
     HAL::Power_PowerOffMonitor();
-    assert(systemInfo.powerMonitor.panel_power_on && !systemInfo.powerMonitor.ShutdownComplete);
+    assert(systemInfo.power.panel_power_on && !systemInfo.power.ShutdownComplete);
     assert(fake_pins[POWER_CONTROL_PIN] == HIGH && fake_pins[POWER_LED_PIN] == HIGH);
-    assert(!systemInfo.powerMonitor.Force_ShutDown && !systemInfo.online_device.eg25_board);
-    assert(systemInfo.recordInfo.record_status == On_Off_Status_OFF);
+    assert(!systemInfo.power.Force_ShutDown && !systemInfo.host.online);
+    assert(State::Effective_Record().record_status == On_Off_Status_OFF);
     assert(fake_system_resets == resets);
 
     // 开机后电源策略重新可用：再次强制关机仍进入驻留。
     fake_pins[POWER_KEY_PIN] = LOW;
     fake_ms += 100;
     HAL::Power_PowerOffMonitor();
-    assert(systemInfo.powerMonitor.panel_power_on);
-    systemInfo.powerMonitor.Force_ShutDown = true;
+    assert(systemInfo.power.panel_power_on);
+    State::Power().Force_ShutDown = true;
     HAL::Power_PowerOffMonitor();
-    assert(!systemInfo.powerMonitor.panel_power_on && systemInfo.powerMonitor.ShutdownComplete);
+    assert(!systemInfo.power.panel_power_on && systemInfo.power.ShutdownComplete);
     assert(fake_system_resets == resets);
 }
 
@@ -506,6 +567,7 @@ main() {
     test_slave_transactions();
     test_decoder_boundary();
     test_device_failures();
+    test_state_requests();
     test_charger_variants();
     test_hold_and_blink();
     test_power_policy();

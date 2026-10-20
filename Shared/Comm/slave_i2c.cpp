@@ -2,6 +2,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
+#include "SystemState.h"
 #include "core_debug.h"
 #include "delay.h"
 #include "hc32_ll.h" // IWYU pragma: keep
@@ -230,7 +231,7 @@ I2C_RXI_Callback() {
         rx_head = next;
     } else {
         ++slave_i2c_diagnostics.rx_overflow;
-        ++systemInfo.i2c__err_count;
+        ++State::Diagnostics().i2c_errors;
     }
     ++slave_i2c_diagnostics.rx_bytes;
     ++progress_sequence;
@@ -375,7 +376,7 @@ slave_i2c_update() {
     } else if (now - last_progress_ms >= 2000U) {
         slave_i2c_diagnostics.last_recovery_sr = I2C_UNIT->SR;
         ++slave_i2c_diagnostics.recoveries;
-        ++systemInfo.i2c__err_count;
+        ++State::Diagnostics().i2c_errors;
         const uint32_t state = enter_critical();
         if (tx_has_response) {
             tx_tail = tx_start_tail;

@@ -1,5 +1,6 @@
 #include "panel_protocol.h"
 #include <cstring>
+#include "SystemState.h"
 #include "core_debug.h"
 #include "mcu_define.h"
 
@@ -119,7 +120,7 @@ message_decode(SEMP_PARSE_STATE* parse, uint8_t* txBuffer, const uint16_t txBuff
     }
 
     if (parse->length < NM_PROTOCOL_HEADER_LEN) {
-        systemInfo.messageDecode.error_count++;
+        State::Diagnostics().messages.error_count++;
         CORE_DEBUG_PRINTF("short message len: %d", parse->length);
         return 0;
     }
@@ -127,19 +128,19 @@ message_decode(SEMP_PARSE_STATE* parse, uint8_t* txBuffer, const uint16_t txBuff
     const uint16_t messageId = request_message_id(parse);
     const PanelPacket* packet = find_packet(messageId);
     if (packet == nullptr) {
-        systemInfo.messageDecode.error_count++;
+        State::Diagnostics().messages.error_count++;
         CORE_DEBUG_PRINTF("unknown message id: 0x%04X, len: %d", messageId, parse->length);
         return 0;
     }
 
     if (!validate_request(parse, packet)) {
-        systemInfo.messageDecode.error_count++;
+        State::Diagnostics().messages.error_count++;
         CORE_DEBUG_PRINTF("invalid message: id=0x%04X, payload=%u, len=%d", messageId, request_payload_length(parse),
                           parse->length);
         return 0;
     }
 
-    systemInfo.online_device.eg25_board = true;
+    State::Host().online = true;
     return encode_response(parse, packet, txBuffer, txBufferSize);
 }
 

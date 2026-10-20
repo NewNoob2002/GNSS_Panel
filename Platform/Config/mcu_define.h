@@ -6,7 +6,6 @@
 typedef struct online_device_t {
     bool bq40z50;
     bool mp2762;
-    bool eg25_board;
 } online_device_t;
 
 typedef enum Charger_Status_t {
@@ -126,36 +125,28 @@ typedef struct PositionInfo_t {
     double coordinate_alt;
 } PositionInfo_t;
 
+/* 主控上报的录制状态 */
 typedef struct RecordInfo_t {
     On_Off_Status_t record_status; // 0-off, 1-on
     float record_leftspace;
     uint8_t record_type;     // 1-xyz 2-Rinex3.02
-    uint8_t record_interval; // 0x00-15min, 0x01-60min, 0x02-120min, 0x04-240min, 0x18- 24hour
-    uint8_t record_op;
+    uint8_t record_interval; // 0xff-不限 0x00-15min, 0x01-60min, 0x02-120min, 0x04-240min, 0x18- 24hour
     uint8_t record_name[16];
-    uint8_t record_change_flag;
 } RecordInfo_t;
 
-typedef struct RadioInfo_t {
-    RadioMode_t radio_mode;
+/* 工作模式与电台/网络基站配置：主控上报的当前值，也是面板请求修改的内容 */
+typedef struct WorkConfig_t {
+    WorkMode_t work_mode;
     On_Off_Status_t radio_status;
-    uint8_t radio_protocol;
+    RadioMode_t radio_mode;
+    uint8_t radio_protocol; // 主控协议编码
     uint8_t radio_channel;
-    uint8_t radio_change_flag;
-} RadioInfo_t;
-
-typedef struct WifiInfo_t {
-    uint8_t wifi_mode;
-    On_Off_Status_t wifi_status;
-    On_Off_Status_t wifi_on_off_set;
-    uint8_t wifi_change_flag;
-    char wifi_ssid[16];
-    uint8_t wifi_ip[4];
-} WifiInfo_t;
-
-typedef struct NtripInfo_t {
     On_Off_Status_t gprs_status;
     On_Off_Status_t NtripServer_status;
+} WorkConfig_t;
+
+/* 主控上报的网络基站/客户端链路信息（面板不修改） */
+typedef struct NtripInfo_t {
     On_Off_Status_t NtripClient_status;
     uint8_t NtripServer_IP[4];
     uint8_t NtripClient_IP[4];
@@ -163,8 +154,16 @@ typedef struct NtripInfo_t {
     uint8_t NtripClient_Mountpoint[32];
 } NtripInfo_t;
 
+/* 主控上报的 Wi-Fi 状态 */
+typedef struct WifiInfo_t {
+    uint8_t wifi_mode;
+    On_Off_Status_t wifi_status;
+    char wifi_ssid[16];
+    uint8_t wifi_ip[4];
+} WifiInfo_t;
+
 typedef struct StarMapInfo_t {
-    bool syncStatus;
+    uint32_t sequence; // 每收到一帧星图数据加 1；0 表示从未收到
     uint8_t numberGPS;
     uint8_t numberGLONASS;
     uint8_t numberGALILEO;
@@ -190,22 +189,59 @@ typedef struct MessageDecode_Count_t {
     uint32_t error_count;
 } MessageDecode_Count_t;
 
-typedef struct SystemInfo_t {
-    bool eg25_overtime;
-    uint16_t i2c__err_count;
+/* ---- 系统状态：按写入者分域（见 Platform/State/SystemState.h） ---- */
+
+/* 板卡与器件：HAL（I2C 扫描）写入 */
+typedef struct BoardInfo_t {
     char software_version[16];
     char hardware_version[16];
-
     online_device_t online_device;
-    WifiInfo_t wifiInfo;
-    RecordInfo_t recordInfo;
-    PositionInfo_t positionInfo;
-    StarMapInfo_t starMapInfo;
-    RadioInfo_t radioInfo;
-    Power_Monitor_t powerMonitor;
-    NtripInfo_t ntripInfo;
-    WorkMode_t work_mode;
-    MessageDecode_Count_t messageDecode;
-} SystemInfo_t, *pSystemInfo_t;
+} BoardInfo_t;
 
-extern SystemInfo_t systemInfo;
+/* 主控上报：面板协议写入。不含面板尚未被主控确认的请求，界面显示用 State::Effective_*() */
+typedef struct HostReport_t {
+    bool online; // 收到过主控的有效帧
+    PositionInfo_t position;
+    StarMapInfo_t starMap;
+    WifiInfo_t wifi;
+    RecordInfo_t record;
+    WorkConfig_t work;
+    NtripInfo_t ntrip;
+} HostReport_t;
+
+/* 面板请求：经 State::Request_*() 写入，面板协议上报，主控完整读出后经 State::Confirm_*() 确认 */
+typedef struct PanelRequest_t {
+    WorkConfig_t work;
+    bool work_pending;
+    uint32_t work_revision;
+
+    On_Off_Status_t record_status;
+    uint8_t record_type;
+    uint8_t record_interval;
+    bool record_op;               // 录制启停待主控确认
+    bool record_settings_pending; // 带屏产品：录制设置（含启停）待主控确认
+    uint32_t record_revision;
+
+    On_Off_Status_t wifi_on; // 面板设定值，确认后保留
+    bool wifi_pending;
+    uint32_t wifi_revision;
+} PanelRequest_t;
+
+/* 通信诊断计数：通信层写入 */
+typedef struct Diagnostics_t {
+    MessageDecode_Count_t messages;
+    uint16_t i2c_errors;
+} Diagnostics_t;
+
+typedef struct SystemInfo_t {
+    BoardInfo_t board;
+    Power_Monitor_t power; /* HAL 电源策略写入；其它模块经 HAL::Power_* / State::Host_* 请求 */
+    HostReport_t host;
+    PanelRequest_t request;
+    Diagnostics_t diag;
+} SystemInfo_t;
+
+#ifdef __cplusplus
+/* 全部模块只读；写入经 State:: 入口（Platform/State/SystemState.h） */
+extern const SystemInfo_t& systemInfo;
+#endif

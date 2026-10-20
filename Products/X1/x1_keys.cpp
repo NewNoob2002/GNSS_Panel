@@ -3,6 +3,7 @@
 // 开机长按由共用 HAL::Power_PowerOffMonitor() 处理（2 s），这里只处理已开机后的动作。
 #include "Arduino.h"
 #include "HAL.h"
+#include "SystemState.h"
 #include "multi_button.h"
 
 enum : uint8_t { POWER_KEY_ID = 1, FUNCTION_KEY_ID = 2 };
@@ -14,7 +15,7 @@ static uint16_t power_key_hold_count;
 static void
 PowerKey_Pressing_Callback(Button* btn) {
     (void)btn;
-    if (!systemInfo.powerMonitor.panel_power_on) {
+    if (!systemInfo.power.panel_power_on) {
         return;
     }
     // LONG_PRESS_HOLD 在长按判定后每个 tick 触发一次，再累计 200 次后请求关机。
@@ -34,9 +35,7 @@ static void
 FuncKey_DoubleClick_Callback(Button* btn) {
     (void)btn;
     CORE_DEBUG_PRINTF("[FuncKey] Double Click");
-    systemInfo.recordInfo.record_op = 1;
-    systemInfo.recordInfo.record_status =
-        systemInfo.recordInfo.record_status == On_Off_Status_ON ? On_Off_Status_OFF : On_Off_Status_ON;
+    State::Request_RecordToggle();
 }
 
 static uint8_t

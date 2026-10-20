@@ -7,7 +7,7 @@ namespace {
 
 DataProc::PowerCause
 shutdown_cause() {
-    const Power_Monitor_t& power = systemInfo.powerMonitor;
+    const Power_Monitor_t& power = systemInfo.power;
     if (power.LinuxPowerOff) {
         return DataProc::PowerCause::Host;
     }
@@ -24,7 +24,7 @@ shutdown_cause() {
 
 void
 PowerBridge::update() {
-    const Power_Monitor_t& power = systemInfo.powerMonitor;
+    const Power_Monitor_t& power = systemInfo.power;
     if (power.panel_power_on && !powered_on_) {
         SystemService::set_powered_on(true);
         shutdown_reported_ = standby_reported_ = false;

@@ -7,6 +7,7 @@ target_include_directories(hc32_platform_headers INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/inc
     ${CMAKE_CURRENT_SOURCE_DIR}/Drivers/inc
     ${CMAKE_CURRENT_SOURCE_DIR}/HAL
+    ${CMAKE_CURRENT_SOURCE_DIR}/State
     ${CMAKE_CURRENT_SOURCE_DIR}/support
 )
 target_link_libraries(hc32_platform_headers INTERFACE hc32_project_options)
@@ -18,6 +19,10 @@ file(GLOB PLATFORM_CORE_SOURCES CONFIGURE_DEPENDS
 file(GLOB PLATFORM_HAL_SOURCES CONFIGURE_DEPENDS
     HAL/*.c
     HAL/*.cpp
+)
+# 系统状态分域与写入口（纯 C++，主机测试与模拟器也直接编译）
+file(GLOB PLATFORM_STATE_SOURCES CONFIGURE_DEPENDS
+    State/*.cpp
 )
 file(GLOB PLATFORM_DRIVER_SOURCES CONFIGURE_DEPENDS
     Drivers/src/*.c
@@ -33,6 +38,7 @@ add_library(hc32_platform OBJECT
     CMSIS/Device/HDSC/hc32f4xx/Source/system_hc32f460.c
     ${PLATFORM_CORE_SOURCES}
     ${PLATFORM_HAL_SOURCES}
+    ${PLATFORM_STATE_SOURCES}
     ${PLATFORM_DRIVER_SOURCES}
     ${PLATFORM_SUPPORT_SOURCES}
 )

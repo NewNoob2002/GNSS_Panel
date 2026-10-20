@@ -2,13 +2,14 @@
 #include "Charger.h"
 #include "HAL.h"
 #include "PowerPolicy.h"
+#include "SystemState.h"
 #include "ots.h"
 
 static PowerPolicy power_policy;
 static bool power_key_down;
 static uint32_t power_key_started_ms;
 
-#define FORCE_SHUTDOWN() (systemInfo.powerMonitor.Force_ShutDown)
+#define FORCE_SHUTDOWN() (State::Power().Force_ShutDown)
 
 static bool POWER_GET_REASON = false;
 en_flag_status_t softwareReset = RESET;
@@ -27,7 +28,7 @@ HAL::Power_AdjustPercent(uint16_t actualPercent) {
 
 void
 ots_callback(void) {
-    systemInfo.powerMonitor.batteryInfo.fOtsTemp = OTS_CalculateTemp();
+    State::Power().batteryInfo.fOtsTemp = OTS_CalculateTemp();
 }
 
 void
@@ -60,7 +61,7 @@ power_on_outputs() {
 
 static void
 clear_shutdown_requests() {
-    Power_Monitor_t& power = systemInfo.powerMonitor;
+    Power_Monitor_t& power = State::Power();
     power.ShutdownReq = false;
     power.ShutdownEnsure = false;
     power.Force_ShutDown = false;
@@ -81,7 +82,7 @@ power_enter_standby(uint32_t now) {
     // 与冷启动等待开机时一致（见 Power_OnCheck）。
     HAL::Charger_Get().enter_standby();
     clear_shutdown_requests();
-    systemInfo.powerMonitor.panel_power_on = false;
+    State::Power().panel_power_on = false;
     power_key_down = digitalRead(POWER_KEY_PIN) == HIGH;
     power_key_started_ms = now;
 }
@@ -94,16 +95,8 @@ power_resume_from_standby(uint32_t now) {
     POWER_GET_REASON = false;
     // 驻留期间按键可能再次置位强制关机等请求，开机前一并清除。
     clear_shutdown_requests();
-    systemInfo.online_device.eg25_board = false;
-    systemInfo.eg25_overtime = false;
-    systemInfo.wifiInfo = {};
-    systemInfo.recordInfo = {};
-    systemInfo.positionInfo = {};
-    systemInfo.starMapInfo = {};
-    systemInfo.radioInfo = {};
-    systemInfo.ntripInfo = {};
-    systemInfo.work_mode = rover_mode;
-    Power_Monitor_t& power = systemInfo.powerMonitor;
+    State::Reset_HostData();
+    Power_Monitor_t& power = State::Power();
     power.ShutdownGoing = false;
     power.ShutdownComplete = false;
     power.ExternalPower = 0;
@@ -123,7 +116,7 @@ HAL::Power_OnCheck(void (*idle)()) {
         if (idle) {
             idle();
         }
-        if (systemInfo.powerMonitor.panel_power_on) {
+        if (State::Power().panel_power_on) {
             CORE_DEBUG_PRINTF("MCU PowerDone");
             break;
         }
@@ -141,11 +134,11 @@ void
 HAL::Power_Shutdown(bool en) {
     if (!en) {
         CORE_DEBUG_PRINTF("Shutdown Req");
-        systemInfo.powerMonitor.ShutdownReq = true;
+        State::Power().ShutdownReq = true;
     } else {
         CORE_DEBUG_PRINTF("Shutdown Done");
-        systemInfo.powerMonitor.ShutdownGoing = false;
-        systemInfo.powerMonitor.ShutdownComplete = true;
+        State::Power().ShutdownGoing = false;
+        State::Power().ShutdownComplete = true;
         digitalWrite(POWER_CONTROL_PIN, LOW);
     }
 }
@@ -153,7 +146,7 @@ HAL::Power_Shutdown(bool en) {
 void
 HAL::Power_PowerOffMonitor() {
     const uint32_t now = millis();
-    if (!systemInfo.powerMonitor.panel_power_on) {
+    if (!State::Power().panel_power_on) {
         const bool pressed = digitalRead(POWER_KEY_PIN) == HIGH;
         if (pressed && !power_key_down) {
             power_key_started_ms = now;
@@ -165,25 +158,25 @@ HAL::Power_PowerOffMonitor() {
                 power_resume_from_standby(now);
             }
         } else if (softwareReset == SET || long_press) {
-            systemInfo.powerMonitor.panel_power_on = true;
-            systemInfo.powerMonitor.pannel_power_on_time = now;
+            State::Power().panel_power_on = true;
+            State::Power().pannel_power_on_time = now;
         }
     }
-    const bool requested = systemInfo.powerMonitor.ShutdownReq || systemInfo.powerMonitor.LowBatteryPowerOff
-                           || systemInfo.powerMonitor.Force_ShutDown || systemInfo.powerMonitor.LinuxPowerOff
-                           || systemInfo.powerMonitor.ShutdownEnsure;
+    const bool requested = State::Power().ShutdownReq || State::Power().LowBatteryPowerOff
+                           || State::Power().Force_ShutDown || State::Power().LinuxPowerOff
+                           || State::Power().ShutdownEnsure;
     if (power_policy.state == PowerPolicy::Running && requested) {
         digitalWrite(CHARGE_LED_PIN, LOW);
         digitalWrite(POWER_LED_PIN, HIGH);
         digitalWrite(FUNCTION_LED_PIN, HIGH);
-        systemInfo.powerMonitor.poweroff_flag = 1;
-        systemInfo.powerMonitor.ShutdownGoing = true;
-        systemInfo.powerMonitor.ShutdownReq = false;
+        State::Power().poweroff_flag = 1;
+        State::Power().ShutdownGoing = true;
+        State::Power().ShutdownReq = false;
     }
-    if (power_policy.UpdateShutdown(now, requested, systemInfo.powerMonitor.ShutdownEnsure, FORCE_SHUTDOWN())) {
+    if (power_policy.UpdateShutdown(now, requested, State::Power().ShutdownEnsure, FORCE_SHUTDOWN())) {
         power_enter_standby(now);
     }
-    if ((systemInfo.powerMonitor.ShutdownEnsure) || FORCE_SHUTDOWN() || systemInfo.powerMonitor.LowBatteryPowerOff) {
+    if ((State::Power().ShutdownEnsure) || FORCE_SHUTDOWN() || State::Power().LowBatteryPowerOff) {
         if (!POWER_GET_REASON) {
             POWER_GET_REASON = true;
             CORE_DEBUG_PRINTF("POWER OFF .................Power Off Cause: %s", Power_GetPowerOffCause());
@@ -193,8 +186,8 @@ HAL::Power_PowerOffMonitor() {
 
 bool
 HAL::Power_ShutdownSoftReset() {
-    if (systemInfo.powerMonitor.reset_flag) {
-        systemInfo.powerMonitor.reset_flag = false;
+    if (State::Power().reset_flag) {
+        State::Power().reset_flag = false;
         return true;
     }
     return false;
@@ -205,7 +198,7 @@ HAL::Power_Update() {
     WatchDog_Feed();
     OtsStart();
     Power_ProductUpdate();
-    Power_GetInfo(&systemInfo.powerMonitor);
+    Power_GetInfo(&State::Power());
 }
 
 void
@@ -213,9 +206,9 @@ HAL::Power_GetInfo(Power_Monitor_t* info) {
     if (info == nullptr) {
         return;
     }
-    if (millis() - systemInfo.powerMonitor.BatteryLastHandleTime >= 3000) {
-        systemInfo.powerMonitor.BatteryLastHandleTime = millis();
-        if (!systemInfo.online_device.bq40z50) {
+    if (millis() - State::Power().BatteryLastHandleTime >= 3000) {
+        State::Power().BatteryLastHandleTime = millis();
+        if (!systemInfo.board.online_device.bq40z50) {
             digitalToggle(POWER_LED_PIN);
         } else {
             Battery_Sample(info->batteryInfo);
@@ -229,9 +222,8 @@ HAL::Power_GetInfo(Power_Monitor_t* info) {
     Charger_Get().update(info->batteryInfo);
     const bool low = info->panel_power_on && info->batteryInfo.sample_valid && info->batteryInfo.Percent <= 9U
                      && info->batteryInfo.chargeStatus == notCharge && !info->ExternalPower;
-    if (low && systemInfo.recordInfo.record_status != On_Off_Status_OFF) {
-        systemInfo.recordInfo.record_status = On_Off_Status_OFF;
-        systemInfo.recordInfo.record_op = 1;
+    if (low) {
+        State::Request_RecordStop();
     }
     if (power_policy.LowBatteryExpired(millis(), low)) {
         info->LowBatteryPowerOff = true;
@@ -240,17 +232,17 @@ HAL::Power_GetInfo(Power_Monitor_t* info) {
 
 void
 HAL::WatchDog_Feed() {
-    if (millis() - systemInfo.powerMonitor.WatchDogLastFeedTime >= WATCHDOG_FEED_TIME) {
-        systemInfo.powerMonitor.WatchDogLastFeedTime = millis();
+    if (millis() - State::Power().WatchDogLastFeedTime >= WATCHDOG_FEED_TIME) {
+        State::Power().WatchDogLastFeedTime = millis();
         digitalToggle(WATCHDOG_FEED_PIN);
     }
 }
 
 const char*
 HAL::Power_GetPowerOffCause() {
-    if (systemInfo.powerMonitor.LinuxPowerOff) {
+    if (State::Power().LinuxPowerOff) {
         return "Shutdown Board";
-    } else if (systemInfo.powerMonitor.LowBatteryPowerOff) {
+    } else if (State::Power().LowBatteryPowerOff) {
         return "Shutdown LowBattery";
     } else if (FORCE_SHUTDOWN()) {
         return "Shutdown Force";

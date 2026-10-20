@@ -4,7 +4,7 @@
 #include "Common/DataProc/DataProc_Def.h"
 
 /**
- * systemInfo（主控上报的业务数据）<-> 共享应用的 Device Account 与业务命令。
+ * systemInfo（主控上报与面板请求）<-> 共享应用的 Device Account 与业务命令。
  * 页面只使用选项索引；与主控协议编码的映射在这里完成。新增业务数据时扩展
  * snapshot()（读）与 execute()（写），并在 display_protocol.cpp 中收发对应字段。
  */
@@ -14,7 +14,7 @@ class DeviceBridge {
     DataProc::DeviceSnapshot snapshot(std::uint32_t now);
     /** 每轮主循环：同步 Wi-Fi 状态；周期检查快照，内容变化才发布。 */
     void update(std::uint32_t now);
-    /** 执行已校验的业务请求：写 systemInfo 并置变更标志，经面板协议发给主控。 */
+    /** 执行已校验的业务请求：经 State::Request_*() 记录面板请求，由面板协议发给主控。 */
     bool execute(const DataProc::DeviceRequest& request, std::uint32_t now);
     /** 发出 Wi-Fi 开关设定；主控回报一致或超时前视为切换中。 */
     bool request_wifi(bool on, std::uint32_t now);
@@ -31,8 +31,6 @@ class DeviceBridge {
     bool polled_ = false;
     bool sent_ = false; // last_ 有效
     DataProc::DeviceSnapshot last_;
-    // 星图数据曾经到达过（syncStatus 每收到一帧置位，读取后清零）。
-    bool constellations_seen_ = false;
     bool wifi_requested_ = false;
     std::uint32_t wifi_request_ms_ = 0;
 };

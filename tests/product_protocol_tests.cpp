@@ -3,11 +3,10 @@
 #include <cstdio>
 #include <cstring>
 #include <vector>
+#include "SystemState.h"
 #include "mcu_define.h"
 #include "panel_protocol.h"
 #include "product_config.h"
-
-SystemInfo_t systemInfo = {};
 
 static std::vector<uint8_t>
 frame(uint16_t id, const std::vector<uint8_t>& payload = {}, uint8_t type = NM_MSG_QUERY_TYPE) {
@@ -53,8 +52,8 @@ test_xbase_packets() {
     wifi[0] = 1;
     memcpy(&wifi[8], "base-ap", 7);
     assert(decode(frame(0x0C, wifi, NM_MSG_SET_TYPE), response) == NM_PROTOCOL_SET_MSG_PACK_LEN);
-    assert(systemInfo.wifiInfo.wifi_status == On_Off_Status_ON
-           && strcmp(systemInfo.wifiInfo.wifi_ssid, "base-ap") == 0);
+    assert(systemInfo.host.wifi.wifi_status == On_Off_Status_ON
+           && strcmp(systemInfo.host.wifi.wifi_ssid, "base-ap") == 0);
     assert(decode(frame(0x07), response) > 0);
 }
 #else
@@ -71,36 +70,44 @@ test_x1_packets() {
     assert(decode(frame(0x07), response) == 0);
     assert(decode(frame(0x06, std::vector<uint8_t>(88, 0), NM_MSG_SET_TYPE), response) == 0);
 
-    systemInfo.powerMonitor.poweroff_flag = 1;
-    systemInfo.recordInfo.record_op = 1;
+    State::Power().poweroff_flag = 1;
+    State::Request_RecordToggle(); // 面板按键开始录制，待主控读走
     const int ctrl = decode(frame(0x02), response);
     assert(ctrl == NM_PROTOCOL_HEADER_LEN + 8 + NM_PROTOCOL_CRC_LEN);
     assert(response[NM_PROTOCOL_HEADER_LEN + 1] == 1 && response[NM_PROTOCOL_HEADER_LEN + 3] == 1);
-    assert(!systemInfo.powerMonitor.ShutdownEnsure);
+    assert(response[NM_PROTOCOL_HEADER_LEN + 2] == On_Off_Status_ON);
+    assert(!systemInfo.power.ShutdownEnsure);
     message_response_complete(response, static_cast<uint16_t>(ctrl));
-    assert(systemInfo.powerMonitor.ShutdownEnsure && systemInfo.powerMonitor.poweroff_flag == 0);
-    assert(systemInfo.recordInfo.record_op == 0);
+    assert(systemInfo.power.ShutdownEnsure && systemInfo.power.poweroff_flag == 0);
+    // 确认后请求值视为主控已采用，直到主控下一次上报。
+    assert(!systemInfo.request.record_op && systemInfo.host.record.record_status == On_Off_Status_ON);
 
-    // 面板按键切换录制后、主控读走前，主控的 0x03 不覆盖面板状态。
-    systemInfo.recordInfo.record_status = On_Off_Status_ON;
-    systemInfo.recordInfo.record_op = 1;
+    // 读出期间又按键切换：本次读出不确认新的切换。
+    State::Request_RecordToggle();
+    const int ctrl2 = decode(frame(0x02), response);
+    State::Request_RecordToggle();
+    message_response_complete(response, static_cast<uint16_t>(ctrl2));
+    assert(systemInfo.request.record_op);
+
+    // 面板按键切换录制后、主控读走前，主控的 0x03 不覆盖面板显示状态。
+    assert(State::Effective_Record().record_status == On_Off_Status_ON);
     assert(decode(frame(0x03, {0, 0, 0, 0, 0, 0, 0, 0}, NM_MSG_SET_TYPE), response) == NM_PROTOCOL_SET_MSG_PACK_LEN);
-    assert(systemInfo.recordInfo.record_status == On_Off_Status_ON);
-    systemInfo.recordInfo.record_op = 0;
+    assert(State::Effective_Record().record_status == On_Off_Status_ON);
+    State::Confirm_Record(State::Record_Revision(), false);
     assert(decode(frame(0x03, {0, 0, 0, 0, 0, 0, 0, 0}, NM_MSG_SET_TYPE), response) == NM_PROTOCOL_SET_MSG_PACK_LEN);
-    assert(systemInfo.recordInfo.record_status == On_Off_Status_OFF);
+    assert(State::Effective_Record().record_status == On_Off_Status_OFF);
     assert(decode(frame(0x03, {2}, NM_MSG_SET_TYPE), response) == 0);
 
     const int reset = decode(frame(0x04, {1}, NM_MSG_SET_TYPE), response);
     assert(reset == NM_PROTOCOL_SET_MSG_PACK_LEN && response[NM_PROTOCOL_HEADER_LEN] == 1);
-    assert(systemInfo.powerMonitor.reset_flag == 0);
+    assert(systemInfo.power.reset_flag == 0);
     message_response_complete(response, static_cast<uint16_t>(reset));
-    assert(systemInfo.powerMonitor.reset_flag == 1);
+    assert(systemInfo.power.reset_flag == 1);
 
     const int power = decode(frame(0x05, {1}, NM_MSG_SET_TYPE), response);
-    assert(power == NM_PROTOCOL_SET_MSG_PACK_LEN && !systemInfo.powerMonitor.LinuxPowerOff);
+    assert(power == NM_PROTOCOL_SET_MSG_PACK_LEN && !systemInfo.power.LinuxPowerOff);
     message_response_complete(response, static_cast<uint16_t>(power));
-    assert(systemInfo.powerMonitor.LinuxPowerOff);
+    assert(systemInfo.power.LinuxPowerOff);
 }
 #endif
 

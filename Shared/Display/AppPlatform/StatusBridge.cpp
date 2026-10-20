@@ -1,6 +1,7 @@
 #include "StatusBridge.h"
 
 #include "P4App.h"
+#include "SystemState.h"
 #include "Utils/I18n/I18n.h"
 #include "mcu_config.h"
 
@@ -11,11 +12,12 @@ void
 position_text(page::StatusBarState& state) {
     i18n::TextId id = i18n::TextId::PositionNone;
     lv_color_t color = lv_palette_main(LV_PALETTE_RED);
-    if (systemInfo.work_mode == base_mode || systemInfo.work_mode == autobase_mode) {
+    const WorkMode_t mode = State::Effective_Work().work_mode;
+    if (mode == base_mode || mode == autobase_mode) {
         id = i18n::TextId::PositionBase;
         color = lv_palette_main(LV_PALETTE_BLUE);
     } else {
-        switch (systemInfo.positionInfo.coordinate_status) {
+        switch (systemInfo.host.position.coordinate_status) {
             case position_single:
                 id = i18n::TextId::PositionSingle;
                 color = lv_palette_main(LV_PALETTE_YELLOW);
@@ -47,7 +49,7 @@ StatusBridge::update(P4App& app, std::uint32_t now) {
 
     page::StatusBarState state;
     position_text(state);
-    state.satellites = systemInfo.positionInfo.satellite_number_used;
+    state.satellites = systemInfo.host.position.satellite_number_used;
     state.satellites_valid = true;
     // 主控未下发时间，沿用旧状态栏：显示开机运行时长。
     const std::uint32_t seconds = now / 1000U;
@@ -57,8 +59,8 @@ StatusBridge::update(P4App& app, std::uint32_t now) {
     state.clock_valid = true;
     // 旧状态栏的 SD 图标从未按录制状态点亮（相关代码已注释），保持一致。
     state.recording = false;
-    state.wifi = systemInfo.wifiInfo.wifi_status == On_Off_Status_ON;
-    const BatteryInfo_t& battery = systemInfo.powerMonitor.batteryInfo;
+    state.wifi = systemInfo.host.wifi.wifi_status == On_Off_Status_ON;
+    const BatteryInfo_t& battery = systemInfo.power.batteryInfo;
     state.battery_valid = battery.sample_valid;
     state.battery_percent = battery.Percent;
     state.charging = battery.chargeStatus != notCharge;

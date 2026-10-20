@@ -38,7 +38,7 @@ HAL::Power_ProductInit() {
 // 由 HAL::Power_Update() 每 500 ms 调用。
 void
 HAL::Power_ProductUpdate() {
-    const BatteryInfo_t& battery = systemInfo.powerMonitor.batteryInfo;
+    const BatteryInfo_t& battery = systemInfo.power.batteryInfo;
     if (comp_updated) {
         return;
     }

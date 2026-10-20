@@ -48,6 +48,7 @@ file(GLOB APP_PLATFORM_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_LIST_DIR}/../Sh
 add_executable(main
     main.cpp
     ${APP_PLATFORM_SOURCES}
+    ${CMAKE_CURRENT_LIST_DIR}/../Platform/State/SystemState.cpp
     ${APP_SOURCES}
     ${HAL_SOURCES}
     ${LVGL_SOURCES}
@@ -60,6 +61,7 @@ target_include_directories(main PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/../Libraries
     ${LVGL_DIR}
     ${CMAKE_CURRENT_LIST_DIR}/../Platform/Config
+    ${CMAKE_CURRENT_LIST_DIR}/../Platform/State
     ${CMAKE_CURRENT_BINARY_DIR}/generated/Platform/Config
     ${SIM_PRODUCT_DIR}
 )

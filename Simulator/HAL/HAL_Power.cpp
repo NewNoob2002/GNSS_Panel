@@ -1,5 +1,6 @@
 #include "../../Platform/HAL/PowerPolicy.h"
 #include "HAL.h"
+#include "SystemState.h"
 #include "lvgl/lvgl.h"
 
 static PowerPolicy power_policy;
@@ -12,16 +13,16 @@ HAL::Power_Init() {
 void
 HAL::Power_Shutdown(bool completed) {
     if (completed) {
-        systemInfo.powerMonitor.ShutdownGoing = false;
-        systemInfo.powerMonitor.ShutdownComplete = true;
+        State::Power().ShutdownGoing = false;
+        State::Power().ShutdownComplete = true;
     } else {
-        systemInfo.powerMonitor.ShutdownReq = true;
+        State::Power().ShutdownReq = true;
     }
 }
 
 void
 HAL::Power_PowerOffMonitor() {
-    auto& power = systemInfo.powerMonitor;
+    auto& power = State::Power();
     const bool requested = power.ShutdownReq || power.Force_ShutDown || power.LowBatteryPowerOff || power.LinuxPowerOff
                            || power.ShutdownEnsure;
     if (power_policy.state == PowerPolicy::Running && requested) {
@@ -36,8 +37,8 @@ HAL::Power_PowerOffMonitor() {
 
 bool
 HAL::Power_ShutdownSoftReset() {
-    const bool value = systemInfo.powerMonitor.reset_flag;
-    systemInfo.powerMonitor.reset_flag = false;
+    const bool value = State::Power().reset_flag;
+    State::Power().reset_flag = false;
     return value;
 }
 
@@ -54,13 +55,13 @@ HAL::WatchDog_Feed() {}
 
 const char*
 HAL::Power_GetPowerOffCause() {
-    if (systemInfo.powerMonitor.LinuxPowerOff) {
+    if (State::Power().LinuxPowerOff) {
         return "Shutdown Board";
     }
-    if (systemInfo.powerMonitor.LowBatteryPowerOff) {
+    if (State::Power().LowBatteryPowerOff) {
         return "Shutdown LowBattery";
     }
-    if (systemInfo.powerMonitor.Force_ShutDown) {
+    if (State::Power().Force_ShutDown) {
         return "Shutdown Force";
     }
     return "Shutdown PushKey";

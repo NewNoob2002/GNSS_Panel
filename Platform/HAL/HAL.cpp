@@ -2,9 +2,8 @@
 #include "Arduino.h"
 #include "Charger.h"
 #include "MillisTaskManager/MillisTaskManager.h"
+#include "SystemState.h"
 #include "elog.h"
-
-SystemInfo_t systemInfo;
 
 static MillisTaskManager taskManager;
 
@@ -85,14 +84,14 @@ HAL::HAL_Init() {
     Power_Init();
     /* Set Interrupt Group Priority */
     HAL_NVIC_SetPriorityGrouping(NVIC_PRIORITYGROUP_4);
-    memset(&systemInfo, 0, sizeof(systemInfo));
+    State::Reset();
     /* Use systick as time base source and configure 1ms tick (default clock after Reset is HSI) */
     HAL_InitTick(TICK_INT_PRIORITY);
 
     I2C_Scan();
     // 扫描结果决定主板版本（V1.5 带 MP2762A，V1.3 用 GPIO 控制充电）。
-    Charger_Get().begin(systemInfo.powerMonitor.batteryInfo);
-    CORE_DEBUG_PRINTF("Board %s, charger %s", systemInfo.hardware_version, Charger_Get().name());
+    Charger_Get().begin(State::Power().batteryInfo);
+    CORE_DEBUG_PRINTF("Board %s, charger %s", systemInfo.board.hardware_version, Charger_Get().name());
     Key_Init();
 
     taskManager.Register(HAL_MONITOR_TASK, PRODUCT_MONITOR_PERIOD_MS);
@@ -113,9 +112,6 @@ HAL::HAL_Update() {
         // 当前 Boot 根据软件复位标志进入升级窗口，无共享 SRAM 命令。
         __DSB();
         NVIC_SystemReset();
-    }
-    if (millis() - systemInfo.powerMonitor.pannel_power_on_time >= 30000 && !systemInfo.online_device.eg25_board) {
-        systemInfo.eg25_overtime = true;
     }
 }
 

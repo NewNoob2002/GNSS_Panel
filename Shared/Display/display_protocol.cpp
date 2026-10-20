@@ -1,17 +1,19 @@
 #include "display_protocol.h"
 #include <cmath>
 #include <cstring>
+#include "SystemState.h"
 #include "core_debug.h"
 #include "mcu_define.h"
 #include "product_config.h"
 
-/* 响应编码时的字段快照：完整读出后与当前值比较，期间有新变化则保留变更标志。 */
+// 写入范围：主控上报只写 State::Host()；面板请求经 State::Confirm_*() 确认；
+// 电源相关通知经 State::Host_*() 交给 HAL 电源策略。
+
+/* 响应编码时记下的请求 revision：完整读出后若请求未再变化，主控即已收到该请求。 */
 static struct {
-    RadioInfo_t radio;
-    WorkMode_t workMode;
-    NtripInfo_t ntrip;
-    RecordInfo_t record;
-    WifiInfo_t wifi;
+    uint32_t work;
+    uint32_t record;
+    uint32_t wifi;
     uint8_t poweroffFlag;
 } response_snapshot;
 
@@ -26,32 +28,33 @@ valid_position(uint8_t value) {
 static void
 fill_info1_response(const SEMP_PARSE_STATE* parse, uint8_t* msg) {
     (void)parse;
-    systemInfo.messageDecode.Info1_count++;
-    memcpy(&msg[NM_PROTOCOL_HEADER_LEN + 0], systemInfo.hardware_version, strnlen(systemInfo.hardware_version, 8));
-    memcpy(&msg[NM_PROTOCOL_HEADER_LEN + 8], systemInfo.software_version, strnlen(systemInfo.software_version, 10));
-    memcpy(&msg[NM_PROTOCOL_HEADER_LEN + 18], &systemInfo.powerMonitor.batteryInfo.Percent, 2);
-    memcpy(&msg[NM_PROTOCOL_HEADER_LEN + 20], &systemInfo.powerMonitor.batteryInfo.Temp, 2);
-    memcpy(&msg[NM_PROTOCOL_HEADER_LEN + 22], &systemInfo.powerMonitor.batteryInfo.Voltage, 2);
+    State::Diagnostics().messages.Info1_count++;
+    const BoardInfo_t& board = systemInfo.board;
+    const BatteryInfo_t& battery = systemInfo.power.batteryInfo;
+    memcpy(&msg[NM_PROTOCOL_HEADER_LEN + 0], board.hardware_version, strnlen(board.hardware_version, 8));
+    memcpy(&msg[NM_PROTOCOL_HEADER_LEN + 8], board.software_version, strnlen(board.software_version, 10));
+    memcpy(&msg[NM_PROTOCOL_HEADER_LEN + 18], &battery.Percent, 2);
+    memcpy(&msg[NM_PROTOCOL_HEADER_LEN + 20], &battery.Temp, 2);
+    memcpy(&msg[NM_PROTOCOL_HEADER_LEN + 22], &battery.Voltage, 2);
 }
 
 static void
 fill_info2_response(const SEMP_PARSE_STATE* parse, uint8_t* msg) {
     (void)parse;
-    systemInfo.messageDecode.Info2_count++;
-    msg[NM_PROTOCOL_HEADER_LEN + 0] = systemInfo.powerMonitor.reset_flag;
-    msg[NM_PROTOCOL_HEADER_LEN + 1] = systemInfo.powerMonitor.poweroff_flag;
-    msg[NM_PROTOCOL_HEADER_LEN + 2] = systemInfo.recordInfo.record_status;
-    msg[NM_PROTOCOL_HEADER_LEN + 3] = systemInfo.recordInfo.record_op;
-    msg[NM_PROTOCOL_HEADER_LEN + 4] = systemInfo.powerMonitor.batteryInfo.chargeStatus != notCharge;
-    response_snapshot.poweroffFlag = systemInfo.powerMonitor.poweroff_flag;
+    State::Diagnostics().messages.Info2_count++;
+    msg[NM_PROTOCOL_HEADER_LEN + 0] = systemInfo.power.reset_flag;
+    msg[NM_PROTOCOL_HEADER_LEN + 1] = systemInfo.power.poweroff_flag;
+    msg[NM_PROTOCOL_HEADER_LEN + 2] = State::Effective_Record().record_status;
+    msg[NM_PROTOCOL_HEADER_LEN + 3] = systemInfo.request.record_op;
+    msg[NM_PROTOCOL_HEADER_LEN + 4] = systemInfo.power.batteryInfo.chargeStatus != notCharge;
+    response_snapshot.poweroffFlag = systemInfo.power.poweroff_flag;
 }
 
 // 主控完整读到关机请求即视为确认（旧版 X1Pro/XBase 语义），与 0x05 确认二选一均可。
 static void
 info2_read_complete() {
     if (response_snapshot.poweroffFlag) {
-        systemInfo.powerMonitor.poweroff_flag = 0;
-        systemInfo.powerMonitor.ShutdownEnsure = true;
+        State::Host_ShutdownAcknowledged();
         CORE_DEBUG_PRINTF("Shutdown Sync");
     }
 }
@@ -59,73 +62,65 @@ info2_read_complete() {
 static void
 fill_info3_response(const SEMP_PARSE_STATE* parse, uint8_t* msg) {
     (void)parse;
-    systemInfo.messageDecode.Info3_count++;
-    msg[NM_PROTOCOL_HEADER_LEN + 0] = systemInfo.work_mode;
-    msg[NM_PROTOCOL_HEADER_LEN + 1] = systemInfo.positionInfo.satellite_number_used;
-    msg[NM_PROTOCOL_HEADER_LEN + 2] = systemInfo.positionInfo.coordinate_status;
-    msg[NM_PROTOCOL_HEADER_LEN + 3] = systemInfo.ntripInfo.gprs_status;
-    msg[NM_PROTOCOL_HEADER_LEN + 4] = systemInfo.ntripInfo.NtripServer_status;
-    msg[NM_PROTOCOL_HEADER_LEN + 5] = systemInfo.ntripInfo.NtripClient_status;
-    msg[NM_PROTOCOL_HEADER_LEN + 6] = systemInfo.radioInfo.radio_status;
-    msg[NM_PROTOCOL_HEADER_LEN + 11] = systemInfo.radioInfo.radio_change_flag;
-    memcpy(&msg[NM_PROTOCOL_HEADER_LEN + 12], &systemInfo.ntripInfo.NtripServer_IP, 4);
-    memcpy(&msg[NM_PROTOCOL_HEADER_LEN + 16], &systemInfo.ntripInfo.NtripServer_Mountpoint, 32);
-    memcpy(&msg[NM_PROTOCOL_HEADER_LEN + 48], &systemInfo.ntripInfo.NtripClient_IP, 4);
-    memcpy(&msg[NM_PROTOCOL_HEADER_LEN + 52], &systemInfo.ntripInfo.NtripClient_Mountpoint, 32);
-    msg[NM_PROTOCOL_HEADER_LEN + 84] = systemInfo.radioInfo.radio_mode;
-    msg[NM_PROTOCOL_HEADER_LEN + 85] = systemInfo.radioInfo.radio_protocol;
-    msg[NM_PROTOCOL_HEADER_LEN + 86] = systemInfo.radioInfo.radio_channel;
-    response_snapshot.radio = systemInfo.radioInfo;
-    response_snapshot.workMode = systemInfo.work_mode;
-    response_snapshot.ntrip = systemInfo.ntripInfo;
+    State::Diagnostics().messages.Info3_count++;
+    const WorkConfig_t work = State::Effective_Work();
+    const HostReport_t& host = systemInfo.host;
+    msg[NM_PROTOCOL_HEADER_LEN + 0] = work.work_mode;
+    msg[NM_PROTOCOL_HEADER_LEN + 1] = host.position.satellite_number_used;
+    msg[NM_PROTOCOL_HEADER_LEN + 2] = host.position.coordinate_status;
+    msg[NM_PROTOCOL_HEADER_LEN + 3] = work.gprs_status;
+    msg[NM_PROTOCOL_HEADER_LEN + 4] = work.NtripServer_status;
+    msg[NM_PROTOCOL_HEADER_LEN + 5] = host.ntrip.NtripClient_status;
+    msg[NM_PROTOCOL_HEADER_LEN + 6] = work.radio_status;
+    msg[NM_PROTOCOL_HEADER_LEN + 11] = systemInfo.request.work_pending;
+    memcpy(&msg[NM_PROTOCOL_HEADER_LEN + 12], &host.ntrip.NtripServer_IP, 4);
+    memcpy(&msg[NM_PROTOCOL_HEADER_LEN + 16], &host.ntrip.NtripServer_Mountpoint, 32);
+    memcpy(&msg[NM_PROTOCOL_HEADER_LEN + 48], &host.ntrip.NtripClient_IP, 4);
+    memcpy(&msg[NM_PROTOCOL_HEADER_LEN + 52], &host.ntrip.NtripClient_Mountpoint, 32);
+    msg[NM_PROTOCOL_HEADER_LEN + 84] = work.radio_mode;
+    msg[NM_PROTOCOL_HEADER_LEN + 85] = work.radio_protocol;
+    msg[NM_PROTOCOL_HEADER_LEN + 86] = work.radio_channel;
+    response_snapshot.work = State::Work_Revision();
 }
 
 static void
 info3_read_complete() {
-    if (memcmp(&systemInfo.radioInfo, &response_snapshot.radio, sizeof(RadioInfo_t)) == 0
-        && systemInfo.work_mode == response_snapshot.workMode
-        && memcmp(&systemInfo.ntripInfo, &response_snapshot.ntrip, sizeof(NtripInfo_t)) == 0) {
-        systemInfo.radioInfo.radio_change_flag = 0;
-    }
+    State::Confirm_Work(response_snapshot.work);
 }
 
 static void
 fill_info4_response(const SEMP_PARSE_STATE* parse, uint8_t* msg) {
     (void)parse;
-    systemInfo.messageDecode.Info4_count++;
-    msg[NM_PROTOCOL_HEADER_LEN + 0] = systemInfo.recordInfo.record_status;
-    msg[NM_PROTOCOL_HEADER_LEN + 1] = systemInfo.recordInfo.record_op;
-    memcpy(&msg[NM_PROTOCOL_HEADER_LEN + 4], &systemInfo.recordInfo.record_leftspace, 4);
-    memcpy(&msg[NM_PROTOCOL_HEADER_LEN + 8], &systemInfo.recordInfo.record_name, 16);
-    msg[NM_PROTOCOL_HEADER_LEN + 24] = systemInfo.recordInfo.record_type;
-    msg[NM_PROTOCOL_HEADER_LEN + 25] = systemInfo.recordInfo.record_interval;
-    msg[NM_PROTOCOL_HEADER_LEN + 26] = systemInfo.recordInfo.record_change_flag;
-    response_snapshot.record = systemInfo.recordInfo;
+    State::Diagnostics().messages.Info4_count++;
+    const RecordInfo_t record = State::Effective_Record();
+    msg[NM_PROTOCOL_HEADER_LEN + 0] = record.record_status;
+    msg[NM_PROTOCOL_HEADER_LEN + 1] = systemInfo.request.record_op;
+    memcpy(&msg[NM_PROTOCOL_HEADER_LEN + 4], &record.record_leftspace, 4);
+    memcpy(&msg[NM_PROTOCOL_HEADER_LEN + 8], &record.record_name, 16);
+    msg[NM_PROTOCOL_HEADER_LEN + 24] = record.record_type;
+    msg[NM_PROTOCOL_HEADER_LEN + 25] = record.record_interval;
+    msg[NM_PROTOCOL_HEADER_LEN + 26] = systemInfo.request.record_settings_pending;
+    response_snapshot.record = State::Record_Revision();
 }
 
 static void
 info4_read_complete() {
-    if (memcmp(&systemInfo.recordInfo, &response_snapshot.record, sizeof(RecordInfo_t)) == 0) {
-        systemInfo.recordInfo.record_change_flag = 0;
-        systemInfo.recordInfo.record_op = 0;
-    }
+    State::Confirm_Record(response_snapshot.record, true);
 }
 
 #if PRODUCT_PROTOCOL_WIFI_CONTROL
 static void
 fill_wifi_info_response(const SEMP_PARSE_STATE* parse, uint8_t* msg) {
     (void)parse;
-    systemInfo.messageDecode.InfoWifi_count++;
-    msg[NM_PROTOCOL_HEADER_LEN + 0] = systemInfo.wifiInfo.wifi_on_off_set;
-    msg[NM_PROTOCOL_HEADER_LEN + 3] = systemInfo.wifiInfo.wifi_change_flag;
-    response_snapshot.wifi = systemInfo.wifiInfo;
+    State::Diagnostics().messages.InfoWifi_count++;
+    msg[NM_PROTOCOL_HEADER_LEN + 0] = systemInfo.request.wifi_on;
+    msg[NM_PROTOCOL_HEADER_LEN + 3] = systemInfo.request.wifi_pending;
+    response_snapshot.wifi = State::Wifi_Revision();
 }
 
 static void
 wifi_info_read_complete() {
-    if (memcmp(&systemInfo.wifiInfo, &response_snapshot.wifi, sizeof(WifiInfo_t)) == 0) {
-        systemInfo.wifiInfo.wifi_change_flag = 0;
-    }
+    State::Confirm_Wifi(response_snapshot.wifi);
 }
 #endif
 
@@ -144,7 +139,7 @@ handle_reset_request(const SEMP_PARSE_STATE* parse, uint8_t* msg) {
 
 static void
 reset_read_complete() {
-    systemInfo.powerMonitor.reset_flag = pending_reset;
+    State::Host_ResetRequested(pending_reset);
 }
 
 static void
@@ -156,11 +151,7 @@ handle_shutdown_confirmation(const SEMP_PARSE_STATE* parse, uint8_t* msg) {
 static void
 shutdown_confirmation_read_complete() {
     if (pending_shutdown_confirmation) {
-        systemInfo.powerMonitor.poweroff_flag = 0;
-        systemInfo.powerMonitor.ShutdownEnsure = true;
-        if (!systemInfo.powerMonitor.ShutdownGoing) {
-            systemInfo.powerMonitor.LinuxPowerOff = true;
-        }
+        State::Host_ShutdownConfirmed();
     }
 }
 
@@ -172,40 +163,33 @@ validate_set1(const uint8_t* payload, uint16_t payloadLength) {
            && payload[87] <= 1U;
 }
 
+// 主控上报总是写入 host；面板有待确认的工作模式请求时界面仍显示请求值（State::Effective_Work）。
 static void
 handle_set1_request(const SEMP_PARSE_STATE* parse, uint8_t* msg) {
-    systemInfo.messageDecode.Set1_count++;
-    if (systemInfo.radioInfo.radio_change_flag == 0) {
-        systemInfo.work_mode = static_cast<WorkMode_t>(parse->buffer[NM_PROTOCOL_HEADER_LEN + 0]);
-        systemInfo.positionInfo.satellite_number_used = parse->buffer[NM_PROTOCOL_HEADER_LEN + 1];
-        systemInfo.positionInfo.coordinate_status =
-            static_cast<PositionStatus_t>(parse->buffer[NM_PROTOCOL_HEADER_LEN + 2]);
-        systemInfo.ntripInfo.gprs_status = static_cast<On_Off_Status_t>(parse->buffer[NM_PROTOCOL_HEADER_LEN + 3]);
-        systemInfo.ntripInfo.NtripServer_status =
-            static_cast<On_Off_Status_t>(parse->buffer[NM_PROTOCOL_HEADER_LEN + 4]);
-        systemInfo.ntripInfo.NtripClient_status =
-            static_cast<On_Off_Status_t>(parse->buffer[NM_PROTOCOL_HEADER_LEN + 5]);
-        systemInfo.radioInfo.radio_status = static_cast<On_Off_Status_t>(parse->buffer[NM_PROTOCOL_HEADER_LEN + 6]);
-
-        systemInfo.positionInfo.satellite_number_track = parse->buffer[NM_PROTOCOL_HEADER_LEN + 7];
-
-        const uint8_t externalPower = parse->buffer[NM_PROTOCOL_HEADER_LEN + 8];
-        if (systemInfo.powerMonitor.ExternalPower && externalPower == 0) {
-            systemInfo.powerMonitor.ExternalPowerChange = 1;
-        }
-        systemInfo.powerMonitor.ExternalPower = externalPower;
-        systemInfo.radioInfo.radio_change_flag = parse->buffer[NM_PROTOCOL_HEADER_LEN + 11];
-        memcpy(&systemInfo.ntripInfo.NtripServer_IP, &parse->buffer[NM_PROTOCOL_HEADER_LEN + 12], 4);
-        memcpy(&systemInfo.ntripInfo.NtripServer_Mountpoint, &parse->buffer[NM_PROTOCOL_HEADER_LEN + 16], 32);
-        memcpy(&systemInfo.ntripInfo.NtripClient_IP, &parse->buffer[NM_PROTOCOL_HEADER_LEN + 48], 4);
-        memcpy(&systemInfo.ntripInfo.NtripClient_Mountpoint, &parse->buffer[NM_PROTOCOL_HEADER_LEN + 52], 32);
-        systemInfo.radioInfo.radio_mode = static_cast<RadioMode_t>(parse->buffer[NM_PROTOCOL_HEADER_LEN + 84]);
-        systemInfo.radioInfo.radio_protocol = parse->buffer[NM_PROTOCOL_HEADER_LEN + 85];
-        systemInfo.radioInfo.radio_channel = parse->buffer[NM_PROTOCOL_HEADER_LEN + 86];
-        if (parse->buffer[NM_PROTOCOL_HEADER_LEN + 87]) {
-            systemInfo.powerMonitor.poweroff_flag = 1;
-            systemInfo.powerMonitor.LinuxPowerOff = true;
-        }
+    State::Diagnostics().messages.Set1_count++;
+    const uint8_t* payload = &parse->buffer[NM_PROTOCOL_HEADER_LEN];
+    HostReport_t& host = State::Host();
+    host.work.work_mode = static_cast<WorkMode_t>(payload[0]);
+    host.position.satellite_number_used = payload[1];
+    host.position.coordinate_status = static_cast<PositionStatus_t>(payload[2]);
+    host.work.gprs_status = static_cast<On_Off_Status_t>(payload[3]);
+    host.work.NtripServer_status = static_cast<On_Off_Status_t>(payload[4]);
+    host.ntrip.NtripClient_status = static_cast<On_Off_Status_t>(payload[5]);
+    host.work.radio_status = static_cast<On_Off_Status_t>(payload[6]);
+    host.position.satellite_number_track = payload[7];
+    State::Host_ExternalPower(payload[8]);
+    memcpy(&host.ntrip.NtripServer_IP, &payload[12], 4);
+    memcpy(&host.ntrip.NtripServer_Mountpoint, &payload[16], 32);
+    memcpy(&host.ntrip.NtripClient_IP, &payload[48], 4);
+    memcpy(&host.ntrip.NtripClient_Mountpoint, &payload[52], 32);
+    host.work.radio_mode = static_cast<RadioMode_t>(payload[84]);
+    host.work.radio_protocol = payload[85];
+    host.work.radio_channel = payload[86];
+    if (payload[11]) {
+        State::Echo_HostWork();
+    }
+    if (payload[87]) {
+        State::Host_ShutdownRequested();
     }
     panel_write_success_payload(msg);
 }
@@ -223,12 +207,12 @@ validate_set3(const uint8_t* payload, uint16_t payloadLength) {
 
 static void
 handle_set3_request(const SEMP_PARSE_STATE* parse, uint8_t* msg) {
-    systemInfo.messageDecode.Set3_count++;
-    systemInfo.positionInfo.coordinate_status =
-        static_cast<PositionStatus_t>(parse->buffer[NM_PROTOCOL_HEADER_LEN + 0]);
-    memcpy(&systemInfo.positionInfo.coordinate_lon, &parse->buffer[NM_PROTOCOL_HEADER_LEN + 4], 8);
-    memcpy(&systemInfo.positionInfo.coordinate_lat, &parse->buffer[NM_PROTOCOL_HEADER_LEN + 12], 8);
-    memcpy(&systemInfo.positionInfo.coordinate_alt, &parse->buffer[NM_PROTOCOL_HEADER_LEN + 20], 8);
+    State::Diagnostics().messages.Set3_count++;
+    PositionInfo_t& position = State::Host().position;
+    position.coordinate_status = static_cast<PositionStatus_t>(parse->buffer[NM_PROTOCOL_HEADER_LEN + 0]);
+    memcpy(&position.coordinate_lon, &parse->buffer[NM_PROTOCOL_HEADER_LEN + 4], 8);
+    memcpy(&position.coordinate_lat, &parse->buffer[NM_PROTOCOL_HEADER_LEN + 12], 8);
+    memcpy(&position.coordinate_alt, &parse->buffer[NM_PROTOCOL_HEADER_LEN + 20], 8);
     panel_write_success_payload(msg);
 }
 
@@ -242,14 +226,16 @@ validate_set6(const uint8_t* payload, uint16_t payloadLength) {
 
 static void
 handle_set6_request(const SEMP_PARSE_STATE* parse, uint8_t* msg) {
-    systemInfo.messageDecode.Set6_count++;
-    if (systemInfo.recordInfo.record_change_flag == 0) {
-        systemInfo.recordInfo.record_status = static_cast<On_Off_Status_t>(parse->buffer[NM_PROTOCOL_HEADER_LEN + 0]);
-        memcpy(&systemInfo.recordInfo.record_leftspace, &parse->buffer[NM_PROTOCOL_HEADER_LEN + 4], 4);
-        memcpy(&systemInfo.recordInfo.record_name, &parse->buffer[NM_PROTOCOL_HEADER_LEN + 8], 16);
-        systemInfo.recordInfo.record_type = parse->buffer[NM_PROTOCOL_HEADER_LEN + 24];
-        systemInfo.recordInfo.record_interval = parse->buffer[NM_PROTOCOL_HEADER_LEN + 25];
-        systemInfo.recordInfo.record_change_flag = parse->buffer[NM_PROTOCOL_HEADER_LEN + 26];
+    State::Diagnostics().messages.Set6_count++;
+    const uint8_t* payload = &parse->buffer[NM_PROTOCOL_HEADER_LEN];
+    RecordInfo_t& record = State::Host().record;
+    record.record_status = static_cast<On_Off_Status_t>(payload[0]);
+    memcpy(&record.record_leftspace, &payload[4], 4);
+    memcpy(&record.record_name, &payload[8], 16);
+    record.record_type = payload[24];
+    record.record_interval = payload[25];
+    if (payload[26]) {
+        State::Echo_HostRecord();
     }
     panel_write_success_payload(msg);
 }
@@ -262,29 +248,28 @@ validate_set_wifi(const uint8_t* payload, uint16_t payloadLength) {
 
 static void
 handle_set_wifi_request(const SEMP_PARSE_STATE* parse, uint8_t* msg) {
-    systemInfo.messageDecode.SetWifi_count++;
-    // 无 Wi-Fi 控制的产品不会置位 wifi_change_flag，状态总是直接同步。
-    if (systemInfo.wifiInfo.wifi_change_flag == 0) {
-        systemInfo.wifiInfo.wifi_status = static_cast<On_Off_Status_t>(parse->buffer[NM_PROTOCOL_HEADER_LEN + 0]);
-        systemInfo.wifiInfo.wifi_mode = parse->buffer[NM_PROTOCOL_HEADER_LEN + 1];
-        memcpy(&systemInfo.wifiInfo.wifi_ip, &parse->buffer[NM_PROTOCOL_HEADER_LEN + 4], 4);
-        memcpy(&systemInfo.wifiInfo.wifi_ssid, &parse->buffer[NM_PROTOCOL_HEADER_LEN + 8], 16);
-    }
+    State::Diagnostics().messages.SetWifi_count++;
+    WifiInfo_t& wifi = State::Host().wifi;
+    wifi.wifi_status = static_cast<On_Off_Status_t>(parse->buffer[NM_PROTOCOL_HEADER_LEN + 0]);
+    wifi.wifi_mode = parse->buffer[NM_PROTOCOL_HEADER_LEN + 1];
+    memcpy(&wifi.wifi_ip, &parse->buffer[NM_PROTOCOL_HEADER_LEN + 4], 4);
+    memcpy(&wifi.wifi_ssid, &parse->buffer[NM_PROTOCOL_HEADER_LEN + 8], 16);
     panel_write_success_payload(msg);
 }
 
 #if PRODUCT_PROTOCOL_SATELLITE
 static void
 handle_set_satellite_request(const SEMP_PARSE_STATE* parse, uint8_t* msg) {
-    systemInfo.messageDecode.SetSatellite_count++;
-    systemInfo.starMapInfo.numberGPS = parse->buffer[NM_PROTOCOL_HEADER_LEN + 0];
-    systemInfo.starMapInfo.numberGLONASS = parse->buffer[NM_PROTOCOL_HEADER_LEN + 1];
-    systemInfo.starMapInfo.numberGALILEO = parse->buffer[NM_PROTOCOL_HEADER_LEN + 2];
-    systemInfo.starMapInfo.numberBDS = parse->buffer[NM_PROTOCOL_HEADER_LEN + 3];
-    systemInfo.starMapInfo.numberSBAS = parse->buffer[NM_PROTOCOL_HEADER_LEN + 4];
-    systemInfo.starMapInfo.numberQZSS = parse->buffer[NM_PROTOCOL_HEADER_LEN + 5];
-    systemInfo.starMapInfo.numberIRNSS = parse->buffer[NM_PROTOCOL_HEADER_LEN + 6];
-    systemInfo.starMapInfo.syncStatus = true;
+    State::Diagnostics().messages.SetSatellite_count++;
+    StarMapInfo_t& stars = State::Host().starMap;
+    stars.numberGPS = parse->buffer[NM_PROTOCOL_HEADER_LEN + 0];
+    stars.numberGLONASS = parse->buffer[NM_PROTOCOL_HEADER_LEN + 1];
+    stars.numberGALILEO = parse->buffer[NM_PROTOCOL_HEADER_LEN + 2];
+    stars.numberBDS = parse->buffer[NM_PROTOCOL_HEADER_LEN + 3];
+    stars.numberSBAS = parse->buffer[NM_PROTOCOL_HEADER_LEN + 4];
+    stars.numberQZSS = parse->buffer[NM_PROTOCOL_HEADER_LEN + 5];
+    stars.numberIRNSS = parse->buffer[NM_PROTOCOL_HEADER_LEN + 6];
+    ++stars.sequence;
     panel_write_success_payload(msg);
 }
 #endif
