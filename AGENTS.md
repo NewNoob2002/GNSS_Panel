@@ -23,7 +23,7 @@ Put a difference between products in `product_config.h` as a `PRODUCT_*` switch,
 
 - `cmake --preset <product>-debug` / `<product>-release` configures one product, where `<product>` is `x1`, `x1pro` or `xbase`; build with `cmake --build --preset <same name>`. Outputs go to `build/<preset>/` (`.elf`, `.map`) and `build/<preset>/generated/` (`.hex`, `.bin`).
 - `gcc-debug` / `gcc-release` remain as aliases for X1Pro and provide `build/gcc-debug/compile_commands.json` for clangd; `.clangd` uses `build/x1-debug` for `Products/X1/`.
-- `cmake -S Simulator -B build/simulator -DSIM_PRODUCT=X1Pro|XBase` builds the PC simulator for a display product (shared app + `AppPlatform` + `Simulator/HAL`).
+- `cmake -S Simulator -B build/simulator -DSIM_PRODUCT=X1Pro|XBase` builds the PC simulator for a display product (shared app + `AppPlatform` + the firmware `Platform/HAL/HAL_Power.cpp` on the virtual board in `Simulator/HAL`).
 - `scripts/sync_shared_app.sh <ATK_RK3506 repo> [commit]` refreshes `Simulator/App` from upstream.
 - `cmake -S tests -B build/host-tests && cmake --build build/host-tests && ctest --test-dir build/host-tests` runs the host regression tests (protocol, transport, power, per-product tables).
 

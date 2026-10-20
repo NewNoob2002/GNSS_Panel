@@ -17,7 +17,7 @@ Libraries/         第三方与器件库；LVGL/Adafruit 仅带屏产品构建�
 Shared/Comm/       I2C 从机传输 + 面板帧协议核心（全部产品）
 Shared/Display/    带屏产品入口、共享应用的 HC32 平台层 AppPlatform/（入口 + Status/Power/Device 三个 Bridge + 初始化步骤）、显示协议表、显示 HAL、LVGL 内存池 operator new（X1Pro、XBase）
 Simulator/App/     共享 LVGL 应用，ATK_RK3506 application/App 的原样副本（UPSTREAM 记录来源提交，scripts/sync_shared_app.sh 同步）
-Simulator/         PC 模拟器：共享应用 + AppPlatform + Simulator/HAL；LVGL 用 Libraries/lvgl，配置用自身 lv_conf.h（LV_CONF_PATH 指定）
+Simulator/         PC 模拟器：共享应用 + AppPlatform + 固件电源时序 HAL_Power.cpp（Simulator/HAL 提供虚拟 GPIO 与时基）；LVGL 用 Libraries/lvgl，配置用自身 lv_conf.h（LV_CONF_PATH 指定）
 Products/<产品>/   product.cmake、product_config.h、产品专属源码
 ```
 
@@ -76,7 +76,9 @@ XBase 的差异取自其分支相对分叉点的产品级改动（无星图/过�
 | 组件 | 位置 | 作用 |
 |---|---|---|
 | `HAL::Charger` | `Platform/HAL/Charger.{h,cpp}` | 充电控制接口；`Mp2762Charger`（V1.5 主板）与 `GpioCharger`（V1.3 主板）两个实现，`Charger_Get()` 按 I2C 扫描结果选择。温度保护 `Charger_Protect()` 与电量计读取 `Battery_Sample()` 与芯片无关 |
-| `PowerPolicy` | `Platform/HAL/PowerPolicy.h` | 关机时序与低电计时（纯逻辑，固件与模拟器共用） |
+| `PowerPolicy` | `Platform/HAL/PowerPolicy.h` | 关机时序与低电计时（纯逻辑） |
+| 电源时序 | `Platform/HAL/HAL_Power.cpp` | 开机长按判定、关机流程、驻留与原地开机、低电量关机；只依赖 GPIO、时基与 `Charger` 的待机切换，固件、主机测试与 PC 模拟器编译同一份 |
+| 电池与充电监控 | `Platform/HAL/HAL_Battery.cpp` | BQ40Z50 采样、充电保护与控制、片内温度、看门狗（仅固件与主机测试） |
 | `HoldTimer` | `Platform/HAL/HoldTimer.h` | 按住计时；Function 键 2.5 s 强制关机（`HAL_Key.cpp`，三产品共用） |
 | `BlinkLed` | `Platform/HAL/BlinkLed.h` | 固定周期闪烁的指示灯 |
 | `StatusBridge` / `PowerBridge` / `DeviceBridge` | `Shared/Display/AppPlatform/` | `systemInfo`/HAL 与共享应用之间各一个方向的转换，状态在对象内 |
