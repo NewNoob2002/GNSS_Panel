@@ -11,7 +11,7 @@
 ## 目录与依赖
 
 ```text
-Platform/          MCU 启动、驱动、Arduino 风格外设、共用 HAL（电源策略、充电/电量计、LED、时基、Flash）
+Platform/          MCU 启动、驱动、Arduino 风格外设、共用 HAL（电源策略、充电/电量计、按键、LED、时基、Flash），Config/board_pins.h 为主板引脚
 Arduino/           Arduino 兼容核心
 Libraries/         第三方与器件库；LVGL/Adafruit 仅带屏产品构建，MultiButton 仅 X1
 Shared/Comm/       I2C 从机传输 + 面板帧协议核心（全部产品）
@@ -31,7 +31,7 @@ Products/<产品>/   product.cmake、product_config.h、产品专属源码
 ## 产品差异放在哪里
 
 1. **功能开关**：`Products/<产品>/product_config.h` 中的 `PRODUCT_*` 宏，经 `mcu_config.h` 被所有源码看到。带屏产品缺少任一开关时 `mcu_config.h` 直接报错，避免 `#if` 未定义被当作 0。
-2. **弱符号扩展点**（`Platform/HAL/HAL.h`）：`Display_Sleep`、`Power_ProductInit`、`Power_ProductUpdate`、`Power_AdjustPercent`。默认无动作，产品源码覆盖。
+2. **弱符号扩展点**（`Platform/HAL/HAL.h`）：`Power_ProductInit`、`Power_ProductUpdate`、`Power_AdjustPercent`、`Key_ProductInit`、`Key_ProductUpdate`。默认无动作，产品源码覆盖（X1：电量补偿、MultiButton 按键动作）。
 3. **协议表**：帧校验、ACK 编码、“完整读出后才生效”在 `Shared/Comm/panel_protocol.cpp`；产品实现 `panel_protocol_packets()`。X1 见 `Products/X1/x1_protocol.cpp`，X1Pro/XBase 共用 `Shared/Display/display_protocol.cpp`。
 4. **产品专属源码**：放在产品目录并在其 `CMakeLists.txt` 中加入 `hc32_product`。
 
@@ -52,6 +52,22 @@ XBase 的差异取自其分支相对分叉点的产品级改动（无星图/过�
 ### 新增一个产品
 
 复制最接近的 `Products/<产品>/` 目录，修改 `product.cmake` 与 `product_config.h`，在顶层 `HC32_PRODUCTS` 和 `CMakePresets.json` 中登记；需要不同行为时优先新增开关或扩展点。
+
+## 平台层的可复用组件
+
+| 组件 | 位置 | 作用 |
+|---|---|---|
+| `HAL::Charger` | `Platform/HAL/Charger.{h,cpp}` | 充电控制接口；`Mp2762Charger`（V1.5 主板）与 `GpioCharger`（V1.3 主板）两个实现，`Charger_Get()` 按 I2C 扫描结果选择。温度保护 `Charger_Protect()` 与电量计读取 `Battery_Sample()` 与芯片无关 |
+| `PowerPolicy` | `Platform/HAL/PowerPolicy.h` | 关机时序与低电计时（纯逻辑，固件与模拟器共用） |
+| `HoldTimer` | `Platform/HAL/HoldTimer.h` | 按住计时；Function 键 2.5 s 强制关机（`HAL_Key.cpp`，三产品共用） |
+| `BlinkLed` | `Platform/HAL/BlinkLed.h` | 固定周期闪烁的指示灯 |
+| `StatusBridge` / `PowerBridge` / `DeviceBridge` | `Shared/Display/AppPlatform/` | `systemInfo`/HAL 与共享应用之间各一个方向的转换，状态在对象内 |
+
+### 常见扩展
+
+- **新的主板版本或充电方案**：在 `Charger.cpp` 增加一个 `HAL::Charger` 实现，并在 `Charger_Get()` 中按检测结果返回；电源与 LED 代码不需要改。
+- **新的业务数据或命令（带屏）**：共享接口先在 ATK_RK3506 增加（`DeviceSnapshot`/`DeviceRequest`），同步后在 `DeviceBridge::snapshot()/execute()` 中映射到 `systemInfo`，并在 `display_protocol.cpp` 收发对应字段。
+- **产品专属按键动作**：实现 `HAL::Key_ProductInit()/Key_ProductUpdate()`；强制关机等共用行为不要复制。
 
 ## 产品行为约定
 
