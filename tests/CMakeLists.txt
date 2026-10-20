@@ -40,6 +40,27 @@ foreach(target firmware_tests x1_protocol_tests xbase_protocol_tests clock_tests
     add_test(NAME ${target} COMMAND ${target})
 endforeach()
 
+# 带屏产品共享 LVGL 应用 + AppPlatform（固件路径）：固件 lv_conf.h（96 KB 池），C++ new 走 LVGL 池
+file(GLOB_RECURSE SHARED_APP_SOURCES CONFIGURE_DEPENDS ${ROOT}/Simulator/App/*.c ${ROOT}/Simulator/App/*.cpp)
+list(FILTER SHARED_APP_SOURCES EXCLUDE REGEX "/Status/")
+file(GLOB_RECURSE LVGL_SOURCES CONFIGURE_DEPENDS ${ROOT}/Libraries/lvgl/src/*.c)
+add_library(display_lvgl STATIC ${LVGL_SOURCES})
+target_include_directories(display_lvgl PUBLIC ${ROOT}/Libraries/lvgl ${ROOT}/Libraries display_fakes)
+target_compile_definitions(display_lvgl PUBLIC LV_CONF_INCLUDE_SIMPLE)
+foreach(product X1Pro XBase)
+    string(TOLOWER ${product} name)
+    add_executable(${name}_display_app_tests display_app_tests.cpp ${SHARED_APP_SOURCES}
+        ${ROOT}/Shared/Display/AppPlatform.cpp ${ROOT}/Shared/Display/lvgl_new.cpp)
+    # display_fakes 在前：替换固件的 HAL.h / Arduino.h；core_debug.h 取自 fakes
+    target_include_directories(${name}_display_app_tests PRIVATE display_fakes fakes ${ROOT}/Simulator/App
+        ${ROOT}/Shared/Display ${ROOT}/Products/${product} ${ROOT}/Platform/Config)
+    target_link_libraries(${name}_display_app_tests PRIVATE display_lvgl)
+    target_compile_options(${name}_display_app_tests PRIVATE -Wall -Wextra -UNDEBUG)
+    add_test(NAME ${name}_display_app_tests COMMAND ${name}_display_app_tests)
+    # 固件 lv_conf 的断言处理是死循环：分配失败表现为超时
+    set_tests_properties(${name}_display_app_tests PROPERTIES TIMEOUT 120)
+endforeach()
+
 set(SIMULATOR_EXECUTABLE "" CACHE FILEPATH "Already built LVGL simulator")
 if(SIMULATOR_EXECUTABLE)
     find_package(Python3 REQUIRED COMPONENTS Interpreter)
