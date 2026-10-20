@@ -48,8 +48,12 @@ write_crc(uint8_t* msg, const uint16_t crcIndex) {
 
 void
 panel_write_success_payload(uint8_t* msg) {
-    msg[NM_PROTOCOL_HEADER_LEN + 0] = 1;
-    msg[NM_PROTOCOL_HEADER_LEN + 1] = 0;
+    panel_write(msg, PanelSetAck{1, 0});
+}
+
+uint16_t
+panel_request_payload_length(const SEMP_PARSE_STATE* parse) {
+    return request_payload_length(parse);
 }
 
 static const PanelPacket*

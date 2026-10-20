@@ -241,6 +241,90 @@ test_decoder_boundary() {
     assert(systemInfo.request.work_pending);
 }
 
+// 线上字节偏移固定（独立于载荷结构体，按主控协议文档的偏移直接读写）。
+static void
+test_wire_offsets() {
+    State::Reset();
+    uint8_t response[256];
+    SEMP_PARSE_STATE parse = {};
+    std::vector<uint8_t> set1(88, 0);
+    set1[0] = base_mode;
+    set1[1] = 21;   // 使用卫星
+    set1[2] = 4;    // 固定解
+    set1[6] = 1;    // 电台开
+    set1[7] = 30;   // 跟踪卫星
+    set1[8] = 1;    // 外部供电
+    set1[12] = 10;  // NTRIP 服务器 IP
+    set1[16] = 'M'; // 挂载点
+    set1[48] = 172; // NTRIP 客户端 IP
+    set1[84] = radio_mode_tx;
+    set1[85] = 13; // 协议编码
+    set1[86] = 7;  // 信道
+    auto bytes = frame(NM_PANEL_SET1_ID, set1, NM_MSG_SET_TYPE);
+    parse.buffer = bytes.data();
+    parse.length = bytes.size();
+    assert(message_decode(&parse, response, sizeof(response)) == NM_PROTOCOL_SET_MSG_PACK_LEN);
+    assert(response[20] == 1 && response[21] == 0);
+    const HostReport_t& host = systemInfo.host;
+    assert(host.work.work_mode == base_mode && host.position.satellite_number_used == 21);
+    assert(host.position.coordinate_status == position_fix && host.work.radio_status == On_Off_Status_ON);
+    assert(host.position.satellite_number_track == 30 && systemInfo.power.ExternalPower == 1);
+    assert(host.ntrip.NtripServer_IP[0] == 10 && host.ntrip.NtripServer_Mountpoint[0] == 'M');
+    assert(host.ntrip.NtripClient_IP[0] == 172);
+    assert(host.work.radio_mode == radio_mode_tx && host.work.radio_protocol == 13 && host.work.radio_channel == 7);
+    assert(!systemInfo.request.work_pending && !systemInfo.power.LinuxPowerOff);
+
+    // INFO3：面板请求待确认时上报请求值与变更标志。
+    WorkConfig_t work = host.work;
+    work.radio_channel = 3;
+    State::Request_Work(work);
+    bytes = frame(NM_PANEL_INFO3_ID);
+    parse.buffer = bytes.data();
+    parse.length = bytes.size();
+    assert(message_decode(&parse, response, sizeof(response)) == NM_PROTOCOL_PINFO3_MSG_PACK_LEN);
+    const uint8_t* info3 = response + NM_PROTOCOL_HEADER_LEN;
+    assert(info3[0] == base_mode && info3[1] == 21 && info3[2] == 4 && info3[6] == 1 && info3[7] == 0);
+    assert(info3[11] == 1 && info3[12] == 10 && info3[16] == 'M' && info3[48] == 172);
+    assert(info3[84] == radio_mode_tx && info3[85] == 13 && info3[86] == 3 && info3[87] == 0);
+
+    // INFO4 / SET6：录制空间（float，偏移 4）、文件名（偏移 8）、类型/间隔（24/25）。
+    std::vector<uint8_t> set6(27, 0);
+    set6[0] = 1;
+    const float space = 512.5f;
+    memcpy(&set6[4], &space, sizeof(space));
+    set6[8] = 'R';
+    set6[24] = 2;
+    set6[25] = 0x18;
+    bytes = frame(NM_PANEL_SET6_ID, set6, NM_MSG_SET_TYPE);
+    parse.buffer = bytes.data();
+    parse.length = bytes.size();
+    assert(message_decode(&parse, response, sizeof(response)) == NM_PROTOCOL_SET_MSG_PACK_LEN);
+    assert(host.record.record_status == On_Off_Status_ON && host.record.record_leftspace == space);
+    assert(host.record.record_name[0] == 'R' && host.record.record_type == 2 && host.record.record_interval == 0x18);
+    bytes = frame(NM_PANEL_INFO4_ID);
+    parse.buffer = bytes.data();
+    parse.length = bytes.size();
+    assert(message_decode(&parse, response, sizeof(response)) > 0);
+    const uint8_t* info4 = response + NM_PROTOCOL_HEADER_LEN;
+    float reported_space;
+    memcpy(&reported_space, info4 + 4, sizeof(reported_space));
+    assert(info4[0] == 1 && reported_space == space && info4[8] == 'R' && info4[24] == 2 && info4[25] == 0x18);
+
+    // SET_WIFI：IP 偏移 4，SSID 偏移 8。
+    std::vector<uint8_t> wifi(24, 0);
+    wifi[0] = 1;
+    wifi[1] = 1;
+    wifi[4] = 192;
+    memcpy(&wifi[8], "station", 7);
+    bytes = frame(NM_PANEL_SET_WIFI_ID, wifi, NM_MSG_SET_TYPE);
+    parse.buffer = bytes.data();
+    parse.length = bytes.size();
+    assert(message_decode(&parse, response, sizeof(response)) == NM_PROTOCOL_SET_MSG_PACK_LEN);
+    assert(host.wifi.wifi_status == On_Off_Status_ON && host.wifi.wifi_mode == 1 && host.wifi.wifi_ip[0] == 192);
+    assert(memcmp(host.wifi.wifi_ssid, "station", 7) == 0);
+    State::Reset();
+}
+
 static int received_frames;
 
 static void
@@ -566,6 +650,7 @@ main() {
     test_parser_boundaries();
     test_slave_transactions();
     test_decoder_boundary();
+    test_wire_offsets();
     test_device_failures();
     test_state_requests();
     test_charger_variants();

@@ -33,6 +33,7 @@ Products/<产品>/   product.cmake、product_config.h、产品专属源码
 1. **功能开关**：`Products/<产品>/product_config.h` 中的 `PRODUCT_*` 宏，经 `mcu_config.h` 被所有源码看到。带屏产品缺少任一开关时 `mcu_config.h` 直接报错，避免 `#if` 未定义被当作 0。
 2. **弱符号扩展点**（`Platform/HAL/HAL.h`）：`Power_ProductInit`、`Power_ProductUpdate`、`Power_AdjustPercent`、`Key_ProductInit`、`Key_ProductUpdate`。默认无动作，产品源码覆盖（X1：电量补偿、MultiButton 按键动作）。
 3. **协议表**：帧校验、ACK 编码、“完整读出后才生效”在 `Shared/Comm/panel_protocol.cpp`；产品实现 `panel_protocol_packets()`。X1 见 `Products/X1/x1_protocol.cpp`，X1Pro/XBase 共用 `Shared/Display/display_protocol.cpp`。
+   每种报文的载荷是一个 packed 结构体（通用的 `PanelInfoPayload`/`PanelStatusPayload`/`PanelSetAck`/`PanelFlagRequest` 在 `panel_protocol.h`，带屏专用的 `Display*Payload` 在 `display_protocol.h`），用 `static_assert` 固定长度与关键偏移；处理函数用 `panel_request<T>()` 读请求、`panel_write()` 写响应（按值拷贝，不做指针转换）。新增字段时改结构体并更新断言，报文长度与表项都取 `sizeof`。`tests/firmware_tests.cpp` 的 `test_wire_offsets` 按协议偏移直接检查字节，结构体改错会在这里失败。
 4. **产品专属源码**：放在产品目录并在其 `CMakeLists.txt` 中加入 `hc32_product`。
 
 | 开关 | X1 | X1Pro | XBase |

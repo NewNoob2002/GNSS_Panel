@@ -7,7 +7,7 @@
 #include "product_config.h"
 
 // 写入范围：主控上报只写 State::Host()；面板请求经 State::Confirm_*() 确认；
-// 电源相关通知经 State::Host_*() 交给 HAL 电源策略。
+// 电源相关通知经 State::Host_*() 交给 HAL 电源策略。载荷布局见 display_protocol.h。
 
 /* 响应编码时记下的请求 revision：完整读出后若请求未再变化，主控即已收到该请求。 */
 static struct {
@@ -25,29 +25,40 @@ valid_position(uint8_t value) {
     return value == 0U || value == 1U || value == 4U || value == 5U || value == 7U;
 }
 
+/** 复制版本等文本字段：最多填满字段，不要求结尾 NUL（与旧报文一致）。 */
+template <std::size_t N>
+static void
+copy_field(char (&dst)[N], const char* src, std::size_t src_size) {
+    std::memcpy(dst, src, strnlen(src, src_size < N ? src_size : N));
+}
+
 static void
 fill_info1_response(const SEMP_PARSE_STATE* parse, uint8_t* msg) {
     (void)parse;
     State::Diagnostics().messages.Info1_count++;
     const BoardInfo_t& board = systemInfo.board;
     const BatteryInfo_t& battery = systemInfo.power.batteryInfo;
-    memcpy(&msg[NM_PROTOCOL_HEADER_LEN + 0], board.hardware_version, strnlen(board.hardware_version, 8));
-    memcpy(&msg[NM_PROTOCOL_HEADER_LEN + 8], board.software_version, strnlen(board.software_version, 10));
-    memcpy(&msg[NM_PROTOCOL_HEADER_LEN + 18], &battery.Percent, 2);
-    memcpy(&msg[NM_PROTOCOL_HEADER_LEN + 20], &battery.Temp, 2);
-    memcpy(&msg[NM_PROTOCOL_HEADER_LEN + 22], &battery.Voltage, 2);
+    PanelInfoPayload info{};
+    copy_field(info.hardware_version, board.hardware_version, sizeof(board.hardware_version));
+    copy_field(info.software_version, board.software_version, sizeof(board.software_version));
+    info.battery_percent = battery.Percent;
+    info.battery_temperature = battery.Temp;
+    info.battery_voltage = battery.Voltage;
+    panel_write(msg, info);
 }
 
 static void
 fill_info2_response(const SEMP_PARSE_STATE* parse, uint8_t* msg) {
     (void)parse;
     State::Diagnostics().messages.Info2_count++;
-    msg[NM_PROTOCOL_HEADER_LEN + 0] = systemInfo.power.reset_flag;
-    msg[NM_PROTOCOL_HEADER_LEN + 1] = systemInfo.power.poweroff_flag;
-    msg[NM_PROTOCOL_HEADER_LEN + 2] = State::Effective_Record().record_status;
-    msg[NM_PROTOCOL_HEADER_LEN + 3] = systemInfo.request.record_op;
-    msg[NM_PROTOCOL_HEADER_LEN + 4] = systemInfo.power.batteryInfo.chargeStatus != notCharge;
-    response_snapshot.poweroffFlag = systemInfo.power.poweroff_flag;
+    PanelStatusPayload status{};
+    status.reset = systemInfo.power.reset_flag;
+    status.poweroff = systemInfo.power.poweroff_flag;
+    status.record_status = State::Effective_Record().record_status;
+    status.record_op = systemInfo.request.record_op;
+    status.charging = systemInfo.power.batteryInfo.chargeStatus != notCharge;
+    panel_write(msg, status);
+    response_snapshot.poweroffFlag = status.poweroff;
 }
 
 // 主控完整读到关机请求即视为确认（旧版 X1Pro/XBase 语义），与 0x05 确认二选一均可。
@@ -65,21 +76,25 @@ fill_info3_response(const SEMP_PARSE_STATE* parse, uint8_t* msg) {
     State::Diagnostics().messages.Info3_count++;
     const WorkConfig_t work = State::Effective_Work();
     const HostReport_t& host = systemInfo.host;
-    msg[NM_PROTOCOL_HEADER_LEN + 0] = work.work_mode;
-    msg[NM_PROTOCOL_HEADER_LEN + 1] = host.position.satellite_number_used;
-    msg[NM_PROTOCOL_HEADER_LEN + 2] = host.position.coordinate_status;
-    msg[NM_PROTOCOL_HEADER_LEN + 3] = work.gprs_status;
-    msg[NM_PROTOCOL_HEADER_LEN + 4] = work.NtripServer_status;
-    msg[NM_PROTOCOL_HEADER_LEN + 5] = host.ntrip.NtripClient_status;
-    msg[NM_PROTOCOL_HEADER_LEN + 6] = work.radio_status;
-    msg[NM_PROTOCOL_HEADER_LEN + 11] = systemInfo.request.work_pending;
-    memcpy(&msg[NM_PROTOCOL_HEADER_LEN + 12], &host.ntrip.NtripServer_IP, 4);
-    memcpy(&msg[NM_PROTOCOL_HEADER_LEN + 16], &host.ntrip.NtripServer_Mountpoint, 32);
-    memcpy(&msg[NM_PROTOCOL_HEADER_LEN + 48], &host.ntrip.NtripClient_IP, 4);
-    memcpy(&msg[NM_PROTOCOL_HEADER_LEN + 52], &host.ntrip.NtripClient_Mountpoint, 32);
-    msg[NM_PROTOCOL_HEADER_LEN + 84] = work.radio_mode;
-    msg[NM_PROTOCOL_HEADER_LEN + 85] = work.radio_protocol;
-    msg[NM_PROTOCOL_HEADER_LEN + 86] = work.radio_channel;
+    DisplayWorkPayload payload{};
+    payload.work_mode = work.work_mode;
+    payload.satellite_used = host.position.satellite_number_used;
+    payload.coordinate_status = host.position.coordinate_status;
+    payload.gprs_status = work.gprs_status;
+    payload.ntrip_server_status = work.NtripServer_status;
+    payload.ntrip_client_status = host.ntrip.NtripClient_status;
+    payload.radio_status = work.radio_status;
+    payload.radio_change_flag = systemInfo.request.work_pending;
+    std::memcpy(payload.ntrip_server_ip, host.ntrip.NtripServer_IP, sizeof(payload.ntrip_server_ip));
+    std::memcpy(payload.ntrip_server_mountpoint, host.ntrip.NtripServer_Mountpoint,
+                sizeof(payload.ntrip_server_mountpoint));
+    std::memcpy(payload.ntrip_client_ip, host.ntrip.NtripClient_IP, sizeof(payload.ntrip_client_ip));
+    std::memcpy(payload.ntrip_client_mountpoint, host.ntrip.NtripClient_Mountpoint,
+                sizeof(payload.ntrip_client_mountpoint));
+    payload.radio_mode = work.radio_mode;
+    payload.radio_protocol = work.radio_protocol;
+    payload.radio_channel = work.radio_channel;
+    panel_write(msg, payload);
     response_snapshot.work = State::Work_Revision();
 }
 
@@ -93,13 +108,15 @@ fill_info4_response(const SEMP_PARSE_STATE* parse, uint8_t* msg) {
     (void)parse;
     State::Diagnostics().messages.Info4_count++;
     const RecordInfo_t record = State::Effective_Record();
-    msg[NM_PROTOCOL_HEADER_LEN + 0] = record.record_status;
-    msg[NM_PROTOCOL_HEADER_LEN + 1] = systemInfo.request.record_op;
-    memcpy(&msg[NM_PROTOCOL_HEADER_LEN + 4], &record.record_leftspace, 4);
-    memcpy(&msg[NM_PROTOCOL_HEADER_LEN + 8], &record.record_name, 16);
-    msg[NM_PROTOCOL_HEADER_LEN + 24] = record.record_type;
-    msg[NM_PROTOCOL_HEADER_LEN + 25] = record.record_interval;
-    msg[NM_PROTOCOL_HEADER_LEN + 26] = systemInfo.request.record_settings_pending;
+    DisplayRecordPayload payload{};
+    payload.record_status = record.record_status;
+    payload.record_op = systemInfo.request.record_op;
+    payload.record_leftspace = record.record_leftspace;
+    std::memcpy(payload.record_name, record.record_name, sizeof(payload.record_name));
+    payload.record_type = record.record_type;
+    payload.record_interval = record.record_interval;
+    payload.record_change_flag = systemInfo.request.record_settings_pending;
+    panel_write(msg, payload);
     response_snapshot.record = State::Record_Revision();
 }
 
@@ -113,8 +130,10 @@ static void
 fill_wifi_info_response(const SEMP_PARSE_STATE* parse, uint8_t* msg) {
     (void)parse;
     State::Diagnostics().messages.InfoWifi_count++;
-    msg[NM_PROTOCOL_HEADER_LEN + 0] = systemInfo.request.wifi_on;
-    msg[NM_PROTOCOL_HEADER_LEN + 3] = systemInfo.request.wifi_pending;
+    DisplayWifiControlPayload payload{};
+    payload.wifi_on = systemInfo.request.wifi_on;
+    payload.wifi_change_flag = systemInfo.request.wifi_pending;
+    panel_write(msg, payload);
     response_snapshot.wifi = State::Wifi_Revision();
 }
 
@@ -126,13 +145,12 @@ wifi_info_read_complete() {
 
 static bool
 validate_flag(const uint8_t* payload, uint16_t payloadLength) {
-    (void)payloadLength;
-    return payload[0] <= 1U;
+    return panel_payload<PanelFlagRequest>(payload, payloadLength).value <= 1U;
 }
 
 static void
 handle_reset_request(const SEMP_PARSE_STATE* parse, uint8_t* msg) {
-    pending_reset = parse->buffer[NM_PROTOCOL_HEADER_LEN];
+    pending_reset = panel_request<PanelFlagRequest>(parse).value;
     CORE_DEBUG_PRINTF("Reset Panel request: %u", pending_reset);
     panel_write_success_payload(msg);
 }
@@ -144,8 +162,8 @@ reset_read_complete() {
 
 static void
 handle_shutdown_confirmation(const SEMP_PARSE_STATE* parse, uint8_t* msg) {
-    pending_shutdown_confirmation = parse->buffer[NM_PROTOCOL_HEADER_LEN];
-    msg[NM_PROTOCOL_HEADER_LEN] = pending_shutdown_confirmation;
+    pending_shutdown_confirmation = panel_request<PanelFlagRequest>(parse).value;
+    panel_write(msg, PanelSetAck{pending_shutdown_confirmation, 0}); // 回显确认值
 }
 
 static void
@@ -157,38 +175,38 @@ shutdown_confirmation_read_complete() {
 
 static bool
 validate_set1(const uint8_t* payload, uint16_t payloadLength) {
-    (void)payloadLength;
-    return payload[0] <= autobase_mode && valid_position(payload[2]) && payload[3] <= 1U && payload[4] <= 1U
-           && payload[5] <= 1U && payload[6] <= 1U && payload[8] <= 1U && payload[84] <= radio_mode_bridge
-           && payload[87] <= 1U;
+    const auto set1 = panel_payload<DisplayWorkPayload>(payload, payloadLength);
+    return set1.work_mode <= autobase_mode && valid_position(set1.coordinate_status) && set1.gprs_status <= 1U
+           && set1.ntrip_server_status <= 1U && set1.ntrip_client_status <= 1U && set1.radio_status <= 1U
+           && set1.external_power <= 1U && set1.radio_mode <= radio_mode_bridge && set1.poweroff_request <= 1U;
 }
 
 // 主控上报总是写入 host；面板有待确认的工作模式请求时界面仍显示请求值（State::Effective_Work）。
 static void
 handle_set1_request(const SEMP_PARSE_STATE* parse, uint8_t* msg) {
     State::Diagnostics().messages.Set1_count++;
-    const uint8_t* payload = &parse->buffer[NM_PROTOCOL_HEADER_LEN];
+    const auto set1 = panel_request<DisplayWorkPayload>(parse);
     HostReport_t& host = State::Host();
-    host.work.work_mode = static_cast<WorkMode_t>(payload[0]);
-    host.position.satellite_number_used = payload[1];
-    host.position.coordinate_status = static_cast<PositionStatus_t>(payload[2]);
-    host.work.gprs_status = static_cast<On_Off_Status_t>(payload[3]);
-    host.work.NtripServer_status = static_cast<On_Off_Status_t>(payload[4]);
-    host.ntrip.NtripClient_status = static_cast<On_Off_Status_t>(payload[5]);
-    host.work.radio_status = static_cast<On_Off_Status_t>(payload[6]);
-    host.position.satellite_number_track = payload[7];
-    State::Host_ExternalPower(payload[8]);
-    memcpy(&host.ntrip.NtripServer_IP, &payload[12], 4);
-    memcpy(&host.ntrip.NtripServer_Mountpoint, &payload[16], 32);
-    memcpy(&host.ntrip.NtripClient_IP, &payload[48], 4);
-    memcpy(&host.ntrip.NtripClient_Mountpoint, &payload[52], 32);
-    host.work.radio_mode = static_cast<RadioMode_t>(payload[84]);
-    host.work.radio_protocol = payload[85];
-    host.work.radio_channel = payload[86];
-    if (payload[11]) {
+    host.work.work_mode = static_cast<WorkMode_t>(set1.work_mode);
+    host.work.gprs_status = static_cast<On_Off_Status_t>(set1.gprs_status);
+    host.work.NtripServer_status = static_cast<On_Off_Status_t>(set1.ntrip_server_status);
+    host.work.radio_status = static_cast<On_Off_Status_t>(set1.radio_status);
+    host.work.radio_mode = static_cast<RadioMode_t>(set1.radio_mode);
+    host.work.radio_protocol = set1.radio_protocol;
+    host.work.radio_channel = set1.radio_channel;
+    host.position.satellite_number_used = set1.satellite_used;
+    host.position.satellite_number_track = set1.satellite_track;
+    host.position.coordinate_status = static_cast<PositionStatus_t>(set1.coordinate_status);
+    host.ntrip.NtripClient_status = static_cast<On_Off_Status_t>(set1.ntrip_client_status);
+    std::memcpy(host.ntrip.NtripServer_IP, set1.ntrip_server_ip, sizeof(set1.ntrip_server_ip));
+    std::memcpy(host.ntrip.NtripServer_Mountpoint, set1.ntrip_server_mountpoint, sizeof(set1.ntrip_server_mountpoint));
+    std::memcpy(host.ntrip.NtripClient_IP, set1.ntrip_client_ip, sizeof(set1.ntrip_client_ip));
+    std::memcpy(host.ntrip.NtripClient_Mountpoint, set1.ntrip_client_mountpoint, sizeof(set1.ntrip_client_mountpoint));
+    State::Host_ExternalPower(set1.external_power);
+    if (set1.radio_change_flag) {
         State::Echo_HostWork();
     }
-    if (payload[87]) {
+    if (set1.poweroff_request) {
         State::Host_ShutdownRequested();
     }
     panel_write_success_payload(msg);
@@ -196,45 +214,41 @@ handle_set1_request(const SEMP_PARSE_STATE* parse, uint8_t* msg) {
 
 static bool
 validate_set3(const uint8_t* payload, uint16_t payloadLength) {
-    (void)payloadLength;
-    double longitude, latitude, altitude;
-    memcpy(&longitude, payload + 4, sizeof(longitude));
-    memcpy(&latitude, payload + 12, sizeof(latitude));
-    memcpy(&altitude, payload + 20, sizeof(altitude));
-    return valid_position(payload[0]) && std::isfinite(longitude) && longitude >= -180.0 && longitude <= 180.0
-           && std::isfinite(latitude) && latitude >= -90.0 && latitude <= 90.0 && std::isfinite(altitude);
+    const auto set3 = panel_payload<DisplayPositionPayload>(payload, payloadLength);
+    return valid_position(set3.coordinate_status) && std::isfinite(set3.longitude) && set3.longitude >= -180.0
+           && set3.longitude <= 180.0 && std::isfinite(set3.latitude) && set3.latitude >= -90.0 && set3.latitude <= 90.0
+           && std::isfinite(set3.altitude);
 }
 
 static void
 handle_set3_request(const SEMP_PARSE_STATE* parse, uint8_t* msg) {
     State::Diagnostics().messages.Set3_count++;
+    const auto set3 = panel_request<DisplayPositionPayload>(parse);
     PositionInfo_t& position = State::Host().position;
-    position.coordinate_status = static_cast<PositionStatus_t>(parse->buffer[NM_PROTOCOL_HEADER_LEN + 0]);
-    memcpy(&position.coordinate_lon, &parse->buffer[NM_PROTOCOL_HEADER_LEN + 4], 8);
-    memcpy(&position.coordinate_lat, &parse->buffer[NM_PROTOCOL_HEADER_LEN + 12], 8);
-    memcpy(&position.coordinate_alt, &parse->buffer[NM_PROTOCOL_HEADER_LEN + 20], 8);
+    position.coordinate_status = static_cast<PositionStatus_t>(set3.coordinate_status);
+    position.coordinate_lon = set3.longitude;
+    position.coordinate_lat = set3.latitude;
+    position.coordinate_alt = set3.altitude;
     panel_write_success_payload(msg);
 }
 
 static bool
 validate_set6(const uint8_t* payload, uint16_t payloadLength) {
-    (void)payloadLength;
-    float space;
-    memcpy(&space, payload + 4, sizeof(space));
-    return payload[0] <= 1U && std::isfinite(space) && space >= 0.0f;
+    const auto set6 = panel_payload<DisplayRecordPayload>(payload, payloadLength);
+    return set6.record_status <= 1U && std::isfinite(set6.record_leftspace) && set6.record_leftspace >= 0.0f;
 }
 
 static void
 handle_set6_request(const SEMP_PARSE_STATE* parse, uint8_t* msg) {
     State::Diagnostics().messages.Set6_count++;
-    const uint8_t* payload = &parse->buffer[NM_PROTOCOL_HEADER_LEN];
+    const auto set6 = panel_request<DisplayRecordPayload>(parse);
     RecordInfo_t& record = State::Host().record;
-    record.record_status = static_cast<On_Off_Status_t>(payload[0]);
-    memcpy(&record.record_leftspace, &payload[4], 4);
-    memcpy(&record.record_name, &payload[8], 16);
-    record.record_type = payload[24];
-    record.record_interval = payload[25];
-    if (payload[26]) {
+    record.record_status = static_cast<On_Off_Status_t>(set6.record_status);
+    record.record_leftspace = set6.record_leftspace;
+    std::memcpy(record.record_name, set6.record_name, sizeof(set6.record_name));
+    record.record_type = set6.record_type;
+    record.record_interval = set6.record_interval;
+    if (set6.record_change_flag) {
         State::Echo_HostRecord();
     }
     panel_write_success_payload(msg);
@@ -242,18 +256,19 @@ handle_set6_request(const SEMP_PARSE_STATE* parse, uint8_t* msg) {
 
 static bool
 validate_set_wifi(const uint8_t* payload, uint16_t payloadLength) {
-    (void)payloadLength;
-    return payload[0] <= 1U && payload[1] <= 1U;
+    const auto wifi = panel_payload<DisplayWifiStatusPayload>(payload, payloadLength);
+    return wifi.wifi_status <= 1U && wifi.wifi_mode <= 1U;
 }
 
 static void
 handle_set_wifi_request(const SEMP_PARSE_STATE* parse, uint8_t* msg) {
     State::Diagnostics().messages.SetWifi_count++;
+    const auto request = panel_request<DisplayWifiStatusPayload>(parse);
     WifiInfo_t& wifi = State::Host().wifi;
-    wifi.wifi_status = static_cast<On_Off_Status_t>(parse->buffer[NM_PROTOCOL_HEADER_LEN + 0]);
-    wifi.wifi_mode = parse->buffer[NM_PROTOCOL_HEADER_LEN + 1];
-    memcpy(&wifi.wifi_ip, &parse->buffer[NM_PROTOCOL_HEADER_LEN + 4], 4);
-    memcpy(&wifi.wifi_ssid, &parse->buffer[NM_PROTOCOL_HEADER_LEN + 8], 16);
+    wifi.wifi_status = static_cast<On_Off_Status_t>(request.wifi_status);
+    wifi.wifi_mode = request.wifi_mode;
+    std::memcpy(wifi.wifi_ip, request.wifi_ip, sizeof(request.wifi_ip));
+    std::memcpy(wifi.wifi_ssid, request.wifi_ssid, sizeof(request.wifi_ssid));
     panel_write_success_payload(msg);
 }
 
@@ -261,43 +276,48 @@ handle_set_wifi_request(const SEMP_PARSE_STATE* parse, uint8_t* msg) {
 static void
 handle_set_satellite_request(const SEMP_PARSE_STATE* parse, uint8_t* msg) {
     State::Diagnostics().messages.SetSatellite_count++;
+    const auto request = panel_request<DisplaySatellitePayload>(parse);
     StarMapInfo_t& stars = State::Host().starMap;
-    stars.numberGPS = parse->buffer[NM_PROTOCOL_HEADER_LEN + 0];
-    stars.numberGLONASS = parse->buffer[NM_PROTOCOL_HEADER_LEN + 1];
-    stars.numberGALILEO = parse->buffer[NM_PROTOCOL_HEADER_LEN + 2];
-    stars.numberBDS = parse->buffer[NM_PROTOCOL_HEADER_LEN + 3];
-    stars.numberSBAS = parse->buffer[NM_PROTOCOL_HEADER_LEN + 4];
-    stars.numberQZSS = parse->buffer[NM_PROTOCOL_HEADER_LEN + 5];
-    stars.numberIRNSS = parse->buffer[NM_PROTOCOL_HEADER_LEN + 6];
+    stars.numberGPS = request.gps;
+    stars.numberGLONASS = request.glonass;
+    stars.numberGALILEO = request.galileo;
+    stars.numberBDS = request.bds;
+    stars.numberSBAS = request.sbas;
+    stars.numberQZSS = request.qzss;
+    stars.numberIRNSS = request.irnss;
     ++stars.sequence;
     panel_write_success_payload(msg);
 }
 #endif
 
 static const PanelPacket packetTable[] = {
-    {NM_PANEL_INFO1_ID, 0, NM_PROTOCOL_INFO1_MSG_LEN, NM_MSG_QUERY_RES_TYPE, fill_info1_response, nullptr, nullptr},
-    {NM_PANEL_INFO2_ID, 0, NM_PROTOCOL_INFO2_MSG_LEN, NM_MSG_QUERY_RES_TYPE, fill_info2_response, nullptr,
+    {NM_PANEL_INFO1_ID, 0, sizeof(PanelInfoPayload), NM_MSG_QUERY_RES_TYPE, fill_info1_response, nullptr, nullptr},
+    {NM_PANEL_INFO2_ID, 0, sizeof(PanelStatusPayload), NM_MSG_QUERY_RES_TYPE, fill_info2_response, nullptr,
      info2_read_complete},
-    {NM_PANEL_INFO3_ID, 0, NM_PROTOCOL_INFO3_MSG_LEN, NM_MSG_QUERY_RES_TYPE, fill_info3_response, nullptr,
+    {NM_PANEL_INFO3_ID, 0, sizeof(DisplayWorkPayload), NM_MSG_QUERY_RES_TYPE, fill_info3_response, nullptr,
      info3_read_complete},
-    {NM_PANEL_INFO4_ID, 0, NM_PROTOCOL_INFO4_MSG_LEN, NM_MSG_QUERY_RES_TYPE, fill_info4_response, nullptr,
+    {NM_PANEL_INFO4_ID, 0, sizeof(DisplayRecordPayload), NM_MSG_QUERY_RES_TYPE, fill_info4_response, nullptr,
      info4_read_complete},
 #if PRODUCT_PROTOCOL_WIFI_CONTROL
-    {NM_PANEL_WIFI_SET_ID, 0, NM_PROTOCOL_WIFI_SET_MSG_LEN, NM_MSG_QUERY_RES_TYPE, fill_wifi_info_response, nullptr,
-     wifi_info_read_complete},
+    {NM_PANEL_WIFI_SET_ID, 0, sizeof(DisplayWifiControlPayload), NM_MSG_QUERY_RES_TYPE, fill_wifi_info_response,
+     nullptr, wifi_info_read_complete},
 #endif
-    {NM_PANEL_SHUTDOWN_CONFIRM_ID, 1, NM_PROTOCOL_SET_MSG_LEN, NM_MSG_SET_RES_TYPE, handle_shutdown_confirmation,
-     validate_flag, shutdown_confirmation_read_complete},
-    {NM_PANEL_RST_ID, 1, NM_PROTOCOL_RST_RESP_MSG_LEN, NM_MSG_SET_RES_TYPE, handle_reset_request, validate_flag,
-     reset_read_complete},
-    {NM_PANEL_SET1_ID, 88, NM_PROTOCOL_SET_MSG_LEN, NM_MSG_SET_RES_TYPE, handle_set1_request, validate_set1, nullptr},
-    {NM_PANEL_SET3_ID, 28, NM_PROTOCOL_SET_MSG_LEN, NM_MSG_SET_RES_TYPE, handle_set3_request, validate_set3, nullptr},
-    {NM_PANEL_SET6_ID, 27, NM_PROTOCOL_SET_MSG_LEN, NM_MSG_SET_RES_TYPE, handle_set6_request, validate_set6, nullptr},
-    {NM_PANEL_SET_WIFI_ID, 24, NM_PROTOCOL_SET_MSG_LEN, NM_MSG_SET_RES_TYPE, handle_set_wifi_request, validate_set_wifi,
-     nullptr},
+    {NM_PANEL_SHUTDOWN_CONFIRM_ID, sizeof(PanelFlagRequest), sizeof(PanelSetAck), NM_MSG_SET_RES_TYPE,
+     handle_shutdown_confirmation, validate_flag, shutdown_confirmation_read_complete},
+    {NM_PANEL_RST_ID, sizeof(PanelFlagRequest), sizeof(PanelSetAck), NM_MSG_SET_RES_TYPE, handle_reset_request,
+     validate_flag, reset_read_complete},
+    {NM_PANEL_SET1_ID, sizeof(DisplayWorkPayload), sizeof(PanelSetAck), NM_MSG_SET_RES_TYPE, handle_set1_request,
+     validate_set1, nullptr},
+    {NM_PANEL_SET3_ID, sizeof(DisplayPositionPayload), sizeof(PanelSetAck), NM_MSG_SET_RES_TYPE, handle_set3_request,
+     validate_set3, nullptr},
+    // SET6 末字节保留，主控可只发 27 字节。
+    {NM_PANEL_SET6_ID, sizeof(DisplayRecordPayload) - 1U, sizeof(PanelSetAck), NM_MSG_SET_RES_TYPE, handle_set6_request,
+     validate_set6, nullptr},
+    {NM_PANEL_SET_WIFI_ID, sizeof(DisplayWifiStatusPayload), sizeof(PanelSetAck), NM_MSG_SET_RES_TYPE,
+     handle_set_wifi_request, validate_set_wifi, nullptr},
 #if PRODUCT_PROTOCOL_SATELLITE
-    {NM_PANEL_SET_SATELLITE_ID, 7, NM_PROTOCOL_SET_MSG_LEN, NM_MSG_SET_RES_TYPE, handle_set_satellite_request, nullptr,
-     nullptr},
+    {NM_PANEL_SET_SATELLITE_ID, sizeof(DisplaySatellitePayload), sizeof(PanelSetAck), NM_MSG_SET_RES_TYPE,
+     handle_set_satellite_request, nullptr, nullptr},
 #endif
 };
 
