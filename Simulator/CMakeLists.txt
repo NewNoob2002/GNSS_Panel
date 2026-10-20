@@ -26,10 +26,12 @@ if(POLICY CMP0074)
     cmake_policy(SET CMP0074 NEW)
 endif()
 
-include_directories(${PROJECT_SOURCE_DIR})
+include_directories(${PROJECT_SOURCE_DIR} ${CMAKE_CURRENT_LIST_DIR}/../Libraries)
 
-file(GLOB_RECURSE INCLUDES "lv_drivers/*.h" "lvgl/demos/*.h" "lvgl/*.h" "./*.h")
-file(GLOB_RECURSE SOURCES "lv_drivers/*.c" "lvgl/demos/*.c" "lvgl/src/*.c")
+# 与固件共用同一份 LVGL 源码（Libraries/lvgl），配置见 lv_conf.h。
+set(LVGL_DIR ${CMAKE_CURRENT_LIST_DIR}/../Libraries/lvgl)
+file(GLOB_RECURSE INCLUDES "lv_drivers/*.h" "./*.h")
+file(GLOB_RECURSE SOURCES "lv_drivers/*.c" "${LVGL_DIR}/src/*.c")
 
 file(GLOB_RECURSE UI_SOURCES
     ${CMAKE_CURRENT_LIST_DIR}/App/*.c
@@ -84,14 +86,15 @@ add_executable(main main.cpp mouse_cursor_icon.c ${SOURCES} ${INCLUDES} ${UI_SOU
     ../Platform/Config/mcu_define.h
     ../Platform/Config/mcu_define.h)
 target_compile_definitions(main PRIVATE
-    LV_CONF_INCLUDE_SIMPLE
+    # 明确指定模拟器配置，避免与 Libraries/lvgl/lv_conf.h（固件配置）按包含顺序混淆
+    LV_CONF_PATH=${CMAKE_CURRENT_LIST_DIR}/lv_conf.h
     LV_INCLUDE_SIMPLE
     LVGL_SIMULATOR
     MIDDLE_LOGO_USE
 )
 target_include_directories(main PRIVATE
     ${SDL2_INCLUDE_DIRS}
-    ${CMAKE_CURRENT_LIST_DIR}/lvgl
+    ${LVGL_DIR}
 )
 
 

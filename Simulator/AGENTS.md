@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-This repository is the desktop LVGL simulator for the HC32F460xE Arduino UI project. `main.cpp` initializes LVGL, SDL, EasyLogger, and the application loop. Application code lives under `App/`: page implementations are in `App/Pages/<PageName>/`, shared data processing is in `App/Common/`, reusable framework code is in `App/Utils/`, and generated fonts/images/symbols are in `App/Resource/`. Hardware simulation shims are in `HAL/`. Bundled third-party LVGL sources are under `lvgl/`, and display/input drivers are under `lv_drivers/`. Configuration headers `lv_conf.h` and `lv_drv_conf.h` control LVGL and driver features.
+This repository is the desktop LVGL simulator for the HC32F460xE Arduino UI project. `main.cpp` initializes LVGL, SDL, EasyLogger, and the application loop. Application code lives under `App/`: page implementations are in `App/Pages/<PageName>/`, shared data processing is in `App/Common/`, reusable framework code is in `App/Utils/`, and generated fonts/images/symbols are in `App/Resource/`. Hardware simulation shims are in `HAL/`. LVGL sources are shared with the firmware at `../Libraries/lvgl/` (selected via `LV_CONF_PATH`, so the simulator's own `lv_conf.h` is used, not the firmware's `Libraries/lvgl/lv_conf.h`), and display/input drivers are under `lv_drivers/`. Configuration headers `lv_conf.h` and `lv_drv_conf.h` control LVGL and driver features.
 
 ## Build, Test, and Development Commands
 
@@ -26,4 +26,4 @@ Recent commits use short summaries such as `update`, `Refactor ...`, and Chinese
 
 ## Agent-Specific Instructions
 
-Do not edit bundled `lvgl/` or `lv_drivers/` sources unless the task explicitly targets driver or vendor behavior. Keep generated resource files in `App/Resource/` synchronized with their source assets, and avoid broad formatting-only changes in third-party directories.
+Do not edit the shared `../Libraries/lvgl/` or `lv_drivers/` sources (LVGL changes also affect the firmware) unless the task explicitly targets driver or vendor behavior. Keep generated resource files in `App/Resource/` synchronized with their source assets, and avoid broad formatting-only changes in third-party directories.
