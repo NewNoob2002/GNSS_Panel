@@ -23,6 +23,16 @@ bool request_power_on();
  * SystemService::enter_standby(), possibly later or never (when power is really removed).
  */
 bool execute_power(DataProc::PowerAction action);
+/** Wi-Fi on/off requested on SystemSettings (only when wifi_available). The platform reports the applied
+ * state, and whether a change is still pending, with SystemService::set_wifi().
+ */
+bool request_wifi(bool on);
+/** Device/business data before the platform's first DeviceService::update(). */
+DataProc::DeviceSnapshot initial_device();
+/** Execute a validated business request (indexes already range-checked); false on failure. The platform
+ * publishes the resulting data with DeviceService::update().
+ */
+bool execute_device(const DataProc::DeviceRequest& request);
 /** Short name of initialization step 0..kInitializationStepCount-1, for logs. */
 const char* initialization_name(unsigned step);
 /** Localized SystemLoading headline of the step (what is actually being initialized or checked). */

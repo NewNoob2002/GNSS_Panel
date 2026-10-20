@@ -11,7 +11,7 @@ bool RecordConfigModel::init() {
         return true;
     account_ = std::make_unique<Account>("RecordConfigModel", DataProc::Center(), 0, this);
     account_->SetEventCallback(on_event);
-    if (!account_->IsRegistered() || !model_utils::subscribe(*account_, status_, state_)) {
+    if (!account_->IsRegistered() || !model_utils::subscribe(*account_, status_, state_, device_)) {
         account_.reset();
         APP_LOG_E("RecordConfigModel", "Account initialization failed");
         return false;
@@ -28,7 +28,24 @@ bool RecordConfigModel::set_status_bar(bool visible, DataProc::StatusBarStyle st
         APP_LOG_E("RecordConfigModel", "StatusBar notification rejected");
     return ok;
 }
+bool RecordConfigModel::start_record(unsigned record_type, unsigned record_interval) const {
+    DataProc::DeviceRequest request{};
+    request.command = DataProc::DeviceCommand::StartRecord;
+    request.record_type = record_type;
+    request.record_interval = record_interval;
+    return model_utils::notify_device(account_, request);
+}
+bool RecordConfigModel::stop_record() const {
+    DataProc::DeviceRequest request{};
+    request.command = DataProc::DeviceCommand::StopRecord;
+    return model_utils::notify_device(account_, request);
+}
 int RecordConfigModel::on_event(Account* account, Account::EventParam_t* event) {
     auto* self = static_cast<RecordConfigModel*>(account->UserData);
-    return model_utils::receive(event, self->status_, self->state_);
+    const int result = model_utils::receive(event, self->status_, self->state_, self->device_);
+    // Device/System changes only: the 5 Hz Status feed is shown by the StatusBar, not by this page.
+    if (result == Account::RES_OK && event->event == Account::EVENT_PUB_PUBLISH && event->tran
+        && std::strcmp(event->tran->ID, "Status") != 0 && self->change_cb_)
+        self->change_cb_();
+    return result;
 }

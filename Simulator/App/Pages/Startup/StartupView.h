@@ -13,6 +13,8 @@ class StartupView {
 
     void destroy() const;
 
+    /** Firmware/board versions from device data; empty text shows N/A. */
+    void update_device(const DataProc::DeviceSnapshot& device) const;
     void update(const DataProc::StatusSnapshot& status);
 
     void apply_language() const;
@@ -32,6 +34,9 @@ class StartupView {
         lv_obj_t* bat_voltage;
         lv_obj_t* bat_level;
         lv_obj_t* bat_fill;
+
+        lv_obj_t* firmware;
+        lv_obj_t* hardware;
     } ui;
 };
 } // namespace page

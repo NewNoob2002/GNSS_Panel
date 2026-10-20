@@ -1,6 +1,7 @@
 #ifndef STAR_MAP_VIEW_H
 #define STAR_MAP_VIEW_H
 
+#include "Common/DataProc/DataProc_Def.h"
 #include "Resource/ResourcePool.h"
 #include "Utils/I18n/I18n.h"
 #include "lvgl.h"
@@ -28,7 +29,8 @@ class StarMapView {
     void destroy();
     void apply_language() const;
     void update_activity_indicator();
-    void update_values(int gps, int bds, int gln, int gal, int sbas, int qzss, int irnss);
+    /** Constellation counts from device data; "-" while they are not valid. */
+    void update(const DataProc::DeviceSnapshot& device);
 };
 
 } // namespace page

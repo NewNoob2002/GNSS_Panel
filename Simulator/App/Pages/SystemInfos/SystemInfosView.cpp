@@ -1,4 +1,6 @@
 #include "SystemInfosView.h"
+#include <cstdio>
+#include <cstring>
 #include "Utils/PageStyle.h"
 
 using namespace page;
@@ -185,7 +187,7 @@ void SystemInfosView::item_create(item_t* item, lv_obj_t* par, const char* name,
     lv_obj_set_height(icon, height);
 }
 
-void SystemInfosView::apply_language(const DataProc::SystemState& state) const {
+void SystemInfosView::apply_language() const {
     lv_label_set_text(ui.work.label_name, i18n::text(i18n::TextId::SystemWorkTitle));
     lv_label_set_text(ui.work.label_info, i18n::text(i18n::TextId::SystemWorkInfo));
     lv_label_set_text(ui.gps.label_name, i18n::text(i18n::TextId::SystemGpsTitle));
@@ -198,18 +200,77 @@ void SystemInfosView::apply_language(const DataProc::SystemState& state) const {
     lv_label_set_text(ui.storage.label_info, i18n::text(i18n::TextId::SystemStorageInfo));
     lv_label_set_text(ui.system.label_name, i18n::text(i18n::TextId::SystemTitle));
     lv_label_set_text(ui.system.label_info, i18n::text(i18n::TextId::SystemInfo));
+}
 
-    // Explicit demo values; target Model snapshots can replace these label updates later.
+namespace {
+/** Option labels are one per line in an I18n text; copy line index into buffer (empty when out of range). */
+void option_text(i18n::TextId id, unsigned index, char* buffer, std::size_t size) {
+    const char* text = i18n::text(id);
+    for (unsigned line = 0; line < index && text; ++line) {
+        text = std::strchr(text, '\n');
+        text = text ? text + 1 : nullptr;
+    }
+    const char* end = text ? std::strchr(text, '\n') : nullptr;
+    const int length = text ? static_cast<int>(end ? end - text : std::strlen(text)) : 0;
+    std::snprintf(buffer, size, "%.*s", length, text ? text : "");
+}
+} // namespace
+
+void SystemInfosView::update(const DataProc::DeviceSnapshot& device, const DataProc::SystemState& state) const {
     using i18n::TextId;
-    lv_label_set_text_fmt(ui.work.label_data, "%s\n%s\n%s", i18n::text(TextId::WorkModeRover),
-                          i18n::text(TextId::StatusOff), i18n::text(TextId::StatusOff));
-    lv_label_set_text(ui.gps.label_data, "31.2304 N\n121.4737 E\n12.5 m");
-    lv_label_set_text_fmt(ui.wifi.label_data, "%s\n%s\n192.168.4.2", i18n::text(TextId::NtripClient),
-                          i18n::text(TextId::StatusOff));
-    lv_label_set_text_fmt(ui.battery.label_data, "85%%\n7.60 V\n28.5 C\n%s", i18n::text(TextId::BatteryNormalCharge));
-    lv_label_set_text_fmt(ui.storage.label_data, "%s\nDEMO-001\n1.2/8 GB\nXYZ\n15 min", i18n::text(TextId::StatusOff));
+    const char* na = i18n::text(TextId::NotAvailable);
+    const auto on_off = [](bool on) {
+        return i18n::text(on ? TextId::StatusOn : TextId::StatusOff);
+    };
+    if (device.work_valid) {
+        const char* ntrip = device.ntrip == DataProc::NtripRole::Server   ? i18n::text(TextId::NtripServer)
+                            : device.ntrip == DataProc::NtripRole::Client ? i18n::text(TextId::NtripClient)
+                                                                          : na;
+        lv_label_set_text_fmt(
+            ui.work.label_data, "%s\n%s\n%s",
+            i18n::text(device.work_mode == DataProc::WorkMode::Rover ? TextId::WorkModeRover : TextId::WorkModeBase),
+            on_off(device.radio_on), ntrip);
+    } else {
+        lv_label_set_text_fmt(ui.work.label_data, "%s\n%s\n%s", na, na, na);
+    }
+    if (device.position_valid)
+        lv_label_set_text_fmt(ui.gps.label_data, "%.6f\n%.6f\n%.2f m", device.latitude, device.longitude,
+                              device.altitude);
+    else
+        lv_label_set_text_fmt(ui.gps.label_data, "%s\n%s\n%s", na, na, na);
+    const char* wifi_state = state.wifi_pending ? "..." : on_off(state.wifi_on);
+    if (device.wifi_valid)
+        lv_label_set_text_fmt(ui.wifi.label_data, "%s-%s\n%s\n%u.%u.%u.%u", device.wifi_station ? "STA" : "AP",
+                              device.wifi_ssid.data(), wifi_state, device.wifi_ip[0], device.wifi_ip[1],
+                              device.wifi_ip[2], device.wifi_ip[3]);
+    else
+        lv_label_set_text_fmt(ui.wifi.label_data, "%s\n%s\n%s", na, wifi_state, na);
+    if (device.power_valid) {
+        const TextId charge = device.external_power                                 ? TextId::BatteryExternalPower
+                              : device.charge == DataProc::ChargeState::NotCharging ? TextId::BatteryNotCharge
+                              : device.charge == DataProc::ChargeState::Fast        ? TextId::BatteryFastCharge
+                                                                                    : TextId::BatteryNormalCharge;
+        lv_label_set_text_fmt(ui.battery.label_data, "%.1f%%\n%.2f V\n%.1f C\n%s",
+                              static_cast<double>(device.battery_percent), static_cast<double>(device.battery_voltage),
+                              static_cast<double>(device.battery_temperature), i18n::text(charge));
+    } else {
+        lv_label_set_text_fmt(ui.battery.label_data, "%s\n%s\n%s\n%s", na, na, na, na);
+    }
+    if (device.record_valid && device.recording) {
+        char type[16], interval[16];
+        option_text(TextId::RecordTypeOptions, device.record_type, type, sizeof(type));
+        option_text(TextId::RecordIntervalOptions, device.record_interval, interval, sizeof(interval));
+        lv_label_set_text_fmt(ui.storage.label_data, "%s\n%s\n%.1f MB\n%s\n%s", on_off(true), device.record_name.data(),
+                              static_cast<double>(device.record_space_mb), type, interval);
+    } else {
+        lv_label_set_text_fmt(ui.storage.label_data, "%s\n-\n-\n-\n-", device.record_valid ? on_off(false) : na);
+    }
     unsigned errors = 0;
     for (const auto& result : state.initialization)
         errors += result.status == DataProc::InitializationStatus::Failed;
-    lv_label_set_text_fmt(ui.system.label_data, "1.0.0\n02:15:30\n%u\nDEMO-001", errors);
+    const auto uptime = device.uptime_s;
+    lv_label_set_text_fmt(ui.system.label_data, "%s\n%02u:%02u:%02u\n%u\n%s",
+                          device.firmware[0] ? device.firmware.data() : na, static_cast<unsigned>(uptime / 3600U),
+                          static_cast<unsigned>(uptime / 60U % 60U), static_cast<unsigned>(uptime % 60U), errors,
+                          device.build[0] ? device.build.data() : na);
 }

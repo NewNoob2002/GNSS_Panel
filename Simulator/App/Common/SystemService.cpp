@@ -92,6 +92,19 @@ int on_event(Account* account, Account::EventParam_t* event) {
             state.powered_on = true;
             state.standby = state.shutting_down = false;
             break;
+        case DataProc::SystemCommand::SetWifi:
+            if (!sender_is(event, "SystemSettingsModel") || !state.wifi_available || state.wifi_pending)
+                return Account::RES_PARAM_ERROR;
+            if (request.wifi_on == state.wifi_on)
+                return Account::RES_OK;
+            // Pending until the platform reports the applied state; a platform that applies it at once calls
+            // set_wifi() inside request_wifi(), so mark pending first.
+            state.wifi_pending = true;
+            if (!system_backend::request_wifi(request.wifi_on)) {
+                state.wifi_pending = false;
+                return Account::RES_UNKNOW;
+            }
+            break;
         case DataProc::SystemCommand::ExecutePower:
             if (!sender_is(event, "SaveConfigModel") || !request.token)
                 return Account::RES_PARAM_ERROR;
@@ -155,6 +168,15 @@ bool SystemService::begin_shutdown(DataProc::PowerCause cause) {
     state.power_cause = cause;
     state.power_pending = false; // A platform shutdown supersedes a prepared user action.
     APP_LOG_I("SystemService", "platform shutdown, cause %d", static_cast<int>(cause));
+    return publish_state();
+}
+bool SystemService::set_wifi(bool on, bool pending) {
+    if (!provider_ready())
+        return false;
+    if (state.wifi_on == on && state.wifi_pending == pending)
+        return true;
+    state.wifi_on = on;
+    state.wifi_pending = pending;
     return publish_state();
 }
 bool SystemService::enter_standby() {

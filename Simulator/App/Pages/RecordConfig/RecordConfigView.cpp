@@ -113,11 +113,25 @@ void RecordConfigView::apply_language() const {
     roller_to_index(ui.roller.right_roller.label, right_roller_index);
 }
 
+void RecordConfigView::set_selection(unsigned type, unsigned interval) {
+    if (type < DataProc::kRecordTypeCount)
+        left_roller_index = static_cast<int8_t>(type);
+    if (interval < DataProc::kRecordIntervalCount)
+        right_roller_index = static_cast<int8_t>(interval);
+    roller_to_index(ui.roller.left_roller.label, static_cast<uint8_t>(left_roller_index));
+    roller_to_index(ui.roller.right_roller.label, static_cast<uint8_t>(right_roller_index));
+}
+
+void RecordConfigView::set_recording(bool recording) const {
+    lv_obj_set_style_bg_img_src(ui.btn_cont.btn_record, resource_pool::get_image(recording ? "stop" : "start"), 0);
+}
+
 void RecordConfigView::scroll(lv_obj_t* label, int delta) {
     if (label != ui.roller.left_roller.label && label != ui.roller.right_roller.label)
         return;
     int8_t& index = label == ui.roller.left_roller.label ? left_roller_index : right_roller_index;
-    const int count = label == ui.roller.left_roller.label ? 2 : 6;
+    const int count = static_cast<int>(label == ui.roller.left_roller.label ? DataProc::kRecordTypeCount
+                                                                            : DataProc::kRecordIntervalCount);
     index = static_cast<int8_t>((index + delta + count) % count);
     roller_to_index(label, index);
 }

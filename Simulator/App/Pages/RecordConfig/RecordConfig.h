@@ -18,7 +18,11 @@ class RecordConfig final : public PageBase {
     void on_language_changed() override;
 
   private:
-    std::array<lv_obj_t*, 5> controls() const;
+    std::array<lv_obj_t*, 6> controls() const;
+    bool recording() const;
+    /** Re-apply recording state: button image, roller lock and the focus order. */
+    void refresh();
+    void on_commit_request() override;
     static void clicked(lv_event_t* event);
     RecordConfigView view_{};
     RecordConfigModel model_;

@@ -20,11 +20,16 @@ void SystemInfos::on_view_load() {
 
 void SystemInfos::on_view_will_appear() {
     model_.set_status_bar(false);
-    view_.apply_language(model_.settings());
+    view_.apply_language();
+    view_.update(model_.device(), model_.settings());
+    model_.set_change_callback([this] {
+        view_.update(model_.device(), model_.settings());
+    });
     view_.group_init(); // Register after the outgoing page has emptied the focus group.
 }
 
 void SystemInfos::on_view_will_disappear() {
+    model_.set_change_callback({});
     lv_group_set_focus_cb(lv_group_get_default(), nullptr);
     utils::leave_focus_group();
 }
@@ -35,7 +40,8 @@ void SystemInfos::on_view_unload() {
 }
 
 void SystemInfos::on_language_changed() {
-    view_.apply_language(model_.settings());
+    view_.apply_language();
+    view_.update(model_.device(), model_.settings());
 }
 
 void SystemInfos::clicked(lv_event_t* event) {

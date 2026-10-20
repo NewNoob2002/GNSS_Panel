@@ -20,10 +20,15 @@ void StarMap::on_view_load() {
 
 void StarMap::on_view_will_appear() {
     model_.set_status_bar(true);
+    view_.update(model_.device());
+    model_.set_change_callback([this] {
+        view_.update(model_.device());
+    });
     utils::focus_controls(std::array{root}, root);
 }
 
 void StarMap::on_view_will_disappear() {
+    model_.set_change_callback({});
     utils::leave_focus_group();
 }
 

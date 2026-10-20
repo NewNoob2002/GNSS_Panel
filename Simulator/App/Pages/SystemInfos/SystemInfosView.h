@@ -20,8 +20,10 @@ class SystemInfosView {
 
     void destroy();
 
-    /** Render localized inventory cards and the retained initialization error count. */
-    void apply_language(const DataProc::SystemState& state = {}) const;
+    /** Localized card titles and field names. */
+    void apply_language() const;
+    /** Card values from device data and the System state (Wi-Fi state, initialization failures). */
+    void update(const DataProc::DeviceSnapshot& device, const DataProc::SystemState& state) const;
 
     /** Inventory controls in visible top-to-bottom order, after create(). */
     std::array<lv_obj_t*, 6> controls() const;

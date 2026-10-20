@@ -141,3 +141,17 @@ void DialplateView::appear_anim_start(const bool reverse) const {
     lv_anim_timeline_set_reverse(ui.anim_timeline, reverse);
     lv_anim_timeline_start(ui.anim_timeline);
 }
+
+void DialplateView::update(const DataProc::DeviceSnapshot& device) const {
+    ui.top_info.satellite_used->set_value(device.satellites_valid ? device.satellites_used % 100U : 0U);
+    ui.top_info.satellite_tacked->set_value(device.satellites_valid ? device.satellites_tracked % 100U : 0U);
+    const bool rover = device.work_valid && device.work_mode == DataProc::WorkMode::Rover;
+    lv_label_set_text(ui.top_info.icon_mode, rover ? CUSTOM_SYMBOL_ROVER : CUSTOM_SYMBOL_BASE);
+    // Radio active: green while receiving (rover), blue while transmitting (base); white when off.
+    const lv_color_t radio = !device.work_valid || !device.radio_on ? lv_color_white()
+                             : rover                                ? lv_palette_main(LV_PALETTE_GREEN)
+                                                                    : lv_palette_main(LV_PALETTE_BLUE);
+    lv_obj_set_style_text_color(ui.top_info.icon_radio, radio, 0);
+    lv_obj_set_style_bg_img_src(
+        ui.btn_cont.btn_rec, resource_pool::get_image(device.record_valid && device.recording ? "stop" : "start"), 0);
+}

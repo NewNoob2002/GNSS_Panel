@@ -5,6 +5,7 @@
 #ifndef LVGL_RECORDCONFIGVIEW_H
 #define LVGL_RECORDCONFIGVIEW_H
 
+#include "Common/DataProc/DataProc_Def.h"
 #include "Resource/ResourcePool.h"
 #include "Utils/I18n/I18n.h"
 #include "lvgl.h"
@@ -50,6 +51,16 @@ class RecordConfigView {
     void apply_language() const;
     /** 仅更新本页滚轮预览，不控制录制状态。delta 为 -1（上一项）或 1（下一项）。 */
     void scroll(lv_obj_t* label, int delta);
+    /** Show the device's record type/interval (option indexes; out-of-range values are ignored). */
+    void set_selection(unsigned type, unsigned interval);
+    unsigned type() const {
+        return static_cast<unsigned>(left_roller_index);
+    }
+    unsigned interval() const {
+        return static_cast<unsigned>(right_roller_index);
+    }
+    /** Record button shows stop while recording, start otherwise. */
+    void set_recording(bool recording) const;
 
     void roller_create(lv_obj_t* par);
 

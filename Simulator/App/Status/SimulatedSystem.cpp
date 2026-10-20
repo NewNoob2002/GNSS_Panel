@@ -19,6 +19,45 @@ constexpr DemoStep steps[] = {
     {"finalization", true, "working UI prepared"},
 };
 static_assert(sizeof(steps) / sizeof(steps[0]) == DataProc::kInitializationStepCount);
+
+void copy(char* dest, std::size_t size, const char* text) {
+    std::snprintf(dest, size, "%s", text);
+}
+/** Simulated device data; commands change it as a real device would report back. */
+DataProc::DeviceSnapshot device = [] {
+    DataProc::DeviceSnapshot d;
+    d.position_valid = true;
+    d.latitude = 31.230400;
+    d.longitude = 121.473700;
+    d.altitude = 12.5;
+    d.satellites_valid = true;
+    d.satellites_used = 9;
+    d.satellites_tracked = 14;
+    d.constellations_valid = true;
+    d.constellations = {4, 3, 1, 2, 0, 1, 0};
+    d.work_valid = true;
+    d.work_mode = DataProc::WorkMode::Rover;
+    d.radio_protocol = 0;
+    d.radio_channel = 1;
+    d.record_valid = true;
+    d.record_interval = 1;
+    copy(d.record_name.data(), d.record_name.size(), "DEMO-001");
+    d.record_space_mb = 1228.8f;
+    d.wifi_valid = true;
+    d.wifi_station = true;
+    copy(d.wifi_ssid.data(), d.wifi_ssid.size(), "RK3506-DEMO");
+    d.wifi_ip = {192, 168, 4, 2};
+    d.power_valid = true;
+    d.battery_percent = 85.0f;
+    d.battery_voltage = 7.60f;
+    d.battery_temperature = 28.5f;
+    d.charge = DataProc::ChargeState::Normal;
+    copy(d.firmware.data(), d.firmware.size(), "1.0.0");
+    copy(d.hardware.data(), d.hardware.size(), "J V1.0");
+    copy(d.build.data(), d.build.size(), "DEMO-001");
+    d.uptime_s = 2 * 3600 + 15 * 60 + 30;
+    return d;
+}();
 } // namespace
 
 system_backend::Capabilities system_backend::capabilities() {
@@ -43,6 +82,38 @@ i18n::TextId system_backend::initialization_title(unsigned step) {
                                        i18n::TextId::FinalizingStartup};
     static_assert(sizeof(titles) / sizeof(titles[0]) == DataProc::kInitializationStepCount);
     return step < DataProc::kInitializationStepCount ? titles[step] : i18n::TextId::Initializing;
+}
+bool system_backend::request_wifi(bool) {
+    return false; // The simulator has no Wi-Fi backend (wifi_available is false).
+}
+DataProc::DeviceSnapshot system_backend::initial_device() {
+    return device;
+}
+bool system_backend::execute_device(const DataProc::DeviceRequest& request) {
+    switch (request.command) {
+        case DataProc::DeviceCommand::ApplyWork:
+            device.ntrip =
+                request.target == DataProc::WorkTarget::Ntrip ? DataProc::NtripRole::Server : DataProc::NtripRole::None;
+            device.work_mode =
+                request.target == DataProc::WorkTarget::Rover ? DataProc::WorkMode::Rover : DataProc::WorkMode::Base;
+            device.radio_on = request.target != DataProc::WorkTarget::Ntrip;
+            if (device.radio_on) {
+                device.radio_protocol = request.radio_protocol;
+                device.radio_channel = request.radio_channel;
+            }
+            break;
+        case DataProc::DeviceCommand::StartRecord:
+            device.recording = true;
+            device.record_type = request.record_type;
+            device.record_interval = request.record_interval;
+            break;
+        case DataProc::DeviceCommand::StopRecord:
+            device.recording = false;
+            break;
+    }
+    APP_LOG_I("SystemService", "simulated device command %d: NO host/device operation",
+              static_cast<int>(request.command));
+    return DeviceService::update(device);
 }
 const char* system_backend::initialization_name(unsigned step) {
     return step < DataProc::kInitializationStepCount ? steps[step].name : "invalid";

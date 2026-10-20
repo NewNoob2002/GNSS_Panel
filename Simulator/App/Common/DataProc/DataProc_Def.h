@@ -21,6 +21,51 @@ struct StatusSnapshot {
     float battery_temperature = 25.0f; // Celsius.
     std::uint32_t position_color_rgb = 0xf44336;
 };
+/** Device/business data published by the platform (Device provider). Option indexes refer to the lists shown
+ * by the pages (I18n RadioProtocolOptions, RadioChannelOptions, RecordTypeOptions, RecordIntervalOptions);
+ * mapping them to device or protocol codes belongs to the platform.
+ */
+constexpr unsigned kRadioProtocolCount = 8, kRadioChannelCount = 10, kRecordTypeCount = 2, kRecordIntervalCount = 6;
+constexpr std::size_t kConstellationCount = 7; // GPS, BDS, GLONASS, Galileo, SBAS, QZSS, IRNSS
+enum class WorkMode { Rover, Base };
+enum class NtripRole { None, Server, Client };
+enum class ChargeState { NotCharging, Normal, Fast };
+struct DeviceSnapshot {
+    bool position_valid = false;
+    double latitude = 0.0, longitude = 0.0, altitude = 0.0; // Degrees, degrees, metres.
+    bool satellites_valid = false;
+    unsigned satellites_used = 0, satellites_tracked = 0;
+    bool constellations_valid = false;
+    std::array<unsigned, kConstellationCount> constellations{};
+    bool work_valid = false;
+    WorkMode work_mode{};
+    bool radio_on = false;
+    unsigned radio_protocol = 0, radio_channel = 0; // Option indexes; channel 0 is CUSTOM.
+    NtripRole ntrip{};
+    bool record_valid = false, recording = false;
+    unsigned record_type = 0, record_interval = 0; // Option indexes.
+    std::array<char, 17> record_name{};
+    float record_space_mb = 0.0f;
+    bool wifi_valid = false, wifi_station = false; // Station (STA) or access point (AP).
+    std::array<char, 17> wifi_ssid{};
+    std::array<std::uint8_t, 4> wifi_ip{};
+    bool power_valid = false, external_power = false;
+    float battery_percent = 0.0f, battery_voltage = 0.0f, battery_temperature = 0.0f;
+    ChargeState charge{};
+    std::array<char, 16> firmware{}, hardware{};
+    std::array<char, 24> build{};
+    std::uint32_t uptime_s = 0;
+};
+/** Work target chosen on WorkSettings: radio Rover/Base use protocol/channel; Ntrip is the network base. */
+enum class WorkTarget { Rover, Base, Ntrip };
+enum class DeviceCommand { ApplyWork, StartRecord, StopRecord };
+struct DeviceRequest {
+    DeviceCommand command{};
+    WorkTarget target{};
+    unsigned radio_protocol = 0, radio_channel = 0;
+    unsigned record_type = 0, record_interval = 0;
+};
+
 struct DateTime {
     unsigned year = 2026, month = 9, day = 30, hour = 12, minute = 30;
 };
@@ -38,7 +83,7 @@ struct InitializationResult {
 };
 struct SystemState {
     i18n::Language language{};
-    bool wifi_available = false, wifi_on = false;
+    bool wifi_available = false, wifi_on = false, wifi_pending = false; // pending: toggle sent, not yet applied
     DateTime date{};
     bool simulated = true, power_pending = false;
     PowerAction power_action{};
@@ -61,7 +106,8 @@ enum class SystemCommand {
     CancelPower,
     BeginInitialization,
     RecordInitialization,
-    RequestPowerOn
+    RequestPowerOn,
+    SetWifi
 };
 struct SystemRequest {
     SystemCommand command{};
@@ -70,6 +116,7 @@ struct SystemRequest {
     PowerAction action{};
     std::uint64_t token = 0;
     unsigned initialization_step = 0;
+    bool wifi_on = false;
     InitializationResult initialization{};
 };
 } // namespace DataProc

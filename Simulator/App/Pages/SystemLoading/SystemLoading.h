@@ -19,6 +19,10 @@ class SystemLoading final : public PageBase {
 
   private:
     void cancel_timer();
+    /** " [DEMO]" in logs only when the platform reports simulated data. */
+    const char* demo_tag() const {
+        return model_.settings().simulated ? " [DEMO]" : "";
+    }
     static void on_timeout(lv_timer_t* timer);
     SystemLoadingView view_{};
     SystemLoadingModel model_;

@@ -103,11 +103,21 @@ void WorkSettingsView::apply_language() const {
     roller_to_index(ui.roller.right_roller.label, right_roller_index);
 }
 
+void WorkSettingsView::set_selection(unsigned protocol, unsigned channel) {
+    if (protocol < DataProc::kRadioProtocolCount)
+        left_roller_index = static_cast<int8_t>(protocol);
+    if (channel < DataProc::kRadioChannelCount)
+        right_roller_index = static_cast<int8_t>(channel);
+    roller_to_index(ui.roller.left_roller.label, static_cast<uint8_t>(left_roller_index));
+    roller_to_index(ui.roller.right_roller.label, static_cast<uint8_t>(right_roller_index));
+}
+
 void WorkSettingsView::scroll(lv_obj_t* label, int delta) {
     if (label != ui.roller.left_roller.label && label != ui.roller.right_roller.label)
         return;
     int8_t& index = label == ui.roller.left_roller.label ? left_roller_index : right_roller_index;
-    const int count = label == ui.roller.left_roller.label ? 8 : 10;
+    const int count = static_cast<int>(label == ui.roller.left_roller.label ? DataProc::kRadioProtocolCount
+                                                                            : DataProc::kRadioChannelCount);
     index = static_cast<int8_t>((index + delta + count) % count);
     roller_to_index(label, index);
 }

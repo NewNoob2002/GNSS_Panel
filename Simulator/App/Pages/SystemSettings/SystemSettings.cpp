@@ -10,16 +10,20 @@ void SystemSettings::on_view_load() {
     if (!model_.init())
         app_fatal("SystemSettings", "Model initialization failed");
     view_.create(root);
-    utils::attach_controls(view_.controls(), clicked, this);
+    utils::attach_controls(std::array{view_.ui.language, view_.ui.wifi, view_.ui.back}, clicked, this);
 }
 void SystemSettings::on_view_will_appear() {
     // SystemDash owns the full-screen flow; Settings must not reveal the shared StatusBar.
     model_.set_status_bar(false);
     view_.apply_language();
     view_.update(model_.settings());
+    model_.set_change_callback([this] {
+        view_.update(model_.settings());
+    });
     utils::focus_controls(view_.controls(), last_focus_);
 }
 void SystemSettings::on_view_will_disappear() {
+    model_.set_change_callback({});
     last_focus_ = utils::leave_focus_group();
 }
 void SystemSettings::on_view_unload() {
@@ -38,6 +42,11 @@ void SystemSettings::clicked(lv_event_t* event) {
     if (target == self->view_.ui.language) {
         if (!self->model_.toggle_language())
             APP_LOG_E("SystemSettings", "language request rejected");
+        self->view_.update(self->model_.settings());
+    } else if (target == self->view_.ui.wifi) {
+        const auto& state = self->model_.settings();
+        if (state.wifi_available && !state.wifi_pending && !self->model_.set_wifi(!state.wifi_on))
+            APP_LOG_E("SystemSettings", "Wi-Fi request rejected");
         self->view_.update(self->model_.settings());
     } else if (target == self->view_.ui.back && !self->page_manager->pop()) {
         APP_LOG_E("SystemSettings", "Back navigation rejected");

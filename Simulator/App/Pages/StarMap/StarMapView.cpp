@@ -108,7 +108,7 @@ void StarMapView::create(lv_obj_t* root) {
         }
     }
 
-    update_values(4, 3, 1, 2, 0, 1, 0); // Demo constellation counts, not sampled satellites.
+    update(DataProc::DeviceSnapshot{}); // "-" until the platform publishes constellation counts.
     apply_language();
 }
 
@@ -124,12 +124,16 @@ void StarMapView::update_activity_indicator() {
     lv_obj_set_style_bg_opa(ui.activity_indicator, activity_indicator_on ? LV_OPA_COVER : LV_OPA_30, 0);
 }
 
-void StarMapView::update_values(int gps, int bds, int gln, int gal, int sbas, int qzss, int irnss) {
-    const int counts[7] = {gps, bds, gln, gal, sbas, qzss, irnss};
+void StarMapView::update(const DataProc::DeviceSnapshot& device) {
+    static_assert(DataProc::kConstellationCount == 7, "one column per constellation");
     char buf[16];
-
-    for (int i = 0; i < 7; ++i) {
-        std::snprintf(buf, sizeof(buf), "%d", counts[i]);
+    for (std::size_t i = 0; i < DataProc::kConstellationCount; ++i) {
+        if (device.constellations_valid)
+            std::snprintf(buf, sizeof(buf), "%u", device.constellations[i]);
+        else
+            std::snprintf(buf, sizeof(buf), "-");
         lv_label_set_text(ui.constell[i].label_val, buf);
     }
+    if (device.constellations_valid)
+        update_activity_indicator(); // Blinks while fresh counts arrive.
 }

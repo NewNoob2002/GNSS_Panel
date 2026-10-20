@@ -23,7 +23,7 @@ void SystemLoading::on_view_will_appear() {
     step_ = 0;
     model_.begin_initialization(); // Report reset failures are logged; startup remains non-blocking.
     view_.show_logo();
-    APP_LOG_I("SystemLoading", "window=Logo [DEMO]");
+    APP_LOG_I("SystemLoading", "window=Logo%s", demo_tag());
 }
 
 void SystemLoading::on_view_did_appear() {
@@ -61,7 +61,7 @@ void SystemLoading::on_timeout(lv_timer_t* timer) {
     if (self->phase_ == Phase::Logo) {
         self->phase_ = Phase::Initialization;
         self->view_.show_initialization();
-        APP_LOG_I("SystemLoading", "window=Initialization [DEMO]");
+        APP_LOG_I("SystemLoading", "window=Initialization%s", self->demo_tag());
         self->view_.show_step(self->step_, self->model_.initialize_step(self->step_));
         lv_timer_set_period(timer, SystemLoadingView::kStepMs);
         lv_timer_reset(timer);
@@ -81,7 +81,7 @@ void SystemLoading::on_timeout(lv_timer_t* timer) {
     if (self->phase_ == Phase::Completion) {
         self->phase_ = Phase::Ready;
         self->view_.show_ready();
-        APP_LOG_I("SystemLoading", "window=Ready [DEMO] status=%s; continuing",
+        APP_LOG_I("SystemLoading", "window=Ready%s status=%s; continuing", self->demo_tag(),
                   self->view_.has_failures() ? "warnings" : "OK");
         lv_timer_set_period(timer, 1000);
         lv_timer_reset(timer);
@@ -89,7 +89,7 @@ void SystemLoading::on_timeout(lv_timer_t* timer) {
     }
     self->timer_ = nullptr;
     lv_timer_del(timer);
-    APP_LOG_I("SystemLoading", "window=Dialplate [DEMO]");
+    APP_LOG_I("SystemLoading", "window=Dialplate%s", self->demo_tag());
     if (!self->page_manager->replace("Pages/Dialplate"))
         LV_LOG_WARN("SystemLoading: preview transition rejected");
 }

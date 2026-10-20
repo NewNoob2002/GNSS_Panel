@@ -24,11 +24,16 @@ void Dialplate::on_view_load() {
 
 void Dialplate::on_view_will_appear() {
     model_.set_status_bar(true);
+    view_.update(model_.device());
+    model_.set_change_callback([this] {
+        view_.update(model_.device());
+    });
     utils::focus_controls(controls(), last_focus_ ? last_focus_ : view_.ui.btn_cont.btn_menu);
     view_.appear_anim_start();
 }
 
 void Dialplate::on_view_will_disappear() {
+    model_.set_change_callback({});
     last_focus_ = utils::leave_focus_group();
 }
 

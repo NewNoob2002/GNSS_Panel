@@ -1,6 +1,7 @@
 #ifndef WorkSettings_VIEW_H
 #define WorkSettings_VIEW_H
 
+#include "Common/DataProc/DataProc_Def.h"
 #include "Resource/ResourcePool.h"
 #include "Utils/I18n/I18n.h"
 #include "lvgl.h"
@@ -53,6 +54,14 @@ class WorkSettingsView {
     void apply_language() const;
     /** 仅更新本页滚轮预览，不写入电台配置。delta 为 -1（上一项）或 1（下一项）。 */
     void scroll(lv_obj_t* label, int delta);
+    /** Show the device's radio protocol/channel (option indexes; out-of-range values are ignored). */
+    void set_selection(unsigned protocol, unsigned channel);
+    unsigned protocol() const {
+        return static_cast<unsigned>(left_roller_index);
+    }
+    unsigned channel() const {
+        return static_cast<unsigned>(right_roller_index);
+    }
 
     void roller_create(lv_obj_t* par);
 

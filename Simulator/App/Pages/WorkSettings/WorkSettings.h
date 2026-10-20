@@ -18,7 +18,8 @@ class WorkSettings final : public PageBase {
     void on_language_changed() override;
 
   private:
-    std::array<lv_obj_t*, 5> controls() const;
+    std::array<lv_obj_t*, 8> controls() const;
+    void apply(lv_obj_t* button);
     static void clicked(lv_event_t* event);
     WorkSettingsView view_{};
     WorkSettingsModel model_;

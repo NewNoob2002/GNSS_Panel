@@ -30,6 +30,7 @@ void SystemSettingsView::create(lv_obj_t* root) {
     wifi_value_ = style::label(ui.wifi, font, 110, 5, 158);
     for (auto* value : {language_value_, wifi_value_})
         lv_obj_set_style_text_align(value, LV_TEXT_ALIGN_RIGHT, 0);
+    // Disabled until update() sees SystemState::wifi_available.
     lv_obj_add_state(ui.wifi, LV_STATE_DISABLED);
     lv_obj_set_style_opa(ui.wifi, LV_OPA_50, LV_STATE_DISABLED);
 }
@@ -40,5 +41,13 @@ void SystemSettingsView::apply_language() const {
 void SystemSettingsView::update(const DataProc::SystemState& state) {
     lv_label_set_text(language_value_, i18n::text(state.language == i18n::Language::English ? TextId::EnglishName
                                                                                             : TextId::RussianName));
-    lv_label_set_text(wifi_value_, i18n::text(state.wifi_on ? TextId::StatusOn : TextId::StatusOff));
+    wifi_available_ = state.wifi_available;
+    if (wifi_available_)
+        lv_obj_clear_state(ui.wifi, LV_STATE_DISABLED);
+    else
+        lv_obj_add_state(ui.wifi, LV_STATE_DISABLED);
+    if (state.wifi_pending)
+        lv_label_set_text(wifi_value_, "..."); // Toggle sent; waiting for the platform to report it applied.
+    else
+        lv_label_set_text(wifi_value_, i18n::text(state.wifi_on ? TextId::StatusOn : TextId::StatusOff));
 }

@@ -1,6 +1,7 @@
 #ifndef DIALPLATE_VIEW_H
 #define DIALPLATE_VIEW_H
 
+#include "Common/DataProc/DataProc_Def.h"
 #include "Utils/lv_anim_label/numberFlow.h"
 #include "lvgl.h"
 
@@ -44,6 +45,8 @@ class DialplateView {
     void destroy();
 
     void appear_anim_start(bool reverse = false) const;
+    /** Satellites, work mode/radio icons and the record button from device data. */
+    void update(const DataProc::DeviceSnapshot& device) const;
 
   private:
     void top_info_create(lv_obj_t* par);
