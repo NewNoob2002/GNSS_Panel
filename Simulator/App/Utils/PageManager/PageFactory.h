@@ -27,7 +27,7 @@
 
 class PageFactory {
   public:
-    virtual PageBase* CreatePage(const char* name) = 0;
+    virtual PageBase* create_page(const char* name) = 0;
     virtual ~PageFactory() = default;
 };
 

@@ -20,18 +20,17 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#ifndef __PING_PONG_BUFFER_H
-#define __PING_PONG_BUFFER_H
+#ifndef RK3506_PING_PONG_BUFFER_H
+#define RK3506_PING_PONG_BUFFER_H
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
 
-typedef struct
-{
+typedef struct {
     void* buffer[2];
     volatile uint8_t writeIndex;
     volatile uint8_t readIndex;

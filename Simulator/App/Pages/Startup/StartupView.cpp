@@ -1,131 +1,113 @@
 #include "StartupView.h"
-#include <cstdio>
+#include "Utils/BatteryStyle.h"
+#include "Utils/PageStyle.h"
 
-using namespace Page;
+using namespace page;
 
 namespace {
-
 constexpr lv_coord_t kStatusBarHeight = 26;
 constexpr lv_color_t kBackground = LV_COLOR_MAKE(0x15, 0x15, 0x13);
-constexpr lv_color_t kPanel = LV_COLOR_MAKE(0x22, 0x22, 0x1E);
-constexpr lv_color_t kAmber = LV_COLOR_MAKE(0xE1, 0xAA, 0x22);
+constexpr lv_color_t kAmber = LV_COLOR_MAKE(0xFF, 0x93, 0x1E);
 constexpr lv_color_t kAmberBright = LV_COLOR_MAKE(0xF6, 0xD0, 0x62);
-constexpr lv_color_t kLineGrey = LV_COLOR_MAKE(0x72, 0x6E, 0x63);
-constexpr lv_color_t kTextWarm = LV_COLOR_MAKE(0xE8, 0xE1, 0xCF);
-constexpr lv_color_t kDanger = LV_COLOR_MAKE(0xD9, 0x58, 0x3E);
+constexpr lv_color_t kMuted = LV_COLOR_MAKE(0x99, 0x99, 0x99);
+constexpr lv_coord_t kBarMaxWidth = 90;
 
-const char*
-GetPowerStateText() {
-    if (systemInfo.powerMonitor.ExternalPower == 1) {
-        return "EXT";
-    }
-    if (systemInfo.powerMonitor.batteryInfo.chargeStatus != notCharge) {
-        return "CHG";
-    }
-    return "BAT";
+void create_info_card(lv_obj_t* parent, const lv_font_t* font, const char* title, const char* value, int x) {
+    auto* card = style::box(parent, x, 3, 78, 44);
+    style::card(card);
+    auto* caption = style::label(card, font, 8, 4, 62);
+    lv_obj_set_style_text_color(caption, kMuted, 0);
+    lv_label_set_text(caption, title);
+    auto* data = style::label(card, font, 8, 22, 62);
+    lv_label_set_text(data, value);
 }
-
-lv_color_t
-GetBatteryColor() {
-    const uint16_t percent = systemInfo.powerMonitor.batteryInfo.Percent;
-    if (percent <= 20 && systemInfo.powerMonitor.ExternalPower != 1) {
-        return kDanger;
-    }
-    return kAmberBright;
-}
-
-lv_obj_t*
-CreateInfoLabel(lv_obj_t* parent, const lv_font_t* font, const char* title, const char* value, lv_align_t align,
-                lv_coord_t x, lv_coord_t y, lv_color_t valueColor = kTextWarm) {
-    lv_obj_t* cont = lv_obj_create(parent);
-    lv_obj_remove_style_all(cont);
-    lv_obj_set_size(cont, 72, 23);
-    lv_obj_clear_flag(cont, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_align(cont, align, x, y);
-
-    lv_obj_t* titleLabel = lv_label_create(cont);
-    lv_obj_remove_style_all(titleLabel);
-    lv_obj_set_style_text_font(titleLabel, font, 0);
-    lv_obj_set_style_text_color(titleLabel, kLineGrey, 0);
-    lv_obj_set_style_text_letter_space(titleLabel, 1, 0);
-    lv_label_set_text(titleLabel, title);
-    lv_obj_align(titleLabel, LV_ALIGN_TOP_LEFT, 0, 0);
-
-    lv_obj_t* valueLabel = lv_label_create(cont);
-    lv_obj_remove_style_all(valueLabel);
-    lv_obj_set_width(valueLabel, 72);
-    lv_label_set_long_mode(valueLabel, LV_LABEL_LONG_DOT);
-    lv_obj_set_style_text_font(valueLabel, font, 0);
-    lv_obj_set_style_text_color(valueLabel, valueColor, 0);
-    lv_obj_set_style_text_letter_space(valueLabel, 1, 0);
-    lv_label_set_text(valueLabel, value);
-    lv_obj_align(valueLabel, LV_ALIGN_BOTTOM_LEFT, 0, 0);
-
-    return cont;
-}
-
 } // namespace
 
-void
-StartupView::Create(lv_obj_t* root) {
-    const lv_font_t* font_small = ResourcePool::GetFont("oswaldBold_12");
-    const lv_font_t* font_main = ResourcePool::GetFont("oswaldBold_18");
-
+void StartupView::create(lv_obj_t* root) {
+    const auto* font_small = resource_pool::get_font("oswaldBold_12");
+    const auto* font_main = resource_pool::get_font("oswaldBold_18");
     lv_obj_set_style_bg_color(root, kBackground, 0);
     lv_obj_set_style_bg_opa(root, LV_OPA_COVER, 0);
 
-    lv_obj_t* content = lv_obj_create(root);
-    lv_obj_remove_style_all(content);
-    lv_obj_set_size(content, LV_HOR_RES, LV_VER_RES - kStatusBarHeight);
-    lv_obj_set_pos(content, 0, kStatusBarHeight);
-    lv_obj_clear_flag(content, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_style_bg_color(content, kBackground, 0);
-    lv_obj_set_style_bg_grad_color(content, kPanel, 0);
-    lv_obj_set_style_bg_grad_dir(content, LV_GRAD_DIR_VER, 0);
-    lv_obj_set_style_bg_opa(content, LV_OPA_COVER, 0);
+    // Reserve the header band for the status bar that appears after the idle delay.
+    auto* heading = style::label(root, font_main, 8, 0, 224);
+    lv_label_set_text(heading, "GNSS RTK");
+    auto* badge = style::mark_demo(style::box(root, 244, 4, 42, 18));
+    style::card(badge);
+    auto* demo = style::label(badge, font_small, 0, 0, 40);
+    lv_obj_set_style_text_align(demo, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_style_text_color(demo, kMuted, 0);
+    lv_label_set_text(demo, "DEMO");
 
-    char batteryText[8];
-    const uint16_t batteryPercent = LV_MIN(systemInfo.powerMonitor.batteryInfo.Percent, 100);
-    std::snprintf(batteryText, sizeof(batteryText), "%u%%", batteryPercent);
+    auto* content = style::box(root, 0, kStatusBarHeight, LV_HOR_RES, LV_VER_RES - kStatusBarHeight);
+    // Demo inventory until target providers supply firmware, board and power measurements.
+    create_info_card(content, font_small, "FW", "1.0.0", 8);
+    create_info_card(content, font_small, "HW", "J V1.0", 94);
+    auto* battery = style::box(content, 8, 55, 164, 42);
+    style::card(battery);
+    auto* icon = lv_img_create(battery);
+    lv_img_set_src(icon, resource_pool::get_image("battery_info"));
+    lv_img_set_zoom(icon, LV_IMG_ZOOM_NONE / 2);
+    lv_img_set_pivot(icon, 0, 0);
+    lv_obj_set_pos(icon, 8, 4);
+    lv_obj_set_style_img_recolor(icon, kAmber, 0);
+    lv_obj_set_style_img_recolor_opa(icon, LV_OPA_COVER, 0);
+    ui.bat_icon = icon;
+    auto* caption = style::label(battery, font_small, 30, 4, 46);
+    lv_obj_set_style_text_color(caption, kMuted, 0);
+    lv_label_set_text(caption, "BAT");
+    ui.bat_caption = caption;
+    auto* charge = style::label(battery, font_main, 108, 0, 48);
+    lv_obj_set_style_text_align(charge, LV_TEXT_ALIGN_RIGHT, 0);
+    lv_label_set_text(charge, "85%");
+    ui.bat_charge = charge;
+    auto* voltage = style::label(battery, font_small, 108, 24, 48);
+    lv_obj_set_style_text_align(voltage, LV_TEXT_ALIGN_RIGHT, 0);
+    lv_obj_set_style_text_color(voltage, kMuted, 0);
+    lv_label_set_text(voltage, "7.60 V");
+    ui.bat_voltage = voltage;
+    ui.bat_fill = battery::create_slot(battery, 8, 27, kBarMaxWidth, 6);
+    ui.bat_level = lv_obj_get_parent(ui.bat_fill);
 
-    CreateInfoLabel(content, font_small, "FW", systemInfo.software_version, LV_ALIGN_TOP_LEFT, 18, 15);
-    CreateInfoLabel(content, font_small, "HW", systemInfo.hardware_version, LV_ALIGN_TOP_LEFT, 18, 54);
-    CreateInfoLabel(content, font_small, "BAT", batteryText, LV_ALIGN_TOP_RIGHT, -8, 15, GetBatteryColor());
-    CreateInfoLabel(content, font_small, "PWR", GetPowerStateText(), LV_ALIGN_TOP_RIGHT, -8, 54);
+    auto* btn_press = style::box(content, 180, 3, 106, 94, true);
+    style::card(btn_press);
+    lv_obj_set_style_border_width(btn_press, 1, LV_STATE_FOCUSED);
+    lv_obj_set_style_border_color(btn_press, kAmber, LV_STATE_FOCUSED);
+    lv_obj_set_style_bg_color(btn_press, lv_color_hex(0x30271d), LV_STATE_PRESSED);
+    lv_obj_set_style_border_width(btn_press, 2, LV_STATE_PRESSED);
+    lv_obj_set_style_border_color(btn_press, kAmberBright, LV_STATE_PRESSED);
+    ui.btn_press = btn_press;
 
-    lv_obj_t* accent = lv_obj_create(content);
-    lv_obj_remove_style_all(accent);
-    lv_obj_set_size(accent, 42, 2);
-    lv_obj_set_style_bg_color(accent, kAmber, 0);
-    lv_obj_set_style_bg_grad_color(accent, kLineGrey, 0);
-    lv_obj_set_style_bg_grad_dir(accent, LV_GRAD_DIR_HOR, 0);
-    lv_obj_set_style_bg_opa(accent, LV_OPA_70, 0);
-    lv_obj_align(accent, LV_ALIGN_TOP_MID, 0, 5);
-
-    constexpr lv_coord_t arcSize = 62;
-    lv_obj_t* arc = lv_arc_create(content);
-    lv_obj_set_size(arc, arcSize, arcSize);
-    lv_obj_align(arc, LV_ALIGN_TOP_MID, 0, 10);
+    auto* arc = lv_arc_create(btn_press);
+    lv_obj_set_size(arc, 46, 46);
+    lv_obj_set_pos(arc, 30, 4);
     lv_arc_set_range(arc, 0, 100);
     lv_arc_set_value(arc, 0);
     lv_arc_set_bg_angles(arc, 135, 45);
     lv_arc_set_rotation(arc, 90);
     lv_obj_remove_style(arc, nullptr, LV_PART_KNOB);
     lv_obj_clear_flag(arc, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_set_style_arc_width(arc, 5, LV_PART_MAIN);
-    lv_obj_set_style_arc_width(arc, 5, LV_PART_INDICATOR);
-    lv_obj_set_style_arc_color(arc, kLineGrey, LV_PART_MAIN);
-    lv_obj_set_style_arc_opa(arc, LV_OPA_50, LV_PART_MAIN);
+    lv_obj_set_style_arc_width(arc, 3, LV_PART_MAIN);
+    lv_obj_set_style_arc_width(arc, 3, LV_PART_INDICATOR);
+    lv_obj_set_style_arc_color(arc, lv_color_hex(0x555555), LV_PART_MAIN);
     lv_obj_set_style_arc_color(arc, kAmberBright, LV_PART_INDICATOR);
     ui.arc = arc;
-
-    lv_obj_t* labelPercent = lv_label_create(content);
-    lv_obj_remove_style_all(labelPercent);
-    lv_label_set_text(labelPercent, "0%");
-    lv_obj_set_style_text_font(labelPercent, font_main, 0);
-    lv_obj_set_style_text_color(labelPercent, kTextWarm, 0);
-    lv_obj_align_to(labelPercent, arc, LV_ALIGN_CENTER, 0, -1);
-    ui.arc_percent = labelPercent;
+    auto* power = lv_img_create(btn_press);
+    lv_img_set_src(power, resource_pool::get_image("shutdown"));
+    lv_obj_set_pos(power, 45, 11);
+    lv_obj_set_style_img_recolor(power, kAmberBright, 0);
+    lv_obj_set_style_img_recolor_opa(power, LV_OPA_COVER, 0);
+    auto* percent = style::label(btn_press, font_small, 11, 29, 84);
+    lv_obj_set_style_text_align(percent, LV_TEXT_ALIGN_CENTER, 0);
+    lv_label_set_text(percent, "0%");
+    ui.arc_percent = percent;
+    auto* label_btn = style::label(btn_press, font_main, 7, 50, 92);
+    lv_obj_set_style_text_align(label_btn, LV_TEXT_ALIGN_CENTER, 0);
+    ui.btn_label = label_btn;
+    auto* hint = style::label(btn_press, font_small, 7, 76, 92);
+    lv_obj_set_style_text_align(hint, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_style_text_color(hint, kMuted, 0);
+    ui.hold_hint = hint;
 
     lv_anim_init(&ui.arc_anim);
     lv_anim_set_var(&ui.arc_anim, ui.arc);
@@ -133,61 +115,33 @@ StartupView::Create(lv_obj_t* root) {
     lv_anim_set_playback_time(&ui.arc_anim, 0);
     lv_anim_set_repeat_count(&ui.arc_anim, 0);
     lv_anim_set_path_cb(&ui.arc_anim, lv_anim_path_linear);
-
-    lv_obj_t* btnPress = lv_obj_create(content);
-    lv_obj_remove_style_all(btnPress);
-    lv_obj_set_size(btnPress, 76, 22);
-    lv_obj_clear_flag(btnPress, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_style_bg_color(btnPress, kAmber, 0);
-    lv_obj_set_style_bg_opa(btnPress, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_side(btnPress, LV_BORDER_SIDE_BOTTOM, 0);
-    lv_obj_set_style_border_color(btnPress, kAmberBright, 0);
-    lv_obj_set_style_border_width(btnPress, 2, 0);
-    lv_obj_set_style_border_opa(btnPress, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_radius(btnPress, 2, 0);
-
-    lv_obj_set_style_border_opa(btnPress, LV_OPA_COVER, LV_STATE_FOCUSED);
-    lv_obj_set_style_bg_opa(btnPress, LV_OPA_10, LV_STATE_FOCUSED);
-
-    lv_obj_set_style_width(btnPress, 64, LV_STATE_PRESSED);
-    lv_obj_set_style_translate_y(btnPress, 1, LV_STATE_PRESSED);
-    lv_obj_set_style_bg_color(btnPress, kAmberBright, LV_STATE_PRESSED);
-    lv_obj_set_style_bg_opa(btnPress, LV_OPA_20, LV_STATE_PRESSED);
-    lv_obj_set_style_border_color(btnPress, kAmberBright, LV_STATE_PRESSED);
-    lv_obj_set_style_border_width(btnPress, 3, LV_STATE_PRESSED);
-    lv_obj_set_style_border_opa(btnPress, LV_OPA_COVER, LV_STATE_PRESSED);
-
-    lv_obj_align(btnPress, LV_ALIGN_BOTTOM_MID, 0, -4);
-    ui.btnPress = btnPress;
-
-    lv_obj_t* labelBtn = lv_label_create(btnPress);
-    lv_obj_remove_style_all(labelBtn);
-    lv_obj_set_style_text_font(labelBtn, font_small, 0);
-    lv_obj_set_style_text_color(labelBtn, kTextWarm, 0);
-    lv_obj_set_style_text_opa(labelBtn, LV_OPA_80, 0);
-    lv_obj_set_style_text_letter_space(labelBtn, 1, 0);
-    lv_obj_center(labelBtn);
-    ui.btnLabel = labelBtn;
-
-    static lv_style_transition_dsc_t focusTransition;
-    static constexpr lv_style_prop_t focusProps[] = {
-        LV_STYLE_BG_OPA, LV_STYLE_BORDER_OPA,  LV_STYLE_BORDER_WIDTH,
-        LV_STYLE_WIDTH,  LV_STYLE_TRANSLATE_Y, LV_STYLE_PROP_INV,
-    };
-    lv_style_transition_dsc_init(&focusTransition, focusProps, lv_anim_path_ease_out, 120, 0, nullptr);
-    lv_obj_set_style_transition(btnPress, &focusTransition, LV_STATE_FOCUSED);
-    lv_obj_set_style_transition(btnPress, &focusTransition, LV_STATE_PRESSED);
-
-    ApplyLanguage();
+    apply_language();
 }
 
-void
-StartupView::Delete() const {}
+void StartupView::destroy() const {
+    battery::stop(ui.bat_fill);
+}
 
-void
-StartupView::Update() {}
+void StartupView::update(const DataProc::StatusSnapshot& status) {
+    if (!ui.bat_charge || !ui.bat_fill)
+        return;
+    const unsigned percent = status.battery_percent > 100 ? 100 : status.battery_percent;
+    if (status.battery_valid) {
+        lv_label_set_text_fmt(ui.bat_charge, "%u%%", percent);
+        lv_label_set_text_fmt(ui.bat_voltage, "%.2f V", status.battery_voltage);
+    } else {
+        lv_label_set_text(ui.bat_charge, "N/A");
+        lv_label_set_text(ui.bat_voltage, "N/A");
+    }
+    const bool charging = status.battery_valid && status.charging;
+    const auto color = status.battery_valid ? battery::color(percent, charging) : kMuted;
+    lv_label_set_text(ui.bat_caption, charging ? "CHG" : "BAT");
+    lv_obj_set_style_text_color(ui.bat_caption, charging ? color : kMuted, 0);
+    lv_obj_set_style_img_recolor(ui.bat_icon, color, 0);
+    battery::update_fill(ui.bat_fill, percent, charging, status.battery_valid);
+}
 
-void
-StartupView::ApplyLanguage() const {
-    lv_label_set_text(ui.btnLabel, I18n::Text(I18n::TextId::Press));
+void StartupView::apply_language() const {
+    lv_label_set_text(ui.btn_label, i18n::text(i18n::TextId::StartupStart));
+    lv_label_set_text(ui.hold_hint, i18n::text(i18n::TextId::StartupHoldHint));
 }

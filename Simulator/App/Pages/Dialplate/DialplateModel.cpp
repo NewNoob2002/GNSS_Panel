@@ -1,54 +1,34 @@
 #include "DialplateModel.h"
+#include <algorithm>
+#include "Common/ModelUtils.h"
+#include "Common/SystemService.h"
+#include "Utils/Log/Log.h"
 
-using namespace Page;
+using namespace page;
 
-void
-DialplateModel::Init() {
-    account = new Account("DialplateModel", DataProc::Center(), 0, this);
-    account->Subscribe("StatusBar");
-    account->SetEventCallback(onEvent);
-}
-
-void
-DialplateModel::Deinit() {
-    if (account) {
-        delete account;
-        account = nullptr;
+bool DialplateModel::init() {
+    if (account_)
+        return true;
+    account_ = std::make_unique<Account>("DialplateModel", DataProc::Center(), 0, this);
+    account_->SetEventCallback(on_event);
+    if (!account_->IsRegistered() || !model_utils::subscribe(*account_, status_, state_)) {
+        account_.reset();
+        APP_LOG_E("DialplateModel", "Account initialization failed");
+        return false;
     }
+    return true;
 }
-
-int
-DialplateModel::onEvent(Account* account, Account::EventParam_t* param) {
-    (void)account;
-    if (param->event != Account::EVENT_PUB_PUBLISH) {
-        return Account::RES_UNSUPPORTED_REQUEST;
-    }
-
-    return Account::RES_OK;
+void DialplateModel::deinit() {
+    account_.reset();
 }
-
-void
-DialplateModel::RecorderCommand(const RecCmd_t cmd) const {
-    DataProc::StatusBar_Info_t statInfo;
-    DATA_PROC_INIT_STRUCT(statInfo);
-    statInfo.cmd = DataProc::STATUS_BAR_CMD_SET_LABEL_REC;
-
-    switch (cmd) {
-        case REC_START: statInfo.param.record_active = true; break;
-        case REC_STOP: statInfo.param.record_active = false; break;
-        default: break;
-    }
-
-    account->Notify("StatusBar", &statInfo, sizeof(statInfo));
+bool DialplateModel::set_status_bar(bool visible, DataProc::StatusBarStyle style) const {
+    const DataProc::StatusBarPresentation request{visible, style};
+    const bool ok = account_ && account_->Notify("StatusBar", &request, sizeof(request)) == Account::RES_OK;
+    if (!ok)
+        APP_LOG_E("DialplateModel", "StatusBar notification rejected");
+    return ok;
 }
-
-void
-DialplateModel::SetStatusBarStyle(const DataProc::StatusBar_Style_t style) const {
-    DataProc::StatusBar_Info_t info;
-    DATA_PROC_INIT_STRUCT(info);
-
-    info.cmd = DataProc::STATUS_BAR_CMD_SET_STYLE;
-    info.param.style = style;
-
-    account->Notify("StatusBar", &info, sizeof(info));
+int DialplateModel::on_event(Account* account, Account::EventParam_t* event) {
+    auto* self = static_cast<DialplateModel*>(account->UserData);
+    return model_utils::receive(event, self->status_, self->state_);
 }

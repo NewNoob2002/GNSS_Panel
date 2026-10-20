@@ -20,20 +20,13 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#ifndef __DATA_CENTER_LOG_H
-#define __DATA_CENTER_LOG_H
+#ifndef RK3506_DATA_CENTER_LOG_H
+#define RK3506_DATA_CENTER_LOG_H
 
-#define DATA_CENTER_USE_LOG 0
-
-#if DATA_CENTER_USE_LOG
-#include <elog.h>
-#  define DC_LOG_INFO(format, ...)  log_i("[DC] [Info] " format, ##__VA_ARGS__)
-#  define DC_LOG_WARN(format, ...)  log_w("[DC] [Warn] " format, ##__VA_ARGS__)
-#  define DC_LOG_ERROR(format, ...) log_e("[DC] [Error] " format, ##__VA_ARGS__)
-#else
-#  define DC_LOG_INFO(...)
-#  define DC_LOG_WARN(...)
-#  define DC_LOG_ERROR(...)
-#endif
+#include "Utils/Log/Log.h"
+#define DC_LOG_DEBUG(...) APP_LOG_D("DataCenter", __VA_ARGS__)
+#define DC_LOG_INFO(...)  APP_LOG_I("DataCenter", __VA_ARGS__)
+#define DC_LOG_WARN(...)  APP_LOG_W("DataCenter", __VA_ARGS__)
+#define DC_LOG_ERROR(...) APP_LOG_E("DataCenter", __VA_ARGS__)
 
 #endif

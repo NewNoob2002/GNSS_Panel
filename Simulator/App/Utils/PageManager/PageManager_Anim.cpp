@@ -23,21 +23,19 @@
 #include "PM_Log.h"
 #include "PageManager.h"
 
-
 /**
   * @brief  Get page loading animation properties
   * @param  anim: Animation type
   * @param  attr: Pointer to attribute
   * @retval Whether the acquisition is successful
   */
-bool
-PageManager::GetLoadAnimAttr(const uint8_t anim, LoadAnimAttr_t* attr) {
+bool PageManager::get_load_anim_attr(const uint8_t anim, LoadAnimAttr_t* attr) {
     const lv_coord_t hor = LV_HOR_RES;
     const lv_coord_t ver = LV_VER_RES;
 
     switch (anim) {
         case LOAD_ANIM_OVER_LEFT:
-            attr->dragDir = ROOT_DRAG_DIR_HOR;
+            attr->drag_dir = ROOT_DRAG_DIR_HOR;
 
             attr->push.enter.start = hor;
             attr->push.enter.end = 0;
@@ -51,7 +49,7 @@ PageManager::GetLoadAnimAttr(const uint8_t anim, LoadAnimAttr_t* attr) {
             break;
 
         case LOAD_ANIM_OVER_RIGHT:
-            attr->dragDir = ROOT_DRAG_DIR_HOR;
+            attr->drag_dir = ROOT_DRAG_DIR_HOR;
 
             attr->push.enter.start = -hor;
             attr->push.enter.end = 0;
@@ -65,7 +63,7 @@ PageManager::GetLoadAnimAttr(const uint8_t anim, LoadAnimAttr_t* attr) {
             break;
 
         case LOAD_ANIM_OVER_TOP:
-            attr->dragDir = ROOT_DRAG_DIR_VER;
+            attr->drag_dir = ROOT_DRAG_DIR_VER;
 
             attr->push.enter.start = ver;
             attr->push.enter.end = 0;
@@ -79,7 +77,7 @@ PageManager::GetLoadAnimAttr(const uint8_t anim, LoadAnimAttr_t* attr) {
             break;
 
         case LOAD_ANIM_OVER_BOTTOM:
-            attr->dragDir = ROOT_DRAG_DIR_VER;
+            attr->drag_dir = ROOT_DRAG_DIR_VER;
 
             attr->push.enter.start = -ver;
             attr->push.enter.end = 0;
@@ -93,7 +91,7 @@ PageManager::GetLoadAnimAttr(const uint8_t anim, LoadAnimAttr_t* attr) {
             break;
 
         case LOAD_ANIM_MOVE_LEFT:
-            attr->dragDir = ROOT_DRAG_DIR_HOR;
+            attr->drag_dir = ROOT_DRAG_DIR_HOR;
 
             attr->push.enter.start = hor;
             attr->push.enter.end = 0;
@@ -107,7 +105,7 @@ PageManager::GetLoadAnimAttr(const uint8_t anim, LoadAnimAttr_t* attr) {
             break;
 
         case LOAD_ANIM_MOVE_RIGHT:
-            attr->dragDir = ROOT_DRAG_DIR_HOR;
+            attr->drag_dir = ROOT_DRAG_DIR_HOR;
 
             attr->push.enter.start = -hor;
             attr->push.enter.end = 0;
@@ -121,7 +119,7 @@ PageManager::GetLoadAnimAttr(const uint8_t anim, LoadAnimAttr_t* attr) {
             break;
 
         case LOAD_ANIM_MOVE_TOP:
-            attr->dragDir = ROOT_DRAG_DIR_VER;
+            attr->drag_dir = ROOT_DRAG_DIR_VER;
 
             attr->push.enter.start = ver;
             attr->push.enter.end = 0;
@@ -135,7 +133,7 @@ PageManager::GetLoadAnimAttr(const uint8_t anim, LoadAnimAttr_t* attr) {
             break;
 
         case LOAD_ANIM_MOVE_BOTTOM:
-            attr->dragDir = ROOT_DRAG_DIR_VER;
+            attr->drag_dir = ROOT_DRAG_DIR_VER;
 
             attr->push.enter.start = -ver;
             attr->push.enter.end = 0;
@@ -149,7 +147,7 @@ PageManager::GetLoadAnimAttr(const uint8_t anim, LoadAnimAttr_t* attr) {
             break;
 
         case LOAD_ANIM_FADE_ON:
-            attr->dragDir = ROOT_DRAG_DIR_NONE;
+            attr->drag_dir = ROOT_DRAG_DIR_NONE;
 
             attr->push.enter.start = LV_OPA_TRANSP;
             attr->push.enter.end = LV_OPA_COVER;
@@ -162,22 +160,32 @@ PageManager::GetLoadAnimAttr(const uint8_t anim, LoadAnimAttr_t* attr) {
             attr->pop.exit.end = LV_OPA_TRANSP;
             break;
 
-        case LOAD_ANIM_NONE: lv_memset(attr, 0, sizeof(LoadAnimAttr_t)); return true;
+        case LOAD_ANIM_NONE:
+            lv_memset(attr, 0, sizeof(LoadAnimAttr_t));
+            return true;
 
-        default: PM_LOG_ERROR("Load anim type error: %d", anim); return false;
+        default:
+            PM_LOG_ERROR("Load anim type error: %d", anim);
+            return false;
     }
 
     /* Determine the setter and getter of the animation */
-    if (attr->dragDir == ROOT_DRAG_DIR_HOR) {
+    if (attr->drag_dir == ROOT_DRAG_DIR_HOR) {
         attr->setter = [](void* obj, const int32_t v) {
             lv_obj_set_x(static_cast<lv_obj_t*>(obj), static_cast<lv_coord_t>(v));
         };
-        attr->getter = [](void* obj) { return static_cast<int32_t>(lv_obj_get_x(static_cast<lv_obj_t*>(obj))); };
-    } else if (attr->dragDir == ROOT_DRAG_DIR_VER) {
+        attr->getter = [](void* obj) {
+            // Match set_x's alignment-relative offset, not the resolved screen coordinate.
+            return static_cast<int32_t>(lv_obj_get_style_x(static_cast<lv_obj_t*>(obj), 0));
+        };
+    } else if (attr->drag_dir == ROOT_DRAG_DIR_VER) {
         attr->setter = [](void* obj, const int32_t v) {
             lv_obj_set_y(static_cast<lv_obj_t*>(obj), static_cast<lv_coord_t>(v));
         };
-        attr->getter = [](void* obj) { return static_cast<int32_t>(lv_obj_get_y(static_cast<lv_obj_t*>(obj))); };
+        attr->getter = [](void* obj) {
+            // Bottom-aligned pages (StarMap) have a nonzero screen origin even at offset zero.
+            return static_cast<int32_t>(lv_obj_get_style_y(static_cast<lv_obj_t*>(obj), 0));
+        };
     } else {
         attr->setter = [](void* obj, const int32_t v) {
             lv_obj_set_style_opa(static_cast<lv_obj_t*>(obj), static_cast<lv_opa_t>(v), LV_PART_MAIN);

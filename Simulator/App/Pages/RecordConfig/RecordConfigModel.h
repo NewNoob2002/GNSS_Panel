@@ -1,34 +1,25 @@
-#ifndef __RECORDCONFIG_MODEL_H
-#define __RECORDCONFIG_MODEL_H
-
+#pragma once
+#include <memory>
 #include "Common/DataProc/DataProc.h"
 
-namespace Page {
-
+namespace page {
+/** Page-owned Account and received data. Init on view load, Deinit on unload, LVGL thread only. */
 class RecordConfigModel {
   public:
-    RecordConfigModel() = default;
-
-    ~RecordConfigModel() = default;
-
-    typedef enum { REC_START = DataProc::RECORDER_CMD_START, REC_STOP = DataProc::RECORDER_CMD_STOP } RecCmd_t;
-
-  public:
-    void Init();
-
-    void Deinit();
-
-    void RecorderCommand(RecCmd_t cmd) const;
-
-    void SetStatusBarStyle(DataProc::StatusBar_Style_t style) const;
+    bool init();
+    void deinit();
+    bool set_status_bar(bool visible, DataProc::StatusBarStyle style = {}) const;
+    const DataProc::StatusSnapshot& status() const {
+        return status_;
+    }
+    const DataProc::SystemState& settings() const {
+        return state_;
+    }
 
   private:
-    Account* account{};
-
-  private:
-    static int onEvent(Account* account, Account::EventParam_t* param);
+    static int on_event(Account* account, Account::EventParam_t* event);
+    std::unique_ptr<Account> account_;
+    DataProc::StatusSnapshot status_{};
+    DataProc::SystemState state_{};
 };
-
-} // namespace Page
-
-#endif
+} // namespace page

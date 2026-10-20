@@ -31,9 +31,6 @@ namespace HAL
     /* KEY */
     void Key_Init();
     void Key_Update();
-    int32_t Encoder_GetDiff();
-    bool Encoder_GetIsPush();
-    void Encoder_SetEnable(bool en);
     /* Dispaly */
     void Display_Init();
     void Dispaly_Update();

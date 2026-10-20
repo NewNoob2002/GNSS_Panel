@@ -5,7 +5,13 @@ namespace {
 const char* const texts[] = {
     "PRESS",
     "Keep Press Shutdown\nShort Press Return",
-    "Warning: Do Not Shut Down",
+    "GNSS RTK Receiver",
+    "System Initialization",
+    "System Ready",
+    "Preparing system modules",
+    "GNSS RTK services are available",
+    "Startup completed",
+    "Step %d of 5",
     "Warning: Saving System Config",
     "Warning: Saving System Config\nInfo: %s",
     "Shutdown Board",
@@ -19,7 +25,7 @@ const char* const texts[] = {
     "Work",
     "Mode\nRadio\nNtrip",
     "GPS",
-    "Latitude\nLongitude\nAltitude\n",
+    "Latitude\nLongitude\nAltitude",
     "WIFI",
     "Mode\nStatus\nIp",
     "Battery",
@@ -27,7 +33,7 @@ const char* const texts[] = {
     "Storage",
     "Status\nName\nSize\nType\nInterval",
     "System",
-    "Firmware\nRunTime\nErrorCount\nBuild\n",
+    "Firmware\nRunTime\nInit errors\nBuild",
     "Rover",
     "Base",
     "ON",
@@ -54,14 +60,56 @@ const char* const texts[] = {
     "SBAS",
     "QZSS",
     "IRNSS",
+    "System Menu",
+    "Settings",
+    "Power Off",
+    "Language",
+    "Date & Time",
+    "System Info",
+    "English",
+    "Russian",
+    "Cancel",
+    "OK",
+    "Power Off?",
+    "Preview only - no device power off",
+    "Unavailable",
+    "Power",
+    "Shutdown 2x",
+    "Reboot 2x",
+    "Demo: RAM only",
+    "Starting GNSS service",
+    "Initializing",
+    "Loading configuration",
+    "Preparing services",
+    "Preparing network",
+    "Finalizing startup",
+    "Back",
+    "Return",
+    "Failed - continuing",
+    "Started with warnings",
+    "Some modules are unavailable",
+    "Config",
+    "Services",
+    "GNSS",
+    "Network",
+    "Finalize",
+    "OK",
+    "FAILED",
+    "NOT RUN",
+    "No detail recorded",
+    "Init %u/%zu  %s",
+    "Start",
+    "Hold 2s",
+    "Checking battery gauge",
+    "Checking charger",
+    "Powering host board",
 };
 
-static_assert(sizeof(texts) / sizeof(texts[0]) == static_cast<size_t>(I18n::TextId::Count));
+static_assert(sizeof(texts) / sizeof(texts[0]) == static_cast<size_t>(i18n::TextId::Count));
 
 } // namespace
 
-const I18n::LanguagePack&
-I18n::EnglishPack() {
+const i18n::LanguagePack& i18n::english_pack() {
     static const LanguagePack pack = {Language::English, texts};
     return pack;
 }

@@ -88,7 +88,7 @@ class PageManager {
     typedef struct {
         lv_anim_setter_t setter;
         lv_anim_getter_t getter;
-        RootDragDir_t dragDir;
+        RootDragDir_t drag_dir;
         AnimValue_t push;
         AnimValue_t pop;
     } LoadAnimAttr_t;
@@ -96,131 +96,131 @@ class PageManager {
   public:
     explicit PageManager(PageFactory* factory = nullptr);
     ~PageManager();
-    void Clear();
 
     /* Loader */
-    bool Install(const char* className, const char* appName);
-    bool Uninstall(const char* appName);
-    bool Register(PageBase* base, const char* name);
-    bool Unregister(const char* name);
+    bool install(const char* class_name, const char* app_name);
+    bool uninstall(const char* app_name);
+    bool register_page(PageBase* base, const char* name);
+    bool unregister_page(const char* name);
 
     /* Router */
-    bool Replace(const char* name, const PageBase::Stash_t* stash = nullptr);
-    bool Push(const char* name, const PageBase::Stash_t* stash = nullptr);
-    bool Pop();
-    bool BackHome();
-    [[nodiscard]] const char* GetPagePrevName() const;
+    bool replace(const char* name, const PageBase::Stash_t* stash = nullptr);
+    bool push(const char* name, const PageBase::Stash_t* stash = nullptr);
+    bool pop();
+    bool back_home();
+    /** Unload the navigation stack and load name as its sole root on the UI thread.
+     * Only valid outside switching/dragging; null/unregistered names or busy state return false unchanged.
+     * Loaded page views are destroyed synchronously, including the caller's view; registered controllers remain.
+     */
+    bool reset_root(const char* name);
+    [[nodiscard]] const char* get_page_prev_name() const;
 
     /* Global Animation */
-    void SetGlobalLoadAnimType(LoadAnim_t anim = LOAD_ANIM_OVER_LEFT, uint16_t time = 500,
-                               lv_anim_path_cb_t path = lv_anim_path_ease_out);
+    void set_global_load_anim_type(LoadAnim_t anim = LOAD_ANIM_OVER_LEFT, uint16_t time_ms = 500,
+                                   lv_anim_path_cb_t path = lv_anim_path_ease_out);
 
-    void
-    SetRootDefaultStyle(lv_style_t* style) {
-        RootDefaultStyle = style;
+    void set_root_default_style(lv_style_t* style) {
+        root_default_style_ = style;
     }
 
-    PageBase*
-    GetCurrentPage() const {
-        return PageCurrent;
+    PageBase* get_current_page() const {
+        return page_current_;
     }
 
-    void NotifyLanguageChanged() const;
+    bool is_switching() const {
+        return anim_state_.is_busy || anim_state_.is_switch_req;
+    }
+    void notify_language_changed() const;
 
   private:
     /* Page Pool */
-    PageBase* FindPageInPool(const char* name) const;
+    PageBase* find_page_in_pool(const char* name) const;
 
     /* Page Stack */
-    PageBase* FindPageInStack(const char* name);
-    [[nodiscard]] PageBase* GetStackTop() const;
-    PageBase* GetStackTopAfter();
-    void SetStackClear(bool keepBottom = false);
-    static bool ForceUnload(PageBase* base);
+    PageBase* find_page_in_stack(const char* name);
+    [[nodiscard]] PageBase* get_stack_top() const;
+    PageBase* get_stack_top_after();
+    void set_stack_clear(bool keep_bottom = false);
+    static bool force_unload(PageBase* base);
 
     /* Animation */
-    static bool GetLoadAnimAttr(uint8_t anim, LoadAnimAttr_t* attr);
+    static bool get_load_anim_attr(uint8_t anim, LoadAnimAttr_t* attr);
 
-    static bool
-    GetIsOverAnim(const uint8_t anim) {
+    static bool get_is_over_anim(const uint8_t anim) {
         return (anim >= LOAD_ANIM_OVER_LEFT && anim <= LOAD_ANIM_OVER_BOTTOM);
     }
 
-    static bool
-    GetIsMoveAnim(const uint8_t anim) {
+    static bool get_is_move_anim(const uint8_t anim) {
         return (anim >= LOAD_ANIM_MOVE_LEFT && anim <= LOAD_ANIM_MOVE_BOTTOM);
     }
 
-    void AnimDefaultInit(lv_anim_t* a) const;
+    void anim_default_init(lv_anim_t* a) const;
 
-    bool
-    GetCurrentLoadAnimAttr(LoadAnimAttr_t* attr) const {
-        return GetLoadAnimAttr(GetCurrentLoadAnimType(), attr);
+    bool get_current_load_anim_attr(LoadAnimAttr_t* attr) const {
+        return get_load_anim_attr(get_current_load_anim_type(), attr);
     }
 
-    [[nodiscard]] LoadAnim_t
-    GetCurrentLoadAnimType() const {
-        return static_cast<LoadAnim_t>(AnimState.Current.Type);
+    [[nodiscard]] LoadAnim_t get_current_load_anim_type() const {
+        return static_cast<LoadAnim_t>(anim_state_.current.type);
     }
 
     /* Root */
-    static void onRootDragEvent(lv_event_t* event);
-    static void onRootDragAnimFinish(lv_anim_t* a);
-    static void onRootAsyncLeave(void* base);
-    static void RootEnableDrag(lv_obj_t* root);
-    static void RootGetDragPredict(lv_coord_t* x, lv_coord_t* y);
+    static void on_root_drag_event(lv_event_t* event);
+    static void on_root_drag_anim_finish(lv_anim_t* a);
+    static void on_root_async_leave(void* base);
+    static void root_enable_drag(lv_obj_t* root);
+    static void root_get_drag_predict(lv_coord_t* x, lv_coord_t* y);
 
     /* Switch */
-    bool SwitchTo(PageBase* newNode, bool isEnterAct, const PageBase::Stash_t* stash = nullptr);
-    static void onSwitchAnimFinish(lv_anim_t* a);
+    bool switch_to(PageBase* new_node, bool is_enter_act, const PageBase::Stash_t* stash = nullptr);
+    static void on_switch_anim_finish(lv_anim_t* a);
 
-    void SwitchAnimCreate(PageBase* base) const;
-    void SwitchAnimTypeUpdate(PageBase* base);
-    bool SwitchReqCheck();
-    [[nodiscard]] bool SwitchAnimStateCheck() const;
+    void switch_anim_create(PageBase* base) const;
+    void switch_anim_type_update(PageBase* base);
+    bool switch_req_check();
+    [[nodiscard]] bool switch_anim_state_check() const;
 
     /* State */
-    PageBase::State_t StateLoadExecute(PageBase* base);
-    PageBase::State_t StateWillAppearExecute(PageBase* base) const;
-    static PageBase::State_t StateDidAppearExecute(PageBase* base);
-    PageBase::State_t StateWillDisappearExecute(PageBase* base) const;
-    static PageBase::State_t StateDidDisappearExecute(PageBase* base);
-    static PageBase::State_t StateUnloadExecute(PageBase* base);
-    void StateUpdate(PageBase* base);
+    PageBase::State_t state_load_execute(PageBase* base);
+    PageBase::State_t state_will_appear_execute(PageBase* base) const;
+    static PageBase::State_t state_did_appear_execute(PageBase* base);
+    PageBase::State_t state_will_disappear_execute(PageBase* base) const;
+    static PageBase::State_t state_did_disappear_execute(PageBase* base);
+    static PageBase::State_t state_unload_execute(PageBase* base);
+    void state_update(PageBase* base);
 
-    [[nodiscard]] PageBase::State_t
-    GetState() const {
-        return PageCurrent->priv.State;
+    [[nodiscard]] PageBase::State_t get_state() const {
+        return page_current_->priv.state;
     }
 
     /* Page factory */
-    PageFactory* pageFactory;
+    PageFactory* page_factory_;
 
     /* Page pool */
-    std::vector<PageBase*> PagePool;
+    std::vector<PageBase*> page_pool_;
 
     /* Page stack */
-    std::stack<PageBase*> PageStack;
+    std::stack<PageBase*> page_stack_;
 
     /* Previous page */
-    PageBase* PagePrev;
+    PageBase* page_prev_;
 
     /* The current page */
-    PageBase* PageCurrent;
+    PageBase* page_current_;
 
     /* Page animation status */
     struct {
-        bool IsSwitchReq; // Has switch request
-        bool IsBusy;      // Is switching
-        bool IsEntering;  // Is in entering action
-        bool IsDragging;  // Is handling a root drag gesture
+        bool is_switch_req; // Has switch request
+        bool is_busy;       // Is switching
+        bool is_entering;   // Is in entering action
+        bool is_dragging;   // Is handling a root drag gesture
 
-        PageBase::AnimAttr_t Current; // Current animation properties
-        PageBase::AnimAttr_t Global;  // Global animation properties
-    } AnimState{};
+        PageBase::AnimAttr_t current; // Current animation properties
+        PageBase::AnimAttr_t global;  // Global animation properties
+    } anim_state_{};
 
     /* Root style */
-    lv_style_t* RootDefaultStyle;
+    lv_style_t* root_default_style_;
 };
 
 #endif

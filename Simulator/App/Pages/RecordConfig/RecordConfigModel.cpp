@@ -1,58 +1,34 @@
-//
-// Created by gtc on 2026/5/11.
-//
-
 #include "RecordConfigModel.h"
+#include <algorithm>
+#include "Common/ModelUtils.h"
+#include "Common/SystemService.h"
+#include "Utils/Log/Log.h"
 
-using namespace Page;
+using namespace page;
 
-void
-RecordConfigModel::Init() {
-    account = new Account("RecordConfigModel", DataProc::Center(), 0, this);
-    account->Subscribe("StatusBar");
-    account->SetEventCallback(onEvent);
-}
-
-void
-RecordConfigModel::Deinit() {
-    if (account) {
-        delete account;
-        account = nullptr;
+bool RecordConfigModel::init() {
+    if (account_)
+        return true;
+    account_ = std::make_unique<Account>("RecordConfigModel", DataProc::Center(), 0, this);
+    account_->SetEventCallback(on_event);
+    if (!account_->IsRegistered() || !model_utils::subscribe(*account_, status_, state_)) {
+        account_.reset();
+        APP_LOG_E("RecordConfigModel", "Account initialization failed");
+        return false;
     }
+    return true;
 }
-
-int
-RecordConfigModel::onEvent(Account* account, Account::EventParam_t* param) {
-    (void)account;
-    if (param->event != Account::EVENT_PUB_PUBLISH) {
-        return Account::RES_UNSUPPORTED_REQUEST;
-    }
-
-    return Account::RES_OK;
+void RecordConfigModel::deinit() {
+    account_.reset();
 }
-
-void
-RecordConfigModel::RecorderCommand(const RecCmd_t cmd) const {
-    DataProc::StatusBar_Info_t statusInfo;
-    DATA_PROC_INIT_STRUCT(statusInfo);
-    statusInfo.cmd = DataProc::STATUS_BAR_CMD_SET_LABEL_REC;
-
-    switch (cmd) {
-        case REC_START: statusInfo.param.record_active = true; break;
-        case REC_STOP: statusInfo.param.record_active = false; break;
-        default: break;
-    }
-
-    account->Notify("StatusBar", &statusInfo, sizeof(statusInfo));
+bool RecordConfigModel::set_status_bar(bool visible, DataProc::StatusBarStyle style) const {
+    const DataProc::StatusBarPresentation request{visible, style};
+    const bool ok = account_ && account_->Notify("StatusBar", &request, sizeof(request)) == Account::RES_OK;
+    if (!ok)
+        APP_LOG_E("RecordConfigModel", "StatusBar notification rejected");
+    return ok;
 }
-
-void
-RecordConfigModel::SetStatusBarStyle(const DataProc::StatusBar_Style_t style) const {
-    DataProc::StatusBar_Info_t info;
-    DATA_PROC_INIT_STRUCT(info);
-
-    info.cmd = DataProc::STATUS_BAR_CMD_SET_STYLE;
-    info.param.style = style;
-
-    account->Notify("StatusBar", &info, sizeof(info));
+int RecordConfigModel::on_event(Account* account, Account::EventParam_t* event) {
+    auto* self = static_cast<RecordConfigModel*>(account->UserData);
+    return model_utils::receive(event, self->status_, self->state_);
 }

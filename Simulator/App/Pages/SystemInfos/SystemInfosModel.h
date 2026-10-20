@@ -1,24 +1,25 @@
-#ifndef __SYSTEM_INFOS_MODEL_H
-#define __SYSTEM_INFOS_MODEL_H
-
+#pragma once
+#include <memory>
 #include "Common/DataProc/DataProc.h"
 
-namespace Page
-{
+namespace page {
+/** Page-owned Account and received data. Init on view load, Deinit on unload, LVGL thread only. */
+class SystemInfosModel {
+  public:
+    bool init();
+    void deinit();
+    bool set_status_bar(bool visible, DataProc::StatusBarStyle style = {}) const;
+    const DataProc::StatusSnapshot& status() const {
+        return status_;
+    }
+    const DataProc::SystemState& settings() const {
+        return state_;
+    }
 
-class SystemInfosModel
-{
-public:
-    void Init();
-    void Deinit();
-
-    void SetStatusBarStyle(DataProc::StatusBar_Style_t style) const;
-
-private:
-    Account *account = nullptr;
-
+  private:
+    static int on_event(Account* account, Account::EventParam_t* event);
+    std::unique_ptr<Account> account_;
+    DataProc::StatusSnapshot status_{};
+    DataProc::SystemState state_{};
 };
-
-}
-
-#endif
+} // namespace page

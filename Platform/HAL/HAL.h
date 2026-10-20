@@ -40,9 +40,9 @@ void WatchDog_Feed();
 /* KEY */
 void Key_Init();
 void Key_Update();
-int32_t Encoder_GetDiff();
-bool Encoder_GetIsPush();
-void Encoder_SetEnable(bool en);
+// 带屏产品两键的当前电平（已按有效电平归一化），共享应用按 RK3506 两键语义解释。
+bool Key_PowerPressed();
+bool Key_FunctionPressed();
 /* LED */
 void Led_Update();
 /* Dispaly */

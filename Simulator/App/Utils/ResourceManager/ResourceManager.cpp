@@ -23,13 +23,15 @@
 #include "ResourceManager.h"
 #include <algorithm>
 #include <cstring>
-#include "lvgl/src/misc/lv_log.h"
+#include "lvgl.h"
 
 #define RES_LOG_INFO  LV_LOG_INFO
 #define RES_LOG_WARN  LV_LOG_WARN
 #define RES_LOG_ERROR LV_LOG_ERROR
 
-ResourceManager::ResourceManager() { DefaultPtr = nullptr; }
+ResourceManager::ResourceManager() {
+    default_ptr_ = nullptr;
+}
 
 ResourceManager::~ResourceManager() = default;
 
@@ -39,10 +41,12 @@ ResourceManager::~ResourceManager() = default;
   * @param  node: Pointer to the resource node
   * @retval Return true if the search is successful
   */
-bool
-ResourceManager::SearchNode(const char* name, ResourceNode_t* node) const {
-    for (const auto iter : NodePool) {
-        if (strcmp(name, iter.name) == 0) {
+bool ResourceManager::search_node(const char* name, ResourceNode_t* node) const {
+    if (name == nullptr || node == nullptr)
+        return false;
+
+    for (const auto& iter : node_pool_) {
+        if (iter.name == name) {
             *node = iter;
             return true;
         }
@@ -56,19 +60,21 @@ ResourceManager::SearchNode(const char* name, ResourceNode_t* node) const {
   * @param  ptr: Pointer to the resource
   * @retval Return true if the addition is successful
   */
-bool
-ResourceManager::AddResource(const char* name, void* ptr) {
+bool ResourceManager::add_resource(const char* name, void* ptr) {
+    if (name == nullptr || ptr == nullptr)
+        return false;
+
     ResourceNode_t node;
-    if (SearchNode(name, &node)) {
+    if (search_node(name, &node)) {
         RES_LOG_WARN("Resource: %s was register", name);
         return false;
     }
 
     node.name = name;
     node.ptr = ptr;
-    NodePool.push_back(node);
+    node_pool_.push_back(node);
 
-    RES_LOG_INFO("Resource: %s[0x%p] add success", node.name, node.ptr);
+    RES_LOG_INFO("Resource: %s[0x%p] add success", node.name.c_str(), node.ptr);
 
     return true;
 }
@@ -78,22 +84,24 @@ ResourceManager::AddResource(const char* name, void* ptr) {
   * @param  name: Resource Name
   * @retval Return true if the removal is successful
   */
-bool
-ResourceManager::RemoveResource(const char* name) {
+bool ResourceManager::remove_resource(const char* name) {
+    if (name == nullptr)
+        return false;
+
     ResourceNode_t node;
-    if (!SearchNode(name, &node)) {
+    if (!search_node(name, &node)) {
         RES_LOG_ERROR("Resource: %s was not found", name);
         return false;
     }
 
-    auto iter = std::find(NodePool.begin(), NodePool.end(), node);
+    auto iter = std::find(node_pool_.begin(), node_pool_.end(), node);
 
-    if (iter == NodePool.end()) {
+    if (iter == node_pool_.end()) {
         RES_LOG_ERROR("Resource: %s was not found", name);
         return false;
     }
 
-    NodePool.erase(iter);
+    node_pool_.erase(iter);
 
     RES_LOG_INFO("Resource: %s remove success", name);
 
@@ -105,13 +113,15 @@ ResourceManager::RemoveResource(const char* name) {
   * @param  name: Resource Name
   * @retval If the acquisition is successful, return the address of the resource, otherwise return the default resource
   */
-void*
-ResourceManager::GetResource(const char* name) const {
+void* ResourceManager::get_resource(const char* name) const {
+    if (name == nullptr)
+        return default_ptr_;
+
     ResourceNode_t node;
 
-    if (!SearchNode(name, &node)) {
-        RES_LOG_WARN("Resource: %s was not found, return default[0x%p]", name, DefaultPtr);
-        return DefaultPtr;
+    if (!search_node(name, &node)) {
+        RES_LOG_WARN("Resource: %s was not found, return default[0x%p]", name, default_ptr_);
+        return default_ptr_;
     }
 
     RES_LOG_INFO("Resource: %s[0x%p] was found", name, node.ptr);
@@ -124,8 +134,7 @@ ResourceManager::GetResource(const char* name) const {
   * @param  ptr: Pointer to the default resource
   * @retval None
   */
-void
-ResourceManager::SetDefault(void* ptr) {
-    DefaultPtr = ptr;
-    RES_LOG_INFO("Resource: set [0x%p] to default", DefaultPtr);
+void ResourceManager::set_default(void* ptr) {
+    default_ptr_ = ptr;
+    RES_LOG_INFO("Resource: set [0x%p] to default", default_ptr_);
 }

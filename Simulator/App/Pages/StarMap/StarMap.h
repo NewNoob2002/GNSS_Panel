@@ -1,39 +1,23 @@
-#ifndef STAR_MAP_H
-#define STAR_MAP_H
+#pragma once
+
+#include "StarMapModel.h"
 
 #include "StarMapView.h"
+#include "Utils/PageManager/PageBase.h"
 
-namespace Page {
-
+namespace page {
 class StarMap final : public PageBase {
   public:
-    StarMap();
-    ~StarMap() override;
-
-    void onCustomAttrConfig() override;
-    void onViewLoad() override;
-    void onViewDidLoad() override;
-    void onViewWillAppear() override;
-    void onViewDidAppear() override;
-    void onViewWillDisappear() override;
-    void onViewDidDisappear() override;
-    void onViewUnload() override;
-    void onViewDidUnload() override;
-    void onLanguageChanged() override;
+    void on_custom_attr_config() override;
+    void on_view_load() override;
+    void on_view_will_appear() override;
+    void on_view_will_disappear() override;
+    void on_view_unload() override;
+    void on_language_changed() override;
 
   private:
-    void Update();
-#if defined(LVGL_SIMULATOR)
-    static void GenerateTestData();
-#endif
-    void AttachEvent(lv_obj_t* obj);
-    static void onTimerUpdate(lv_timer_t* timer);
-    static void onEvent(lv_event_t* event);
-
-    StarMapView View;
-    lv_timer_t* timer{};
+    static void clicked(lv_event_t* event);
+    StarMapView view_{};
+    StarMapModel model_;
 };
-
-} // namespace Page
-
-#endif // STAR_MAP_H
+} // namespace page

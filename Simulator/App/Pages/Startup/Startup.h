@@ -1,52 +1,32 @@
-#ifndef STARTUP_PRESENTER_H
-#define STARTUP_PRESENTER_H
+#pragma once
 
-#include "StartupView.h"
 #include "StartupModel.h"
 
+#include "StartupView.h"
+#include "Utils/PageManager/PageBase.h"
 
-namespace Page {
-
+namespace page {
+/** Startup hold: shows progress and requests power-on; the platform decides and P4App navigates. */
 class Startup final : public PageBase {
-public:
-    Startup()
-    = default;
+  public:
+    void on_custom_attr_config() override;
+    void on_view_load() override;
+    void on_view_will_appear() override;
+    void on_view_did_appear() override;
+    void on_view_will_disappear() override;
+    void on_view_unload() override;
+    void on_language_changed() override;
 
-    ~Startup() override = default;
-
-    void onCustomAttrConfig() override;
-
-    void onViewLoad() override;
-
-    void onViewDidLoad() override;
-
-    void onViewWillAppear() override;
-
-    void onViewDidAppear() override;
-
-    void onViewWillDisappear() override;
-
-    void onViewDidDisappear() override;
-
-    void onViewUnload() override;
-
-    void onViewDidUnload() override;
-
-    void onLanguageChanged() override;
-
-    StartupView View{};
-    StartupModel Model;
-
-    void AttachEvent(lv_obj_t* obj);
-
-private:
-    mutable lv_timer_t* timer{};
-
-    static void onTimer(lv_timer_t* timer);
-
-    static void onEvent(lv_event_t* event);
+  private:
+    void cancel_timer();
+    void cancel_status_timer();
+    static void on_status_timeout(lv_timer_t* timer);
+    static void set_progress(void* obj, int32_t value);
+    static void hold_event(lv_event_t* event);
+    static void on_timeout(lv_timer_t* timer);
+    StartupView view_{};
+    StartupModel model_;
+    lv_timer_t* timer_ = nullptr;
+    lv_timer_t* status_timer_ = nullptr;
 };
-
-}
-
-#endif
+} // namespace page

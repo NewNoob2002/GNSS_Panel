@@ -2,28 +2,24 @@
 
 ## Project Structure & Module Organization
 
-This repository is the desktop LVGL simulator for the HC32F460xE Arduino UI project. `main.cpp` initializes LVGL, SDL, EasyLogger, and the application loop. Application code lives under `App/`: page implementations are in `App/Pages/<PageName>/`, shared data processing is in `App/Common/`, reusable framework code is in `App/Utils/`, and generated fonts/images/symbols are in `App/Resource/`. Hardware simulation shims are in `HAL/`. LVGL sources are shared with the firmware at `../Libraries/lvgl/` (selected via `LV_CONF_PATH`, so the simulator's own `lv_conf.h` is used, not the firmware's `Libraries/lvgl/lv_conf.h`), and display/input drivers are under `lv_drivers/`. Configuration headers `lv_conf.h` and `lv_drv_conf.h` control LVGL and driver features.
+This directory is the desktop SDL simulator for the HC32 display products (X1Pro, XBase). `main.cpp` creates the SDL window and LVGL display, then runs the same code as the firmware: the shared LVGL application in `App/` plus the HC32 platform layer `../Shared/Display/AppPlatform.cpp`. Hardware is replaced by the shims in `HAL/` (the real shutdown `PowerPolicy` runs there). LVGL sources are shared with the firmware at `../Libraries/lvgl/`; the simulator uses its own `lv_conf.h` through `LV_CONF_PATH`.
+
+`App/` is a verbatim copy of ATK_RK3506 `application/App` (source commit in `App/UPSTREAM`). Only `App/CMakeLists.txt` (firmware build), `App/UPSTREAM` and `App/.clang-format` are HC32-owned.
 
 ## Build, Test, and Development Commands
 
-- `cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug` configures the simulator build.
-- `cmake --build build --config Debug` compiles the `main` executable.
-- `cmake --build build --target run` launches the simulator via the CMake `run` target.
-
-On Windows, `SDL2_ROOT` defaults to `E:/SDL2-2.32.10` and can be overridden during CMake configuration. On Linux, install SDL2 development files first, for example `sudo apt install libsdl2-dev`. Build output is placed in `bin/`.
+- `cmake -S Simulator -B build/simulator -DSIM_PRODUCT=X1Pro|XBase` configures the simulator (run from the repository root; SDL2 development files required).
+- `cmake --build build/simulator` builds `Simulator/build/bin/main`.
+- `cd Simulator && ./build/bin/main` runs it; the key bindings (focus/press/back/commit and injected HC32 power/battery events) are printed at start.
 
 ## Coding Style & Naming Conventions
 
-Use C11 for C sources and C++17 for C++ sources. Match the existing style: 4-space indentation, braces on function definitions on the next line, and short section comments for LVGL-style files. Page modules follow the pattern `<Page>.cpp`, `<Page>.h`, optional `<Page>Model.*`, and `<Page>View.*`. Prefer PascalCase for page and class names, snake_case for C-style LVGL callbacks or driver functions, and descriptive resource names such as `img_src_wifi.c`.
+`App/` follows the upstream style (snake_case, its own formatting); do not reformat it here. HC32-owned files (`main.cpp`, `HAL/`, `../Shared/Display/AppPlatform.*`) follow the repository `.clang-format` and C++17.
 
 ## Testing Guidelines
 
-There is no dedicated automated test suite in this simulator. Before submitting changes, run a clean CMake build and manually smoke-test `bin/main`: confirm startup, page navigation, resource rendering, and any modified HAL or data-processing behavior. For UI changes, include screenshots or a short description of the exercised screens in the review.
-
-## Commit & Pull Request Guidelines
-
-Recent commits use short summaries such as `update`, `Refactor ...`, and Chinese descriptions of configuration or driver changes. Prefer a concise imperative summary with a clear scope, for example `Refactor StatusBar update flow` or `更新SDL配置路径`. Pull requests should explain the user-visible change, list build/manual test results, note any SDL or toolchain assumptions, and link related issues when available. Avoid mixing unrelated LVGL vendor updates with application changes.
+`ctest --test-dir build/host-tests` runs `x1pro_display_app_tests` / `xbase_display_app_tests` (shared app + AppPlatform firmware path with the firmware `lv_conf.h`, including the LVGL memory margin) and, when `SIMULATOR_EXECUTABLE` is configured, `simulator_smoke`. For UI changes also run the simulator and exercise the affected pages.
 
 ## Agent-Specific Instructions
 
-Do not edit the shared `../Libraries/lvgl/` or `lv_drivers/` sources (LVGL changes also affect the firmware) unless the task explicitly targets driver or vendor behavior. Keep generated resource files in `App/Resource/` synchronized with their source assets, and avoid broad formatting-only changes in third-party directories.
+Do not edit `App/` directly: change ATK_RK3506 `application/App`, commit there, then run `scripts/sync_shared_app.sh <ATK_RK3506 repo> [commit]`. Do not edit the shared `../Libraries/lvgl/` sources unless the task explicitly targets LVGL (changes also affect the firmware).

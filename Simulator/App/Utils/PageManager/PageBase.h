@@ -23,13 +23,13 @@
 #ifndef PAGE_BASE_H
 #define PAGE_BASE_H
 
-#include "lvgl/lvgl.h"
+#include "lvgl.h"
 
 /* Generate stash area data */
 #define PAGE_STASH_MAKE(data)  {&(data), sizeof(data)}
 
 /* Get the data in the stash area */
-#define PAGE_STASH_POP(data)   this->StashPop(&(data), sizeof(data))
+#define PAGE_STASH_POP(data)   this->stash_pop(&(data), sizeof(data))
 
 #define PAGE_ANIM_TIME_DEFAULT 500 //[ms]
 
@@ -60,91 +60,95 @@ class PageBase {
 
     /* Page switching animation properties */
     typedef struct {
-        uint8_t Type;
-        uint16_t Time;
-        lv_anim_path_cb_t Path;
+        uint8_t type;
+        uint16_t time;
+        lv_anim_path_cb_t path;
     } AnimAttr_t;
 
   public:
-    lv_obj_t* _root{};          // UI root node
-    PageManager* pageManager{}; // Page manager pointer
-    const char* pageName{};     // Page name
-    uint16_t pageID{};          // Page ID
-    void* UserData{};           // User data pointer
+    lv_obj_t* root{};            // UI root node
+    PageManager* page_manager{}; // Page manager pointer
+    const char* page_name{};     // Page name
+    uint16_t page_id{};          // Page ID
+    void* user_data{};           // User data pointer
 
     /* Private data, Only page manager access */
     struct {
-        bool ReqEnableCache;      // Cache enable request
-        bool ReqDisableAutoCache; // Automatic cache management enable request
+        bool req_enable_cache;       // Cache enable request
+        bool req_disable_auto_cache; // Automatic cache management enable request
 
-        bool IsDisableAutoCache; // Whether it is automatic cache management
-        bool IsCached;           // Cache enable
+        bool is_disable_auto_cache; // Whether it is automatic cache management
+        bool is_cached;             // Cache enable
 
-        Stash_t Stash; // Stash area
-        State_t State; // Page state
+        Stash_t stash; // Stash area
+        State_t state; // Page state
 
         /* Animation state  */
         struct {
-            bool IsEnter;    // Whether it is the entering party
-            bool IsBusy;     // Whether the animation is playing
-            AnimAttr_t Attr; // Animation properties
-        } Anim;
+            bool is_enter;   // Whether it is the entering party
+            bool is_busy;    // Whether the animation is playing
+            AnimAttr_t attr; // Animation properties
+        } anim;
     } priv{};
 
   public:
     virtual ~PageBase() = default;
 
     /* Synchronize user-defined attribute configuration */
-    virtual void
-    onCustomAttrConfig() {}
+    virtual void on_custom_attr_config() {}
 
     /* Page load start */
-    virtual void
-    onViewLoad() {}
+    virtual void on_view_load() {}
 
     /* Page load end */
-    virtual void
-    onViewDidLoad() {}
+    virtual void on_view_did_load() {}
 
     /* Page appear animation start */
-    virtual void
-    onViewWillAppear() {}
+    virtual void on_view_will_appear() {}
 
     /* Page appear animation end  */
-    virtual void
-    onViewDidAppear() {}
+    virtual void on_view_did_appear() {}
 
     /* Page disappear animation start */
-    virtual void
-    onViewWillDisappear() {}
+    virtual void on_view_will_disappear() {}
 
     /* Page disappear animation end */
-    virtual void
-    onViewDidDisappear() {}
+    virtual void on_view_did_disappear() {}
 
     /* Page unload start */
-    virtual void
-    onViewUnload() {}
+    virtual void on_view_unload() {}
 
     /* Page unload end */
-    virtual void
-    onViewDidUnload() {}
+    virtual void on_view_did_unload() {}
 
-    virtual void
-    onLanguageChanged() {}
+    virtual void on_language_changed() {}
+
+    /** Local editor consumes Next/Enter; COMMIT is always explicit, never a short-click. */
+    virtual bool on_next_request() {
+        return false;
+    }
+    virtual bool on_enter_request() {
+        return false;
+    }
+    virtual void on_commit_request() {}
+
+    /** LVGL-thread Back request: true consumes local cancel/back; false allows the router to pop. */
+    virtual bool on_back_request() {
+        return false;
+    }
 
     /* Set whether to manually manage the cache */
-    void SetCustomCacheEnable(bool en);
+    void set_custom_cache_enable(bool en);
 
     /* Set whether to enable automatic cache */
-    void SetCustomAutoCacheEnable(bool en);
+    void set_custom_auto_cache_enable(bool en);
 
     /* Set custom animation properties  */
-    void SetCustomLoadAnimType(uint8_t animType, uint16_t time = PAGE_ANIM_TIME_DEFAULT,
-                               lv_anim_path_cb_t path = PAGE_ANIM_PATH_DEFAULT);
+    void set_custom_load_anim_type(uint8_t anim_type, uint16_t time = PAGE_ANIM_TIME_DEFAULT,
+                                   lv_anim_path_cb_t path = PAGE_ANIM_PATH_DEFAULT);
 
     /* Pop the data from stash area */
-    bool StashPop(void* ptr, uint32_t size);
+    bool stash_pop(void* ptr, uint32_t size);
 };
 
 #endif // PAGE_BASE_H

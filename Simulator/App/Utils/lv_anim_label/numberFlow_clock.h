@@ -7,29 +7,30 @@
 
 #include "numberFlow.h"
 
-class numberFlow_clock {
-public:
-    explicit numberFlow_clock(const lv_font_t *font);
+class NumberFlowClock {
+  public:
+    explicit NumberFlowClock(const lv_font_t* font);
 
-    ~numberFlow_clock();
+    ~NumberFlowClock();
 
-    void create(lv_obj_t *parent);
+    void create(lv_obj_t* parent);
 
-    void setPos(lv_align_t align, lv_coord_t x, lv_coord_t y) const;
+    void set_pos(lv_align_t align, lv_coord_t x, lv_coord_t y) const;
 
-    void setTime(uint32_t hour_val, uint32_t minute_val, uint32_t second_val) const;
+    void set_time(uint32_t hour_val, uint32_t minute_val, uint32_t second_val) const;
 
-    [[nodiscard]] lv_obj_t *getCont() const {
-        return cont;
+    [[nodiscard]] lv_obj_t* get_cont() const {
+        return cont_;
     };
-private:
-    const lv_font_t *font;
-    lv_obj_t *cont; // 主容器
-    numberFlow *hour; // 小时（2位）
-    numberFlow *minute; // 分钟（2位）
-    numberFlow *second; // 秒（2位）
-    lv_obj_t *separator1; // 第一个冒号
-    lv_obj_t *separator2; // 第二个冒号
+
+  private:
+    const lv_font_t* font_;
+    lv_obj_t* cont_;       // 主容器
+    NumberFlow* hour_;     // 小时（2位）
+    NumberFlow* minute_;   // 分钟（2位）
+    NumberFlow* second_;   // 秒（2位）
+    lv_obj_t* separator1_; // 第一个冒号
+    lv_obj_t* separator2_; // 第二个冒号
 };
 
 #endif //LVGL_NUMBERFLOW_CLOCK_H

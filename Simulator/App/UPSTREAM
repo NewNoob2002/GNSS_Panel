@@ -1,0 +1,3 @@
+ATK_RK3506 application/App
+commit c2da7d75bcc4f22cd703ee297d905a542ba70ef6
+subject fix: portable size formats in PageManager and DataCenter logs

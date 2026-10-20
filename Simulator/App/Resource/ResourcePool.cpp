@@ -1,31 +1,29 @@
 #include "ResourcePool.h"
 #include "Utils/ResourceManager/ResourceManager.h"
-#include "lvgl/src/widgets/lv_img.h"
 
-static ResourceManager Font_;
-static ResourceManager Image_;
+static ResourceManager font_;
+static ResourceManager image_;
 
 extern "C" {
 #define IMPORT_FONT(name)                                                                                              \
     do {                                                                                                               \
         LV_FONT_DECLARE(font_##name)                                                                                   \
-        Font_.AddResource(#name, (void*)&font_##name);                                                                 \
+        font_.add_resource(#name, (void*)&font_##name);                                                                \
     } while (0)
 
 #define IMPORT_SYMBOL(name)                                                                                            \
     do {                                                                                                               \
         LV_FONT_DECLARE(symbol_##name)                                                                                 \
-        Font_.AddResource(#name, (void*)&symbol_##name);                                                               \
+        font_.add_resource(#name, (void*)&symbol_##name);                                                              \
     } while (0)
 
 #define IMPORT_IMG(name)                                                                                               \
     do {                                                                                                               \
         LV_IMG_DECLARE(img_src_##name)                                                                                 \
-        Image_.AddResource(#name, (void*)&img_src_##name);                                                             \
+        image_.add_resource(#name, (void*)&img_src_##name);                                                            \
     } while (0)
 
-static void
-Resource_Init() {
+static void resource_init() {
     /* Import Fonts */
     IMPORT_FONT(oswaldBold_12);
     IMPORT_FONT(oswaldBold_18);
@@ -37,6 +35,7 @@ Resource_Init() {
     // /* Import Images */
     IMPORT_IMG(battery);
     IMPORT_IMG(battery_info);
+    IMPORT_IMG(record);
     IMPORT_IMG(clock);
     IMPORT_IMG(mode);
     IMPORT_IMG(settings);
@@ -53,7 +52,12 @@ Resource_Init() {
     IMPORT_IMG(up);
     IMPORT_IMG(down);
     IMPORT_IMG(reset);
+    IMPORT_IMG(back);
     IMPORT_IMG(shutdown);
+    IMPORT_IMG(system_dash_power);
+    IMPORT_IMG(system_dash_power_small);
+    IMPORT_IMG(system_dash_settings);
+    IMPORT_IMG(system_dash_return);
     IMPORT_IMG(rover);
     IMPORT_IMG(base);
     IMPORT_IMG(ntrip);
@@ -70,18 +74,15 @@ Resource_Init() {
 }
 } /* extern "C" */
 
-void
-ResourcePool::Init() {
-    Resource_Init();
-    Font_.SetDefault((void*)LV_FONT_DEFAULT);
+void resource_pool::init() {
+    resource_init();
+    font_.set_default((void*)LV_FONT_DEFAULT);
 }
 
-lv_font_t*
-ResourcePool::GetFont(const char* name) {
-    return static_cast<lv_font_t*>(Font_.GetResource(name));
+lv_font_t* resource_pool::get_font(const char* name) {
+    return static_cast<lv_font_t*>(font_.get_resource(name));
 }
 
-const void*
-ResourcePool::GetImage(const char* name) {
-    return Image_.GetResource(name);
+const void* resource_pool::get_image(const char* name) {
+    return image_.get_resource(name);
 }

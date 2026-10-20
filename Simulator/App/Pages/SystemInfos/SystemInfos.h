@@ -1,51 +1,23 @@
-#ifndef __SYSTEM_INFOS_PRESENTER_H
-#define __SYSTEM_INFOS_PRESENTER_H
+#pragma once
 
-#include "SystemInfosView.h"
 #include "SystemInfosModel.h"
 
-namespace Page {
+#include "SystemInfosView.h"
+#include "Utils/PageManager/PageBase.h"
 
-class SystemInfos : public PageBase {
-public:
-    SystemInfos();
+namespace page {
+class SystemInfos final : public PageBase {
+  public:
+    void on_custom_attr_config() override;
+    void on_view_load() override;
+    void on_view_will_appear() override;
+    void on_view_will_disappear() override;
+    void on_view_unload() override;
+    void on_language_changed() override;
 
-    ~SystemInfos() override;
-
-    void onCustomAttrConfig() override;
-
-    void onViewLoad() override;
-
-    void onViewDidLoad() override;
-
-    void onViewWillAppear() override;
-
-    void onViewDidAppear() override;
-
-    void onViewWillDisappear() override;
-
-    void onViewDidDisappear() override;
-
-    void onViewUnload() override;
-
-    void onViewDidUnload() override;
-
-    void onLanguageChanged() override;
-
-private:
-    void Update() const;
-
-    void AttachEvent(lv_obj_t* obj);
-
-    static void onTimerUpdate(lv_timer_t* timer);
-
-    static void onEvent(lv_event_t* event);
-
-    SystemInfosView View;
-    SystemInfosModel Model;
-    lv_timer_t* timer{};
+  private:
+    static void clicked(lv_event_t* event);
+    SystemInfosView view_{};
+    SystemInfosModel model_;
 };
-
-}
-
-#endif
+} // namespace page

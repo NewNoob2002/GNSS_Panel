@@ -1,196 +1,55 @@
 #include "WorkSettings.h"
+#include "Utils/Log/Log.h"
+#include "Utils/PageManager/PageManager.h"
+#include "Utils/PageManager/PageUtils.h"
 
-using namespace Page;
+using namespace page;
 
-WorkSettings::WorkSettings() = default;
-
-WorkSettings::~WorkSettings() = default;
-
-void
-WorkSettings::onCustomAttrConfig() {
-    SetCustomLoadAnimType(PageManager::LOAD_ANIM_NONE);
-    SetCustomCacheEnable(true);
-    PageBase::onCustomAttrConfig();
+void WorkSettings::on_custom_attr_config() {
+    set_custom_load_anim_type(PageManager::LOAD_ANIM_MOVE_LEFT, 300, lv_anim_path_ease_in_out);
 }
 
-void
-WorkSettings::onViewLoad() {
-    PageBase::onViewLoad();
-    View.Create(_root);
-    lv_obj_fade_in(_root, 300, 0);
+std::array<lv_obj_t*, 5> WorkSettings::controls() const {
+    const auto& r = view_.ui.roller;
+    return {r.left_roller.btn_up, r.left_roller.btn_down, r.right_roller.btn_up, r.right_roller.btn_down, r.btn_reset};
 }
 
-void
-WorkSettings::onViewDidLoad() {
-    PageBase::onViewDidLoad();
-    AttachEvent(View.ui.roller.left_roller.btnUp);
-    AttachEvent(View.ui.roller.left_roller.btnDown);
-    AttachEvent(View.ui.roller.right_roller.btnUp);
-    AttachEvent(View.ui.roller.right_roller.btnDown);
-    AttachEvent(View.ui.roller.btnReset);
-
-    AttachEvent(View.ui.btnCont.btnBase);
-    AttachEvent(View.ui.btnCont.btnRover);
-    AttachEvent(View.ui.btnCont.btnNtrip);
+void WorkSettings::on_view_load() {
+    if (!model_.init())
+        app_fatal("WorkSettings", "Model initialization failed");
+    view_.create(root);
+    for (auto* obj : {view_.ui.btn_cont.btn_base, view_.ui.btn_cont.btn_rover, view_.ui.btn_cont.btn_ntrip})
+        lv_obj_add_state(obj, LV_STATE_DISABLED);
+    utils::attach_controls(controls(), clicked, this);
 }
 
-void
-WorkSettings::onViewWillAppear() {
-    PageBase::onViewWillAppear();
-    if (timer == nullptr) {
-        PM_LOG_INFO("WorkSettings::Create");
-        timer = lv_timer_create(onTimerUpdate, 20000, this);
-        lv_timer_ready(timer);
-    } else {
-        PM_LOG_INFO("WorkSettings::Resume");
-        lv_timer_resume(timer);
-        lv_timer_ready(timer);
-    }
-
-    lv_indev_wait_release(lv_indev_get_act());
-    lv_group_t* group = lv_group_get_default();
-    LV_ASSERT_NULL(group);
-
-    lv_group_set_wrap(group, true);
-
-    lv_group_add_obj(group, View.ui.roller.left_roller.btnUp);
-    lv_group_add_obj(group, View.ui.roller.left_roller.btnDown);
-    lv_group_add_obj(group, View.ui.roller.right_roller.btnUp);
-    lv_group_add_obj(group, View.ui.roller.right_roller.btnDown);
-    lv_group_add_obj(group, View.ui.roller.btnReset);
-    lv_group_add_obj(group, View.ui.btnCont.btnBase);
-    lv_group_add_obj(group, View.ui.btnCont.btnRover);
-    lv_group_add_obj(group, View.ui.btnCont.btnNtrip);
-
-    if (lastFocus) {
-        lv_group_focus_obj(lastFocus);
-    } else {
-        lv_group_focus_obj(View.ui.btnCont.btnBase);
-    }
-
-    View.AppearAnimStart();
+void WorkSettings::on_view_will_appear() {
+    model_.set_status_bar(true);
+    utils::focus_controls(controls(), last_focus_ ? last_focus_ : view_.ui.roller.btn_reset);
 }
 
-void
-WorkSettings::onViewDidAppear() {
-    PageBase::onViewDidAppear();
+void WorkSettings::on_view_will_disappear() {
+    last_focus_ = utils::leave_focus_group();
 }
 
-void
-WorkSettings::onViewWillDisappear() {
-    PageBase::onViewWillDisappear();
-    lv_group_t* group = lv_group_get_default();
-    LV_ASSERT_NULL(group);
-    lastFocus = lv_group_get_focused(group);
-    lv_group_remove_all_objs(group);
+void WorkSettings::on_view_unload() {
+    model_.deinit();
+    view_.destroy();
+    last_focus_ = nullptr;
 }
 
-void
-WorkSettings::onViewDidDisappear() {
-    PageBase::onViewDidDisappear();
-    if (timer) {
-        PM_LOG_INFO("WorkSettings::Pause");
-        lv_timer_pause(timer);
-    }
+void WorkSettings::on_language_changed() {
+    view_.apply_language();
 }
 
-void
-WorkSettings::onViewUnload() {
-    PageBase::onViewUnload();
-    if (timer) {
-        lv_timer_del(timer);
-        timer = nullptr;
-    }
-    View.Delete();
-    if (lastFocus) {
-        lastFocus = nullptr;
-    }
-}
-
-void
-WorkSettings::onViewDidUnload() {
-    PageBase::onViewDidUnload();
-}
-
-void
-WorkSettings::onLanguageChanged() {
-    View.ApplyLanguage();
-}
-
-void
-WorkSettings::onBtnClicked(const lv_obj_t* btn) const {
-    if (btn == View.ui.btnCont.btnBase) {
-        const uint8_t protocol_index = RadioProtocol[
-            WorkSettingsView::Roller_GetIndex(View.ui.roller.left_roller.label)];
-        const uint8_t channel_index = WorkSettingsView::Roller_GetIndex(View.ui.roller.right_roller.label);
-        if (channel_index != 0) {
-            PM_LOG_INFO("btnBase, pro:%d, freq:%d", protocol_index, channel_index);
-            systemInfo.work_mode = autobase_mode;
-            systemInfo.radioInfo.radio_status = On_Off_Status_ON;
-            systemInfo.ntripInfo.gprs_status = On_Off_Status_OFF;
-            systemInfo.ntripInfo.NtripServer_status = On_Off_Status_OFF;
-            systemInfo.radioInfo.radio_mode = radio_mode_tx;
-            systemInfo.radioInfo.radio_protocol = protocol_index;
-            systemInfo.radioInfo.radio_channel = channel_index;
-            systemInfo.radioInfo.radio_change_flag = 1;
-        }
-        pageManager->Pop();
-    } else if (btn == View.ui.btnCont.btnRover) {
-        const uint8_t protocol_index = RadioProtocol[
-            WorkSettingsView::Roller_GetIndex(View.ui.roller.left_roller.label)];
-        const uint8_t channel_index = WorkSettingsView::Roller_GetIndex(View.ui.roller.right_roller.label);
-        if (channel_index != 0) {
-            PM_LOG_INFO("btnRover, pro:%d, freq:%d", protocol_index, channel_index);
-            systemInfo.work_mode = rover_mode;
-            systemInfo.radioInfo.radio_status = On_Off_Status_ON;
-            systemInfo.ntripInfo.gprs_status = On_Off_Status_OFF;
-            systemInfo.ntripInfo.NtripServer_status = On_Off_Status_OFF;
-            systemInfo.radioInfo.radio_mode = radio_mode_rx;
-            systemInfo.radioInfo.radio_protocol = protocol_index;
-            systemInfo.radioInfo.radio_channel = channel_index;
-            systemInfo.radioInfo.radio_change_flag = 1;
-        }
-        pageManager->Pop();
-    } else if (btn == View.ui.btnCont.btnNtrip) {
-        systemInfo.work_mode = autobase_mode;
-        systemInfo.radioInfo.radio_status = On_Off_Status_OFF;
-        systemInfo.ntripInfo.gprs_status = On_Off_Status_ON;
-        systemInfo.ntripInfo.NtripServer_status = On_Off_Status_ON;
-        systemInfo.radioInfo.radio_change_flag = 1;
-        pageManager->Pop();
-    } else if (btn == View.ui.roller.left_roller.btnUp) {
-        this->View.Roller_up(View.ui.roller.left_roller.label);
-    } else if (btn == View.ui.roller.left_roller.btnDown) {
-        this->View.Roller_down(View.ui.roller.left_roller.label);
-    } else if (btn == View.ui.roller.right_roller.btnUp) {
-        this->View.Roller_up(View.ui.roller.right_roller.label);
-    } else if (btn == View.ui.roller.right_roller.btnDown) {
-        this->View.Roller_down(View.ui.roller.right_roller.label);
-    } else if (btn == View.ui.roller.btnReset) {
-        pageManager->Pop();
-    }
-}
-
-void
-WorkSettings::AttachEvent(lv_obj_t* obj) {
-    lv_obj_add_event_cb(obj, onEvent, LV_EVENT_ALL, this);
-}
-
-void
-WorkSettings::onTimerUpdate(lv_timer_t* timer) {
-    const auto* instance = static_cast<WorkSettings*>(timer->user_data);
-    instance->View.Update();
-    PM_LOG_INFO("WorkSettings::onTimerUpdate");
-}
-
-void
-WorkSettings::onEvent(lv_event_t* event) {
-    const auto* instance = static_cast<WorkSettings*>(lv_event_get_user_data(event));
-    LV_ASSERT_NULL(instance);
-
-    const lv_obj_t* obj = event->current_target;
-
-    if (const lv_event_code_t code = lv_event_get_code(event); code == LV_EVENT_SHORT_CLICKED) {
-        instance->onBtnClicked(obj);
-    }
+void WorkSettings::clicked(lv_event_t* event) {
+    auto* self = static_cast<WorkSettings*>(lv_event_get_user_data(event));
+    auto* obj = lv_event_get_current_target(event);
+    const auto& r = self->view_.ui.roller;
+    if (obj == r.left_roller.btn_up || obj == r.left_roller.btn_down)
+        self->view_.scroll(r.left_roller.label, obj == r.left_roller.btn_up ? -1 : 1);
+    else if (obj == r.right_roller.btn_up || obj == r.right_roller.btn_down)
+        self->view_.scroll(r.right_roller.label, obj == r.right_roller.btn_up ? -1 : 1);
+    else if (obj == r.btn_reset)
+        self->page_manager->pop();
 }

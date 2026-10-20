@@ -23,41 +23,43 @@
 #include "PageBase.h"
 #include "PM_Log.h"
 
-void
-PageBase::SetCustomCacheEnable(const bool en) {
-    PM_LOG_INFO("Page(%s) %s = %d", pageName, __func__, en);
-    SetCustomAutoCacheEnable(false);
-    priv.ReqEnableCache = en;
+void PageBase::set_custom_cache_enable(const bool en) {
+    PM_LOG_INFO("Page(%s) %s = %d", page_name, __func__, en);
+    set_custom_auto_cache_enable(false);
+    priv.req_enable_cache = en;
 }
 
-void
-PageBase::SetCustomAutoCacheEnable(const bool en) {
-    PM_LOG_INFO("Page(%s) %s = %d", pageName, __func__, en);
-    priv.ReqDisableAutoCache = !en;
+void PageBase::set_custom_auto_cache_enable(const bool en) {
+    PM_LOG_INFO("Page(%s) %s = %d", page_name, __func__, en);
+    priv.req_disable_auto_cache = !en;
 }
 
-void
-PageBase::SetCustomLoadAnimType(const uint8_t animType, const uint16_t time, const lv_anim_path_cb_t path) {
-    priv.Anim.Attr.Type = animType;
-    priv.Anim.Attr.Time = time;
-    priv.Anim.Attr.Path = path;
+void PageBase::set_custom_load_anim_type(const uint8_t anim_type, const uint16_t time, const lv_anim_path_cb_t path) {
+    priv.anim.attr.type = anim_type;
+    priv.anim.attr.time = time;
+    priv.anim.attr.path = path != nullptr ? path : lv_anim_path_linear;
 }
 
-bool
-PageBase::StashPop(void* ptr, const uint32_t size) {
-    if (priv.Stash.ptr == nullptr) {
+bool PageBase::stash_pop(void* ptr, const uint32_t size) {
+    if (ptr == nullptr || size == 0) {
+        PM_LOG_WARN("Invalid Stash destination");
+        return false;
+    }
+
+    if (priv.stash.ptr == nullptr) {
         PM_LOG_WARN("No Stash found");
         return false;
     }
 
-    if (priv.Stash.size != size) {
-        PM_LOG_WARN("Stash[0x%p](%d) does not match the size(%d)", priv.Stash.ptr, priv.Stash.size, size);
+    if (priv.stash.size != size) {
+        PM_LOG_WARN("Stash[0x%p](%lu) does not match the size(%lu)", priv.stash.ptr,
+                    static_cast<unsigned long>(priv.stash.size), static_cast<unsigned long>(size));
         return false;
     }
 
-    lv_memcpy(ptr, priv.Stash.ptr, priv.Stash.size);
-    lv_mem_free(priv.Stash.ptr);
-    priv.Stash.ptr = nullptr;
-    priv.Stash.size = 0;
+    lv_memcpy(ptr, priv.stash.ptr, priv.stash.size);
+    lv_mem_free(priv.stash.ptr);
+    priv.stash.ptr = nullptr;
+    priv.stash.size = 0;
     return true;
 }

@@ -1,28 +1,44 @@
 #include "StartupModel.h"
+#include <algorithm>
+#include "Common/ModelUtils.h"
+#include "Common/SystemService.h"
+#include "Utils/Log/Log.h"
 
-using namespace Page;
+using namespace page;
 
-void
-StartupModel::Init() {
-    account = new Account("StartupModel", DataProc::Center(), 0, this);
-    account->Subscribe("StatusBar");
-}
-
-void
-StartupModel::Deinit() {
-    if (account) {
-        delete account;
-        account = nullptr;
+bool StartupModel::init() {
+    if (account_)
+        return true;
+    account_ = std::make_unique<Account>("StartupModel", DataProc::Center(), 0, this);
+    account_->SetEventCallback(on_event);
+    if (!account_->IsRegistered() || !model_utils::subscribe(*account_, status_, state_)) {
+        account_.reset();
+        APP_LOG_E("StartupModel", "Account initialization failed");
+        return false;
     }
+    return true;
 }
-
-
-void
-StartupModel::SetStatusBarAppear(const bool en, const bool delay) const {
-    DataProc::StatusBar_Info_t info;
-    DATA_PROC_INIT_STRUCT(info);
-    info.cmd = DataProc::STATUS_BAR_CMD_APPEAR;
-    info.param.appear = en;
-    info.param.delay = delay;
-    account->Notify("StatusBar", &info, sizeof(info));
+void StartupModel::deinit() {
+    account_.reset();
+}
+bool StartupModel::set_status_bar(bool visible, DataProc::StatusBarStyle style) const {
+    const DataProc::StatusBarPresentation request{visible, style};
+    const bool ok = account_ && account_->Notify("StatusBar", &request, sizeof(request)) == Account::RES_OK;
+    if (!ok)
+        APP_LOG_E("StartupModel", "StatusBar notification rejected");
+    return ok;
+}
+bool StartupModel::request_power_on() const {
+    DataProc::SystemRequest request{};
+    request.command = DataProc::SystemCommand::RequestPowerOn;
+    return account_ && account_->Notify("System", &request, sizeof(request)) == Account::RES_OK;
+}
+int StartupModel::on_event(Account* account, Account::EventParam_t* event) {
+    auto* self = static_cast<StartupModel*>(account->UserData);
+    const int res = model_utils::receive(event, self->status_, self->state_);
+    if (res == Account::RES_OK && event && event->tran && std::strcmp(event->tran->ID, "Status") == 0) {
+        if (self->status_cb_)
+            self->status_cb_(self->status_);
+    }
+    return res;
 }

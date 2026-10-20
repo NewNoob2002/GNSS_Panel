@@ -1,9 +1,10 @@
 #ifndef DIALPLATE_VIEW_H
 #define DIALPLATE_VIEW_H
 
-#include "../Page.h"
+#include "Utils/lv_anim_label/numberFlow.h"
+#include "lvgl.h"
 
-namespace Page {
+namespace page {
 
 class DialplateView {
 
@@ -21,35 +22,37 @@ class DialplateView {
             lv_obj_t* icon_satellite;
             lv_obj_t* icon_radio;
             lv_obj_t* icon_mode;
-            numberFlow* satellite_used;
-            numberFlow* satellite_tacked;
-        } topInfo;
+            NumberFlow* satellite_used;
+            NumberFlow* satellite_tacked;
+        } top_info;
 
         struct {
             lv_obj_t* cont;
-            lv_obj_t* btnMap;
-            lv_obj_t* btnRec;
-            lv_obj_t* btnMenu;
-            lv_obj_t* btnShutdown;
-        } btnCont;
+            lv_obj_t* btn_map;
+            lv_obj_t* btn_rec;
+            lv_obj_t* btn_menu;
+            lv_obj_t* btn_shutdown;
+        } btn_cont;
 
         lv_anim_timeline_t* anim_timeline;
     } ui;
 
-    void Create(lv_obj_t* root);
+    /** 在已初始化的 LVGL 中创建主界面；LVGL 子对象由 root 持有。 */
+    void create(lv_obj_t* root);
 
-    void Delete();
+    /** 释放动画和 C++ 辅助对象；调用方仍须清理 root 下的 LVGL 子对象。 */
+    void destroy();
 
-    void AppearAnimStart(bool reverse = false) const;
+    void appear_anim_start(bool reverse = false) const;
 
   private:
-    void TopInfo_Create(lv_obj_t* par);
+    void top_info_create(lv_obj_t* par);
 
-    void BtnCont_Create(lv_obj_t* par);
+    void btn_cont_create(lv_obj_t* par);
 
-    static lv_obj_t* Btn_Create(lv_obj_t* par, const void* img_src, lv_coord_t x_ofs, const TransformInfo_t& transform);
+    static lv_obj_t* btn_create(lv_obj_t* par, const void* img_src, lv_coord_t x_ofs, const TransformInfo_t& transform);
 };
 
-} // namespace Page
+} // namespace page
 
 #endif // DIALPLATE_VIEW_H

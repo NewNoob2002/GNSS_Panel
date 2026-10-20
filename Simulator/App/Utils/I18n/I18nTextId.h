@@ -3,12 +3,18 @@
 
 #include <cstddef>
 
-namespace I18n {
+namespace i18n {
 
 enum class TextId : size_t {
     Press = 0,
     ShutdownHint,
-    HardwareCheckWarning,
+    SystemLoadingTitle,
+    SystemInitialization,
+    SystemReady,
+    PreparingModules,
+    ServicesAvailable,
+    StartupCompleted,
+    InitializationStep,
     SaveConfigWarning,
     SaveConfigMessage,
     SaveConfigPowerOffBoard,
@@ -57,9 +63,52 @@ enum class TextId : size_t {
     StarMapSbas,
     StarMapQzss,
     StarMapIrnss,
+    SystemMenuTitle,
+    SettingsTitle,
+    PowerOff,
+    LanguageTitle,
+    DateTimeTitle,
+    SystemInfoTitle,
+    EnglishName,
+    RussianName,
+    Cancel,
+    Confirm,
+    PowerOffQuestion,
+    PowerPreviewHint,
+    Unavailable,
+    PowerTitle,
+    ShutdownDouble,
+    RebootDouble,
+    RamPreview,
+    StartingGnssService,
+    Initializing,
+    LoadingConfiguration,
+    PreparingServices,
+    PreparingNetwork,
+    FinalizingStartup,
+    Back,
+    Return,
+    InitializationFailedContinue,
+    ReadyWithWarnings,
+    ServicesLimited,
+    InitializationConfig,
+    InitializationServices,
+    InitializationGnss,
+    InitializationNetwork,
+    InitializationFinalize,
+    InitializationOk,
+    InitializationFailed,
+    InitializationNotRun,
+    InitializationNoDetail,
+    InitializationResultFormat,
+    StartupStart,
+    StartupHoldHint,
+    CheckingBatteryGauge,
+    CheckingCharger,
+    PoweringHostBoard,
     Count
 };
 
-} // namespace I18n
+} // namespace i18n
 
 #endif

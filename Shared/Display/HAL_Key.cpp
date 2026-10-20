@@ -2,31 +2,23 @@
 #include "ButtonEvent/ButtonEvent.h"
 #include "HAL.h"
 
+// Function 键只在此处理长按强制关机；单击/双击等界面操作由共享应用按电平自行判定（AppPlatform）。
 static ButtonEvent FuncKey;
 static volatile uint8_t ForceShutdown_count = 0;
-
-static bool EncoderEnable = true;
-static volatile int32_t EncoderDiff = 0;
 
 static void
 FuncKey_callback(ButtonEvent* btn, int event) {
     (void)btn;
     switch (event) {
-        case ButtonEvent::EVENT_DOUBLE_CLICKED: EncoderDiff++; break;
-        case ButtonEvent::EVENT_CLICKED: EncoderDiff--; break;
         case ButtonEvent::EVENT_RELEASED: ForceShutdown_count = 0; break;
         case ButtonEvent::EVENT_LONG_PRESSED_REPEAT:
             ForceShutdown_count++;
-            /*
-						if(ForceShutdown_count == 5){
-							systemInfo.powerMonitor.ExternalPowerChange = 1;
-						}
-						*/
             if (ForceShutdown_count == 10) {
                 ForceShutdown_count = 0;
                 systemInfo.powerMonitor.Force_ShutDown = true;
             }
             break;
+        default: break;
     }
 }
 
@@ -41,26 +33,16 @@ HAL::Key_Init() {
 
 void
 HAL::Key_Update() {
-    FuncKey.EventMonitor(digitalRead(FUNCTION_KEY_PIN) == LOW);
+    FuncKey.EventMonitor(Key_FunctionPressed());
 }
 
-int32_t
-HAL::Encoder_GetDiff() {
-    int32_t diff = EncoderDiff;
-    EncoderDiff = 0;
-    return diff;
-}
-
+// Power 键按下为高电平（与 Power_PowerOffMonitor 开机判定一致），Function 键按下为低电平。
 bool
-HAL::Encoder_GetIsPush() {
-    if (!EncoderEnable) {
-        return false;
-    }
-
+HAL::Key_PowerPressed() {
     return digitalRead(POWER_KEY_PIN) == HIGH;
 }
 
-void
-HAL::Encoder_SetEnable(bool en) {
-    EncoderEnable = en;
+bool
+HAL::Key_FunctionPressed() {
+    return digitalRead(FUNCTION_KEY_PIN) == LOW;
 }

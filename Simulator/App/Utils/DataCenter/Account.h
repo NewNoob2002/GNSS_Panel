@@ -20,25 +20,25 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#ifndef ACCOUNT_H
-#define ACCOUNT_H
+#ifndef RK3506_ACCOUNT_H
+#define RK3506_ACCOUNT_H
 
-#include <cstdint>
+#include <stdint.h>
 #include <vector>
 #include "PingPongBuffer/PingPongBuffer.h"
-#include "lvgl/lvgl.h"
+#include "lvgl.h"
 
 class DataCenter;
 
 class Account {
-public:
+  public:
     /* Event type enumeration */
     typedef enum {
         EVENT_NONE,
         EVENT_PUB_PUBLISH, // Publisher posted information
-        EVENT_SUB_PULL, // Subscriber data pull request
-        EVENT_NOTIFY, // Subscribers send notifications to publishers
-        EVENT_TIMER, // Timed event
+        EVENT_SUB_PULL,    // Subscriber data pull request
+        EVENT_NOTIFY,      // Subscribers send notifications to publishers
+        EVENT_TIMER,       // Timed event
         EVENT_LAST
     } EventCode_t;
 
@@ -58,93 +58,60 @@ public:
     /* Event parameter structure */
     typedef struct {
         EventCode_t event; // Event type
-        Account *tran; // Pointer to sender
-        Account *recv; // Pointer to receiver
-        void *data_p; // Pointer to data
-        uint32_t size; // The length of the data
+        Account* tran;     // Pointer to sender
+        Account* recv;     // Pointer to receiver
+        void* data_p;      // Pointer to data
+        uint32_t size;     // The length of the data
     } EventParam_t;
 
     /* Event callback function pointer */
-    typedef int (*EventCallback_t)(Account *account, EventParam_t *param);
+    typedef int (*EventCallback_t)(Account* account, EventParam_t* param);
 
-    typedef std::vector<Account *> AccountVector_t;
+    typedef std::vector<Account*> AccountVector_t;
 
-    Account(
-        const char *id,
-        DataCenter *center,
-        uint32_t bufSize = 0,
-        void *userData = nullptr
-    );
-
+  public:
+    Account(const char* id, DataCenter* center, uint32_t bufSize = 0, void* userData = nullptr);
     ~Account();
-
-    Account *Subscribe(const char *pubID);
-
-    bool Unsubscribe(const char *pubID);
-
-    bool Commit(const void *data_p, uint32_t size);
-
-    int Publish();
-
-    int Pull(const char *pubID, void *data_p, uint32_t size);
-
-    int Pull(Account *pub, void *data_p, uint32_t size);
-
-    int Notify(const char *pubID, const void *data_p, uint32_t size);
-
-    int Notify(Account *pub, const void *data_p, uint32_t size);
-
-    void SetEventCallback(EventCallback_t callback);
-
-    void SetTimerPeriod(uint32_t period);
-
-    void SetTimerEnable(bool en) const;
-
-    [[nodiscard]] size_t GetPublishersSize() const;
-
-    [[nodiscard]] size_t GetSubscribersSize() const;
-
-    static const char *GetResString(const int &res) {
-        switch (res) {
-            case RES_OK:
-                return "OK";
-            case RES_UNKNOW:
-                return "Unknown Event";
-            case RES_SIZE_MISMATCH:
-                return "Size mismatch";
-            case RES_UNSUPPORTED_REQUEST:
-                return "Unsupported request";
-            case RES_NO_CALLBACK:
-                return "No callback";
-            case RES_NO_CACHE:
-                return "No cache";
-            case RES_NO_COMMITED:
-                return "No commited";
-            case RES_NOT_FOUND:
-                return "Not found";
-            case RES_PARAM_ERROR:
-                return "Parameter error";
-            default: ;
-        }
-        return "RES_ERROR";
+    Account(const Account&) = delete;
+    Account& operator=(const Account&) = delete;
+    bool IsRegistered() const {
+        return registered_;
     }
 
-    const char *ID; /* Unique account ID */
-    DataCenter *Center; /* Pointer to the data center */
-    void *UserData;
+    Account* Subscribe(const char* pubID);
+    bool Unsubscribe(const char* pubID);
+    bool Commit(const void* data_p, uint32_t size);
+    int Publish();
+    int Pull(const char* pubID, void* data_p, uint32_t size);
+    int Pull(Account* pub, void* data_p, uint32_t size);
+    int Notify(const char* pubID, const void* data_p, uint32_t size);
+    int Notify(Account* pub, const void* data_p, uint32_t size);
+    void SetEventCallback(EventCallback_t callback);
+    void SetTimerPeriod(uint32_t period);
+    void SetTimerEnable(bool en);
+    size_t GetPublishersSize();
+    size_t GetSubscribersSize();
 
-    AccountVector_t publishers; /* Followed publishers */
+  public:
+    const char* ID;     /* Unique account ID */
+    DataCenter* Center; /* Pointer to the data center */
+    void* UserData;
+
+    AccountVector_t publishers;  /* Followed publishers */
     AccountVector_t subscribers; /* Followed subscribers */
 
     struct {
         EventCallback_t eventCallback;
-        lv_timer_t *timer;
+        lv_timer_t* timer;
         PingPongBuffer_t BufferManager;
         uint32_t BufferSize;
-    } priv{};
+    } priv;
 
-private:
-    static void TimerCallbackHandler(lv_timer_t *task);
+  private:
+    friend class DataCenter;
+    bool registered_ = false;
+    uint64_t registration_serial_ = 0;
+    static void TimerCallbackHandler(lv_timer_t* task);
 };
 
 #endif

@@ -24,7 +24,6 @@
 #include "PM_Log.h"
 #include "PageManager.h"
 
-
 #define CONSTRAIN(amt, low, high) ((amt) < (low) ? (low) : ((amt) > (high) ? (high) : (amt)))
 
 /* The distance threshold to trigger the drag */
@@ -35,11 +34,10 @@
   * @param  event: Pointer to event structure
   * @retval None
   */
-void
-PageManager::onRootDragEvent(lv_event_t* event) {
-    const lv_event_code_t eventCode = lv_event_get_code(event);
+void PageManager::on_root_drag_event(lv_event_t* event) {
+    const lv_event_code_t event_code = lv_event_get_code(event);
 
-    if (!(eventCode == LV_EVENT_PRESSED || eventCode == LV_EVENT_PRESSING || eventCode == LV_EVENT_RELEASED)) {
+    if (!(event_code == LV_EVENT_PRESSED || event_code == LV_EVENT_PRESSING || event_code == LV_EVENT_RELEASED)) {
         return;
     }
 
@@ -56,88 +54,88 @@ PageManager::onRootDragEvent(lv_event_t* event) {
         return;
     }
 
-    PageManager* manager = base->pageManager;
-    LoadAnimAttr_t animAttr;
+    PageManager* manager = base->page_manager;
+    LoadAnimAttr_t anim_attr;
 
-    if (!manager->GetCurrentLoadAnimAttr(&animAttr)) {
+    if (!manager->get_current_load_anim_attr(&anim_attr)) {
         PM_LOG_ERROR("Can't get current anim attr");
         return;
     }
 
-    if (eventCode == LV_EVENT_PRESSED) {
-        if (manager->AnimState.IsSwitchReq) {
+    if (event_code == LV_EVENT_PRESSED) {
+        if (manager->anim_state_.is_switch_req) {
             return;
         }
 
-        if (manager->AnimState.IsBusy) {
+        if (manager->anim_state_.is_busy) {
             PM_LOG_INFO("Root drag anim interrupted");
-            lv_anim_del(root, animAttr.setter);
-            manager->AnimState.IsBusy = false;
+            lv_anim_del(root, anim_attr.setter);
+            manager->anim_state_.is_busy = false;
         }
 
         /* Temporary showing the bottom page */
-        const PageBase* bottomPage = manager->GetStackTopAfter();
-        if (bottomPage == nullptr || bottomPage->_root == nullptr) {
+        const PageBase* bottom_page = manager->get_stack_top_after();
+        if (bottom_page == nullptr || bottom_page->root == nullptr) {
             return;
         }
 
-        lv_obj_clear_flag(bottomPage->_root, LV_OBJ_FLAG_HIDDEN);
-        manager->AnimState.IsDragging = true;
-    } else if (eventCode == LV_EVENT_PRESSING) {
-        if (!manager->AnimState.IsDragging) {
+        lv_obj_clear_flag(bottom_page->root, LV_OBJ_FLAG_HIDDEN);
+        manager->anim_state_.is_dragging = true;
+    } else if (event_code == LV_EVENT_PRESSING) {
+        if (!manager->anim_state_.is_dragging) {
             return;
         }
 
-        lv_coord_t cur = animAttr.getter(root);
+        lv_coord_t cur = anim_attr.getter(root);
 
-        const lv_coord_t max = std::max(animAttr.pop.exit.start, animAttr.pop.exit.end);
-        const lv_coord_t min = std::min(animAttr.pop.exit.start, animAttr.pop.exit.end);
+        const lv_coord_t max = std::max(anim_attr.pop.exit.start, anim_attr.pop.exit.end);
+        const lv_coord_t min = std::min(anim_attr.pop.exit.start, anim_attr.pop.exit.end);
 
         lv_point_t offset;
         lv_indev_get_vect(lv_indev_get_act(), &offset);
 
-        if (animAttr.dragDir == ROOT_DRAG_DIR_HOR) {
+        if (anim_attr.drag_dir == ROOT_DRAG_DIR_HOR) {
             cur += offset.x;
-        } else if (animAttr.dragDir == ROOT_DRAG_DIR_VER) {
+        } else if (anim_attr.drag_dir == ROOT_DRAG_DIR_VER) {
             cur += offset.y;
         }
 
-        animAttr.setter(root, CONSTRAIN(cur, min, max));
-    } else if (eventCode == LV_EVENT_RELEASED) {
-        if (manager->AnimState.IsSwitchReq || !manager->AnimState.IsDragging) {
+        anim_attr.setter(root, CONSTRAIN(cur, min, max));
+    } else if (event_code == LV_EVENT_RELEASED) {
+        if (manager->anim_state_.is_switch_req || !manager->anim_state_.is_dragging) {
             return;
         }
-        manager->AnimState.IsDragging = false;
+        manager->anim_state_.is_dragging = false;
 
-        const lv_coord_t offset_sum = animAttr.push.enter.end - animAttr.push.enter.start;
+        const lv_coord_t offset_sum = anim_attr.push.enter.end - anim_attr.push.enter.start;
 
         lv_coord_t x_predict = 0;
         lv_coord_t y_predict = 0;
-        RootGetDragPredict(&x_predict, &y_predict);
+        root_get_drag_predict(&x_predict, &y_predict);
 
-        const lv_coord_t start = animAttr.getter(root);
+        const lv_coord_t start = anim_attr.getter(root);
         lv_coord_t end = start;
 
-        if (animAttr.dragDir == ROOT_DRAG_DIR_HOR) {
+        if (anim_attr.drag_dir == ROOT_DRAG_DIR_HOR) {
             end += x_predict;
             PM_LOG_INFO("Root drag x_predict = %d", end);
-        } else if (animAttr.dragDir == ROOT_DRAG_DIR_VER) {
+        } else if (anim_attr.drag_dir == ROOT_DRAG_DIR_VER) {
             end += y_predict;
             PM_LOG_INFO("Root drag y_predict = %d", end);
         }
 
         if (std::abs(end) > std::abs((int)offset_sum) / 2) {
-            lv_async_call(onRootAsyncLeave, base);
-        } else if (end != animAttr.push.enter.end) {
-            manager->AnimState.IsBusy = true;
+            lv_async_call(on_root_async_leave, base);
+        } else if (end != anim_attr.push.enter.end) {
+            manager->anim_state_.is_busy = true;
 
             lv_anim_t a;
-            manager->AnimDefaultInit(&a);
+            manager->anim_default_init(&a);
             lv_anim_set_user_data(&a, manager);
             lv_anim_set_var(&a, root);
-            lv_anim_set_values(&a, start, animAttr.push.enter.end);
-            lv_anim_set_exec_cb(&a, animAttr.setter);
-            lv_anim_set_ready_cb(&a, onRootDragAnimFinish);
+            lv_anim_set_values(&a, start, anim_attr.push.enter.end);
+            lv_anim_set_exec_cb(&a, anim_attr.setter);
+            lv_anim_set_ready_cb(&a, on_root_drag_anim_finish);
             lv_anim_start(&a);
             PM_LOG_INFO("Root drag anim start");
         }
@@ -149,15 +147,14 @@ PageManager::onRootDragEvent(lv_event_t* event) {
   * @param  a: Pointer to animation
   * @retval None
   */
-void
-PageManager::onRootDragAnimFinish(lv_anim_t* a) {
+void PageManager::on_root_drag_anim_finish(lv_anim_t* a) {
     auto* manager = static_cast<PageManager*>(lv_anim_get_user_data(a));
     PM_LOG_INFO("Root drag anim finish");
-    manager->AnimState.IsBusy = false;
+    manager->anim_state_.is_busy = false;
 
     /* Hide the bottom page */
-    if (const PageBase* bottomPage = manager->GetStackTopAfter(); bottomPage) {
-        lv_obj_add_flag(bottomPage->_root, LV_OBJ_FLAG_HIDDEN);
+    if (const PageBase* bottom_page = manager->get_stack_top_after(); bottom_page) {
+        lv_obj_add_flag(bottom_page->root, LV_OBJ_FLAG_HIDDEN);
     }
 }
 
@@ -166,11 +163,10 @@ PageManager::onRootDragAnimFinish(lv_anim_t* a) {
   * @param  root: Pointer to the root object
   * @retval None
   */
-void
-PageManager::RootEnableDrag(lv_obj_t* root) {
+void PageManager::root_enable_drag(lv_obj_t* root) {
     auto* base = static_cast<PageBase*>(lv_obj_get_user_data(root));
-    lv_obj_add_event_cb(root, onRootDragEvent, LV_EVENT_ALL, base);
-    PM_LOG_INFO("Page(%s) Root drag enabled", base->pageName);
+    lv_obj_add_event_cb(root, on_root_drag_event, LV_EVENT_ALL, base);
+    PM_LOG_INFO("Page(%s) Root drag enabled", base->page_name);
 }
 
 /**
@@ -178,11 +174,10 @@ PageManager::RootEnableDrag(lv_obj_t* root) {
   * @param  data: Pointer to the base class of the page
   * @retval None
   */
-void
-PageManager::onRootAsyncLeave(void* data) {
+void PageManager::on_root_async_leave(void* data) {
     auto* base = static_cast<PageBase*>(data);
-    PM_LOG_INFO("Page(%s) send event: LV_EVENT_LEAVE, need to handle...", base->pageName);
-    lv_event_send(base->_root, LV_EVENT_LEAVE, base);
+    PM_LOG_INFO("Page(%s) send event: LV_EVENT_LEAVE, need to handle...", base->page_name);
+    lv_event_send(base->root, LV_EVENT_LEAVE, base);
 }
 
 /**
@@ -191,8 +186,7 @@ PageManager::onRootAsyncLeave(void* data) {
   * @param  y: y stop point
   * @retval None
   */
-void
-PageManager::RootGetDragPredict(lv_coord_t* x, lv_coord_t* y) {
+void PageManager::root_get_drag_predict(lv_coord_t* x, lv_coord_t* y) {
     const lv_indev_t* indev = lv_indev_get_act();
     lv_point_t vect;
     lv_indev_get_vect(indev, &vect);

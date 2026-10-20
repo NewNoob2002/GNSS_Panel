@@ -1,92 +1,67 @@
 #ifndef SYSTEM_INFOS_VIEW_H
 #define SYSTEM_INFOS_VIEW_H
 
-#include "../Page.h"
+#include "Common/DataProc/DataProc_Def.h"
+#include "Resource/ResourcePool.h"
+#include "Utils/I18n/I18n.h"
+#include "lvgl.h"
 
-namespace Page
-{
-    class SystemInfosView
-    {
-    public:
-        SystemInfosView()
-        {
-        }
+namespace page {
+class SystemInfosView {
+  public:
+    SystemInfosView() = default;
 
-        ~SystemInfosView()
-        {
-        }
+    ~SystemInfosView() = default;
 
-        void Create(lv_obj_t *root);
+    void create(lv_obj_t* root);
 
-        void Delete();
+    /** 页面出现后注册焦点；必须在前一页面清空焦点组之后调用。 */
+    void group_init();
 
-        void ApplyLanguage() const;
+    void destroy();
 
-        typedef struct {
-            lv_obj_t *cont;
-            lv_obj_t *icon;
-            lv_obj_t *labelName;
-            lv_obj_t *labelInfo;
-            lv_obj_t *labelData;
-        } item_t;
+    /** Render localized inventory cards and the retained initialization error count. */
+    void apply_language(const DataProc::SystemState& state = {}) const;
 
-        struct {
-            item_t work;
-            item_t gps;
-            item_t wifi;
-            item_t battery;
-            item_t storage;
-            item_t system;
-        } ui;
+    /** Inventory controls in visible top-to-bottom order, after create(). */
+    std::array<lv_obj_t*, 6> controls() const;
 
-        void SetWork(
-            WorkMode_t workMode,
-            RadioInfo_t radioInfo,
-            const NtripInfo_t &ntripInfo) const;
+    typedef struct {
+        lv_obj_t* cont;
+        lv_obj_t* icon;
+        lv_obj_t* label_name;
+        lv_obj_t* label_info;
+        lv_obj_t* label_data;
+    } item_t;
 
-        void SetGPS(
-            double lat,
-            double lng,
-            double alt) const;
+    struct {
+        item_t work;
+        item_t gps;
+        item_t wifi;
+        item_t battery;
+        item_t storage;
+        item_t system;
+    } ui;
 
-        void SetWifi(const WifiInfo_t &wifiInfo) const;
+    static void set_scroll_to_y(lv_obj_t* obj, lv_coord_t y, lv_anim_enable_t en);
 
-        void SetBattery(const BatteryInfo_t &batteryInfo) const;
+    static void on_focus(lv_group_t* e);
 
-        void SetStorage(const RecordInfo_t &recordInfo) const;
+  private:
+    struct {
+        lv_style_t icon;
+        lv_style_t focus;
+        lv_style_t info;
+        lv_style_t data;
+    } style_;
 
-        void SetSystem(
-            const char *firmVer,
-            const char *bootTime,
-            const uint16_t error,
-            const char *buildTime) const;
+  private:
+    void style_init();
 
-        static void SetScrollToY(lv_obj_t *obj, lv_coord_t y, lv_anim_enable_t en);
+    void style_reset();
 
-        static void onFocus(lv_group_t *e);
-
-    private:
-        struct {
-            lv_style_t icon;
-            lv_style_t focus;
-            lv_style_t info;
-            lv_style_t data;
-        } style;
-
-    private:
-        void Group_Init();
-
-        void Style_Init();
-
-        void Style_Reset();
-
-        void Item_Create(
-            item_t *item,
-            lv_obj_t *par,
-            const char *name,
-            const char *img_src,
-            const char *infos);
-    };
-}
+    void item_create(item_t* item, lv_obj_t* par, const char* name, const char* img_src, const char* infos);
+};
+} // namespace page
 
 #endif // SYSTEM_INFOS_VIEW_H

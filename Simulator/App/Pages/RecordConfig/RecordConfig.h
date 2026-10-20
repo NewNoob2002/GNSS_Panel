@@ -1,70 +1,27 @@
-//
-// Created by gtc on 2026/5/9.
-//
+#pragma once
 
-#ifndef LVGL_RECORDCONFIG_H
-#define LVGL_RECORDCONFIG_H
-
-#include "RecordConfigView.h"
 #include "RecordConfigModel.h"
 
-namespace Page {
-class RecordConfig : public PageBase {
-public:
-    RecordConfig()
-        : recState(RECORD_STATE_STOP), lastFocus(nullptr), timerRecord(nullptr), timerRoller(nullptr) {}
+#include <array>
+#include "RecordConfigView.h"
+#include "Utils/PageManager/PageBase.h"
 
-    ~RecordConfig() override = default;
+namespace page {
+/** Recording-option preview and navigation; record remains disabled without its backend. */
+class RecordConfig final : public PageBase {
+  public:
+    void on_custom_attr_config() override;
+    void on_view_load() override;
+    void on_view_will_appear() override;
+    void on_view_will_disappear() override;
+    void on_view_unload() override;
+    void on_language_changed() override;
 
-    void onCustomAttrConfig() override;
-
-    void onViewLoad() override;
-
-    void onViewDidLoad() override;
-
-    void onViewWillAppear() override;
-
-    void onViewDidAppear() override;
-
-    void onViewWillDisappear() override;
-
-    void onViewDidDisappear() override;
-
-    void onViewUnload() override;
-
-    void onViewDidUnload() override;
-
-    void onLanguageChanged() override;
-
-private:
-    typedef enum {
-        RECORD_STATE_START = 0,
-        RECORD_STATE_STOP
-    } RecordState_t;
-
-    RecordConfigView View{};
-    RecordConfigModel Model{};
-    RecordState_t recState;
-    lv_obj_t* lastFocus;
-    lv_timer_t* timerRecord;
-    lv_timer_t* timerRoller;
-
-    void onRecord(bool longPress);
-
-    void onBtnClicked(const lv_obj_t* btn, const lv_event_code_t& code);
-
-    void SetBtnRecImgSrc(const char* srcName) const;
-
-    void AttachEvent(lv_obj_t* obj);
-
-    void RecordUpdate();
-    void RollerUpdate() const;
-
-    static void onTimerRecordUpdate(lv_timer_t* timer);
-    static void onTimerRollerUpdate(lv_timer_t* timer);
-
-    static void onEvent(lv_event_t* event);
+  private:
+    std::array<lv_obj_t*, 5> controls() const;
+    static void clicked(lv_event_t* event);
+    RecordConfigView view_{};
+    RecordConfigModel model_;
+    lv_obj_t* last_focus_ = nullptr;
 };
-}
-
-#endif //LVGL_RECORDCONFIG_H
+} // namespace page

@@ -1,9 +1,7 @@
 #include "lv_anim_timeline_wrapper.h"
 
-void lv_anim_timeline_add_wrapper(lv_anim_timeline_t* at, const lv_anim_timeline_wrapper_t* wrapper)
-{
-    for(uint32_t i = 0; wrapper[i].obj != NULL; i++)
-    {
+void lv_anim_timeline_add_wrapper(lv_anim_timeline_t* at, const lv_anim_timeline_wrapper_t* wrapper) {
+    for (uint32_t i = 0; wrapper[i].obj != NULL; i++) {
         const lv_anim_timeline_wrapper_t* atw = &wrapper[i];
 
         lv_anim_t a;

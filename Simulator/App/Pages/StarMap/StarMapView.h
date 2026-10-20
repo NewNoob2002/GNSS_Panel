@@ -1,9 +1,11 @@
 #ifndef STAR_MAP_VIEW_H
 #define STAR_MAP_VIEW_H
 
-#include "../Page.h"
+#include "Resource/ResourcePool.h"
+#include "Utils/I18n/I18n.h"
+#include "lvgl.h"
 
-namespace Page {
+namespace page {
 
 class StarMapView {
   public:
@@ -22,13 +24,13 @@ class StarMapView {
 
     bool activity_indicator_on = false;
 
-    void Create(lv_obj_t* root);
-    void Delete();
-    void ApplyLanguage() const;
-    void UpdateActivityIndicator();
-    void UpdateValues(int gps, int bds, int gln, int gal, int sbas, int qzss, int irnss);
+    void create(lv_obj_t* root);
+    void destroy();
+    void apply_language() const;
+    void update_activity_indicator();
+    void update_values(int gps, int bds, int gln, int gal, int sbas, int qzss, int irnss);
 };
 
-} // namespace Page
+} // namespace page
 
 #endif // STAR_MAP_VIEW_H

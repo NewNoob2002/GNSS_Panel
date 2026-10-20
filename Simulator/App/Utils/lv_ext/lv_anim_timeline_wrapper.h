@@ -5,9 +5,10 @@
 extern "C" {
 #endif
 
-#include "lvgl/lvgl.h"
+#include "lvgl.h"
 
 /*Data of anim_timeline*/
+// NOLINTNEXTLINE(clang-analyzer-optin.performance.Padding) -- keep the public field order used by timeline initializers.
 typedef struct {
     uint32_t start_time;
     lv_obj_t* obj;
@@ -35,8 +36,7 @@ void lv_anim_timeline_add_wrapper(lv_anim_timeline_t* at, const lv_anim_timeline
 *      MACROS
 **********************/
 
-#define LV_ANIM_TIMELINE_WRAPPER_END                                                                                   \
-    { 0, NULL, NULL, 0, 0, 0, NULL, false }
+#define LV_ANIM_TIMELINE_WRAPPER_END {0, NULL, NULL, 0, 0, 0, NULL, false}
 
 #ifdef __cplusplus
 } /*extern "C"*/

@@ -1,13 +1,13 @@
 #ifndef WorkSettings_VIEW_H
 #define WorkSettings_VIEW_H
 
-#include "../Page.h"
+#include "Resource/ResourcePool.h"
+#include "Utils/I18n/I18n.h"
+#include "lvgl.h"
 
-extern const uint8_t RadioProtocol[PROTOCOL_MAX];
-
-namespace Page {
+namespace page {
 class WorkSettingsView {
-public:
+  public:
     struct {
         struct {
             lv_obj_t* cont;
@@ -16,70 +16,59 @@ public:
                 lv_obj_t* cont;
                 lv_obj_t* label;
 
-                lv_obj_t* btnCont;
-                lv_obj_t* btnUp;
-                lv_obj_t* btnDown;
+                lv_obj_t* btn_cont;
+                lv_obj_t* btn_up;
+                lv_obj_t* btn_down;
             } left_roller;
 
             struct {
                 lv_obj_t* cont;
                 lv_obj_t* label;
 
-                lv_obj_t* btnCont;
-                lv_obj_t* btnUp;
-                lv_obj_t* btnDown;
+                lv_obj_t* btn_cont;
+                lv_obj_t* btn_up;
+                lv_obj_t* btn_down;
             } right_roller;
 
-            lv_obj_t* btnReset;
+            lv_obj_t* btn_reset;
         } roller;
 
         struct {
             lv_obj_t* cont;
-            lv_obj_t* btnBase;
-            lv_obj_t* btnRover;
-            lv_obj_t* btnNtrip;
-        } btnCont;
+            lv_obj_t* btn_base;
+            lv_obj_t* btn_rover;
+            lv_obj_t* btn_ntrip;
+        } btn_cont;
 
-        lv_anim_timeline_t* anim_timeline;
     } ui;
 
     WorkSettingsView() = default;
 
     ~WorkSettingsView() = default;
 
-    void Create(lv_obj_t* root);
+    void create(lv_obj_t* root);
 
-    void Delete();
+    void destroy();
 
-    void Update() const;
+    void apply_language() const;
+    /** 仅更新本页滚轮预览，不写入电台配置。delta 为 -1（上一项）或 1（下一项）。 */
+    void scroll(lv_obj_t* label, int delta);
 
-    void ApplyLanguage() const;
+    void roller_create(lv_obj_t* par);
 
-    void Roller_Create(lv_obj_t* par);
+    static void roller_style_init(lv_obj_t* obj);
 
-    static void Roller_Style_Init(lv_obj_t* obj);
+    void btn_cont_create(lv_obj_t* par);
 
-    void BtnCont_Create(lv_obj_t* par);
+    static lv_obj_t* btn_create(lv_obj_t* par, const void* img_src, lv_coord_t x_ofs, lv_coord_t y_ofs);
 
-    static lv_obj_t* Btn_Create(lv_obj_t* par, const void* img_src, lv_coord_t x_ofs, lv_coord_t y_ofs);
+    static void roller_to_index(lv_obj_t* obj, uint8_t index);
 
-    static void Roller_toIndex(lv_obj_t* obj, uint8_t index);
-
-    void Roller_up(lv_obj_t* obj) const;
-
-    void Roller_down(lv_obj_t* obj) const;
-
-    static void Roller_Reset(lv_obj_t* label);
-
-    static uint8_t Roller_GetIndex(const lv_obj_t* obj);
-
-    void AppearAnimStart(bool reverse = false) const;
-
-private:
+  private:
     static int8_t left_roller_index;
     static int8_t right_roller_index;
 };
 
-}
+} // namespace page
 
 #endif // WorkSettings_VIEW_H

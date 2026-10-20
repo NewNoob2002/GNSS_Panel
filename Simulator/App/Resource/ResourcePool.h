@@ -1,14 +1,16 @@
 #pragma once
-#include "lvgl/src/font/lv_font.h"
-#include "Utils/lv_anim_label/numberFlow.h"
+#include "lvgl.h"
 #include "symbol/symbol_unicode.h"
 
-namespace ResourcePool {
+namespace resource_pool {
 
-void Init();
+/** 在 lv_init() 后调用一次，注册静态编译的字体和图片资源。 */
+void init();
 
-lv_font_t* GetFont(const char* name);
+/** 返回资源池持有的字体；名称缺失时返回 LV_FONT_DEFAULT。 */
+lv_font_t* get_font(const char* name);
 
-const void* GetImage(const char* name);
+/** 返回资源池持有的图片；名称缺失时返回 nullptr。 */
+const void* get_image(const char* name);
 
-}
+} // namespace resource_pool
