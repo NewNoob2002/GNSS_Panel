@@ -82,6 +82,7 @@ HAL::HAL_Init() {
     elog_start();
 #endif
     Power_Init();
+    Battery_Init();
     /* Set Interrupt Group Priority */
     HAL_NVIC_SetPriorityGrouping(NVIC_PRIORITYGROUP_4);
     State::Reset();

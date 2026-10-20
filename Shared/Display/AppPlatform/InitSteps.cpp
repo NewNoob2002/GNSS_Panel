@@ -4,9 +4,7 @@
 #include "Common/SystemBackend.h"
 #include "mcu_config.h"
 
-#if !defined(LVGL_SIMULATOR)
-#include <Arduino.h>
-#endif
+#include <Arduino.h> // 模拟器中为 Simulator/HAL/Arduino.h 的虚拟 GPIO
 
 namespace {
 
@@ -61,11 +59,7 @@ system_backend::initialize_step(unsigned step, char* detail, std::size_t size) {
             return true;
         case 3: {
             // 主控在开机时才上电、需数十秒启动，此处只确认供电已打开，不检查通信。
-#if defined(LVGL_SIMULATOR)
-            const bool powered = true;
-#else
             const bool powered = digitalRead(POWER_CONTROL_PIN) == HIGH;
-#endif
             std::snprintf(detail, size, "host board power %s", powered ? "on" : "off");
             return powered;
         }

@@ -14,8 +14,7 @@ OWNERS = {
         "Platform/HAL/HAL.cpp",
         "Platform/HAL/HAL_I2C.cpp",
         "Platform/HAL/HAL_Power.cpp",
-        # 仅 LVGL_SIMULATOR 分支：模拟器中代替 HAL 置位开机
-        "Shared/Display/AppPlatform/AppPlatform.cpp",
+        "Platform/HAL/HAL_Battery.cpp",
     },
     "Host": {
         "Shared/Comm/panel_protocol.cpp",

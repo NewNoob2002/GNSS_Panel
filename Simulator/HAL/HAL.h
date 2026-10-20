@@ -1,37 +1,26 @@
-//
-// Created by guoti on 2025/12/20.
-//
+#pragma once
+// 模拟器的 HAL 声明：电源时序直接编译固件的 Platform/HAL/HAL_Power.cpp（经 CMake 强制包含本文件，
+// 并屏蔽固件 HAL.h 的硬件依赖）；电池、充电与按键由 main.cpp 模拟。
+#define __HAL_H // 固件 HAL.h 的包含保护：在模拟器中不展开
 
-#ifndef LVGL_HAL_H
-#define LVGL_HAL_H
-
+#include <cstdio>
 #include "../../Platform/Config/mcu_config.h"
-#ifdef __cplusplus
-namespace HAL
-{
-    void HAL_Init();
-    void HAL_Update();
 
-    void HAL_Deinit();
-    /* I2C */
-    int I2C_Scan();
+#define CORE_DEBUG_PRINTF(fmt, ...) std::printf("[HAL] " fmt "\n", ##__VA_ARGS__)
 
-    /* Power */
-    void Power_Init();
-    void Power_Shutdown(bool en);
-    void Power_PowerOffMonitor();
-    bool Power_ShutdownSoftReset();
-    void Power_Update();
-    void Power_GetInfo(Power_Monitor_t *info);
-    const char *Power_GetPowerOffCause();
-    void WatchDog_Feed();
-    /* KEY */
-    void Key_Init();
-    void Key_Update();
-    /* Dispaly */
-    void Display_Init();
-    void Dispaly_Update();
-}
-#endif /*__cplusplus*/
+namespace HAL {
+void HAL_Init();
+void HAL_Update();
 
-#endif //LVGL_HAL_H
+/* Power（Platform/HAL/HAL_Power.cpp） */
+void Power_Init();
+void Power_OnCheck(void (*idle)() = nullptr);
+void Power_Shutdown(bool en);
+void Power_PowerOffMonitor();
+bool Power_ShutdownSoftReset();
+const char* Power_GetPowerOffCause();
+void Power_ProductInit();
+
+/* 模拟器输入：Power 键电平（Enter / 鼠标中键按住） */
+void Sim_SetPowerKey(bool pressed);
+} // namespace HAL

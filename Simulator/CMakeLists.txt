@@ -42,6 +42,10 @@ file(GLOB_RECURSE APP_SOURCES CONFIGURE_DEPENDS
 )
 list(FILTER APP_SOURCES EXCLUDE REGEX "/Status/")
 file(GLOB HAL_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_LIST_DIR}/HAL/*.cpp)
+# 固件电源时序原样编译：强制包含模拟器 HAL.h（屏蔽固件 HAL.h 的硬件依赖），GPIO/时基由 HAL/Arduino.h 提供
+set(FIRMWARE_POWER_SOURCE ${CMAKE_CURRENT_LIST_DIR}/../Platform/HAL/HAL_Power.cpp)
+set_source_files_properties(${FIRMWARE_POWER_SOURCE} PROPERTIES
+    COMPILE_OPTIONS "-include;${CMAKE_CURRENT_LIST_DIR}/HAL/HAL.h")
 # HC32 平台层（与固件同一份）
 file(GLOB APP_PLATFORM_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_LIST_DIR}/../Shared/Display/AppPlatform/*.cpp)
 
@@ -51,6 +55,7 @@ add_executable(main
     ${CMAKE_CURRENT_LIST_DIR}/../Platform/State/SystemState.cpp
     ${APP_SOURCES}
     ${HAL_SOURCES}
+    ${FIRMWARE_POWER_SOURCE}
     ${LVGL_SOURCES}
 )
 target_include_directories(main PRIVATE

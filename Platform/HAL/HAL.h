@@ -19,6 +19,7 @@ int I2C_Scan();
 
 /* Power */
 void Power_Init();
+void Battery_Init();
 void Power_OnCheck(void (*idle)() = nullptr);
 void Power_Shutdown(bool en);
 void Power_PowerOffMonitor();

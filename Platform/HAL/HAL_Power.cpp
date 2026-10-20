@@ -3,7 +3,9 @@
 #include "HAL.h"
 #include "PowerPolicy.h"
 #include "SystemState.h"
-#include "ots.h"
+
+// 电源时序：开机判定、关机流程、关机驻留与原地开机、低电量关机。只依赖 GPIO、时基与充电控制的
+// 待机/开机切换，固件、主机测试与 PC 模拟器共用同一份（电池与充电监控见 HAL_Battery.cpp）。
 
 static PowerPolicy power_policy;
 static bool power_key_down;
@@ -17,19 +19,6 @@ en_flag_status_t softwareReset = RESET;
 // 产品电源扩展点：默认无动作，X1 用于电量补偿。
 __attribute__((weak)) void
 HAL::Power_ProductInit() {}
-
-__attribute__((weak)) void
-HAL::Power_ProductUpdate() {}
-
-__attribute__((weak)) uint16_t
-HAL::Power_AdjustPercent(uint16_t actualPercent) {
-    return actualPercent;
-}
-
-void
-ots_callback(void) {
-    State::Power().batteryInfo.fOtsTemp = OTS_CalculateTemp();
-}
 
 void
 HAL::Power_Init() {
@@ -47,7 +36,6 @@ HAL::Power_Init() {
 
     pinMode(WATCHDOG_FEED_PIN, OUTPUT);
     Power_ProductInit();
-    OtsInitConfig(ots_callback);
 }
 
 // 开机后恢复电源保持与指示灯；冷启动和关机驻留恢复共用。
@@ -173,6 +161,17 @@ HAL::Power_PowerOffMonitor() {
         State::Power().ShutdownGoing = true;
         State::Power().ShutdownReq = false;
     }
+    // 低电量：停止录制；持续 3 min 后关机。
+    const Power_Monitor_t& power = systemInfo.power;
+    const BatteryInfo_t& battery = power.batteryInfo;
+    const bool low = power.panel_power_on && battery.sample_valid && battery.Percent <= 9U
+                     && battery.chargeStatus == notCharge && !power.ExternalPower;
+    if (low) {
+        State::Request_RecordStop();
+    }
+    if (power_policy.LowBatteryExpired(now, low)) {
+        State::Power().LowBatteryPowerOff = true;
+    }
     if (power_policy.UpdateShutdown(now, requested, State::Power().ShutdownEnsure, FORCE_SHUTDOWN())) {
         power_enter_standby(now);
     }
@@ -191,51 +190,6 @@ HAL::Power_ShutdownSoftReset() {
         return true;
     }
     return false;
-}
-
-void
-HAL::Power_Update() {
-    WatchDog_Feed();
-    OtsStart();
-    Power_ProductUpdate();
-    Power_GetInfo(&State::Power());
-}
-
-void
-HAL::Power_GetInfo(Power_Monitor_t* info) {
-    if (info == nullptr) {
-        return;
-    }
-    if (millis() - State::Power().BatteryLastHandleTime >= 3000) {
-        State::Power().BatteryLastHandleTime = millis();
-        if (!systemInfo.board.online_device.bq40z50) {
-            digitalToggle(POWER_LED_PIN);
-        } else {
-            Battery_Sample(info->batteryInfo);
-        }
-    }
-    if (info->batteryInfo.sample_valid && millis() - info->batteryInfo.last_sample_ms > 10000U) {
-        info->batteryInfo.sample_valid = false;
-    }
-    info->batteryInfo.ChargerDetect = digitalRead(CHARGER_CTRL_PIN);
-    Charger_Protect(info->batteryInfo);
-    Charger_Get().update(info->batteryInfo);
-    const bool low = info->panel_power_on && info->batteryInfo.sample_valid && info->batteryInfo.Percent <= 9U
-                     && info->batteryInfo.chargeStatus == notCharge && !info->ExternalPower;
-    if (low) {
-        State::Request_RecordStop();
-    }
-    if (power_policy.LowBatteryExpired(millis(), low)) {
-        info->LowBatteryPowerOff = true;
-    }
-}
-
-void
-HAL::WatchDog_Feed() {
-    if (millis() - State::Power().WatchDogLastFeedTime >= WATCHDOG_FEED_TIME) {
-        State::Power().WatchDogLastFeedTime = millis();
-        digitalToggle(WATCHDOG_FEED_PIN);
-    }
 }
 
 const char*

@@ -596,6 +596,48 @@ test_power_policy() {
     assert(forced.UpdateShutdown(1, true, false, true));
 }
 
+// 低电量（≤9%、未充电、无外部供电）：立即停止录制，持续 3 min 后关机。
+static void
+test_low_battery() {
+    State::Reset();
+    Power_Monitor_t& power = State::Power();
+    power.panel_power_on = true;
+    power.batteryInfo.sample_valid = true;
+    power.batteryInfo.Percent = 9;
+    State::Host().record.record_status = On_Off_Status_ON;
+    fake_pins[POWER_KEY_PIN] = LOW;
+    fake_ms = 50000;
+    HAL::Power_PowerOffMonitor();
+    assert(State::Effective_Record().record_status == On_Off_Status_OFF && systemInfo.request.record_op);
+    assert(!power.LowBatteryPowerOff && !power.ShutdownGoing);
+    fake_ms += 179999U;
+    HAL::Power_PowerOffMonitor();
+    assert(!power.LowBatteryPowerOff);
+    // 外部供电中断计时：恢复低电后重新计 3 min。
+    power.ExternalPower = 1;
+    HAL::Power_PowerOffMonitor();
+    power.ExternalPower = 0;
+    fake_ms += 1U;
+    HAL::Power_PowerOffMonitor();
+    assert(!power.LowBatteryPowerOff);
+    fake_ms += 180000U;
+    HAL::Power_PowerOffMonitor();
+    assert(power.LowBatteryPowerOff);
+    HAL::Power_PowerOffMonitor();
+    assert(power.ShutdownGoing && power.poweroff_flag == 1);
+    // 关机时序结束（主控未确认，20 s 兜底）进入驻留，为后续测试恢复初始状态。
+    fake_ms += 20000U;
+    HAL::Power_PowerOffMonitor();
+    assert(power.ShutdownComplete && !power.panel_power_on);
+    fake_pins[POWER_KEY_PIN] = HIGH;
+    HAL::Power_PowerOffMonitor();
+    fake_ms += 2000U;
+    HAL::Power_PowerOffMonitor();
+    assert(power.panel_power_on);
+    fake_pins[POWER_KEY_PIN] = LOW;
+    State::Reset();
+}
+
 // 外部供电关机后驻留：不复位、不自动开机；长按电源键 2 s 原地开机，状态与冷启动一致。
 static void
 test_resident_off() {
@@ -656,6 +698,7 @@ main() {
     test_charger_variants();
     test_hold_and_blink();
     test_power_policy();
+    test_low_battery();
     test_resident_off();
     puts("protocol, transport, devices and power regressions passed");
 }

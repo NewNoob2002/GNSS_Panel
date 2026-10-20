@@ -62,6 +62,8 @@ set_board(bool v15) {
     std::snprintf(board.hardware_version, sizeof(board.hardware_version), "%s", v15 ? "V1.5" : "V1.3");
 }
 
+void report_host_data();
+
 // 模拟器中的初始状态：板卡与电池（代替 HAL）和主控已上报的数据（代替面板协议）。
 void
 init_system_info() {
@@ -78,6 +80,12 @@ init_system_info() {
     battery.Percent_f = 76.0f;
     battery.chargeStatus = notCharge;
     State::Power().ExternalPower = 1;
+    report_host_data();
+}
+
+// 模拟主控上报的数据（冷启动时已在线；驻留后开机时固件清除主控数据，见 simulate_host）。
+void
+report_host_data() {
     HostReport_t& host = State::Host();
     host.online = true;
     auto& position = host.position;
@@ -120,12 +128,24 @@ print_controls() {
               "             V = toggle board V1.5/V1.3 (MP2762A present or not; checked at the next power-on).");
 }
 
-// 模拟主控：读走面板请求即确认（代替协议的完整读出），1 s 后应用 Wi-Fi；每秒刷新一次星图数据。
+// 模拟主控：读走面板请求即确认（代替协议的完整读出），1 s 后应用 Wi-Fi；读到关机标志即确认关机
+// （固件电源时序随后 8 s 断电进入驻留）；每秒刷新一次星图数据。
 void
 simulate_host(uint32_t now) {
     static uint32_t wifi_since = 0;
     static bool wifi_applying = false; // 已收到设定，1 s 后应用
     static uint32_t last_stars = 0;
+    static uint32_t offline_since = 0;
+    // 驻留后开机：主控重新上电启动，约 3 s 后重新上报数据。
+    if (!systemInfo.host.online) {
+        if (offline_since == 0) {
+            offline_since = now;
+        } else if (systemInfo.power.panel_power_on && now - offline_since >= 3000) {
+            offline_since = 0;
+            report_host_data();
+            std::printf("[sim] host: online again\n");
+        }
+    }
     const PanelRequest_t& request = systemInfo.request;
     HostReport_t& host = State::Host();
     if (request.wifi_pending) {
@@ -149,6 +169,10 @@ simulate_host(uint32_t now) {
         const RecordInfo_t& record = host.record;
         std::printf("[sim] host: record %s, type %u, interval 0x%02x\n", record.record_status ? "start" : "stop",
                     record.record_type, record.record_interval);
+    }
+    if (systemInfo.power.poweroff_flag) {
+        State::Host_ShutdownAcknowledged();
+        std::printf("[sim] host: shutdown acknowledged\n");
     }
     if (now - last_stars >= 1000) {
         last_stars = now;
@@ -253,6 +277,7 @@ main() {
                             app->on_input(P4App::InputAction::Commit);
                         } else if (!enter_down) {
                             enter_down = true;
+                            HAL::Sim_SetPowerKey(true); // 固件电源时序按 Power 键电平判定开机
                             app->on_input(P4App::InputAction::Press);
                         }
                     } else {
@@ -262,6 +287,7 @@ main() {
                            && (event.key.keysym.sym == SDLK_RETURN || event.key.keysym.sym == SDLK_KP_ENTER)) {
                     if (enter_down) {
                         enter_down = false;
+                        HAL::Sim_SetPowerKey(false);
                         app->on_input(P4App::InputAction::Release);
                     }
                 } else if (event.type == SDL_MOUSEWHEEL && event.wheel.y != 0) {
@@ -275,6 +301,7 @@ main() {
                     if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_RIGHT) {
                         app->on_input(P4App::InputAction::Back);
                     } else if (event.type != SDL_MOUSEMOTION && event.button.button == SDL_BUTTON_MIDDLE) {
+                        HAL::Sim_SetPowerKey(event.type == SDL_MOUSEBUTTONDOWN);
                         app->on_input(event.type == SDL_MOUSEBUTTONDOWN ? P4App::InputAction::Press
                                                                         : P4App::InputAction::Release);
                     } else if (event.type != SDL_MOUSEMOTION && event.button.button == SDL_BUTTON_LEFT) {
@@ -284,6 +311,7 @@ main() {
                     }
                 } else if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_FOCUS_LOST) {
                     enter_down = false;
+                    HAL::Sim_SetPowerKey(false);
                     app->cancel_input();
                     pointer.state = LV_INDEV_STATE_RELEASED;
                     lv_indev_reset(indev, nullptr);
