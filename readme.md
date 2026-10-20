@@ -5,7 +5,7 @@
 
 ![alt text](https://img.shields.io/badge/UI-LVGL_v8.3.11-orange.svg)
 
-![alt text](https://img.shields.io/badge/IDE-EIDE-green.svg)
+![alt text](https://img.shields.io/badge/Build-CMake_%2B_arm--none--eabi--gcc-green.svg)
 
 ![alt text](https://img.shields.io/badge/License-MIT-yellow.svg)
 
@@ -35,17 +35,17 @@
 
 ## 😄 实物演示
 
-![alt text](https://github.com/NewNoob2002/HC32F460xE_Arduino/blob/master/Images/Image_mainPage.png)
+![main page](Images/Image_mainPage.png)
 
 ## 📂 项目结构说明
 
 > 项目采用分层架构，确保代码的可移植性和可维护性：
 
-> ├── .cmsis / .eide    # 项目构建与工程配置 (支持 EIDE)
+> ├── cmake             # 工具链文件与公共编译选项（配合根目录 CMakePresets.json）
 
 > ├── Arduino           # Arduino API 兼容层抽象实现
 
-> ├── Libraries         # 第三方库 (LVGL, 字体, 图像资源)
+> ├── Libraries         # 第三方与器件库（LVGL、Adafruit 显示驱动、电量计/充电芯片驱动等）
 
 > ├── Platform          # 硬件抽象层 (HAL) 与驱动定义，三产品共用
 
@@ -57,7 +57,32 @@
 
 > ├── Products          # 产品配置与专属代码：X1（无屏）、X1Pro、XBase
 
-> └── Simulator         # PC 端仿真器环境；Simulator/App 为带屏产品共用的 LVGL 页面
+> ├── Simulator         # PC 端仿真器环境；Simulator/App 为带屏产品共用的 LVGL 页面及字体/图片资源
+
+> └── tests             # 主机回归测试（协议、传输、电源与各产品协议表）
+
+## 🔨 构建
+
+每次配置只构建一个产品，`<product>` 为 `x1`、`x1pro` 或 `xbase`：
+
+```bash
+cmake --preset <product>-debug        # 或 <product>-release
+cmake --build --preset <product>-debug
+```
+
+产物位于 `build/<preset>/`（`.elf`、`.map`）和 `build/<preset>/generated/`（`.hex`、`.bin`）。
+
+```bash
+# PC 模拟器（带屏产品）
+cmake -S Simulator -B build/simulator -DSIM_PRODUCT=X1Pro   # 或 XBase
+cmake --build build/simulator
+cd Simulator && ./build/bin/main   # 可执行文件固定输出到 Simulator/build/bin/
+
+# 主机回归测试
+cmake -S tests -B build/host-tests && cmake --build build/host-tests && ctest --test-dir build/host-tests
+```
+
+产品差异的组织方式见 [docs/product_structure.md](docs/product_structure.md)。
 
 ## 🛠 技术深度 (Technical Stack)
 
