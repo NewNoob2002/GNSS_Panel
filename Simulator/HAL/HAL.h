@@ -20,9 +20,6 @@ namespace HAL
     void Power_Init();
     void Power_Shutdown(bool en);
     void Power_PowerOffMonitor();
-    bool Power_ShutdownEnsure();
-    bool Power_ShutdownForce();
-    bool Power_ShutdownLowBattery();
     bool Power_ShutdownSoftReset();
     void Power_Update();
     void Power_GetInfo(Power_Monitor_t *info);

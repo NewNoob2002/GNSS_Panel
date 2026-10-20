@@ -1,8 +1,7 @@
 #include "Arduino.h"
+#include "Charger.h"
 #include "HAL.h"
 #include "PowerPolicy.h"
-#include "bq40z50.h"
-#include "mp2762a.h"
 #include "ots.h"
 
 static PowerPolicy power_policy;
@@ -56,12 +55,7 @@ power_on_outputs() {
     digitalWrite(POWER_LED_PIN, HIGH);
     digitalWrite(FUNCTION_LED_PIN, HIGH);
     digitalWrite(POWER_CONTROL_PIN, HIGH);
-    if (!systemInfo.online_device.mp2762) {
-        uint8_t typec_power = digitalRead(CHARGER_ADC_DETECT_PIN);
-        if (!typec_power) {
-            USB_Switch_GPIO_Control(0);
-        }
-    }
+    HAL::Charger_Get().power_on();
 }
 
 static void
@@ -85,9 +79,7 @@ power_enter_standby(uint32_t now) {
     digitalWrite(POWER_LED_PIN, LOW);
     digitalWrite(FUNCTION_LED_PIN, LOW);
     // 与冷启动等待开机时一致（见 Power_OnCheck）。
-    if (!systemInfo.online_device.mp2762) {
-        USB_Switch_GPIO_Control(1);
-    }
+    HAL::Charger_Get().enter_standby();
     clear_shutdown_requests();
     systemInfo.powerMonitor.panel_power_on = false;
     power_key_down = digitalRead(POWER_KEY_PIN) == HIGH;
@@ -124,11 +116,7 @@ power_resume_from_standby(uint32_t now) {
 
 void
 HAL::Power_OnCheck(void (*idle)()) {
-    if (!systemInfo.online_device.mp2762) {
-        Charger_Control_GPIO_Init();
-        USB_Switch_GPIO_Init();
-        USB_Switch_GPIO_Control(1);
-    }
+    Charger_Get().enter_standby();
     while (true) {
         HAL::HAL_Update();
         // 带屏产品在等待开机时继续刷新界面；无屏产品不传入。
@@ -204,42 +192,6 @@ HAL::Power_PowerOffMonitor() {
 }
 
 bool
-HAL::Power_ShutdownEnsure() {
-    if (systemInfo.powerMonitor.ShutdownEnsure) {
-        systemInfo.powerMonitor.ShutdownEnsure = false;
-        return true;
-    }
-    return false;
-}
-
-bool
-HAL::Power_ShutdownForce() {
-    if (systemInfo.powerMonitor.Force_ShutDown) {
-        systemInfo.powerMonitor.Force_ShutDown = false;
-        return true;
-    }
-    return false;
-}
-
-bool
-HAL::Power_ShutdownLinux() {
-    if (systemInfo.powerMonitor.LinuxPowerOff) {
-        systemInfo.powerMonitor.LinuxPowerOff = false;
-        return true;
-    }
-    return false;
-}
-
-bool
-HAL::Power_ShutdownLowBattery() {
-    if (systemInfo.powerMonitor.LowBatteryPowerOff) {
-        systemInfo.powerMonitor.LowBatteryPowerOff = false;
-        return true;
-    }
-    return false;
-}
-
-bool
 HAL::Power_ShutdownSoftReset() {
     if (systemInfo.powerMonitor.reset_flag) {
         systemInfo.powerMonitor.reset_flag = false;
@@ -257,40 +209,6 @@ HAL::Power_Update() {
 }
 
 void
-HAL::Power_EnableCharger(BatteryInfo_t* pBatteryState) {
-    if (pBatteryState->ChargerDisable) {
-        if (systemInfo.online_device.mp2762) {
-            uint8_t config;
-            if (mp2762setChargerEnabled(true, &config)) {
-                pBatteryState->mp2762_cfg0 = config;
-                pBatteryState->ChargerDisable = 0;
-            }
-        } else {
-            pBatteryState->ChargerDisable = 0;
-            Charger_Control_Monitor(pBatteryState);
-        }
-    }
-}
-
-void
-HAL::Power_DisableCharger(BatteryInfo_t* pBatteryState) {
-    if (pBatteryState->ChargerDisable == 0) {
-        if (systemInfo.online_device.mp2762) {
-            uint8_t config;
-            if (mp2762setChargerEnabled(false, &config)) {
-                pBatteryState->mp2762_cfg0 = config;
-                pBatteryState->ChargerDisable = 1;
-                pBatteryState->chargeStatus = notCharge;
-            }
-        } else {
-            pBatteryState->chargeStatus = notCharge;
-            Charge_Enable_Switch(0);
-            pBatteryState->ChargerDisable = 1;
-        }
-    }
-}
-
-void
 HAL::Power_GetInfo(Power_Monitor_t* info) {
     if (info == nullptr) {
         return;
@@ -300,19 +218,15 @@ HAL::Power_GetInfo(Power_Monitor_t* info) {
         if (!systemInfo.online_device.bq40z50) {
             digitalToggle(POWER_LED_PIN);
         } else {
-            checkBatteryInfo(&info->batteryInfo);
+            Battery_Sample(info->batteryInfo);
         }
     }
     if (info->batteryInfo.sample_valid && millis() - info->batteryInfo.last_sample_ms > 10000U) {
         info->batteryInfo.sample_valid = false;
     }
     info->batteryInfo.ChargerDetect = digitalRead(CHARGER_CTRL_PIN);
-    BatteryTemp_Monitor(&info->batteryInfo); //Battery Temperature Check
-    if (systemInfo.online_device.mp2762) {
-        charger_update(&info->batteryInfo);
-    } else {
-        Charger_Control_Monitor(&info->batteryInfo);
-    }
+    Charger_Protect(info->batteryInfo);
+    Charger_Get().update(info->batteryInfo);
     const bool low = info->panel_power_on && info->batteryInfo.sample_valid && info->batteryInfo.Percent <= 9U
                      && info->batteryInfo.chargeStatus == notCharge && !info->ExternalPower;
     if (low && systemInfo.recordInfo.record_status != On_Off_Status_OFF) {
@@ -329,160 +243,6 @@ HAL::WatchDog_Feed() {
     if (millis() - systemInfo.powerMonitor.WatchDogLastFeedTime >= WATCHDOG_FEED_TIME) {
         systemInfo.powerMonitor.WatchDogLastFeedTime = millis();
         digitalToggle(WATCHDOG_FEED_PIN);
-    }
-}
-
-bool
-chagrer_begin(pBatteryInfo_t p_batteryState) {
-    // Reset all configure
-    mp2762registerReset();
-    // Set Charger Current
-    mp2762setFastChargeVoltageMv(6600);
-    // Setting precharge current to 880mA
-    mp2762setPrechargeCurrentMa(880);
-    // Setting fast charge current to 1600mA
-    mp2762setFastChargeCurrentMa(1600);
-    // get charge status
-    uint8_t charge_status = mp2762getChargeStatus();
-    p_batteryState->chargeStatus = static_cast<Charger_Status_t>(charge_status);
-
-    return true;
-}
-
-void
-charger_update(pBatteryInfo_t p_batteryState) {
-    const uint8_t charge_status = mp2762getChargeStatus();
-    //		Serial.printf("typec: %d, charge_status:%d\n", typec_detect, charge_status);
-    if (CM_VALUE_IN_RANGE(charge_status, 0, 2)) {
-        p_batteryState->chargeStatus = static_cast<Charger_Status_t>(charge_status);
-    }
-}
-
-void
-checkBatteryInfo(pBatteryInfo_t p_batteryState) {
-    uint16_t batteryLevelPercent, remaining, full, batteryVoltage_mV, batteryTempC;
-    if (!bq40z50ReadRegister16Checked(BQ40Z50_RELATIVE_STATE_OF_CHARGE, &batteryLevelPercent)
-        || !bq40z50ReadRegister16Checked(BQ40Z50_REMAINING_CAPACITY, &remaining)
-        || !bq40z50ReadRegister16Checked(BQ40Z50_FULL_CHARGE_CAPACITY, &full)
-        || !bq40z50ReadRegister16Checked(BQ40Z50_VOLTAGE, &batteryVoltage_mV)
-        || !bq40z50ReadRegister16Checked(BQ40Z50_TEMPERATURE, &batteryTempC) || full == 0U || batteryLevelPercent > 100U
-        || batteryVoltage_mV == 0U || batteryTempC == 0U) {
-        p_batteryState->sample_valid = false;
-        return;
-    }
-    const float batteryLevelPercent_f = static_cast<float>(remaining) / full * 100.0f;
-    const uint16_t batteryVoltage = batteryVoltage_mV / 1000U;
-    const float batteryVoltage_f = batteryVoltage_mV / 1000.0f;
-    const float batteryTempC_f = batteryTempC / 10.0f - 273.15f;
-    p_batteryState->sample_valid = true;
-    p_batteryState->last_sample_ms = millis();
-
-    p_batteryState->Actual_Percent = batteryLevelPercent;
-    const uint16_t processedPercent = HAL::Power_AdjustPercent(batteryLevelPercent);
-    p_batteryState->Processed_Percent = processedPercent;
-
-    p_batteryState->Percent = CM_SET_VALUE_IN_RANGE(processedPercent, 0, 100);
-    p_batteryState->Voltage = CM_SET_VALUE_IN_RANGE(batteryVoltage, 6, 9);
-    p_batteryState->Temp = CM_SET_VALUE_IN_RANGE(batteryTempC, 1, 65535);
-
-    p_batteryState->Percent_f = CM_SET_VALUE_IN_RANGE(batteryLevelPercent_f, 0.0, 100.0);
-    p_batteryState->Voltage_f = CM_SET_VALUE_IN_RANGE(batteryVoltage_f, 6.0, 8.4);
-    p_batteryState->Temp_f = CM_SET_VALUE_IN_RANGE(batteryTempC_f, 0.0, 100.0);
-}
-
-void
-BatteryTemp_Monitor(pBatteryInfo_t pBatteryState) {
-    if (!pBatteryState->sample_valid) {
-        // 电量计从未识别时交由充电芯片自身保护充电：深度放电电池的电量计可能需要充电电压才能唤醒。
-        // 电量计在线但样本失效或过期时，无法判断温度，禁止充电。
-        if (systemInfo.online_device.bq40z50) {
-            HAL::Power_DisableCharger(pBatteryState);
-        } else {
-            pBatteryState->ChargerOverTempCount = 0;
-            pBatteryState->isOverTemp = 0;
-            HAL::Power_EnableCharger(pBatteryState);
-        }
-        return;
-    }
-    if (pBatteryState->Temp_f >= BATTERY_TERMINATE_TEMP) {
-        if (pBatteryState->ChargerOverTempCount <= 50) {
-            pBatteryState->ChargerOverTempCount++;
-        }
-        if (pBatteryState->ChargerOverTempCount >= 20) {
-            pBatteryState->isOverTemp = 1;
-        }
-    } else {
-        pBatteryState->ChargerOverTempCount = 0;
-        pBatteryState->isOverTemp = 0;
-    }
-
-    if (pBatteryState->isOverTemp) {
-        HAL::Power_DisableCharger(pBatteryState);
-    } else {
-        HAL::Power_EnableCharger(pBatteryState);
-    }
-}
-
-void
-Charger_Control_GPIO_Init(void) {
-    pinMode(CHARGER_ENABLE_PIN, OUTPUT);
-    pinMode(CHARGER_SWITCH_PIN, OUTPUT);
-
-    pinMode(CHARGER_CTRL_PIN, INPUT_PULLUP);
-    pinMode(CHARGER_CTRL_FAST_PIN, INPUT_PULLUP);
-    pinMode(CHARGER_ADC_DETECT_PIN, INPUT_PULLUP);
-}
-
-void
-USB_Switch_GPIO_Init(void) {
-    pinMode(USB_SWITCH_PIN, OUTPUT);
-}
-
-void
-USB_Switch_GPIO_Control(uint8_t state) {
-    digitalWrite(USB_SWITCH_PIN, state == 1 ? HIGH : LOW);
-}
-
-void
-Charge_Enable_Switch(uint8_t state) {
-    digitalWrite(CHARGER_ENABLE_PIN, state == 1 ? HIGH : LOW);
-}
-
-void
-Charge_Current_Select(uint16_t select) {
-    if (3000 == select) {
-        digitalWrite(CHARGER_SWITCH_PIN, HIGH);
-    } else {
-        digitalWrite(CHARGER_SWITCH_PIN, LOW);
-    }
-}
-
-void
-Charger_Control_Monitor(BatteryInfo_t* batteryState) {
-    if (batteryState->ChargerDetect) {
-        if (batteryState->ChargerPlugCount < 5) {
-            batteryState->ChargerPlugCount++;
-        }
-    } else {
-        batteryState->ChargerPlugCount = 0;
-    }
-
-    if (batteryState->ChargerDisable) {
-        return;
-    }
-
-    if (batteryState->ChargerPlugCount >= 3) {
-        Charge_Enable_Switch(1);
-        Charge_Current_Select(3000);
-
-        if (digitalRead(CHARGER_ENABLE_PIN) == 1) {
-            batteryState->chargeStatus = fastCharge;
-        } else {
-            batteryState->chargeStatus = normalCharge;
-        }
-    } else {
-        batteryState->chargeStatus = notCharge;
-        Charge_Enable_Switch(0);
     }
 }
 

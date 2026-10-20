@@ -1,5 +1,6 @@
 #include "HAL.h"
 #include "Arduino.h"
+#include "Charger.h"
 #include "MillisTaskManager/MillisTaskManager.h"
 #include "elog.h"
 
@@ -89,6 +90,9 @@ HAL::HAL_Init() {
     HAL_InitTick(TICK_INT_PRIORITY);
 
     I2C_Scan();
+    // 扫描结果决定主板版本（V1.5 带 MP2762A，V1.3 用 GPIO 控制充电）。
+    Charger_Get().begin(systemInfo.powerMonitor.batteryInfo);
+    CORE_DEBUG_PRINTF("Board %s, charger %s", systemInfo.hardware_version, Charger_Get().name());
     Key_Init();
 
     taskManager.Register(HAL_MONITOR_TASK, PRODUCT_MONITOR_PERIOD_MS);

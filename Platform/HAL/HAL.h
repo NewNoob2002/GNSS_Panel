@@ -22,14 +22,8 @@ void Power_Init();
 void Power_OnCheck(void (*idle)() = nullptr);
 void Power_Shutdown(bool en);
 void Power_PowerOffMonitor();
-bool Power_ShutdownEnsure();
-bool Power_ShutdownForce();
-bool Power_ShutdownLinux();
-bool Power_ShutdownLowBattery();
 bool Power_ShutdownSoftReset();
 void Power_Update();
-void Power_EnableCharger(BatteryInfo_t* pBatteryState);
-void Power_DisableCharger(BatteryInfo_t* pBatteryState);
 void Power_GetInfo(Power_Monitor_t* info);
 /* 产品电源扩展点（弱符号默认实现） */
 void Power_ProductInit();
@@ -100,17 +94,6 @@ HAL_TickFreqTypeDef HAL_GetTickFreq(void);
 void HAL_SuspendTick(void);
 void HAL_ResumeTick(void);
 
-bool chagrer_begin(pBatteryInfo_t p_batteryState);
-void charger_update(pBatteryInfo_t p_batteryState);
-void checkBatteryInfo(pBatteryInfo_t p_batteryState);
-
-void BatteryTemp_Monitor(pBatteryInfo_t pBatteryState);
-void Charger_Control_GPIO_Init(void);
-void USB_Switch_GPIO_Init(void);
-void USB_Switch_GPIO_Control(uint8_t state);
-void Charge_Enable_Switch(uint8_t state);
-void Charge_Current_Select(uint16_t select);
-void Charger_Control_Monitor(BatteryInfo_t* batteryState);
 
 #ifdef __cplusplus
 }

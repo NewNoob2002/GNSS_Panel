@@ -4,6 +4,7 @@
 #include <limits>
 #include <string>
 #include <vector>
+#include "Charger.h"
 #include "HAL.h"
 #include "PowerPolicy.h"
 #include "Wire.h"
@@ -311,13 +312,13 @@ test_device_failures() {
     fake_registers[0x0b][BQ40Z50_TEMPERATURE] = 2982;
     fake_ms = 20000;
     BatteryInfo_t battery = {};
-    checkBatteryInfo(&battery);
+    HAL::Battery_Sample(battery);
     assert(battery.sample_valid && battery.Percent == 50 && battery.Percent_f == 50.0f);
     const float voltage = battery.Voltage_f;
     fake_receive_error = LL_ERR;
     uint16_t value = 0x1234;
     assert(!bq40z50ReadRegister16Checked(BQ40Z50_VOLTAGE, &value) && value == 0x1234);
-    checkBatteryInfo(&battery);
+    HAL::Battery_Sample(battery);
     assert(!battery.sample_valid && battery.Voltage_f == voltage);
     uint8_t config = 0;
     const uint32_t writes = fake_master_writes;
@@ -325,7 +326,7 @@ test_device_failures() {
     assert(fake_master_writes == writes);
     fake_receive_error = 0;
     fake_registers[0x0b][BQ40Z50_FULL_CHARGE_CAPACITY] = 0;
-    checkBatteryInfo(&battery);
+    HAL::Battery_Sample(battery);
     assert(!battery.sample_valid && bq40z50getRelativeStateOfCharge_float() == -1.0f);
     fake_io_error = LL_ERR;
     assert(!Wire.beginTransmission(0x0b));
@@ -337,26 +338,62 @@ test_device_failures() {
     battery.sample_valid = true;
     battery.Temp_f = 50.0f;
     for (int i = 0; i < 20; ++i) {
-        BatteryTemp_Monitor(&battery);
+        HAL::Charger_Protect(battery);
     }
     assert(battery.ChargerDisable && digitalRead(CHARGER_ENABLE_PIN) == LOW);
     battery.Temp_f = 25.0f;
     battery.ChargerPlugCount = 3;
     battery.ChargerDetect = 1;
-    BatteryTemp_Monitor(&battery);
+    HAL::Charger_Protect(battery);
     assert(!battery.ChargerDisable && digitalRead(CHARGER_ENABLE_PIN) == HIGH);
     // 电量计在线但样本失效：禁止充电。
     systemInfo.online_device.bq40z50 = true;
     battery.sample_valid = false;
-    BatteryTemp_Monitor(&battery);
+    HAL::Charger_Protect(battery);
     assert(battery.ChargerDisable && digitalRead(CHARGER_ENABLE_PIN) == LOW);
     // 电量计从未识别：交由充电芯片保护，恢复充电。
     systemInfo.online_device.bq40z50 = false;
-    BatteryTemp_Monitor(&battery);
+    HAL::Charger_Protect(battery);
     assert(!battery.ChargerDisable && digitalRead(CHARGER_ENABLE_PIN) == HIGH);
     systemInfo.online_device.mp2762 = true;
     assert(mp2762setChargerEnabled(false, &config));
     assert(mp2762setChargerEnabled(true, &config) && (config & 16));
+}
+
+// 两个主板版本：V1.3 无 MP2762A（GPIO 控制充电与 USB 通路），V1.5 经 MP2762A。
+static void
+test_charger_variants() {
+    systemInfo = {};
+    BatteryInfo_t battery = {};
+    HAL::Charger& gpio = HAL::Charger_Get();
+    assert(std::string(gpio.name()) == "GPIO");
+    gpio.begin(battery);
+    gpio.enter_standby();
+    assert(fake_pins[USB_SWITCH_PIN] == HIGH);
+    fake_pins[CHARGER_ADC_DETECT_PIN] = HIGH; // 接有 Type-C 供电：保持
+    gpio.power_on();
+    assert(fake_pins[USB_SWITCH_PIN] == HIGH);
+    fake_pins[CHARGER_ADC_DETECT_PIN] = LOW;
+    gpio.power_on();
+    assert(fake_pins[USB_SWITCH_PIN] == LOW);
+
+    systemInfo.online_device.mp2762 = true;
+    HAL::Charger& mp2762 = HAL::Charger_Get();
+    assert(std::string(mp2762.name()) == "MP2762A");
+    battery.chargeStatus = normalCharge;
+    mp2762.set_enabled(false, battery);
+    assert(battery.ChargerDisable && battery.chargeStatus == notCharge);
+    const uint32_t writes = fake_master_writes;
+    mp2762.set_enabled(false, battery); // 状态未变不访问芯片
+    assert(fake_master_writes == writes);
+    // 写入失败时保持禁止状态，下次再试。
+    fake_io_error = LL_ERR;
+    mp2762.set_enabled(true, battery);
+    assert(battery.ChargerDisable);
+    fake_io_error = 0;
+    mp2762.set_enabled(true, battery);
+    assert(!battery.ChargerDisable);
+    systemInfo = {};
 }
 
 static void
@@ -439,6 +476,7 @@ main() {
     test_slave_transactions();
     test_decoder_boundary();
     test_device_failures();
+    test_charger_variants();
     test_power_policy();
     test_resident_off();
     puts("protocol, transport, devices and power regressions passed");

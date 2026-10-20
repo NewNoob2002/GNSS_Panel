@@ -12,7 +12,7 @@ add_executable(firmware_tests firmware_tests.cpp
     ${ROOT}/Shared/Comm/slave_i2c.cpp ${ROOT}/Shared/Comm/panel_protocol.cpp
     ${ROOT}/Shared/Display/display_protocol.cpp
     ${PARSER_SOURCES}
-    ${ROOT}/Platform/Core/src/Wire.cpp ${ROOT}/Platform/HAL/HAL_Power.cpp
+    ${ROOT}/Platform/Core/src/Wire.cpp ${ROOT}/Platform/HAL/HAL_Power.cpp ${ROOT}/Platform/HAL/Charger.cpp
     ${ROOT}/Libraries/Bq40z50/bq40z50.cpp ${ROOT}/Libraries/Mp2762a/mp2762a.cpp)
 target_include_directories(firmware_tests PRIVATE fakes ${ROOT}/Shared/Comm ${ROOT}/Shared/Display
     ${ROOT}/Products/X1Pro ${ROOT}/Platform/Config

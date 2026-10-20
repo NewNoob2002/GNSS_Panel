@@ -1,3 +1,4 @@
+#include "Charger.h"
 #include "HAL.h"
 #include "Wire.h"
 #include "bq40z50.h"
@@ -18,14 +19,13 @@ i2c_scan_callback(void* e) {
             CORE_DEBUG_PRINTF("0x%02X - BQ40Z50 Battery Pack Manager / Fuel gauge", addr);
             systemInfo.online_device.bq40z50 = true;
             bq40z50Begin(&Wire);
-            checkBatteryInfo(&systemInfo.powerMonitor.batteryInfo);
+            HAL::Battery_Sample(systemInfo.powerMonitor.batteryInfo);
             break;
         }
         case 0x5C: {
             CORE_DEBUG_PRINTF("0x%02X - MP27692A Power Management / Charger", addr);
             systemInfo.online_device.mp2762 = true;
             mp2762aBegin(&Wire);
-            chagrer_begin(&systemInfo.powerMonitor.batteryInfo);
             strcpy(systemInfo.hardware_version, "V1.5");
             break;
         }

@@ -35,27 +35,6 @@ HAL::Power_PowerOffMonitor() {
 }
 
 bool
-HAL::Power_ShutdownEnsure() {
-    const bool value = systemInfo.powerMonitor.ShutdownEnsure;
-    systemInfo.powerMonitor.ShutdownEnsure = false;
-    return value;
-}
-
-bool
-HAL::Power_ShutdownForce() {
-    const bool value = systemInfo.powerMonitor.Force_ShutDown;
-    systemInfo.powerMonitor.Force_ShutDown = false;
-    return value;
-}
-
-bool
-HAL::Power_ShutdownLowBattery() {
-    const bool value = systemInfo.powerMonitor.LowBatteryPowerOff;
-    systemInfo.powerMonitor.LowBatteryPowerOff = false;
-    return value;
-}
-
-bool
 HAL::Power_ShutdownSoftReset() {
     const bool value = systemInfo.powerMonitor.reset_flag;
     systemInfo.powerMonitor.reset_flag = false;
