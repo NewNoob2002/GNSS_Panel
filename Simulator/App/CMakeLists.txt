@@ -3,8 +3,6 @@ file(GLOB_RECURSE SIMULATOR_APP_SOURCES CONFIGURE_DEPENDS
     *.cpp
 )
 
-list(FILTER SIMULATOR_APP_SOURCES EXCLUDE REGEX "Common/DataProc/DP_Power\\.cpp$")
-
 add_library(hc32_simulator_app_headers INTERFACE)
 target_include_directories(hc32_simulator_app_headers INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}
