@@ -55,7 +55,7 @@
 ## 同步流程
 
 - 改共享应用：在 ATK_RK3506 修改 `application/App` 并提交（主机测试通过），再在 HC32 运行同步脚本，构建六个预设与主机测试。
-- HC32 特有行为只放在 `Shared/Display/AppPlatform.cpp`（实现 `system_backend`、调用 `SystemService`/`P4App`），不改 `Simulator/App`。
+- HC32 特有行为只放在 `Shared/Display/AppPlatform/`（实现 `system_backend`、调用 `SystemService`/`P4App`），不改 `Simulator/App`：`AppPlatform.cpp` 是入口与电源/业务后端，`StatusBridge`、`PowerBridge`、`DeviceBridge` 各管一个方向的转换（状态在对象内，`App_Init` 时整体重建），`InitSteps.cpp` 是 SystemLoading 的检查步骤。新增业务数据时扩展 `DeviceBridge::snapshot()/execute()` 与 `display_protocol.cpp`。
 - `Simulator/App/.clang-format` 关闭 HC32 侧格式化，避免与上游格式冲突。
 
 ## 已确认的细节

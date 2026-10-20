@@ -1,0 +1,69 @@
+#include "StatusBridge.h"
+
+#include "P4App.h"
+#include "Utils/I18n/I18n.h"
+#include "mcu_config.h"
+
+namespace {
+
+// 与旧状态栏一致：基站模式显示 BASE（蓝），否则按定位状态着色。
+void
+position_text(page::StatusBarState& state) {
+    i18n::TextId id = i18n::TextId::PositionNone;
+    lv_color_t color = lv_palette_main(LV_PALETTE_RED);
+    if (systemInfo.work_mode == base_mode || systemInfo.work_mode == autobase_mode) {
+        id = i18n::TextId::PositionBase;
+        color = lv_palette_main(LV_PALETTE_BLUE);
+    } else {
+        switch (systemInfo.positionInfo.coordinate_status) {
+            case position_single:
+                id = i18n::TextId::PositionSingle;
+                color = lv_palette_main(LV_PALETTE_YELLOW);
+                break;
+            case position_fix:
+                id = i18n::TextId::PositionFix;
+                color = lv_palette_main(LV_PALETTE_GREEN);
+                break;
+            case position_float:
+                id = i18n::TextId::PositionFloat;
+                color = lv_palette_main(LV_PALETTE_YELLOW);
+                break;
+            default: break;
+        }
+    }
+    state.position = i18n::text(id);
+    state.position_color = color;
+}
+
+} // namespace
+
+void
+StatusBridge::update(P4App& app, std::uint32_t now) {
+    if (sent_ && now - last_ms_ < kPeriodMs) {
+        return;
+    }
+    sent_ = true;
+    last_ms_ = now;
+
+    page::StatusBarState state;
+    position_text(state);
+    state.satellites = systemInfo.positionInfo.satellite_number_used;
+    state.satellites_valid = true;
+    // 主控未下发时间，沿用旧状态栏：显示开机运行时长。
+    const std::uint32_t seconds = now / 1000U;
+    state.hour = (seconds / 3600U) % 24U;
+    state.minute = (seconds / 60U) % 60U;
+    state.second = seconds % 60U;
+    state.clock_valid = true;
+    // 旧状态栏的 SD 图标从未按录制状态点亮（相关代码已注释），保持一致。
+    state.recording = false;
+    state.wifi = systemInfo.wifiInfo.wifi_status == On_Off_Status_ON;
+    const BatteryInfo_t& battery = systemInfo.powerMonitor.batteryInfo;
+    state.battery_valid = battery.sample_valid;
+    state.battery_percent = battery.Percent;
+    state.charging = battery.chargeStatus != notCharge;
+    state.battery_voltage = battery.Voltage_f;
+    state.battery_temperature_valid = battery.sample_valid;
+    state.battery_temperature = battery.Temp_f;
+    app.update_status(state);
+}

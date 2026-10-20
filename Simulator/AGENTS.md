@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-This directory is the desktop SDL simulator for the HC32 display products (X1Pro, XBase). `main.cpp` creates the SDL window and LVGL display, then runs the same code as the firmware: the shared LVGL application in `App/` plus the HC32 platform layer `../Shared/Display/AppPlatform.cpp`. Hardware is replaced by the shims in `HAL/` (the real shutdown `PowerPolicy` runs there). LVGL sources are shared with the firmware at `../Libraries/lvgl/`; the simulator uses its own `lv_conf.h` through `LV_CONF_PATH`.
+This directory is the desktop SDL simulator for the HC32 display products (X1Pro, XBase). `main.cpp` creates the SDL window and LVGL display, then runs the same code as the firmware: the shared LVGL application in `App/` plus the HC32 platform layer `../Shared/Display/AppPlatform/`. Hardware is replaced by the shims in `HAL/` (the real shutdown `PowerPolicy` runs there). LVGL sources are shared with the firmware at `../Libraries/lvgl/`; the simulator uses its own `lv_conf.h` through `LV_CONF_PATH`.
 
 `App/` is a verbatim copy of ATK_RK3506 `application/App` (source commit in `App/UPSTREAM`). Only `App/CMakeLists.txt` (firmware build), `App/UPSTREAM` and `App/.clang-format` are HC32-owned.
 
@@ -14,7 +14,7 @@ This directory is the desktop SDL simulator for the HC32 display products (X1Pro
 
 ## Coding Style & Naming Conventions
 
-`App/` follows the upstream style (snake_case, its own formatting); do not reformat it here. HC32-owned files (`main.cpp`, `HAL/`, `../Shared/Display/AppPlatform.*`) follow the repository `.clang-format` and C++17.
+`App/` follows the upstream style (snake_case, its own formatting); do not reformat it here. HC32-owned files (`main.cpp`, `HAL/`, `../Shared/Display/AppPlatform*`) follow the repository `.clang-format` and C++17.
 
 ## Testing Guidelines
 

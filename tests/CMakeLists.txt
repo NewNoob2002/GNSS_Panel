@@ -47,10 +47,11 @@ file(GLOB_RECURSE LVGL_SOURCES CONFIGURE_DEPENDS ${ROOT}/Libraries/lvgl/src/*.c)
 add_library(display_lvgl STATIC ${LVGL_SOURCES})
 target_include_directories(display_lvgl PUBLIC ${ROOT}/Libraries/lvgl ${ROOT}/Libraries display_fakes)
 target_compile_definitions(display_lvgl PUBLIC LV_CONF_INCLUDE_SIMPLE)
+file(GLOB APP_PLATFORM_SOURCES CONFIGURE_DEPENDS ${ROOT}/Shared/Display/AppPlatform/*.cpp)
 foreach(product X1Pro XBase)
     string(TOLOWER ${product} name)
     add_executable(${name}_display_app_tests display_app_tests.cpp ${SHARED_APP_SOURCES}
-        ${ROOT}/Shared/Display/AppPlatform.cpp ${ROOT}/Shared/Display/lvgl_new.cpp)
+        ${APP_PLATFORM_SOURCES} ${ROOT}/Shared/Display/lvgl_new.cpp)
     # display_fakes 在前：替换固件的 HAL.h / Arduino.h；core_debug.h 取自 fakes
     target_include_directories(${name}_display_app_tests PRIVATE display_fakes fakes ${ROOT}/Simulator/App
         ${ROOT}/Shared/Display ${ROOT}/Products/${product} ${ROOT}/Platform/Config)

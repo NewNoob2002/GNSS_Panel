@@ -53,7 +53,7 @@
 
 > │   ├── Comm          # 与主控的 I2C 从机通信、面板帧协议核心（全部产品）
 
-> │   └── Display       # 带屏产品入口、共享应用的平台层 AppPlatform、显示协议表、显示/按键 HAL（X1Pro、XBase）
+> │   └── Display       # 带屏产品入口、共享应用的平台层 AppPlatform/、显示协议表、显示 HAL（X1Pro、XBase）
 
 > ├── Products          # 产品配置与专属代码：X1（无屏）、X1Pro、XBase
 

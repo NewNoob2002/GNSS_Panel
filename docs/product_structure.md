@@ -15,7 +15,7 @@ Platform/          MCU 启动、驱动、Arduino 风格外设、共用 HAL（电
 Arduino/           Arduino 兼容核心
 Libraries/         第三方与器件库；LVGL/Adafruit 仅带屏产品构建，MultiButton 仅 X1
 Shared/Comm/       I2C 从机传输 + 面板帧协议核心（全部产品）
-Shared/Display/    带屏产品入口、共享应用的 HC32 平台层 AppPlatform、显示协议表、显示/按键 HAL、LVGL 内存池 operator new（X1Pro、XBase）
+Shared/Display/    带屏产品入口、共享应用的 HC32 平台层 AppPlatform/（入口 + Status/Power/Device 三个 Bridge + 初始化步骤）、显示协议表、显示 HAL、LVGL 内存池 operator new（X1Pro、XBase）
 Simulator/App/     共享 LVGL 应用，ATK_RK3506 application/App 的原样副本（UPSTREAM 记录来源提交，scripts/sync_shared_app.sh 同步）
 Simulator/         PC 模拟器：共享应用 + AppPlatform + Simulator/HAL；LVGL 用 Libraries/lvgl，配置用自身 lv_conf.h（LV_CONF_PATH 指定）
 Products/<产品>/   product.cmake、product_config.h、产品专属源码

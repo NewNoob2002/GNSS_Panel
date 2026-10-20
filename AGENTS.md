@@ -52,4 +52,4 @@ Pull requests should include a concise description, build results, linked issue 
 
 Keep vendored-library edits minimal. Do not reformat generated resources or third-party code unless the task explicitly requires it.
 
-Do not edit `Simulator/App/` directly (except its HC32-owned files listed above): change ATK_RK3506 `application/App`, commit there, then run `scripts/sync_shared_app.sh`. HC32-specific behavior belongs in `Shared/Display/AppPlatform.cpp` behind the shared `system_backend` / `SystemService` / `P4App` interfaces.
+Do not edit `Simulator/App/` directly (except its HC32-owned files listed above): change ATK_RK3506 `application/App`, commit there, then run `scripts/sync_shared_app.sh`. HC32-specific behavior belongs in `Shared/Display/AppPlatform/` behind the shared `system_backend` / `SystemService` / `P4App` interfaces: `AppPlatform.cpp` (entry, power/business backend), `StatusBridge` (status bar), `PowerBridge` (HAL power events), `DeviceBridge` (device data and business commands, option index <-> host protocol codes), `InitSteps.cpp` (SystemLoading checks).
