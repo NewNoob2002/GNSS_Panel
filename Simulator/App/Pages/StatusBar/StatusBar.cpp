@@ -382,7 +382,6 @@ onEvent(Account* account, Account::EventParam_t* param) {
 }
 
 DATA_PROC_INIT_DEF(StatusBar) {
-    account->Subscribe("Power");
     account->SetEventCallback(onEvent);
 
     actStatusBar = account;

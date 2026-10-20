@@ -17,6 +17,7 @@ Libraries/         第三方与器件库；LVGL/Adafruit/ButtonEvent 仅带屏�
 Shared/Comm/       I2C 从机传输 + 面板帧协议核心（全部产品）
 Shared/Display/    带屏产品入口、显示协议表、显示/编码器 HAL、LVGL 内存池 operator new（X1Pro、XBase）
 Simulator/App/     带屏产品共用 LVGL 页面（固件与 PC 模拟器同一份）
+Simulator/         PC 模拟器；LVGL 源码直接用 Libraries/lvgl，配置用自身 lv_conf.h（LV_CONF_PATH 指定）
 Products/<产品>/   product.cmake、product_config.h、产品专属源码
 ```
 

@@ -11,7 +11,7 @@
 #if LV_USE_FS_STDIO != '\0'
 
 #include <stdio.h>
-#ifndef WIN32
+#ifndef _WIN32
     #include <dirent.h>
     #include <unistd.h>
 #else
@@ -27,7 +27,7 @@
  *      TYPEDEFS
  **********************/
 typedef struct {
-#ifdef WIN32
+#ifdef _WIN32
     HANDLE dir_p;
     char next_fn[MAX_PATH_LEN];
 #else
@@ -207,7 +207,7 @@ static void * fs_dir_open(lv_fs_drv_t * drv, const char * path)
 {
     LV_UNUSED(drv);
     dir_handle_t * handle = (dir_handle_t *)lv_mem_alloc(sizeof(dir_handle_t));
-#ifndef WIN32
+#ifndef _WIN32
     /*Make the path relative to the current directory (the projects root folder)*/
     char buf[MAX_PATH_LEN];
     lv_snprintf(buf, sizeof(buf), LV_FS_STDIO_PATH "%s", path);
@@ -262,7 +262,7 @@ static lv_fs_res_t fs_dir_read(lv_fs_drv_t * drv, void * dir_p, char * fn)
 {
     LV_UNUSED(drv);
     dir_handle_t * handle = (dir_handle_t *)dir_p;
-#ifndef WIN32
+#ifndef _WIN32
     struct dirent * entry;
     do {
         entry = readdir(handle->dir_p);
@@ -310,7 +310,7 @@ static lv_fs_res_t fs_dir_close(lv_fs_drv_t * drv, void * dir_p)
 {
     LV_UNUSED(drv);
     dir_handle_t * handle = (dir_handle_t *)dir_p;
-#ifndef WIN32
+#ifndef _WIN32
     closedir(handle->dir_p);
 #else
     FindClose(handle->dir_p);

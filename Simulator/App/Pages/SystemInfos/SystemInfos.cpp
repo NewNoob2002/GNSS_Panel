@@ -94,8 +94,6 @@ SystemInfos::Update() const {
     View.SetWifi(systemInfo.wifiInfo);
 
     /* Power */
-    // BatteryInfo_t power;
-    // Model.GetBatteryInfo(&power);
     View.SetBattery(systemInfo.powerMonitor.batteryInfo);
 
     /* Storage */
