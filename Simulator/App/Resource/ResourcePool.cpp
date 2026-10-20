@@ -37,7 +37,6 @@ Resource_Init() {
     // /* Import Images */
     IMPORT_IMG(battery);
     IMPORT_IMG(battery_info);
-    IMPORT_IMG(record);
     IMPORT_IMG(clock);
     IMPORT_IMG(mode);
     IMPORT_IMG(settings);
@@ -54,7 +53,6 @@ Resource_Init() {
     IMPORT_IMG(up);
     IMPORT_IMG(down);
     IMPORT_IMG(reset);
-    IMPORT_IMG(back);
     IMPORT_IMG(shutdown);
     IMPORT_IMG(rover);
     IMPORT_IMG(base);
