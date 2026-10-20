@@ -1,6 +1,7 @@
 {
     "C_Cpp.errorSquiggles": "enabled",
     "cmake.ignoreCMakeListsMissing": true,
+    "cmake.useCMakePresets": "always",
     "clangd.arguments": [
         "--query-driver=**/arm-none-eabi-gcc*,**/arm-none-eabi-g++*"
     ]
