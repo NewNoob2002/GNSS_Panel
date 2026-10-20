@@ -75,6 +75,6 @@ else()
     target_link_libraries(main PRIVATE SDL2::SDL2)
 endif()
 
-# 可执行文件固定输出到 Simulator/build/bin/main（readme 与文档沿用此路径）。
-set_target_properties(main PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/build/bin)
+# 输出到各自构建目录的 bin/main：X1Pro 与 XBase 可用两个构建目录并存，互不覆盖。
+set_target_properties(main PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 add_custom_target(run COMMAND $<TARGET_FILE:main>)

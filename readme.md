@@ -76,7 +76,7 @@ cmake --build --preset <product>-debug
 # PC 模拟器（带屏产品）
 cmake -S Simulator -B build/simulator -DSIM_PRODUCT=X1Pro   # 或 XBase
 cmake --build build/simulator
-cd Simulator && ./build/bin/main   # 可执行文件固定输出到 Simulator/build/bin/，启动时打印按键说明
+./build/simulator/bin/main         # 输出在各自构建目录的 bin/，启动时打印按键说明
 
 # 主机回归测试
 cmake -S tests -B build/host-tests && cmake --build build/host-tests && ctest --test-dir build/host-tests

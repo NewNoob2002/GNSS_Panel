@@ -9,8 +9,8 @@ This directory is the desktop SDL simulator for the HC32 display products (X1Pro
 ## Build, Test, and Development Commands
 
 - `cmake -S Simulator -B build/simulator -DSIM_PRODUCT=X1Pro|XBase` configures the simulator (run from the repository root; SDL2 development files required).
-- `cmake --build build/simulator` builds `Simulator/build/bin/main`.
-- `cd Simulator && ./build/bin/main` runs it; the key bindings (focus/press/back/commit and injected HC32 power/battery events) are printed at start.
+- `cmake --build build/simulator` builds `build/simulator/bin/main` (each build directory has its own binary, so X1Pro and XBase can be built side by side).
+- `./build/simulator/bin/main` runs it; the key bindings (focus/press/back/commit and injected HC32 power/battery events) are printed at start.
 
 ## Coding Style & Naming Conventions
 
