@@ -53,6 +53,23 @@ XBase 的差异取自其分支相对分叉点的产品级改动（无星图/过�
 
 复制最接近的 `Products/<产品>/` 目录，修改 `product.cmake` 与 `product_config.h`，在顶层 `HC32_PRODUCTS` 和 `CMakePresets.json` 中登记；需要不同行为时优先新增开关或扩展点。
 
+## 系统状态与所有权
+
+全部运行状态在 `systemInfo`（`Platform/Config/mcu_define.h` 定义类型，`Platform/State/SystemState.{h,cpp}` 持有存储）。`systemInfo` 对所有模块是 `const`，写入按“谁写”分域：
+
+| 域 | 内容 | 写入者 | 入口 |
+|---|---|---|---|
+| `board` | 软硬件版本、器件在线（BQ40Z50、MP2762A） | HAL I2C 扫描 | `State::Board()` |
+| `power` | 电池采样、开关机与关机流程标志 | HAL 电源策略 | `State::Power()`；其它模块经 `HAL::Power_Shutdown()`、`State::Request_ForcedShutdown()`、`State::Host_*()` 请求 |
+| `host` | 主控上报：定位、星图、Wi-Fi、录制、工作模式、NTRIP、主控在线 | 面板协议 | `State::Host()` |
+| `request` | 面板请求：工作模式、录制启停/设置、Wi-Fi 开关 | 界面（`DeviceBridge`）、X1 按键、低电策略 | `State::Request_*()`；协议 `State::Confirm_*()` |
+| `diag` | 报文计数、I2C 错误 | 通信层 | `State::Diagnostics()` |
+
+- 面板请求与主控上报分开保存。请求待确认时，界面与协议响应用请求值（`State::Effective_Work()/Effective_Record()`）；主控上报照常写入 `host`，不再整帧忽略。
+- 协议填充响应时记下 revision，主控完整读出后调用 `Confirm_*()`；期间请求又变化则不确认，下次查询再上报。确认后请求值写入 `host`，直到主控下一次上报。
+- 线上字段（`radio_change_flag`、`record_op`、`record_change_flag`、`wifi_change_flag`、`wifi_on_off_set`）由协议从 `request` 组装，报文格式不变。
+- `tests/check_state_ownership.py`（ctest `state_ownership`）检查各写入口只在其写入者的文件中调用；新增写入者时同步更新该脚本的表。
+
 ## 平台层的可复用组件
 
 | 组件 | 位置 | 作用 |
@@ -66,7 +83,7 @@ XBase 的差异取自其分支相对分叉点的产品级改动（无星图/过�
 ### 常见扩展
 
 - **新的主板版本或充电方案**：在 `Charger.cpp` 增加一个 `HAL::Charger` 实现，并在 `Charger_Get()` 中按检测结果返回；电源与 LED 代码不需要改。
-- **新的业务数据或命令（带屏）**：共享接口先在 ATK_RK3506 增加（`DeviceSnapshot`/`DeviceRequest`），同步后在 `DeviceBridge::snapshot()/execute()` 中映射到 `systemInfo`，并在 `display_protocol.cpp` 收发对应字段。
+- **新的业务数据或命令（带屏）**：共享接口先在 ATK_RK3506 增加（`DeviceSnapshot`/`DeviceRequest`），同步后在 `DeviceBridge::snapshot()/execute()` 中映射：读 `systemInfo.host` 或 `State::Effective_*()`，写经 `State::Request_*()`；主控上报的新字段加到 `HostReport_t` 并在 `display_protocol.cpp` 收发。
 - **产品专属按键动作**：实现 `HAL::Key_ProductInit()/Key_ProductUpdate()`；强制关机等共用行为不要复制。
 
 ## 产品行为约定

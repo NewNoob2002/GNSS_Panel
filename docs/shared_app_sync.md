@@ -23,9 +23,9 @@
 | 重启 | 模拟 | 不支持 | `SystemState.reboot_available`；为 false 时 SystemDash 隐藏 Reboot |
 | 初始化步骤 | 5 步 DEMO | 用真实器件在线状态（电量计、充电芯片、主控供电） | 步骤结果由平台后端提供，界面与日志不变 |
 | 设备数据（定位、卫星、星图、工作模式、记录、Wi-Fi、电池、版本） | `SimulatedSystem` 的固定数据 | 由 `systemInfo` 组装 `DeviceSnapshot`，每 500 ms 检查、内容变化才发布 | Account “Device”（`DeviceService::update/snapshot`），页面只显示选项索引 |
-| 工作模式/电台/NTRIP | 模拟后端只改快照 | `execute_device(ApplyWork)` 写 `systemInfo` 并置 `radio_change_flag`，经面板协议发给主控 | `DeviceRequest`（只接受 WorkSettingsModel 发送、索引越界拒绝） |
-| 记录配置与启停 | 同上 | `execute_device(StartRecord/StopRecord)` 写 `recordInfo` 并置 `record_change_flag`；XBase 不改类型/间隔 | 同上（只接受 RecordConfigModel） |
-| Wi-Fi 开关 | 无后端，禁用 | X1Pro：`request_wifi()` 写 `wifi_on_off_set` + `wifi_change_flag`；主控回报一致前显示 “...”，15 s 无回报放弃等待 | `SystemCommand::SetWifi`、`SystemState.wifi_pending`、`SystemService::set_wifi()` |
+| 工作模式/电台/NTRIP | 模拟后端只改快照 | `execute_device(ApplyWork)` 经 `State::Request_Work()` 记录面板请求，面板协议上报（`radio_change_flag`）并在主控读出后确认 | `DeviceRequest`（只接受 WorkSettingsModel 发送、索引越界拒绝） |
+| 记录配置与启停 | 同上 | `execute_device(StartRecord/StopRecord)` 经 `State::Request_Record()`（协议上报 `record_op`/`record_change_flag`）；XBase 不改类型/间隔 | 同上（只接受 RecordConfigModel） |
+| Wi-Fi 开关 | 无后端，禁用 | X1Pro：`request_wifi()` 经 `State::Request_Wifi()`（协议上报 `wifi_on_off_set` + `wifi_change_flag`）；主控回报一致前显示 “...”，15 s 无回报放弃等待 | `SystemCommand::SetWifi`、`SystemState.wifi_pending`、`SystemService::set_wifi()` |
 | 电池过温警告 | 无 | X1Pro 顶层横幅，65 °C 出现、60 °C 消失 | 共享横幅组件，按产品开关启用 |
 | Model 初始化失败 | `std::abort()` | 单片机上会直接卡死 | 改为可替换的致命错误钩子（RK 默认 abort，HC32 记录后复位） |
 

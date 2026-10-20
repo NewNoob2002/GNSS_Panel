@@ -15,6 +15,8 @@ One source tree builds three products on the same MCU and board family: `X1` (no
 - `Simulator/App/` is the shared LVGL application, a verbatim copy of ATK_RK3506 `application/App` (source commit in `Simulator/App/UPSTREAM`). It is used by the display firmware and the PC simulator. Only `CMakeLists.txt`, `UPSTREAM` and `.clang-format` there are HC32-owned.
 - `Products/<Product>/` holds `product.cmake` (version, image prefix, display flag), `product_config.h` (feature switches included through `mcu_config.h`) and product-only sources (X1: entry point, keys, SOC compensation, protocol table).
 
+Runtime state lives in `systemInfo`, which is `const` everywhere; each domain has one writer (board: HAL I2C scan, power: HAL power policy, host: panel protocol, request: `State::Request_*()`, diag: comm layer). Write through the `State::` entry points in `Platform/State/SystemState.h` and keep `tests/check_state_ownership.py` in sync (see `docs/product_structure.md`).
+
 Put a difference between products in `product_config.h` as a `PRODUCT_*` switch, or in product-only sources, never as a copy of shared code. Shared code reaches product behavior through those switches or weak `HAL::` hooks (`Power_ProductInit/Update`, `Power_AdjustPercent`). See `docs/product_structure.md`.
 
 ## Build, Test, and Development Commands
