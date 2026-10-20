@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-This repository is an HC32F460xE firmware project migrated from Keil MDK toward CMake + `arm-none-eabi-gcc`.
+This repository is an HC32F460xE firmware project migrated from Keil MDK to CMake + `arm-none-eabi-gcc`; the Keil project has been removed.
 
 One source tree builds three products on the same MCU and board family: `X1` (no screen), `X1Pro` and `XBase` (AMOLED + LVGL). Each CMake configure builds exactly one product, selected by the `PRODUCT` cache variable.
 
@@ -23,8 +23,6 @@ Put a difference between products in `product_config.h` as a `PRODUCT_*` switch,
 - `gcc-debug` / `gcc-release` remain as aliases for X1Pro and provide `build/gcc-debug/compile_commands.json` for clangd; `.clangd` uses `build/x1-debug` for `Products/X1/`.
 - `cmake -S Simulator -B build/simulator -DSIM_PRODUCT=X1Pro|XBase` builds the PC simulator for a display product.
 - `cmake -S tests -B build/host-tests && cmake --build build/host-tests && ctest --test-dir build/host-tests` runs the host regression tests (protocol, transport, power, per-product tables).
-
-The legacy Keil project remains at `Platform/project/proj_hc32.uvprojx` for reference.
 
 ## Coding Style & Naming Conventions
 
