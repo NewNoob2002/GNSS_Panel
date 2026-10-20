@@ -9,7 +9,7 @@ One source tree builds three products on the same MCU and board family: `X1` (no
 - `CMakeLists.txt` is the top-level orchestrator only: it selects the product, adds subdirectories and links the final image (`<prefix>_<version>.elf`).
 - `Platform/` contains CMSIS, startup, linker script, drivers, the shared HAL (power policy, charger/gauge, LEDs, tick) and support code. It is shared by all products and must not depend on LVGL or `Simulator/App`.
 - `Arduino/` provides the Arduino-compatible core.
-- `Libraries/` contains third-party and device libraries. Display-only targets (LVGL, Adafruit, ButtonEvent) are built only when the product has a display; `MultiButton` only for X1.
+- `Libraries/` contains third-party and device libraries. Display-only targets (LVGL, Adafruit) are built only when the product has a display; `MultiButton` only for X1.
 - `Shared/Comm/` is the I2C slave transport and panel frame-protocol core used by every product.
 - `Shared/Display/` is shared by X1Pro and XBase: display entry point, `AppPlatform` (HC32 platform layer of the shared LVGL app: status snapshot, two-key input, power events, `system_backend`), display protocol table, display/key HAL and the LVGL-backed `operator new`.
 - `Simulator/App/` is the shared LVGL application, a verbatim copy of ATK_RK3506 `application/App` (source commit in `Simulator/App/UPSTREAM`). It is used by the display firmware and the PC simulator. Only `CMakeLists.txt`, `UPSTREAM` and `.clang-format` there are HC32-owned.

@@ -3,12 +3,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-typedef struct ledState_t {
-    uint32_t lastToggleTime;
-    uint16_t currentRate;
-    bool usedByOtherTask;
-} ledState_t;
-
 typedef struct online_device_t {
     bool bq40z50;
     bool mp2762;

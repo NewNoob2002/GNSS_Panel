@@ -14,13 +14,12 @@ target_link_libraries(hc32_shared_comm PUBLIC
 )
 
 if(PRODUCT_HAS_DISPLAY)
-    # X1Pro / XBase 共用：带屏入口、共享 LVGL 应用的平台层、显示协议表、显示与按键 HAL、LVGL 内存分配
+    # X1Pro / XBase 共用：带屏入口、共享 LVGL 应用的平台层、显示协议表、显示 HAL、LVGL 内存分配
     add_library(hc32_shared_display OBJECT
         Display/AppPlatform.cpp
         Display/display_main.cpp
         Display/display_protocol.cpp
         Display/HAL_Display.cpp
-        Display/HAL_Key.cpp
         Display/lvgl_new.cpp
     )
     target_include_directories(hc32_shared_display PUBLIC

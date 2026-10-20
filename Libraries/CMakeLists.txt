@@ -132,17 +132,6 @@ target_link_libraries(hc32_adafruit_st77xx PUBLIC
     hc32_adafruit_busio
 )
 
-add_library(hc32_button_event OBJECT
-    ButtonEvent/ButtonEvent.cpp
-)
-target_include_directories(hc32_button_event PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/ButtonEvent
-)
-target_link_libraries(hc32_button_event PUBLIC
-    hc32_project_options
-    hc32_arduino_headers
-)
-
 file(GLOB_RECURSE LVGL_SOURCES CONFIGURE_DEPENDS
     lvgl/src/core/*.c
     lvgl/src/draw/*.c
@@ -181,7 +170,6 @@ target_sources(hc32_display_libraries INTERFACE
     $<TARGET_OBJECTS:hc32_adafruit_busio>
     $<TARGET_OBJECTS:hc32_adafruit_gfx>
     $<TARGET_OBJECTS:hc32_adafruit_st77xx>
-    $<TARGET_OBJECTS:hc32_button_event>
     $<TARGET_OBJECTS:hc32_lvgl>
 )
 target_link_libraries(hc32_display_libraries INTERFACE
@@ -189,7 +177,6 @@ target_link_libraries(hc32_display_libraries INTERFACE
     hc32_adafruit_busio
     hc32_adafruit_gfx
     hc32_adafruit_st77xx
-    hc32_button_event
     hc32_lvgl
 )
 else()

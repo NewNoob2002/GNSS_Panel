@@ -4,7 +4,9 @@
 #include <limits>
 #include <string>
 #include <vector>
+#include "BlinkLed.h"
 #include "Charger.h"
+#include "HoldTimer.h"
 #include "HAL.h"
 #include "PowerPolicy.h"
 #include "Wire.h"
@@ -396,6 +398,34 @@ test_charger_variants() {
     systemInfo = {};
 }
 
+// 强制关机计时与指示灯闪烁：时间差需支持 tick 回绕。
+static void
+test_hold_and_blink() {
+    const uint32_t start = UINT32_MAX - 1000U;
+    HoldTimer hold(2500U);
+    assert(!hold.update(true, start));
+    assert(!hold.update(true, start + 2499U));
+    assert(hold.update(true, start + 2500U));
+    assert(!hold.update(true, start + 5000U)); // 每次按住只触发一次
+    assert(!hold.update(false, start + 5001U));
+    assert(!hold.update(true, start + 6000U));
+    assert(!hold.update(false, start + 7000U)); // 中途松开重新计时
+    assert(!hold.update(true, start + 7001U));
+    assert(hold.update(true, start + 9501U));
+
+    BlinkLed led(POWER_LED_PIN);
+    led.write(true);
+    led.update(start); // 周期 0：不翻转
+    assert(fake_pins[POWER_LED_PIN] == HIGH);
+    led.set_period(300);
+    led.update(start); // 上次翻转时间为 0，回绕后差值已超过周期
+    assert(fake_pins[POWER_LED_PIN] == LOW);
+    led.update(start + 299U);
+    assert(fake_pins[POWER_LED_PIN] == LOW);
+    led.update(start + 300U);
+    assert(fake_pins[POWER_LED_PIN] == HIGH);
+}
+
 static void
 test_power_policy() {
     PowerPolicy policy;
@@ -477,6 +507,7 @@ main() {
     test_decoder_boundary();
     test_device_failures();
     test_charger_variants();
+    test_hold_and_blink();
     test_power_policy();
     test_resident_off();
     puts("protocol, transport, devices and power regressions passed");

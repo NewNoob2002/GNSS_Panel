@@ -31,9 +31,11 @@ void Power_ProductUpdate();
 uint16_t Power_AdjustPercent(uint16_t actualPercent);
 const char* Power_GetPowerOffCause();
 void WatchDog_Feed();
-/* KEY */
+/* KEY：Key_Init/Key_Update 共用（含 Function 长按强制关机），产品按键动作走扩展点（弱符号默认实现） */
 void Key_Init();
 void Key_Update();
+void Key_ProductInit();
+void Key_ProductUpdate();
 // 带屏产品两键的当前电平（已按有效电平归一化），共享应用按 RK3506 两键语义解释。
 bool Key_PowerPressed();
 bool Key_FunctionPressed();

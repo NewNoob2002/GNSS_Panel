@@ -13,7 +13,7 @@
 ```text
 Platform/          MCU 启动、驱动、Arduino 风格外设、共用 HAL（电源策略、充电/电量计、LED、时基、Flash）
 Arduino/           Arduino 兼容核心
-Libraries/         第三方与器件库；LVGL/Adafruit/ButtonEvent 仅带屏产品构建，MultiButton 仅 X1
+Libraries/         第三方与器件库；LVGL/Adafruit 仅带屏产品构建，MultiButton 仅 X1
 Shared/Comm/       I2C 从机传输 + 面板帧协议核心（全部产品）
 Shared/Display/    带屏产品入口、共享应用的 HC32 平台层 AppPlatform、显示协议表、显示/按键 HAL、LVGL 内存池 operator new（X1Pro、XBase）
 Simulator/App/     共享 LVGL 应用，ATK_RK3506 application/App 的原样副本（UPSTREAM 记录来源提交，scripts/sync_shared_app.sh 同步）
@@ -62,7 +62,7 @@ XBase 的差异取自其分支相对分叉点的产品级改动（无星图/过�
 ## X1 移植说明
 
 - 开机长按由共用电源监控处理（2 s，与 X1Pro 和 Boot 仓库 X1 契约一致）；旧版因 MultiButton 10 ms 调用 5 ms 节拍，实际约 4 s。
-- 功能键长按 2.5 s 强制关机，与 X1Pro（ButtonEvent 500 ms + 10×200 ms）一致；旧版计数用 `LONG_PRESS_START`，实际无法触发，已修正。
+- 功能键按住 2.5 s 强制关机，三个产品共用 `Platform/HAL/HAL_Key.cpp`（`HoldTimer`，与旧 X1Pro ButtonEvent 500 ms + 10×200 ms 一致）；旧版 X1 计数用 `LONG_PRESS_START`，实际无法触发，已修正。
 - 电量补偿参数从旧地址 `0x7A000`（Boot V2 元数据 A）改到 App 参数扇区 `0x7E000`，只写首字，读出值不在 0..9 时视为未保存。旧设备上已保存的补偿值不会迁移；Boot 仓库的 X1 App 在该扇区使用不同的记录格式，两者交替烧录时补偿值会失效。
 - 补偿差值 ≥ 10 时不采用（旧版写入 RAM 但不保存）。
 - 擦除参数扇区时总线保持约 18 ms，期间中断暂停。
