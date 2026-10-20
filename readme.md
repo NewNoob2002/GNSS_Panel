@@ -53,11 +53,11 @@
 
 > │   ├── Comm          # 与主控的 I2C 从机通信、面板帧协议核心（全部产品）
 
-> │   └── Display       # 带屏产品入口、显示协议表、显示/编码器 HAL（X1Pro、XBase）
+> │   └── Display       # 带屏产品入口、共享应用的平台层 AppPlatform、显示协议表、显示/按键 HAL（X1Pro、XBase）
 
 > ├── Products          # 产品配置与专属代码：X1（无屏）、X1Pro、XBase
 
-> ├── Simulator         # PC 端仿真器环境；Simulator/App 为带屏产品共用的 LVGL 页面及字体/图片资源
+> ├── Simulator         # PC 端仿真器；Simulator/App 为与 RK3506 共用的 LVGL 应用（上游 ATK_RK3506，见 docs/shared_app_sync.md）
 
 > └── tests             # 主机回归测试（协议、传输、电源与各产品协议表）
 
@@ -76,7 +76,7 @@ cmake --build --preset <product>-debug
 # PC 模拟器（带屏产品）
 cmake -S Simulator -B build/simulator -DSIM_PRODUCT=X1Pro   # 或 XBase
 cmake --build build/simulator
-cd Simulator && ./build/bin/main   # 可执行文件固定输出到 Simulator/build/bin/
+cd Simulator && ./build/bin/main   # 可执行文件固定输出到 Simulator/build/bin/，启动时打印按键说明
 
 # 主机回归测试
 cmake -S tests -B build/host-tests && cmake --build build/host-tests && ctest --test-dir build/host-tests

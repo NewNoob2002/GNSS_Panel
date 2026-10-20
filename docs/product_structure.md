@@ -15,9 +15,9 @@ Platform/          MCU 启动、驱动、Arduino 风格外设、共用 HAL（电
 Arduino/           Arduino 兼容核心
 Libraries/         第三方与器件库；LVGL/Adafruit/ButtonEvent 仅带屏产品构建，MultiButton 仅 X1
 Shared/Comm/       I2C 从机传输 + 面板帧协议核心（全部产品）
-Shared/Display/    带屏产品入口、显示协议表、显示/编码器 HAL、LVGL 内存池 operator new（X1Pro、XBase）
-Simulator/App/     带屏产品共用 LVGL 页面（固件与 PC 模拟器同一份）
-Simulator/         PC 模拟器；LVGL 源码直接用 Libraries/lvgl，配置用自身 lv_conf.h（LV_CONF_PATH 指定）
+Shared/Display/    带屏产品入口、共享应用的 HC32 平台层 AppPlatform、显示协议表、显示/按键 HAL、LVGL 内存池 operator new（X1Pro、XBase）
+Simulator/App/     共享 LVGL 应用，ATK_RK3506 application/App 的原样副本（UPSTREAM 记录来源提交，scripts/sync_shared_app.sh 同步）
+Simulator/         PC 模拟器：共享应用 + AppPlatform + Simulator/HAL；LVGL 用 Libraries/lvgl，配置用自身 lv_conf.h（LV_CONF_PATH 指定）
 Products/<产品>/   product.cmake、product_config.h、产品专属源码
 ```
 
@@ -55,7 +55,7 @@ XBase 的差异取自其分支相对分叉点的产品级改动（无星图/过�
 
 ## 产品行为约定
 
-- **外部供电关机驻留**（三产品共用 HAL）：断电延时到期后若 MCU 仍有电，清除关机请求、熄灭电源/功能灯、继续充电，置 `ShutdownComplete`。带屏产品据此回到栈底的待机页 Startup（状态栏照常显示，编码器重新启用），长按电源键 2 s 后 HAL 原地开机：重置电源策略、清除主控上报数据（电池采样、器件在线与版本保留）、恢复电源保持与指示灯，界面与冷启动一样进入 HardwareCheck。不使用软件复位开机：Boot 保留 SWRF 会直接开机，且升级窗口会停留约 1 s。
+- **外部供电关机驻留**（三产品共用 HAL）：断电延时到期后若 MCU 仍有电，清除关机请求、熄灭电源/功能灯、继续充电，置 `ShutdownComplete`。带屏产品由 AppPlatform 上报待机，共享应用重置页面栈回到 Startup，长按电源键 2 s 后 HAL 原地开机：重置电源策略、清除主控上报数据（电池采样、器件在线与版本保留）、恢复电源保持与指示灯，界面与冷启动一样进入 SystemLoading。不使用软件复位开机：Boot 保留 SWRF 会直接开机，且升级窗口会停留约 1 s。
 - **电量计不可用时充电**：电量计从未识别时交由充电芯片保护继续充电；在线但样本失效/过期时禁止充电。
 - **关机确认**：主控完整读出含关机标志的状态帧（X1Pro/XBase 为 INFO2 `0x02`，X1 为 CTRL `0x02`）即确认，8 s 后断电；X1Pro/XBase 也接受 `0x05`（n=1）。均未确认时从首次请求起 20 s 兜底。
 

@@ -11,8 +11,8 @@ One source tree builds three products on the same MCU and board family: `X1` (no
 - `Arduino/` provides the Arduino-compatible core.
 - `Libraries/` contains third-party and device libraries. Display-only targets (LVGL, Adafruit, ButtonEvent) are built only when the product has a display; `MultiButton` only for X1.
 - `Shared/Comm/` is the I2C slave transport and panel frame-protocol core used by every product.
-- `Shared/Display/` is shared by X1Pro and XBase: display entry point, display protocol table, display/encoder HAL and the LVGL-backed `operator new`.
-- `Simulator/App/` contains LVGL app pages, resources, and app utilities reused by the display products and the PC simulator.
+- `Shared/Display/` is shared by X1Pro and XBase: display entry point, `AppPlatform` (HC32 platform layer of the shared LVGL app: status snapshot, two-key input, power events, `system_backend`), display protocol table, display/key HAL and the LVGL-backed `operator new`.
+- `Simulator/App/` is the shared LVGL application, a verbatim copy of ATK_RK3506 `application/App` (source commit in `Simulator/App/UPSTREAM`). It is used by the display firmware and the PC simulator. Only `CMakeLists.txt`, `UPSTREAM` and `.clang-format` there are HC32-owned.
 - `Products/<Product>/` holds `product.cmake` (version, image prefix, display flag), `product_config.h` (feature switches included through `mcu_config.h`) and product-only sources (X1: entry point, keys, SOC compensation, protocol table).
 
 Put a difference between products in `product_config.h` as a `PRODUCT_*` switch, or in product-only sources, never as a copy of shared code. Shared code reaches product behavior through those switches or weak `HAL::` hooks (`Power_ProductInit/Update`, `Power_AdjustPercent`). See `docs/product_structure.md`.
@@ -21,7 +21,8 @@ Put a difference between products in `product_config.h` as a `PRODUCT_*` switch,
 
 - `cmake --preset <product>-debug` / `<product>-release` configures one product, where `<product>` is `x1`, `x1pro` or `xbase`; build with `cmake --build --preset <same name>`. Outputs go to `build/<preset>/` (`.elf`, `.map`) and `build/<preset>/generated/` (`.hex`, `.bin`).
 - `gcc-debug` / `gcc-release` remain as aliases for X1Pro and provide `build/gcc-debug/compile_commands.json` for clangd; `.clangd` uses `build/x1-debug` for `Products/X1/`.
-- `cmake -S Simulator -B build/simulator -DSIM_PRODUCT=X1Pro|XBase` builds the PC simulator for a display product.
+- `cmake -S Simulator -B build/simulator -DSIM_PRODUCT=X1Pro|XBase` builds the PC simulator for a display product (shared app + `AppPlatform` + `Simulator/HAL`).
+- `scripts/sync_shared_app.sh <ATK_RK3506 repo> [commit]` refreshes `Simulator/App` from upstream.
 - `cmake -S tests -B build/host-tests && cmake --build build/host-tests && ctest --test-dir build/host-tests` runs the host regression tests (protocol, transport, power, per-product tables).
 
 ## Coding Style & Naming Conventions
@@ -50,3 +51,5 @@ Pull requests should include a concise description, build results, linked issue 
 ## Agent-Specific Instructions
 
 Keep vendored-library edits minimal. Do not reformat generated resources or third-party code unless the task explicitly requires it.
+
+Do not edit `Simulator/App/` directly (except its HC32-owned files listed above): change ATK_RK3506 `application/App`, commit there, then run `scripts/sync_shared_app.sh`. HC32-specific behavior belongs in `Shared/Display/AppPlatform.cpp` behind the shared `system_backend` / `SystemService` / `P4App` interfaces.
