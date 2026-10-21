@@ -26,6 +26,8 @@
 | `codex/gpt-6.1-sol`（high） | 外设驱动、显示端口、框架替换、内存调优等需要判断的工作（★ 任务） |
 | `antigravity/claude-sonnet-5-5` | 规则明确的批量迁移（按页面迁移 API）；审阅 sol 完成的 ★ 任务 diff |
 | `antigravity/gemini-4-argon` | 大上下文机械工作：上游源码替换、CMake 清理、资源格式转换、全仓清点、重命名 |
+
+注：2026-10-21 起 `gemini-4-argon` 配额用尽（约 2026-10-28 恢复），期间其任务改由 `antigravity/claude-sonnet-5-5` 执行。
 | `antigravity/gemini-3.8-flash` | 文档同步、清点类只读任务 |
 
 ## 阶段 2：HC32 去 Arduino 化
