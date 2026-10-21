@@ -1,12 +1,22 @@
-#include "Arduino.h"
 #include "Charger.h"
+#include "GpioPin.h"
 #include "HAL.h"
 #include "PowerPolicy.h"
 #include "SystemState.h"
+#include "delay.h"
 #include "product_config.h"
 
 // 电源时序：开机判定、关机流程、关机驻留与原地开机、低电量关机。只依赖 GPIO、时基与充电控制的
 // 待机/开机切换，固件、主机测试与 PC 模拟器共用同一份（电池与充电监控见 HAL_Battery.cpp）。
+
+static constexpr GpioPin powerControl(POWER_CONTROL_PIN);
+static constexpr GpioPin powerLed(POWER_LED_PIN);
+static constexpr GpioPin functionLed(FUNCTION_LED_PIN);
+static constexpr GpioPin chargeLed(CHARGE_LED_PIN);
+static constexpr GpioPin watchdogFeed(WATCHDOG_FEED_PIN);
+#if !PRODUCT_HAS_DISPLAY
+static constexpr GpioPin powerKey(POWER_KEY_PIN);
+#endif
 
 static PowerPolicy power_policy;
 #if !PRODUCT_HAS_DISPLAY
@@ -28,27 +38,27 @@ HAL::Power_Init() {
     softwareReset = RMU_GetStatus(RMU_FLAG_SW);
     // Type-C 独立供电给 MCU，确认开机前保持 Linux 主板断电；电池供电时仅按住 Power 键维持 MCU，
     // 提前松开不得锁存电源。仅软件复位立即保持供电，供 Boot 保留 SWRF 和 app_fatal 恢复使用。
-    pinMode(POWER_CONTROL_PIN, OUTPUT, softwareReset == SET ? HIGH : LOW);
+    powerControl.setMode(GPIO_OUTPUT, softwareReset == SET);
     RMU_ClearStatus();
     if (softwareReset == SET) {
         CORE_DEBUG_PRINTF("Power: Software Reset");
     } else {
         CORE_DEBUG_PRINTF("Power: Waiting Keep Press...");
     }
-    pinMode(POWER_LED_PIN, OUTPUT);
-    pinMode(FUNCTION_LED_PIN, OUTPUT);
-    pinMode(CHARGE_LED_PIN, OUTPUT);
+    powerLed.setMode(GPIO_OUTPUT);
+    functionLed.setMode(GPIO_OUTPUT);
+    chargeLed.setMode(GPIO_OUTPUT);
 
-    pinMode(WATCHDOG_FEED_PIN, OUTPUT);
+    watchdogFeed.setMode(GPIO_OUTPUT);
     Power_ProductInit();
 }
 
 // 开机后恢复电源保持与指示灯；冷启动和关机驻留恢复共用。
 static void
 power_on_outputs() {
-    digitalWrite(POWER_LED_PIN, HIGH);
-    digitalWrite(FUNCTION_LED_PIN, HIGH);
-    digitalWrite(POWER_CONTROL_PIN, HIGH);
+    powerLed.write(true);
+    functionLed.write(true);
+    powerControl.write(true);
     HAL::Charger_Get().power_on();
 }
 
@@ -70,14 +80,14 @@ clear_shutdown_requests() {
 static void
 power_enter_standby(uint32_t now) {
     HAL::Power_Shutdown(true);
-    digitalWrite(POWER_LED_PIN, LOW);
-    digitalWrite(FUNCTION_LED_PIN, LOW);
+    powerLed.write(false);
+    functionLed.write(false);
     // 与冷启动等待开机时一致（见 Power_OnCheck）。
     HAL::Charger_Get().enter_standby();
     clear_shutdown_requests();
     State::Power().panel_power_on = false;
 #if !PRODUCT_HAS_DISPLAY
-    power_key_down = digitalRead(POWER_KEY_PIN) == HIGH;
+    power_key_down = powerKey.read();
     power_key_started_ms = now;
 #else
     (void)now;
@@ -155,7 +165,7 @@ HAL::Power_Shutdown(bool en) {
         CORE_DEBUG_PRINTF("Shutdown Done");
         State::Power().ShutdownGoing = false;
         State::Power().ShutdownComplete = true;
-        digitalWrite(POWER_CONTROL_PIN, LOW);
+        powerControl.write(false);
     }
 }
 
@@ -170,7 +180,7 @@ HAL::Power_PowerOffMonitor() {
             State::Power().pannel_power_on_time = now;
         }
 #else
-        const bool pressed = digitalRead(POWER_KEY_PIN) == HIGH;
+        const bool pressed = powerKey.read();
         if (pressed && !power_key_down) {
             power_key_started_ms = now;
         }
@@ -190,9 +200,9 @@ HAL::Power_PowerOffMonitor() {
                            || State::Power().Force_ShutDown || State::Power().LinuxPowerOff
                            || State::Power().ShutdownEnsure;
     if (power_policy.state == PowerPolicy::Running && requested) {
-        digitalWrite(CHARGE_LED_PIN, LOW);
-        digitalWrite(POWER_LED_PIN, HIGH);
-        digitalWrite(FUNCTION_LED_PIN, HIGH);
+        chargeLed.write(false);
+        powerLed.write(true);
+        functionLed.write(true);
         State::Power().poweroff_flag = 1;
         State::Power().ShutdownGoing = true;
         State::Power().ShutdownReq = false;

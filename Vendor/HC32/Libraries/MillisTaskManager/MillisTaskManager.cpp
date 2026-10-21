@@ -255,7 +255,7 @@ bool MillisTaskManager::SetIntervalTime(const TaskFunction_t func, const uint32_
 }
 
 #if (MTM_USE_CPU_USAGE == 1)
-#include "Arduino.h"                //需要使用micros()
+#include "delay.h"                  // 需要使用 micros()
 static uint32_t UserFuncLoopUs = 0; //累计时间
 /**
   * @brief  获取CPU占用率

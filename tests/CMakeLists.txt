@@ -17,7 +17,7 @@ add_executable(firmware_tests firmware_tests.cpp ${STATE_SOURCES}
     ${HC32}/Comm/slave_i2c.cpp ${HC32}/Comm/panel_protocol.cpp
     ${HC32}/Display/display_protocol.cpp
     ${PARSER_SOURCES}
-    ${HC32}/Platform/Core/src/i2c_master.cpp ${HC32}/Platform/HAL/HAL_Power.cpp ${HC32}/Platform/HAL/HAL_Battery.cpp ${HC32}/Platform/HAL/Charger.cpp
+    ${HC32}/Platform/Core/src/I2cMaster.cpp ${HC32}/Platform/Config/board_peripherals.cpp ${HC32}/Platform/HAL/HAL_Power.cpp ${HC32}/Platform/HAL/HAL_Battery.cpp ${HC32}/Platform/HAL/Charger.cpp
     ${HC32}/Libraries/Bq40z50/bq40z50.cpp ${HC32}/Libraries/Mp2762a/mp2762a.cpp)
 target_include_directories(firmware_tests PRIVATE fakes ${STATE_INCLUDE} ${HC32}/Comm ${HC32}/Display
     ${HC32}/Products/X1Pro ${HC32}/Platform/Config
@@ -44,7 +44,7 @@ foreach(product X1 XBase)
     string(TOLOWER ${product} name)
     add_executable(${name}_power_tests firmware_tests.cpp ${STATE_SOURCES}
         ${HC32}/Platform/HAL/HAL_Power.cpp ${HC32}/Platform/HAL/Charger.cpp
-        ${HC32}/Platform/HAL/HAL_Battery.cpp ${HC32}/Platform/Core/src/i2c_master.cpp
+        ${HC32}/Platform/HAL/HAL_Battery.cpp ${HC32}/Platform/Core/src/I2cMaster.cpp ${HC32}/Platform/Config/board_peripherals.cpp
         ${HC32}/Libraries/Bq40z50/bq40z50.cpp ${HC32}/Libraries/Mp2762a/mp2762a.cpp)
     target_include_directories(${name}_power_tests PRIVATE fakes ${STATE_INCLUDE}
         ${HC32}/Products/${product} ${HC32}/Platform/Config ${HC32}/Platform/Core/inc ${HC32}/Platform/HAL
@@ -53,7 +53,10 @@ foreach(product X1 XBase)
     target_compile_options(${name}_power_tests PRIVATE -include ${CMAKE_CURRENT_LIST_DIR}/fakes/HAL.h)
     target_compile_definitions(${name}_power_tests PRIVATE __CORE_DEBUG __HAL_H POWER_TESTS_ONLY)
 endforeach()
-foreach(target firmware_tests x1_power_tests xbase_power_tests x1_protocol_tests xbase_protocol_tests clock_tests heap_tests)
+add_executable(gpio_tests gpio_tests.cpp
+    ${HC32}/Platform/Core/src/gpio.c ${HC32}/Platform/Core/src/pinmap.cpp)
+target_include_directories(gpio_tests PRIVATE gpio_fakes ${HC32}/Platform/Core/inc)
+foreach(target gpio_tests firmware_tests x1_power_tests xbase_power_tests x1_protocol_tests xbase_protocol_tests clock_tests heap_tests)
     target_compile_options(${target} PRIVATE -Wall -Wextra -UNDEBUG -fsanitize=address,undefined -fno-omit-frame-pointer)
     target_link_options(${target} PRIVATE -fsanitize=address,undefined)
     add_test(NAME ${target} COMMAND ${target})
@@ -83,9 +86,9 @@ foreach(product X1Pro XBase)
     target_compile_definitions(${name}_display_app_tests PRIVATE __HAL_H)
     # 统计真实后端的开机请求，验证提前松键从未调用 HAL；电源时序仍执行固件实现。
     target_link_options(${name}_display_app_tests PRIVATE -Wl,--wrap=_ZN3HAL15Power_RequestOnEv)
-    # display_fakes 在前：替换固件的 HAL.h / Arduino.h；core_debug.h 取自 fakes
+    # display_fakes 在前：替换固件 HAL 与 GPIO/时基接口；调试接口取自 fakes
     target_include_directories(${name}_display_app_tests PRIVATE display_fakes fakes ${STATE_INCLUDE}
-        ${HC32}/Display ${HC32}/Products/${product} ${HC32}/Platform/Config ${HC32}/Platform/HAL)
+        ${HC32}/Display ${HC32}/Products/${product} ${HC32}/Platform/Config ${HC32}/Platform/Core/inc ${HC32}/Platform/HAL)
     target_link_libraries(${name}_display_app_tests PRIVATE app_ui)
     target_compile_options(${name}_display_app_tests PRIVATE -Wall -Wextra -UNDEBUG)
     add_test(NAME ${name}_display_app_tests COMMAND ${name}_display_app_tests)

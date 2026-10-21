@@ -1,5 +1,6 @@
 #pragma once
-#include "Arduino.h"
+#include "GpioPin.h"
+#include "delay.h"
 
 /** 按固定周期翻转的指示灯；周期为 0 时不翻转，引脚电平由 write() 决定。 */
 class BlinkLed {
@@ -13,7 +14,7 @@ class BlinkLed {
 
     void
     write(bool on) const {
-        digitalWrite(pin_, on ? HIGH : LOW);
+        pin_.write(on);
     }
 
     /** 到达周期时翻转一次。 */
@@ -21,12 +22,12 @@ class BlinkLed {
     update(uint32_t now) {
         if (period_ms_ > 0 && now - last_toggle_ms_ >= period_ms_) {
             last_toggle_ms_ = now;
-            digitalToggle(pin_);
+            pin_.toggle();
         }
     }
 
   private:
-    gpio_pin_t pin_;
+    GpioPin pin_;
     uint16_t period_ms_ = 0;
     uint32_t last_toggle_ms_ = 0;
 };

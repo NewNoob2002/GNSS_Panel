@@ -1,8 +1,8 @@
 #include "panel_protocol.h"
 #include <cstring>
 #include "SystemState.h"
-#include "core_debug.h"
 #include "mcu_define.h"
+#include "platform_debug.h"
 
 static uint32_t
 calculate_crc(const char* msg, unsigned int len) {

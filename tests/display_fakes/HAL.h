@@ -1,8 +1,8 @@
 #pragma once
 // 主机测试：AppPlatform 与 HAL_Power.cpp 使用的 HAL 接口，板级替身由 display_app_tests.cpp 实现。
-#include "Arduino.h"
-#include "core_debug.h"
+#include "gpio.h"
 #include "mcu_config.h"
+#include "platform_debug.h"
 
 namespace HAL {
 void HAL_Update();

@@ -1,7 +1,8 @@
 #include "delay.h"
 #include "HAL.h"
 #include "dwt.h"
-#include "yield.h"
+/** 延续现有可覆盖的等待钩子，声明与 Arduino/yield.c 的弱符号保持一致。 */
+void yield(void);
 
 uint32_t HAL_GetTick(void);
 

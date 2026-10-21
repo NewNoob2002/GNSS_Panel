@@ -48,7 +48,6 @@ target_include_directories(hc32_shared_comm PUBLIC
 target_link_libraries(hc32_shared_comm PUBLIC
     hc32_project_options
     hc32_platform_headers
-    hc32_arduino_headers
     hc32_parser
 )
 
@@ -56,7 +55,7 @@ if(PRODUCT_HAS_DISPLAY)
     add_library(app_build_options INTERFACE)
     target_link_libraries(app_build_options INTERFACE hc32_project_options)
     add_library(app_lvgl INTERFACE)
-    target_link_libraries(app_lvgl INTERFACE hc32_display_libraries)
+    target_link_libraries(app_lvgl INTERFACE hc32_lvgl)
     add_subdirectory(${REPO_ROOT}/App ${CMAKE_CURRENT_BINARY_DIR}/App)
 
     # 共享应用的 HC32 平台层：入口 + 各方向的 *Bridge + 初始化步骤
@@ -74,6 +73,7 @@ if(PRODUCT_HAS_DISPLAY)
     target_include_directories(hc32_shared_display PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/Display
     )
+    target_link_libraries(hc32_shared_display PRIVATE hc32_arduino_headers)
     target_link_libraries(hc32_shared_display PUBLIC
         hc32_shared_comm
         app_ui

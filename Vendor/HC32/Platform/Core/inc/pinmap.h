@@ -1,0 +1,54 @@
+/*
+ * Copyright (c) 2015 Arduino LLC. All right reserved.
+ * SPDX-License-Identifier: LGPL-2.1-or-later
+ * 引脚编号与映射迁自 Arduino/Core/variants/hc32f460xx/variant.h 和原板级类型头。
+ */
+#pragma once
+#include <stdint.h>
+#include "hc32_ll.h"
+
+typedef int16_t gpio_pin_t;
+
+// clang-format off
+typedef enum {
+    PA0, PA1, PA2, PA3, PA4, PA5, PA6, PA7, PA8, PA9, PA10, PA11, PA12, PA13, PA14, PA15,
+    PB0, PB1, PB2, PB3, PB4, PB5, PB6, PB7, PB8, PB9, PB10, PB11, PB12, PB13, PB14, PB15,
+    PC0, PC1, PC2, PC3, PC4, PC5, PC6, PC7, PC8, PC9, PC10, PC11, PC12, PC13, PC14, PC15,
+#ifdef GPIO_D
+    PD0, PD1, PD2, PD3, PD4, PD5, PD6, PD7, PD8, PD9, PD10, PD11, PD12, PD13, PD14, PD15,
+#endif
+#ifdef GPIO_E
+    PE0, PE1, PE2, PE3, PE4, PE5, PE6, PE7, PE8, PE9, PE10, PE11, PE12, PE13, PE14, PE15,
+#endif
+    PH0, PH1, PH2, PIN_MAX
+} Pin_TypeDef;
+// clang-format on
+
+#define BOARD_NR_GPIO_PINS PIN_MAX
+#define IS_GPIO_PIN(pin)   ((pin) >= 0 && (pin) < BOARD_NR_GPIO_PINS)
+
+typedef struct pin_adc_info_t {
+    const uint8_t device  : 2; /**< 0 表示未分配，1/2 对应 ADC1/ADC2。 */
+    const uint8_t channel : 6; /**< device 非零时有效的 ADC 通道。 */
+} pin_adc_info_t;
+
+typedef struct pin_timera_info_t {
+    const uint8_t unit     : 3; /**< 0 表示未分配，1..6 对应 TimerA 单元。 */
+    const uint8_t channel  : 3; /**< 0..7 对应 TimerA 通道 1..8。 */
+    const uint8_t function : 2; /**< 0..2 对应 Func_Tima0..2（硬件功能号 4..6）。 */
+} pin_timera_info_t;
+
+typedef struct pin_info_t {
+    const uint8_t bit_pos : 5;
+    const uint8_t port    : 3;
+    const pin_adc_info_t adc_info;
+    const pin_timera_info_t timera_info;
+} pin_info_t;
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+extern const pin_info_t PIN_MAP[BOARD_NR_GPIO_PINS];
+#ifdef __cplusplus
+}
+#endif

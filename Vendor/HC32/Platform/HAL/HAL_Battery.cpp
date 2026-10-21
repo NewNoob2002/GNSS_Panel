@@ -1,8 +1,13 @@
-#include "Arduino.h"
 #include "Charger.h"
+#include "GpioPin.h"
 #include "HAL.h"
 #include "SystemState.h"
+#include "delay.h"
 #include "ots.h"
+
+static constexpr GpioPin powerLed(POWER_LED_PIN);
+static constexpr GpioPin chargerControl(CHARGER_CTRL_PIN);
+static constexpr GpioPin watchdogFeed(WATCHDOG_FEED_PIN);
 
 // 电池与充电监控：BQ40Z50 采样、充电控制、MCU 片内温度、看门狗。只在固件与主机测试中编译；
 // 电源时序（含低电量关机）见 HAL_Power.cpp。
@@ -42,7 +47,7 @@ HAL::Power_GetInfo(Power_Monitor_t* info) {
     if (millis() - State::Power().BatteryLastHandleTime >= 3000) {
         State::Power().BatteryLastHandleTime = millis();
         if (!systemInfo.board.online_device.bq40z50) {
-            digitalToggle(POWER_LED_PIN);
+            powerLed.toggle();
         } else {
             Battery_Sample(info->batteryInfo);
         }
@@ -50,7 +55,7 @@ HAL::Power_GetInfo(Power_Monitor_t* info) {
     if (info->batteryInfo.sample_valid && millis() - info->batteryInfo.last_sample_ms > 10000U) {
         info->batteryInfo.sample_valid = false;
     }
-    info->batteryInfo.ChargerDetect = digitalRead(CHARGER_CTRL_PIN);
+    info->batteryInfo.ChargerDetect = chargerControl.read();
     Charger_Protect(info->batteryInfo);
     Charger_Get().update(info->batteryInfo);
 }
@@ -59,6 +64,6 @@ void
 HAL::WatchDog_Feed() {
     if (millis() - State::Power().WatchDogLastFeedTime >= WATCHDOG_FEED_TIME) {
         State::Power().WatchDogLastFeedTime = millis();
-        digitalToggle(WATCHDOG_FEED_PIN);
+        watchdogFeed.toggle();
     }
 }

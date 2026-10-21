@@ -6,17 +6,17 @@
 #include <cstdlib>
 #include <cstring>
 
+#include "App.h"
 #include "AppPlatform.h"
-#include "Arduino.h"
 #include "Charger.h"
 #include "Common/SystemService.h"
 #include "HAL.h"
-#include "App.h"
 #include "Resource/ResourcePool.h"
 #include "SystemState.h"
 #include "Utils/I18n/I18n.h"
 #include "Utils/PageStyle.h"
 #include "delay.h"
+#include "gpio.h"
 #include "mcu_config.h"
 
 namespace {
@@ -184,7 +184,7 @@ void
 cold_boot_idle() {
     run(5);
     assert(now < 6000);
-    assert(digitalRead(POWER_CONTROL_PIN) == LOW);
+    assert(gpio_read(POWER_CONTROL_PIN) == GPIO_LOW);
     if (systemInfo.power.panel_power_on) {
         assert(SystemService::snapshot().powered_on);
     }
@@ -198,17 +198,17 @@ hal_power_on_and_boot() {
     power_key = true;
     run(1500);
     assert(power_on_requests == before && !systemInfo.power.panel_power_on);
-    assert(on_page("Pages/Startup") && digitalRead(POWER_CONTROL_PIN) == LOW);
+    assert(on_page("Pages/Startup") && gpio_read(POWER_CONTROL_PIN) == GPIO_LOW);
     power_key = false;
     run(100); // 进度尚未归零时重新按下，驻留恢复也必须重新计满 2 s。
     assert(startup_progress(lv_scr_act()) > 0);
     power_key = true;
     run(1995);
     assert(power_on_requests == before && !systemInfo.power.panel_power_on);
-    assert(on_page("Pages/Startup") && digitalRead(POWER_CONTROL_PIN) == LOW);
+    assert(on_page("Pages/Startup") && gpio_read(POWER_CONTROL_PIN) == GPIO_LOW);
     run(300);
     assert(power_on_requests == before + 1 && systemInfo.power.panel_power_on);
-    assert(on_page("Pages/SystemLoading") && digitalRead(POWER_CONTROL_PIN) == HIGH);
+    assert(on_page("Pages/SystemLoading") && gpio_read(POWER_CONTROL_PIN) == GPIO_HIGH);
     power_key = false;
     assert(!systemInfo.host.online); // 驻留恢复清除主控数据，随后模拟重新通信。
     State::Host().online = true;
@@ -223,7 +223,7 @@ hal_enter_standby() {
     State::Power().Force_ShutDown = true;
     HAL::Power_PowerOffMonitor();
     assert(systemInfo.power.ShutdownComplete && !systemInfo.power.panel_power_on);
-    assert(digitalRead(POWER_CONTROL_PIN) == LOW);
+    assert(gpio_read(POWER_CONTROL_PIN) == GPIO_LOW);
     power_key = false;
     run(800);
     assert(on_page("Pages/Startup"));
@@ -235,22 +235,28 @@ millis(void) {
     return now;
 }
 
-/** Read the independent Power key and host rail levels on the virtual board. */
+/** 读取虚拟板上独立的 Power 键与主控供电电平。 */
 int
-digitalRead(int pin) {
-    return pin == POWER_KEY_PIN ? (power_key ? HIGH : LOW) : pin_levels[pin];
+gpio_read(gpio_pin_t pin) {
+    return pin == POWER_KEY_PIN ? (power_key ? GPIO_HIGH : GPIO_LOW) : pin_levels[pin];
 }
 
-/** Record a firmware output write. */
+/** 记录固件的输出电平写入。 */
 void
-digitalWrite(int pin, int value) {
-    pin_levels[pin] = value;
+gpio_write(gpio_pin_t pin, uint32_t value) {
+    pin_levels[pin] = value == GPIO_HIGH;
 }
 
-/** Apply the initial output level configured by Power_Init. */
+/** 应用 Power_Init 指定的初始电平。 */
 void
-pinMode(int pin, int, int value) {
-    digitalWrite(pin, value);
+gpio_set_mode(gpio_pin_t pin, gpio_mode_t, uint8_t value) {
+    gpio_write(pin, value);
+}
+
+/** 翻转虚拟输出电平。 */
+void
+gpio_toggle(gpio_pin_t pin) {
+    pin_levels[pin] ^= 1U;
 }
 
 /** Return the seeded reset reason. */
@@ -323,7 +329,7 @@ main() {
 
     reset_system_info();
     HAL::Power_Init();
-    assert(digitalRead(POWER_CONTROL_PIN) == LOW);
+    assert(gpio_read(POWER_CONTROL_PIN) == GPIO_LOW);
     // 冷启动：界面开始轮询时键已按下，进度必须从这次按压开始计。
     power_key = true;
     App_Init();
@@ -333,19 +339,19 @@ main() {
     assert(startup_progress(lv_scr_act()) >= 30);
 
     run(500);
-    assert(power_on_requests == 0 && digitalRead(POWER_CONTROL_PIN) == LOW);
+    assert(power_on_requests == 0 && gpio_read(POWER_CONTROL_PIN) == GPIO_LOW);
     power_key = false; // 约 1.5 s 松开，再在回退动画结束前重新按下。
     run(100);
     assert(on_page("Pages/Startup") && startup_progress(lv_scr_act()) > 0);
     assert(power_on_requests == 0 && !systemInfo.power.panel_power_on);
-    assert(!SystemService::snapshot().powered_on && digitalRead(POWER_CONTROL_PIN) == LOW);
+    assert(!SystemService::snapshot().powered_on && gpio_read(POWER_CONTROL_PIN) == GPIO_LOW);
     power_key = true;
     run(1995);
     assert(power_on_requests == 0 && !systemInfo.power.panel_power_on);
-    assert(on_page("Pages/Startup") && digitalRead(POWER_CONTROL_PIN) == LOW);
+    assert(on_page("Pages/Startup") && gpio_read(POWER_CONTROL_PIN) == GPIO_LOW);
     HAL::Power_OnCheck(cold_boot_idle);
     assert(power_on_requests == 1 && systemInfo.power.panel_power_on);
-    assert(digitalRead(POWER_CONTROL_PIN) == HIGH && charger_power_on_calls == 1 && standby_calls == 1);
+    assert(gpio_read(POWER_CONTROL_PIN) == GPIO_HIGH && charger_power_on_calls == 1 && standby_calls == 1);
     power_key = false;
     run(300);
     assert(on_page("Pages/SystemLoading"));
@@ -560,7 +566,7 @@ main() {
     now += 2500;
     HAL::Power_PowerOffMonitor(); // 只运行 HAL：原始电平按住超过 2 s 仍不得恢复。
     assert(on_page("Pages/Startup") && !systemInfo.power.panel_power_on);
-    assert(power_on_requests == before_resume && digitalRead(POWER_CONTROL_PIN) == LOW);
+    assert(power_on_requests == before_resume && gpio_read(POWER_CONTROL_PIN) == GPIO_LOW);
     power_key = false;
     run(100);
     hal_power_on_and_boot();
@@ -599,7 +605,7 @@ main() {
         power_key = true;
         run(2300);
         power_key = false;
-        assert(systemInfo.power.panel_power_on && digitalRead(POWER_CONTROL_PIN) == HIGH);
+        assert(systemInfo.power.panel_power_on && gpio_read(POWER_CONTROL_PIN) == GPIO_HIGH);
         assert(on_page("Pages/SystemLoading"));
     };
     hal_enter_standby();
@@ -656,7 +662,7 @@ main() {
     reset_reason = SET;
     const int before_reset = power_on_requests;
     HAL::Power_Init();
-    assert(digitalRead(POWER_CONTROL_PIN) == HIGH && reset_reason == RESET);
+    assert(gpio_read(POWER_CONTROL_PIN) == GPIO_HIGH && reset_reason == RESET);
     App_Init();
     HAL::Power_OnCheck();
     assert(systemInfo.power.panel_power_on && !power_key && power_on_requests == before_reset);

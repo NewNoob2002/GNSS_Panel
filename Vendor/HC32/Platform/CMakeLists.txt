@@ -10,11 +10,14 @@ target_include_directories(hc32_platform_headers INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/State
     ${CMAKE_CURRENT_SOURCE_DIR}/support
 )
-target_link_libraries(hc32_platform_headers INTERFACE hc32_project_options)
+target_link_libraries(hc32_platform_headers INTERFACE hc32_project_options hc32_easylogger_headers)
 
 file(GLOB PLATFORM_CORE_SOURCES CONFIGURE_DEPENDS
     Core/src/*.c
     Core/src/*.cpp
+)
+file(GLOB PLATFORM_CONFIG_SOURCES CONFIGURE_DEPENDS
+    Config/*.cpp
 )
 file(GLOB PLATFORM_HAL_SOURCES CONFIGURE_DEPENDS
     HAL/*.c
@@ -37,6 +40,7 @@ add_library(hc32_platform OBJECT
     CMSIS/Device/HDSC/hc32f4xx/Source/GCC/startup_hc32f460.S
     CMSIS/Device/HDSC/hc32f4xx/Source/system_hc32f460.c
     ${PLATFORM_CORE_SOURCES}
+    ${PLATFORM_CONFIG_SOURCES}
     ${PLATFORM_HAL_SOURCES}
     ${PLATFORM_STATE_SOURCES}
     ${PLATFORM_DRIVER_SOURCES}
@@ -48,9 +52,6 @@ target_link_libraries(hc32_platform PUBLIC
 )
 # 平台层三产品共用，不依赖显示库或界面代码。
 target_include_directories(hc32_platform PRIVATE
-    ${PROJECT_SOURCE_DIR}/Arduino
-    ${PROJECT_SOURCE_DIR}/Arduino/Core/avr
-    ${PROJECT_SOURCE_DIR}/Arduino/Core/variants/hc32f460xx
     ${PROJECT_SOURCE_DIR}/Libraries
     ${PROJECT_SOURCE_DIR}/Libraries/Bq40z50
     ${PROJECT_SOURCE_DIR}/Libraries/MillisTaskManager

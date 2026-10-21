@@ -1,5 +1,6 @@
 #pragma once
 
+/** 主机测试中不输出固件调试信息。 */
 inline void
 fake_debug_print(const char*, ...) {}
 

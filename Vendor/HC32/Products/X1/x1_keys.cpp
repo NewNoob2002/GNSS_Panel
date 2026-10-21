@@ -1,13 +1,16 @@
 // X1 按键：电源键长按关机，功能键双击切换录制（源自 X1_Panel_dev）。
 // 功能键按住 2.5 s 强制关机与带屏产品共用（Platform/HAL/HAL_Key.cpp）；
 // 开机长按由共用 HAL::Power_PowerOffMonitor() 处理（2 s），这里只处理已开机后的动作。
-#include "Arduino.h"
+#include "GpioPin.h"
 #include "HAL.h"
 #include "SystemState.h"
+#include "delay.h"
 #include "multi_button.h"
 
 enum : uint8_t { POWER_KEY_ID = 1, FUNCTION_KEY_ID = 2 };
 
+static constexpr GpioPin powerKeyPin(POWER_KEY_PIN);
+static constexpr GpioPin functionKeyPin(FUNCTION_KEY_PIN);
 static Button PowerKey, FuncKey;
 
 static uint16_t power_key_hold_count;
@@ -41,8 +44,8 @@ FuncKey_DoubleClick_Callback(Button* btn) {
 static uint8_t
 read_button_gpio(uint8_t button_id) {
     switch (button_id) {
-        case POWER_KEY_ID: return digitalRead(POWER_KEY_PIN);
-        case FUNCTION_KEY_ID: return digitalRead(FUNCTION_KEY_PIN);
+        case POWER_KEY_ID: return powerKeyPin.read();
+        case FUNCTION_KEY_ID: return functionKeyPin.read();
         default: return 0;
     }
 }

@@ -1,7 +1,7 @@
 #ifndef BQ40Z50_H
 #define BQ40Z50_H
 
-#include "i2c_master.h"
+#include "I2cMaster.h"
 
 //device address
 #define BQ40Z50_DEVICE_ADDRESS           0x0B
@@ -30,7 +30,7 @@
 extern "C" {
 #endif
 
-bool bq40z50Begin(i2c_master_t* i2cBus);
+bool bq40z50Begin(I2cMaster* i2cBus);
 
 uint8_t bq40z50ReadRegister8(uint8_t reg);
 

@@ -10,9 +10,9 @@
 #include "HoldTimer.h"
 #include "PowerPolicy.h"
 #include "SystemState.h"
+#include "board_peripherals.h"
 #include "bq40z50.h"
 #include "display_protocol.h"
-#include "i2c_master.h"
 #include "mp2762a.h"
 #include "product_config.h"
 #include "slave_i2c.h"
@@ -406,86 +406,102 @@ scan_capture(const uint8_t* address) {
     }
 }
 
+/** 核对类接口与原事务轨迹，包括频率边界、NACK、超时恢复和双 STOP。 */
 static void
 test_i2c_master() {
-    auto* bus = &g_i2c_main;
+    auto* bus = &board_i2c;
     uint8_t bytes[2] = {0x08, 0x34};
-    i2c_master_deinit(bus);
+    bus->end();
     fake_master_trace.clear();
-    assert(!i2c_master_init(nullptr, 100000U));
-    assert(!i2c_master_probe(bus, 0x0b));
-    assert(!i2c_master_init(bus, 0) && !i2c_master_init(bus, 400001U));
+    assert(!bus->isReady());
+    assert(!bus->probe(0x0b));
+    assert(!bus->begin(0) && !bus->begin(400001U));
     assert(fake_master_trace.empty());
     fake_master_init_error = LL_ERR;
-    assert(!i2c_master_init(bus, 100000U));
-    assert(!i2c_master_probe(bus, 0x0b) && fake_master_trace.empty());
+    assert(!bus->begin(100000U));
+    assert(!bus->isReady() && !bus->probe(0x0b) && fake_master_trace.empty());
     fake_master_init_error = LL_OK;
     for (uint32_t hz : {1U, 100000U, 100001U, 400000U}) {
-        assert(i2c_master_init(bus, hz));
+        assert(bus->begin(hz) && bus->isReady());
         assert(fake_master_config.u32Baudrate == hz);
         assert(fake_master_config.u32ClockDiv == (hz <= 100000U ? I2C_CLK_DIV8 : I2C_CLK_DIV2));
         assert(fake_master_config.u32SclTime == (hz <= 100000U ? 3U : 5U));
     }
     assert(fake_master_trace == "BBBB");
     fake_master_trace.clear();
-    assert(!i2c_master_write(bus, 0x80, bytes, 2));
-    assert(!i2c_master_write(bus, 0x0b, nullptr, 2));
-    assert(!i2c_master_write(bus, 0x0b, bytes, 0));
-    assert(!i2c_master_write_read(bus, 0x80, 0x08, bytes, 2));
-    assert(!i2c_master_write_read(bus, 0x0b, 0x08, nullptr, 2));
-    assert(!i2c_master_write_read(bus, 0x0b, 0x08, bytes, 0));
+    assert(!bus->write(0x80, bytes, 2));
+    assert(!bus->write(0x0b, nullptr, 2));
+    assert(!bus->write(0x0b, bytes, 0));
+    assert(!bus->writeRead(0x80, 0x08, bytes, 2));
+    assert(!bus->writeRead(0x0b, 0x08, nullptr, 2));
+    assert(!bus->writeRead(0x0b, 0x08, bytes, 0));
     if (SIZE_MAX > UINT32_MAX) {
-        assert(!i2c_master_write(bus, 0x0b, bytes, static_cast<size_t>(UINT32_MAX) + 1U));
-        assert(!i2c_master_write_read(bus, 0x0b, 0x08, bytes, static_cast<size_t>(UINT32_MAX) + 1U));
+        assert(!bus->write(0x0b, bytes, static_cast<size_t>(UINT32_MAX) + 1U));
+        assert(!bus->writeRead(0x0b, 0x08, bytes, static_cast<size_t>(UINT32_MAX) + 1U));
     }
     assert(fake_master_trace.empty());
-    assert(i2c_master_write(bus, 0x5c, bytes, 2));
+    assert(bus->write(0x5c, bytes, 2));
     assert(fake_registers[0x5c][0x08] == 0x34 && fake_master_trace == "ERrASWDPAe");
     fake_registers[0x0b][0x08] = 0x1234;
     fake_master_trace.clear();
-    assert(i2c_master_write_read(bus, 0x0b, 0x08, bytes, 1));
+    assert(bus->writeRead(0x0b, 0x08, bytes, 1));
     assert(bytes[0] == 0x34 && fake_master_trace == "ERrASWDTNVGAe");
     fake_master_trace.clear();
-    assert(i2c_master_write_read(bus, 0x0b, 0x08, bytes, 2));
+    assert(bus->writeRead(0x0b, 0x08, bytes, 2));
     assert(bytes[0] == 0x34 && bytes[1] == 0x12 && fake_master_trace == "ERrASWDTVGAe");
     for (char step : std::string("SWDTVG")) {
         fake_master_failure = step;
         fake_master_trace.clear();
-        assert(!i2c_master_write_read(bus, 0x0b, 0x08, bytes, 1));
+        assert(!bus->writeRead(0x0b, 0x08, bytes, 1));
         assert(fake_master_trace.size() >= 5 && fake_master_trace.substr(fake_master_trace.size() - 5) == "PARre");
         fake_master_failure = 0;
-        assert(i2c_master_probe(bus, 0x0b));
+        assert(bus->probe(0x0b));
     }
     fake_master_failure = 'D';
     fake_master_trace.clear();
-    assert(!i2c_master_write(bus, 0x5c, bytes, 2));
+    assert(!bus->write(0x5c, bytes, 2));
     assert(fake_master_trace == "ERrASWDPARrePARre");
     fake_master_failure = 'P';
     fake_master_trace.clear();
-    assert(!i2c_master_probe(bus, 0x0b));
+    assert(!bus->probe(0x0b));
     assert(fake_master_trace == "ERrASWPARre");
     fake_master_failure = 0;
-    assert(i2c_master_probe(bus, 0) && i2c_master_probe(bus, 0x7f));
-    assert(i2c_master_scan(bus, scan_capture) == 126);
+    assert(bus->probe(0) && bus->probe(0x7f));
+    assert(bus->scan(scan_capture) == 126);
     assert(scan_callbacks == 126 && scan_online == 126);
     scan_callbacks = scan_online = 0;
     fake_master_failure = 'W';
-    assert(i2c_master_scan(bus, scan_capture) == 0);
+    assert(bus->scan(scan_capture) == 0);
     assert(scan_callbacks == 126 && scan_online == 0);
     fake_master_failure = 0;
-    assert(i2c_master_scan(bus, nullptr) == 126);
-    i2c_master_deinit(bus);
+    assert(bus->scan(nullptr) == 126);
+    bus->end();
     fake_master_trace.clear();
-    assert(!i2c_master_write_read(bus, 0x0b, 0x08, bytes, 2));
-    assert(!i2c_master_probe(bus, 0x0b) && fake_master_trace.empty());
-    i2c_master_deinit(nullptr);
+    assert(!bus->isReady());
+    assert(!bus->writeRead(0x0b, 0x08, bytes, 2));
+    assert(!bus->probe(0x0b) && fake_master_trace.empty());
+    bus->end();
+
+    // 配置其他外设与引脚，核对构造无硬件动作、实例就绪状态相互独立。
+    CM_I2C_TypeDef otherRegs;
+    fake_fcg1_clock = 0;
+    fake_mux_pin = -1;
+    I2cMaster other({&otherRegs, 0x1234, PA10, PA11, 60, 61});
+    assert(fake_fcg1_clock == 0 && fake_mux_pin == -1 && !other.isReady());
+    assert(other.begin(400000U));
+    assert(fake_fcg1_clock == 0x1234 && fake_mux_pin == PA11 && fake_mux_function == 61);
+    assert(fake_master_regs == &otherRegs && other.isReady() && !bus->isReady());
+    assert(other.probe(0x42) && fake_master_regs == &otherRegs);
+    other.end();
+    assert(!other.isReady() && !bus->isReady());
 }
 
 static void
 test_device_failures() {
-    assert(i2c_master_init(&g_i2c_main, 100000U));
-    assert(bq40z50Begin(&g_i2c_main));
-    assert(mp2762aBegin(&g_i2c_main));
+    assert(board_i2c.begin(100000U));
+    assert(!bq40z50Begin(nullptr) && !mp2762aBegin(nullptr));
+    assert(bq40z50Begin(&board_i2c));
+    assert(mp2762aBegin(&board_i2c));
     fake_registers[0x0b][BQ40Z50_RELATIVE_STATE_OF_CHARGE] = 50;
     fake_registers[0x0b][BQ40Z50_REMAINING_CAPACITY] = 1000;
     fake_registers[0x0b][BQ40Z50_FULL_CHARGE_CAPACITY] = 2000;
@@ -510,9 +526,9 @@ test_device_failures() {
     HAL::Battery_Sample(battery);
     assert(!battery.sample_valid && bq40z50getRelativeStateOfCharge_float() == -1.0f);
     fake_io_error = LL_ERR;
-    assert(!i2c_master_probe(&g_i2c_main, 0x0b));
+    assert(!board_i2c.probe(0x0b));
     fake_io_error = 0;
-    assert(i2c_master_probe(&g_i2c_main, 0x0b));
+    assert(board_i2c.probe(0x0b));
 
     State::Board().online_device.mp2762 = false;
     battery.sample_valid = true;
@@ -520,21 +536,21 @@ test_device_failures() {
     for (int i = 0; i < 20; ++i) {
         HAL::Charger_Protect(battery);
     }
-    assert(battery.ChargerDisable && digitalRead(CHARGER_ENABLE_PIN) == LOW);
+    assert(battery.ChargerDisable && gpio_read(CHARGER_ENABLE_PIN) == GPIO_LOW);
     battery.Temp_f = 25.0f;
     battery.ChargerPlugCount = 3;
     battery.ChargerDetect = 1;
     HAL::Charger_Protect(battery);
-    assert(!battery.ChargerDisable && digitalRead(CHARGER_ENABLE_PIN) == HIGH);
+    assert(!battery.ChargerDisable && gpio_read(CHARGER_ENABLE_PIN) == GPIO_HIGH);
     // 电量计在线但样本失效：禁止充电。
     State::Board().online_device.bq40z50 = true;
     battery.sample_valid = false;
     HAL::Charger_Protect(battery);
-    assert(battery.ChargerDisable && digitalRead(CHARGER_ENABLE_PIN) == LOW);
+    assert(battery.ChargerDisable && gpio_read(CHARGER_ENABLE_PIN) == GPIO_LOW);
     // 电量计从未识别：交由充电芯片保护，恢复充电。
     State::Board().online_device.bq40z50 = false;
     HAL::Charger_Protect(battery);
-    assert(!battery.ChargerDisable && digitalRead(CHARGER_ENABLE_PIN) == HIGH);
+    assert(!battery.ChargerDisable && gpio_read(CHARGER_ENABLE_PIN) == GPIO_HIGH);
     State::Board().online_device.mp2762 = true;
     assert(mp2762setChargerEnabled(false, &config));
     assert(mp2762setChargerEnabled(true, &config) && (config & 16));

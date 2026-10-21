@@ -1,8 +1,10 @@
 #include "HAL.h"
-#include "Arduino.h"
 #include "Charger.h"
 #include "MillisTaskManager/MillisTaskManager.h"
 #include "SystemState.h"
+#include "addon_gpio.h"
+#include "delay.h"
+#include "dwt.h"
 #include "elog.h"
 
 static MillisTaskManager taskManager;

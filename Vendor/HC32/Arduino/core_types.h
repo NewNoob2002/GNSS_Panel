@@ -10,6 +10,6 @@ typedef uint16_t word;
 typedef void (*voidFuncPtr)(void);
 typedef void (*voidFuncPtrWithArg)(void*);
 
-typedef int16_t gpio_pin_t;
+#include "pinmap.h"
 
 #endif // _TYPES_H_

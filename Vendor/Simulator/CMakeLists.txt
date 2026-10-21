@@ -79,7 +79,7 @@ else()
     )
 
     file(GLOB HAL_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_LIST_DIR}/HAL/*.cpp)
-    # 固件电源时序原样编译：强制包含模拟器 HAL.h（屏蔽固件 HAL.h 的硬件依赖），GPIO/时基由 HAL/Arduino.h 提供
+    # 固件电源时序原样编译：强制包含模拟器 HAL.h（屏蔽固件 HAL.h 的硬件依赖），GPIO/时基由 HAL/gpio.h 与 HAL/delay.h 提供
     set(FIRMWARE_POWER_SOURCE ${HC32_DIR}/Platform/HAL/HAL_Power.cpp)
     set_source_files_properties(${FIRMWARE_POWER_SOURCE} PROPERTIES
         COMPILE_OPTIONS "-include;${CMAKE_CURRENT_LIST_DIR}/HAL/HAL.h")
@@ -101,6 +101,7 @@ else()
         ${REPO_ROOT}/External
         ${LVGL_DIR}
         ${HC32_DIR}/Platform/Config
+        ${HC32_DIR}/Platform/Core/inc
         ${HC32_DIR}/Platform/State
         ${CMAKE_CURRENT_BINARY_DIR}/generated/Platform/Config
         ${SIM_PRODUCT_DIR}

@@ -6,9 +6,11 @@
 #include "HAL.h"
 #include "mcu_config.h"
 
-#include <Arduino.h> // 模拟器中为 Simulator/HAL/Arduino.h 的虚拟 GPIO
+#include "GpioPin.h"
 
 namespace {
+
+constexpr GpioPin powerControl(POWER_CONTROL_PIN);
 
 struct InitStep {
     const char* name;
@@ -79,7 +81,7 @@ system_backend::poll_initialization_step(unsigned step, std::uint32_t elapsed_ms
             return result(!v15);
         }
         case 3: {
-            const bool powered = digitalRead(POWER_CONTROL_PIN) == HIGH;
+            const bool powered = powerControl.read();
             std::snprintf(detail, size, "host board power %s", powered ? "on" : "off");
             return result(powered);
         }

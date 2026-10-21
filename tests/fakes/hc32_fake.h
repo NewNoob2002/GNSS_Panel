@@ -8,7 +8,6 @@
 using IRQn_Type = int;
 using en_int_src_t = int;
 using func_ptr_t = void (*)();
-using gpio_pin_t = int;
 using voidFuncPtrWithArg = void (*)(void*);
 using en_flag_status_t = int;
 
@@ -43,8 +42,6 @@ extern FakeGpio fake_gpio;
 #define GPIO_FUNC_48                48
 #define GPIO_FUNC_51                51
 #define GPIO_FUNC_50                50
-#define PA9                         9
-#define PA8                         8
 #define INT005_IRQn                 5
 #define INT006_IRQn                 6
 #define INT004_IRQn                 4
@@ -105,6 +102,9 @@ extern uint8_t fake_address, fake_register;
 extern uint16_t fake_registers[128][256];
 extern uint32_t fake_master_writes;
 extern int fake_pins[32];
+inline uint32_t fake_fcg1_clock;
+inline int fake_mux_pin, fake_mux_function;
+inline CM_I2C_TypeDef* fake_master_regs;
 
 inline uint32_t
 __get_PRIMASK() {
@@ -160,11 +160,21 @@ GPIO_SetFunc(int port, int pin, int function) {
     }
 }
 
+/** 核对主板 I2C 复用配置；其他引脚由独立配置回归覆盖。 */
 inline void
-GPIO_SetFunction(int, int) {}
+GPIO_SetFunction(int pin, int function) {
+    fake_mux_pin = pin;
+    fake_mux_function = function;
+    if (pin == 9 || pin == 8) {
+        assert(function == (pin == 9 ? GPIO_FUNC_51 : GPIO_FUNC_50));
+    }
+}
 
+/** 记录使能的外设时钟，验证驱动使用调用方配置。 */
 inline void
-FCG_Fcg1PeriphClockCmd(int, int) {}
+FCG_Fcg1PeriphClockCmd(int clock, int) {
+    fake_fcg1_clock = clock;
+}
 
 inline void
 NVIC_DisableIRQ(int) {}
@@ -192,6 +202,7 @@ INTC_IrqSignIn(const stc_irq_signin_config_t* config) {
 
 inline int32_t
 I2C_DeInit(CM_I2C_TypeDef* unit) {
+    fake_master_regs = unit;
     unit->SR = 0;
     return LL_OK;
 }
@@ -281,8 +292,10 @@ fake_master_step(char step, uint32_t timeout) {
     return fake_master_failure == step ? LL_ERR : fake_io_error;
 }
 
+/** 记录事务接收到的寄存器实例，验证无固定外设依赖。 */
 inline int32_t
-I2C_Start(CM_I2C_TypeDef*, uint32_t timeout) {
+I2C_Start(CM_I2C_TypeDef* unit, uint32_t timeout) {
+    fake_master_regs = unit;
     return fake_master_step('S', timeout);
 }
 
@@ -333,8 +346,6 @@ I2C_MasterReceiveDataAndStop(CM_I2C_TypeDef*, uint8_t* data, uint32_t length, ui
     return LL_OK;
 }
 
-#define OUTPUT                                  1
-#define INPUT_PULLUP                            2
 #define HIGH                                    1
 #define LOW                                     0
 #define POWER_CONTROL_PIN                       0
@@ -366,24 +377,4 @@ RMU_GetStatus(int) {
 inline void
 RMU_ClearStatus() {
     fake_software_reset = RESET;
-}
-
-inline void
-pinMode(int pin, int, int value = 0) {
-    fake_pins[pin] = value;
-}
-
-inline int
-digitalRead(int pin) {
-    return fake_pins[pin];
-}
-
-inline void
-digitalWrite(int pin, int value) {
-    fake_pins[pin] = value;
-}
-
-inline void
-digitalToggle(int pin) {
-    fake_pins[pin] ^= 1;
 }

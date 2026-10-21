@@ -1,7 +1,7 @@
 #pragma once
-#include "core_debug.h"
 #include "hc32_fake.h"
 #include "mcu_define.h"
+#include "platform_debug.h"
 
 namespace HAL {
 void HAL_Update();

@@ -1,10 +1,18 @@
 #include "Charger.h"
-#include "Arduino.h"
+#include "GpioPin.h"
 #include "HAL.h"
 #include "bq40z50.h"
+#include "delay.h"
 #include "mp2762a.h"
 
 namespace {
+
+constexpr GpioPin chargerEnable(CHARGER_ENABLE_PIN);
+constexpr GpioPin chargerSwitch(CHARGER_SWITCH_PIN);
+constexpr GpioPin chargerControl(CHARGER_CTRL_PIN);
+constexpr GpioPin chargerFast(CHARGER_CTRL_FAST_PIN);
+constexpr GpioPin chargerDetect(CHARGER_ADC_DETECT_PIN);
+constexpr GpioPin usbSwitch(USB_SWITCH_PIN);
 
 // V1.5 主板：MP2762A。
 class Mp2762Charger final : public HAL::Charger {
@@ -53,24 +61,24 @@ class GpioCharger final : public HAL::Charger {
 
     void
     begin(BatteryInfo_t&) override {
-        pinMode(CHARGER_ENABLE_PIN, OUTPUT);
-        pinMode(CHARGER_SWITCH_PIN, OUTPUT);
-        pinMode(CHARGER_CTRL_PIN, INPUT_PULLUP);
-        pinMode(CHARGER_CTRL_FAST_PIN, INPUT_PULLUP);
-        pinMode(CHARGER_ADC_DETECT_PIN, INPUT_PULLUP);
-        pinMode(USB_SWITCH_PIN, OUTPUT);
+        chargerEnable.setMode(GPIO_OUTPUT);
+        chargerSwitch.setMode(GPIO_OUTPUT);
+        chargerControl.setMode(GPIO_INPUT_PULLUP);
+        chargerFast.setMode(GPIO_INPUT_PULLUP);
+        chargerDetect.setMode(GPIO_INPUT_PULLUP);
+        usbSwitch.setMode(GPIO_OUTPUT);
     }
 
     void
     enter_standby() override {
-        digitalWrite(USB_SWITCH_PIN, HIGH);
+        usbSwitch.write(true);
     }
 
     void
     power_on() override {
         // 未接 Type-C 供电时切回 USB 通路。
-        if (!digitalRead(CHARGER_ADC_DETECT_PIN)) {
-            digitalWrite(USB_SWITCH_PIN, LOW);
+        if (!chargerDetect.read()) {
+            usbSwitch.write(false);
         }
     }
 
@@ -87,12 +95,12 @@ class GpioCharger final : public HAL::Charger {
             return;
         }
         if (battery.ChargerPlugCount >= 3) {
-            digitalWrite(CHARGER_ENABLE_PIN, HIGH);
-            digitalWrite(CHARGER_SWITCH_PIN, HIGH); // 3 A 档
-            battery.chargeStatus = digitalRead(CHARGER_ENABLE_PIN) == HIGH ? fastCharge : normalCharge;
+            chargerEnable.write(true);
+            chargerSwitch.write(true); // 3 A 档
+            battery.chargeStatus = chargerEnable.read() ? fastCharge : normalCharge;
         } else {
             battery.chargeStatus = notCharge;
-            digitalWrite(CHARGER_ENABLE_PIN, LOW);
+            chargerEnable.write(false);
         }
     }
 
@@ -103,7 +111,7 @@ class GpioCharger final : public HAL::Charger {
             battery.ChargerDisable = 0; // update() 只在允许充电时驱动引脚
             update(battery);
         } else {
-            digitalWrite(CHARGER_ENABLE_PIN, LOW);
+            chargerEnable.write(false);
         }
         return true;
     }

@@ -40,10 +40,10 @@ void
 SPIClass::begin(void) {
     SPI_DeInit(SPIx);
 
-    pinMode(sclk_pin, OUTPUT_AF_PP);
-    pinMode(mosi_pin, OUTPUT_AF_PP);
+    gpio_set_mode(sclk_pin, GPIO_OUTPUT_AF_PP, GPIO_LOW);
+    gpio_set_mode(mosi_pin, GPIO_OUTPUT_AF_PP, GPIO_LOW);
     if (miso_pin != -1) {
-        pinMode(miso_pin, OUTPUT_AF_PP);
+        gpio_set_mode(miso_pin, GPIO_OUTPUT_AF_PP, GPIO_LOW);
     }
 
     uint16_t sclk_function = GPIO_FUNC_0;
@@ -295,11 +295,11 @@ SPIClass::read(uint8_t* buf, uint32_t len) {
 
     while ((--len)) {
         SPI_I2S_WAIT_TX(SPIx);
-        noInterrupts();
+        __disable_irq();
         SPI_I2S_TXDATA(SPIx, 0x00FF);
         SPI_I2S_WAIT_RX(SPIx);
         *buf++ = (uint8_t)SPI_I2S_RXDATA(SPIx);
-        interrupts();
+        __enable_irq();
     }
     SPI_I2S_WAIT_RX(SPIx);
     *buf++ = (uint8_t)SPI_I2S_RXDATA(SPIx);

@@ -7,7 +7,7 @@
  * general information on the GPIO registers can be found in the HC32F460 user manual, chapter 9.4
  */
 #include <hc32_ll.h>
-#include "WVariant.h"
+#include "pinmap.h"
 
 /**
  * @brief convert arduino pin number to port number
@@ -49,7 +49,7 @@
  *
  * @note
  * to ensure proper function, the pin must *not* have been set to any other function than GPIO.
- * if not sure, use pinMode(pin, INPUT) or pinMode(pin, OUTPUT) to set the pin to GPIO mode first.
+ * 不确定当前功能时，先用 gpio_set_mode 的 GPIO_INPUT 或 GPIO_OUTPUT 配置为 GPIO。
  * (default mode after reset is GPIO)
  *
  * @note
@@ -63,7 +63,7 @@
  * using them in combination with this register may cause unexpected results or even damage the chip.
  *
  * @note
- * really, just use pinMode(pin, INPUT) or pinMode(pin, OUTPUT) to set the pin to GPIO mode first.
+ * 请先用 gpio_set_mode 的 GPIO_INPUT 或 GPIO_OUTPUT 配置为 GPIO。
  */
 #define portModeRegister(port) \
     __PORT_OFFSET_REGISTER(M4_PORT->POERA, port)

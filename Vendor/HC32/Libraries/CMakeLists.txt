@@ -22,7 +22,7 @@ target_include_directories(hc32_millis_task_manager PUBLIC
 )
 target_link_libraries(hc32_millis_task_manager PUBLIC
     hc32_project_options
-    hc32_arduino_headers
+    hc32_platform_headers
 )
 
 add_library(hc32_mp2762a OBJECT
@@ -50,6 +50,10 @@ target_link_libraries(hc32_parser PUBLIC
     hc32_project_options
 )
 
+add_library(hc32_easylogger_headers INTERFACE)
+target_include_directories(hc32_easylogger_headers INTERFACE
+    ${CMAKE_CURRENT_SOURCE_DIR}/easylogger/inc
+)
 add_library(hc32_easylogger OBJECT
     easylogger/src/elog.c
     easylogger/src/elog_async.c
@@ -57,9 +61,7 @@ add_library(hc32_easylogger OBJECT
     easylogger/src/elog_utils.c
     easylogger/port/elog_port.c
 )
-target_include_directories(hc32_easylogger PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/easylogger/inc
-)
+target_link_libraries(hc32_easylogger PUBLIC hc32_easylogger_headers)
 target_include_directories(hc32_easylogger PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
@@ -94,10 +96,9 @@ add_library(hc32_adafruit_busio OBJECT
 target_include_directories(hc32_adafruit_busio PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/Adafruit_BusIO
 )
-target_link_libraries(hc32_adafruit_busio PUBLIC
-    hc32_project_options
-    hc32_arduino_headers
-    hc32_platform_headers
+target_link_libraries(hc32_adafruit_busio
+    PRIVATE hc32_arduino_headers
+    PUBLIC hc32_project_options hc32_platform_headers
 )
 
 add_library(hc32_adafruit_gfx OBJECT
@@ -108,11 +109,9 @@ add_library(hc32_adafruit_gfx OBJECT
 target_include_directories(hc32_adafruit_gfx PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/Adafruit-GFX-Library
 )
-target_link_libraries(hc32_adafruit_gfx PUBLIC
-    hc32_project_options
-    hc32_arduino_headers
-    hc32_platform_headers
-    hc32_adafruit_busio
+target_link_libraries(hc32_adafruit_gfx
+    PRIVATE hc32_arduino_headers
+    PUBLIC hc32_project_options hc32_platform_headers hc32_adafruit_busio
 )
 
 add_library(hc32_adafruit_st77xx OBJECT
@@ -122,12 +121,9 @@ add_library(hc32_adafruit_st77xx OBJECT
 target_include_directories(hc32_adafruit_st77xx PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/Adafruit-ST7735-Library
 )
-target_link_libraries(hc32_adafruit_st77xx PUBLIC
-    hc32_project_options
-    hc32_arduino_headers
-    hc32_platform_headers
-    hc32_adafruit_gfx
-    hc32_adafruit_busio
+target_link_libraries(hc32_adafruit_st77xx
+    PRIVATE hc32_arduino_headers
+    PUBLIC hc32_project_options hc32_platform_headers hc32_adafruit_gfx hc32_adafruit_busio
 )
 
 set(EXTERNAL_DIR ${REPO_ROOT}/External)
@@ -162,9 +158,7 @@ target_compile_definitions(hc32_lvgl PUBLIC
 )
 target_link_libraries(hc32_lvgl PUBLIC
     hc32_project_options
-    hc32_arduino_headers
     hc32_platform_headers
-    hc32_adafruit_st77xx
 )
 
 add_library(hc32_display_libraries INTERFACE)

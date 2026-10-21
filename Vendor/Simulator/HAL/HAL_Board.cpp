@@ -1,8 +1,9 @@
 #include <array>
 
 #include "../../HC32/Platform/HAL/Charger.h"
-#include "Arduino.h"
 #include "HAL.h"
+#include "delay.h"
+#include "gpio.h"
 #include "lvgl/lvgl.h"
 
 namespace {
@@ -39,27 +40,31 @@ SimCharger charger;
 
 } // namespace
 
+/** 配置虚拟引脚的初始输出电平。 */
 void
-pinMode(gpio_pin_t pin, PinMode_TypeDef mode, uint8_t state) {
-    if (valid(pin) && mode == OUTPUT) {
+gpio_set_mode(gpio_pin_t pin, gpio_mode_t mode, uint8_t state) {
+    if (valid(pin) && mode == GPIO_OUTPUT) {
         pins[pin] = state;
     }
 }
 
+/** 读取虚拟 GPIO 电平，无效引脚读低。 */
 int
-digitalRead(gpio_pin_t pin) {
-    return valid(pin) ? pins[pin] : LOW;
+gpio_read(gpio_pin_t pin) {
+    return valid(pin) ? pins[pin] : static_cast<int>(GPIO_LOW);
 }
 
+/** 写入虚拟 GPIO 电平。 */
 void
-digitalWrite(gpio_pin_t pin, uint32_t value) {
+gpio_write(gpio_pin_t pin, uint32_t value) {
     if (valid(pin)) {
-        pins[pin] = value ? HIGH : LOW;
+        pins[pin] = value == GPIO_HIGH;
     }
 }
 
+/** 翻转虚拟 GPIO 输出电平。 */
 void
-digitalToggle(gpio_pin_t pin) {
+gpio_toggle(gpio_pin_t pin) {
     if (valid(pin)) {
         pins[pin] ^= 1U;
     }
@@ -85,5 +90,5 @@ HAL::I2C_ProbeDevice(uint8_t address) {
 void
 HAL::Sim_SetPowerKey(bool pressed) {
     // Power 键按下为高电平（与固件 HAL::Key_PowerPressed 一致）。
-    digitalWrite(POWER_KEY_PIN, pressed ? HIGH : LOW);
+    gpio_write(POWER_KEY_PIN, pressed);
 }

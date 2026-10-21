@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include "time_fakes/dwt.h"
+#include "time_fakes/yield.h"
 uint32_t SystemCoreClock = 200000000U;
 uint32_t clock_primask;
 struct FakeSysTick fake_systick;
