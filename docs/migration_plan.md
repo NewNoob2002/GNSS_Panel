@@ -64,6 +64,8 @@
 | 3.5 | 主控截图对比（与 LVGL 8 基线逐页）与视觉/交互差异修正 | 主控 / sol |
 | 3.6 ★ | HC32 内存与性能调优：`LV_DRAW_LAYER_SIMPLE_BUF_SIZE`、C 堆缩减、`LV_MEM_SIZE`、图片 `A8` 取舍；记录 `lv_mem` 峰值、栈水印、帧率与 debug/release 体积 | sol |
 
+进度：3.0 调研与基线完成（`5c000cd`）；3.1 `4784fa7` 已合入（9 页渲染与 LVGL 8 基线逐字节一致，X1Pro/XBase release 334488/1344/169460，RAM 余量 21,776 B）。
+
 阶段 3 额外验收：截图与 3.0 基线逐页对比；HC32 RAM 以链接符号 `__RamEnd - __StackTop` 为准，余量不少于 8 KiB；`App/` 不再出现 LVGL 8 专有符号；`Frameworks/` 只剩被使用的模块。
 
 实机清单：阶段 2 清单全部重复；每个页面进入/返回/动画；长时间运行（≥ 30 分钟）无内存泄漏（`lv_mem` 监视）；刷新流畅度不低于 LVGL 8 版本。
