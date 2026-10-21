@@ -16,7 +16,7 @@
 | 内容 | RK3506（现状/模拟） | HC32（平台实现） | 共享层需要新增 |
 |---|---|---|---|
 | 状态栏数据 | `DemoStatus` 每 200 ms | 由 `systemInfo` 组装快照，200 ms 发布 | 快照增加电池温度（含有效位） |
-| 开机 | Startup 自身 2 s 计时后进入 SystemLoading | HAL 读 Power 键原始电平判定 2 s，置 `panel_power_on` | `SystemState.powered_on`；Startup 的长按只做显示并发出开机请求，`powered_on` 变为 true 时才切页。RK 模拟后端收到请求立即置位 |
+| 开机 | Startup 自身 2 s 计时后进入 SystemLoading | Startup 完整长按后经 `HAL::Power_RequestOn()` 置 `panel_power_on`；冷启动等待循环退出后拉高系统电源，驻留恢复立即拉高 | `SystemState.powered_on`；后端接受请求后 SystemService 同步发布，P4App 切到 SystemLoading；PowerBridge 幂等补报 HAL 状态 |
 | 用户关机 | SystemDash → 弹窗 → SaveConfig → 模拟 `power(Off)` | `power(Off)` 调 `HAL::Power_Shutdown(false)` | 无 |
 | 外部关机（主控、低电、强制关机） | 无 | HAL 置位 `LinuxPowerOff/LowBatteryPowerOff/Force_ShutDown` | `SystemState` 增加关机原因与“正在关机”；P4App 收到后推入 SaveConfig，SaveConfig 显示原因文案（HC32 现有 4 条） |
 | 关机完成后待机 | SaveConfig 计时结束后 `reset_root("Pages/Startup")` | HAL 断电延时到期、外部供电仍在时进入驻留（`ShutdownComplete`） | `SystemState.standby`；由平台通知后 `reset_root`，不由 SaveConfig 计时决定 |
@@ -60,8 +60,8 @@
 
 ## 已确认的细节
 
-- 开机由平台决定、界面跟随：Startup 长按只显示进度并发出开机请求；平台确认后发布 `powered_on`，由 P4App 切到 SystemLoading。
-- HC32 不提供重启：`reboot_available = false`，SystemDash 电源弹窗只有 Shutdown；长按 Power 2 s 进度满 100% 确认，短按或提前松开关闭弹窗。运行中的 Power 长按只由界面处理（HAL 只在未开机时判定长按开机），两者不冲突。
+- 带屏开机仅由 Startup 完整 2 s 长按决定：后端调用 `HAL::Power_RequestOn()`，成功后 SystemService 同步发布 `powered_on`，由 P4App 切到 SystemLoading；提前松键重新计时，不发请求。冷启动与关机驻留都不再用 HAL 原始键电平决定开机，X1 保留原始键长按路径。三产品普通上电时 `POWER_CONTROL_PIN` 为 LOW，确认后才给 Linux 主板供电并锁存；Type-C 可独立维持 MCU，电池供电下提前松开则不锁存。软件复位（SWRF）立即保持 HIGH 并自动开机，供 Boot / `app_fatal` 直接恢复。
+- HC32 不提供重启：`reboot_available = false`，SystemDash 电源弹窗只有 Shutdown；长按 Power 2 s 进度满 100% 确认，短按或提前松开关闭弹窗。运行中的 Power 长按只由界面处理，HAL 不对带屏产品进行原始键长按开机判定。
 - HC32 初始化步骤（`InitSteps.cpp`）非阻塞轮询，失败只显示、不阻塞进入首页：
   1. 版本信息：只检查编译期写入的产品与固件版本。
   2. 电量计：在加载页用 `HAL::I2C_ProbeDevice(0x0B)` 重新探测 BQ40Z50。

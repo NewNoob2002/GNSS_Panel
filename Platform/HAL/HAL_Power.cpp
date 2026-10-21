@@ -3,13 +3,16 @@
 #include "HAL.h"
 #include "PowerPolicy.h"
 #include "SystemState.h"
+#include "product_config.h"
 
 // 电源时序：开机判定、关机流程、关机驻留与原地开机、低电量关机。只依赖 GPIO、时基与充电控制的
 // 待机/开机切换，固件、主机测试与 PC 模拟器共用同一份（电池与充电监控见 HAL_Battery.cpp）。
 
 static PowerPolicy power_policy;
+#if !PRODUCT_HAS_DISPLAY
 static bool power_key_down;
 static uint32_t power_key_started_ms;
+#endif
 
 #define FORCE_SHUTDOWN() (State::Power().Force_ShutDown)
 
@@ -23,7 +26,9 @@ HAL::Power_ProductInit() {}
 void
 HAL::Power_Init() {
     softwareReset = RMU_GetStatus(RMU_FLAG_SW);
-    pinMode(POWER_CONTROL_PIN, OUTPUT, HIGH);
+    // Type-C 独立供电给 MCU，确认开机前保持 Linux 主板断电；电池供电时仅按住 Power 键维持 MCU，
+    // 提前松开不得锁存电源。仅软件复位立即保持供电，供 Boot 保留 SWRF 和 app_fatal 恢复使用。
+    pinMode(POWER_CONTROL_PIN, OUTPUT, softwareReset == SET ? HIGH : LOW);
     RMU_ClearStatus();
     if (softwareReset == SET) {
         CORE_DEBUG_PRINTF("Power: Software Reset");
@@ -59,7 +64,7 @@ clear_shutdown_requests() {
     power.reset_flag = 0;
 }
 
-// 断电延时到期后，仅外部供电时 MCU 仍在运行：进入关机驻留，继续充电并等待电源键开机。
+// 断电延时到期后，仅外部供电时 MCU 仍在运行：进入关机驻留，继续充电并等待开机确认。
 // 清除关机请求，界面据 ShutdownComplete 回到待机页。不能软件复位：Boot 保留 SWRF，
 // 复位会使设备直接开机，且 Boot 升级窗口会额外停留约 1 s。
 static void
@@ -71,12 +76,16 @@ power_enter_standby(uint32_t now) {
     HAL::Charger_Get().enter_standby();
     clear_shutdown_requests();
     State::Power().panel_power_on = false;
+#if !PRODUCT_HAS_DISPLAY
     power_key_down = digitalRead(POWER_KEY_PIN) == HIGH;
     power_key_started_ms = now;
+#else
+    (void)now;
+#endif
 }
 
-// 驻留中长按开机：状态与冷启动一致。主控已断电重启，清除其上报的数据；
-// 电池采样、器件在线状态与版本信息保留。
+// 驻留中确认开机：带屏产品由 Startup 请求，X1 由 HAL 长按判定；状态与冷启动一致。
+// 主控已断电重启，清除其上报的数据；电池采样、器件在线状态与版本信息保留。
 static void
 power_resume_from_standby(uint32_t now) {
     power_policy = PowerPolicy{};
@@ -93,6 +102,29 @@ power_resume_from_standby(uint32_t now) {
     power.pannel_power_on_time = now;
     CORE_DEBUG_PRINTF("Power: resume from standby");
     power_on_outputs();
+}
+
+/**
+ * @brief Accept a Startup hold on the LVGL thread, or resume from shutdown standby.
+ * @return False while shutdown is pending or in progress; true if accepted or already on.
+ * Cold boot defers rail activation to Power_OnCheck; standby restores outputs immediately.
+ */
+bool
+HAL::Power_RequestOn() {
+    if (power_policy.state == PowerPolicy::Off) {
+        power_resume_from_standby(millis());
+        return true;
+    }
+    const Power_Monitor_t& power = systemInfo.power;
+    if (power_policy.state != PowerPolicy::Running || power.ShutdownGoing || power.ShutdownReq || power.ShutdownEnsure
+        || power.LowBatteryPowerOff || power.Force_ShutDown || power.LinuxPowerOff) {
+        return false;
+    }
+    if (!power.panel_power_on) {
+        State::Power().panel_power_on = true;
+        State::Power().pannel_power_on_time = millis();
+    }
+    return true;
 }
 
 void
@@ -135,6 +167,13 @@ void
 HAL::Power_PowerOffMonitor() {
     const uint32_t now = millis();
     if (!State::Power().panel_power_on) {
+#if PRODUCT_HAS_DISPLAY
+        // 带屏产品只由 Startup 的完整长按请求开机；软件复位保留直接开机路径。
+        if (softwareReset == SET && power_policy.state != PowerPolicy::Off) {
+            State::Power().panel_power_on = true;
+            State::Power().pannel_power_on_time = now;
+        }
+#else
         const bool pressed = digitalRead(POWER_KEY_PIN) == HIGH;
         if (pressed && !power_key_down) {
             power_key_started_ms = now;
@@ -149,6 +188,7 @@ HAL::Power_PowerOffMonitor() {
             State::Power().panel_power_on = true;
             State::Power().pannel_power_on_time = now;
         }
+#endif
     }
     const bool requested = State::Power().ShutdownReq || State::Power().LowBatteryPowerOff
                            || State::Power().Force_ShutDown || State::Power().LinuxPowerOff

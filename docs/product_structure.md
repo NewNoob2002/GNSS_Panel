@@ -80,7 +80,7 @@ XBase 的差异取自其分支相对分叉点的产品级改动（无星图/过�
 |---|---|---|
 | `HAL::Charger` | `Platform/HAL/Charger.{h,cpp}` | 充电控制接口；`Mp2762Charger`（V1.5 主板）与 `GpioCharger`（V1.3 主板）两个实现，`Charger_Get()` 按 I2C 扫描结果选择。温度保护 `Charger_Protect()` 与电量计读取 `Battery_Sample()` 与芯片无关 |
 | `PowerPolicy` | `Platform/HAL/PowerPolicy.h` | 关机时序与低电计时（纯逻辑） |
-| 电源时序 | `Platform/HAL/HAL_Power.cpp` | 开机长按判定、关机流程、驻留与原地开机、低电量关机；只依赖 GPIO、时基与 `Charger` 的待机切换，固件、主机测试与 PC 模拟器编译同一份 |
+| 电源时序 | `Platform/HAL/HAL_Power.cpp` | 带屏 Startup 开机请求、X1 原始按键长按判定、关机流程、驻留与原地开机、低电量关机；只依赖 GPIO、时基与 `Charger` 的待机切换，固件、主机测试与 PC 模拟器编译同一份 |
 | 电池与充电监控 | `Platform/HAL/HAL_Battery.cpp` | BQ40Z50 采样、充电保护与控制、片内温度、看门狗（仅固件与主机测试） |
 | `HoldTimer` | `Platform/HAL/HoldTimer.h` | 按住计时；Function 键 2.5 s 强制关机（`HAL_Key.cpp`，三产品共用） |
 | `BlinkLed` | `Platform/HAL/BlinkLed.h` | 固定周期闪烁的指示灯 |
@@ -94,13 +94,14 @@ XBase 的差异取自其分支相对分叉点的产品级改动（无星图/过�
 
 ## 产品行为约定
 
-- **外部供电关机驻留**（三产品共用 HAL）：断电延时到期后若 MCU 仍有电，清除关机请求、熄灭电源/功能灯、继续充电，置 `ShutdownComplete`。带屏产品由 AppPlatform 上报待机，共享应用重置页面栈回到 Startup，长按电源键 2 s 后 HAL 原地开机：重置电源策略、清除主控上报数据（电池采样、器件在线与版本保留）、恢复电源保持与指示灯，界面与冷启动一样进入 SystemLoading。不使用软件复位开机：Boot 保留 SWRF 会直接开机，且升级窗口会停留约 1 s。
+- **上电等待与电源保持**（三产品共用引脚）：普通上电时 `Power_Init()` 将 `POWER_CONTROL_PIN` 配置为输出 LOW，确认开机后才拉 HIGH，给 Linux 主板供电并锁存电源。Type-C 独立供电给 MCU，等待期间主板保持断电；电池供电时 MCU 仅靠按住 Power 键维持，确认前松开不得锁存。带屏产品仅在 Startup 完成 2 s 长按后，经 LVGL 线程调用 `HAL::Power_RequestOn()`，`Power_OnCheck()` 随后退出等待并恢复输出；原始键电平长按不能开机。X1 仍由 HAL 原始键电平长按 2 s 决定。软件复位（SWRF）例外：初始化立即拉 HIGH 并自动开机，保留 Boot 与 `app_fatal` 的直接恢复契约。
+- **外部供电关机驻留**（三产品共用 HAL）：断电延时到期后若 MCU 仍有电，清除关机请求、熄灭电源/功能灯、继续充电，置 `ShutdownComplete`。带屏产品由 AppPlatform 上报待机，共享应用重置页面栈回到 Startup；仅当 Startup 完成 2 s 长按后调用 `HAL::Power_RequestOn()` 才原地开机，原始键电平长按不能恢复。X1 保留 HAL 原始电源键长按 2 s 恢复。恢复时重置电源策略、清除主控上报数据（电池采样、器件在线与版本保留）、拉高电源保持与指示灯；带屏后端成功返回后，SystemService 同步发布 `powered_on`，进入 SystemLoading，PowerBridge 幂等补报。关机进行中拒绝开机请求。不使用软件复位开机：Boot 保留 SWRF 会直接开机，且升级窗口会停留约 1 s。
 - **电量计不可用时充电**：电量计从未识别时交由充电芯片保护继续充电；在线但样本失效/过期时禁止充电。
 - **关机确认**：主控完整读出含关机标志的状态帧（X1Pro/XBase 为 INFO2 `0x02`，X1 为 CTRL `0x02`）即确认，8 s 后断电；X1Pro/XBase 也接受 `0x05`（n=1）。均未确认时从首次请求起 20 s 兜底。
 
 ## X1 移植说明
 
-- 开机长按由共用电源监控处理（2 s，与 X1Pro 和 Boot 仓库 X1 契约一致）；旧版因 MultiButton 10 ms 调用 5 ms 节拍，实际约 4 s。
+- X1 开机长按由共用电源监控处理（原始键电平 2 s，与 Boot 仓库 X1 契约一致；带屏产品改由 Startup 的 2 s 长按请求）；旧版因 MultiButton 10 ms 调用 5 ms 节拍，实际约 4 s。
 - 功能键按住 2.5 s 强制关机，三个产品共用 `Platform/HAL/HAL_Key.cpp`（`HoldTimer`，与旧 X1Pro ButtonEvent 500 ms + 10×200 ms 一致）；旧版 X1 计数用 `LONG_PRESS_START`，实际无法触发，已修正。
 - 电量补偿参数从旧地址 `0x7A000`（Boot V2 元数据 A）改到 App 参数扇区 `0x7E000`，只写首字，读出值不在 0..9 时视为未保存。旧设备上已保存的补偿值不会迁移；Boot 仓库的 X1 App 在该扇区使用不同的记录格式，两者交替烧录时补偿值会失效。
 - 补偿差值 ≥ 10 时不采用（旧版写入 RAM 但不保存）。

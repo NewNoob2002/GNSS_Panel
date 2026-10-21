@@ -257,6 +257,7 @@ main() {
         print_controls();
         result = EXIT_SUCCESS;
         bool enter_down = false;
+        bool cold_boot_wait = true;
         while (!stop) {
             SDL_Event event;
             while (SDL_PollEvent(&event)) {
@@ -277,7 +278,7 @@ main() {
                             app->on_input(P4App::InputAction::Commit);
                         } else if (!enter_down) {
                             enter_down = true;
-                            HAL::Sim_SetPowerKey(true); // 固件电源时序按 Power 键电平判定开机
+                            HAL::Sim_SetPowerKey(true); // 原始电平仅模拟按键，开机由 Startup 完整长按请求。
                             app->on_input(P4App::InputAction::Press);
                         }
                     } else {
@@ -321,6 +322,11 @@ main() {
             simulate_host(lv_tick_get());
             App_Update();
             lv_timer_handler();
+            if (cold_boot_wait && systemInfo.power.panel_power_on) {
+                // SDL 事件循环维持冷启动界面；Startup 确认后再退出固件等待并拉高主控电源。
+                HAL::Power_OnCheck();
+                cold_boot_wait = false;
+            }
             SDL_SetWindowTitle(window, app->current_page());
             if (frame.dirty) {
                 if (SDL_UpdateTexture(texture, nullptr, frame.pixels.data(), kWidth * 4) != 0

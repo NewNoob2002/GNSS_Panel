@@ -7,6 +7,7 @@ namespace HAL {
 void HAL_Update();
 void Power_Init();
 void Battery_Init();
+bool Power_RequestOn();
 void Power_OnCheck(void (*idle)() = nullptr);
 void Power_Shutdown(bool);
 void Power_PowerOffMonitor();

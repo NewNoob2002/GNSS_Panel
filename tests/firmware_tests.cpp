@@ -14,6 +14,7 @@
 #include "bq40z50.h"
 #include "display_protocol.h"
 #include "mp2762a.h"
+#include "product_config.h"
 #include "slave_i2c.h"
 
 CM_I2C_TypeDef fake_i2c1, fake_i2c2;
@@ -33,6 +34,7 @@ HAL::HAL_Update() {}
 void
 App_Update() {}
 
+#ifndef POWER_TESTS_ONLY
 static std::vector<uint8_t>
 frame(uint16_t id, const std::vector<uint8_t>& payload = {}, uint8_t type = NM_MSG_QUERY_TYPE) {
     std::vector<uint8_t> bytes(NM_PROTOCOL_HEADER_LEN, 0);
@@ -543,6 +545,69 @@ test_charger_variants() {
     State::Reset();
 }
 
+#endif // POWER_TESTS_ONLY
+
+/** Verify cold-boot rail gating, repeated requests, and software-reset recovery. */
+static void
+test_power_on() {
+    State::Reset();
+    fake_pins[POWER_KEY_PIN] = LOW;
+    fake_ms = 100;
+    HAL::Power_Init();
+    assert(fake_pins[POWER_CONTROL_PIN] == LOW && fake_software_reset == RESET);
+    HAL::Power_PowerOffMonitor();
+    fake_pins[POWER_KEY_PIN] = HIGH;
+    HAL::Power_PowerOffMonitor();
+    fake_ms += 1500;
+    HAL::Power_PowerOffMonitor();
+    assert(!systemInfo.power.panel_power_on && fake_pins[POWER_CONTROL_PIN] == LOW);
+    fake_pins[POWER_KEY_PIN] = LOW;
+    HAL::Power_PowerOffMonitor();
+    fake_ms += 1000;
+    HAL::Power_PowerOffMonitor();
+    assert(!systemInfo.power.panel_power_on && fake_pins[POWER_CONTROL_PIN] == LOW);
+    fake_pins[POWER_KEY_PIN] = HIGH;
+    HAL::Power_PowerOffMonitor();
+    fake_ms += 1999;
+    HAL::Power_PowerOffMonitor();
+    assert(!systemInfo.power.panel_power_on && fake_pins[POWER_CONTROL_PIN] == LOW);
+    fake_ms += 501;
+    HAL::Power_PowerOffMonitor();
+#if PRODUCT_HAS_DISPLAY
+    assert(!systemInfo.power.panel_power_on && fake_pins[POWER_CONTROL_PIN] == LOW);
+    const bool accepted = HAL::Power_RequestOn();
+    assert(accepted);
+#endif
+    assert(systemInfo.power.panel_power_on && fake_pins[POWER_CONTROL_PIN] == LOW);
+    assert(systemInfo.power.pannel_power_on_time == fake_ms);
+    const uint32_t accepted_at = systemInfo.power.pannel_power_on_time;
+    State::Host().online = true;
+    fake_ms += 100;
+    const bool repeated = HAL::Power_RequestOn();
+    assert(repeated && systemInfo.power.pannel_power_on_time == accepted_at && systemInfo.host.online);
+    assert(fake_pins[POWER_CONTROL_PIN] == LOW);
+    HAL::Power_OnCheck();
+    assert(fake_pins[POWER_CONTROL_PIN] == HIGH && fake_pins[POWER_LED_PIN] == HIGH);
+    HAL::Power_Shutdown(false);
+    const bool during_request = HAL::Power_RequestOn();
+    assert(!during_request && systemInfo.power.ShutdownReq && systemInfo.power.panel_power_on);
+    assert(fake_pins[POWER_CONTROL_PIN] == HIGH && systemInfo.power.pannel_power_on_time == accepted_at);
+    State::Power().ShutdownReq = false;
+
+    State::Reset();
+    fake_pins[POWER_KEY_PIN] = LOW;
+    fake_software_reset = SET;
+    HAL::Power_Init();
+    assert(fake_pins[POWER_CONTROL_PIN] == HIGH && fake_software_reset == RESET);
+    HAL::Power_PowerOffMonitor();
+    assert(systemInfo.power.panel_power_on && systemInfo.power.pannel_power_on_time == fake_ms);
+    HAL::Power_OnCheck();
+    assert(fake_pins[POWER_CONTROL_PIN] == HIGH);
+    State::Reset();
+    HAL::Power_Init(); // 恢复普通上电状态，后续测试不沿用软件复位原因。
+    assert(fake_pins[POWER_CONTROL_PIN] == LOW);
+}
+
 // 强制关机计时与指示灯闪烁：时间差需支持 tick 回绕。
 static void
 test_hold_and_blink() {
@@ -625,6 +690,9 @@ test_low_battery() {
     assert(power.LowBatteryPowerOff);
     HAL::Power_PowerOffMonitor();
     assert(power.ShutdownGoing && power.poweroff_flag == 1);
+    const uint32_t powered_at = power.pannel_power_on_time;
+    const bool accepted = HAL::Power_RequestOn();
+    assert(!accepted && power.ShutdownGoing && power.pannel_power_on_time == powered_at);
     // 关机时序结束（主控未确认，20 s 兜底）进入驻留，为后续测试恢复初始状态。
     fake_ms += 20000U;
     HAL::Power_PowerOffMonitor();
@@ -633,17 +701,26 @@ test_low_battery() {
     HAL::Power_PowerOffMonitor();
     fake_ms += 2000U;
     HAL::Power_PowerOffMonitor();
+#if PRODUCT_HAS_DISPLAY
+    assert(!power.panel_power_on && fake_pins[POWER_CONTROL_PIN] == LOW);
+    const bool resumed = HAL::Power_RequestOn();
+    assert(resumed);
+#endif
     assert(power.panel_power_on);
     fake_pins[POWER_KEY_PIN] = LOW;
     State::Reset();
 }
 
-// 外部供电关机后驻留：不复位、不自动开机；长按电源键 2 s 原地开机，状态与冷启动一致。
+// 外部供电关机后驻留：不复位；带屏仅接受 Startup 请求，X1 保留原始电源键 2 s 开机。
 static void
 test_resident_off() {
     State::Reset();
     State::Power().panel_power_on = true;
     State::Power().Force_ShutDown = true;
+    State::Power().batteryInfo.sample_valid = true;
+    State::Power().batteryInfo.Percent = 70;
+    State::Board().online_device.bq40z50 = true;
+    std::snprintf(State::Board().hardware_version, sizeof(systemInfo.board.hardware_version), "TEST");
     State::Host().online = true;
     State::Host().record.record_status = On_Off_Status_ON;
     fake_pins[POWER_KEY_PIN] = HIGH; // 关机时按键仍按住
@@ -670,11 +747,24 @@ test_resident_off() {
     assert(!systemInfo.power.panel_power_on);
     fake_ms += 1;
     HAL::Power_PowerOffMonitor();
+#if PRODUCT_HAS_DISPLAY
+    assert(!systemInfo.power.panel_power_on && fake_pins[POWER_CONTROL_PIN] == LOW);
+    assert(systemInfo.host.online && systemInfo.power.ShutdownComplete);
+    const bool resumed = HAL::Power_RequestOn();
+    assert(resumed);
+#endif
     assert(systemInfo.power.panel_power_on && !systemInfo.power.ShutdownComplete);
     assert(fake_pins[POWER_CONTROL_PIN] == HIGH && fake_pins[POWER_LED_PIN] == HIGH);
     assert(!systemInfo.power.Force_ShutDown && !systemInfo.host.online);
+    assert(systemInfo.power.batteryInfo.sample_valid && systemInfo.power.batteryInfo.Percent == 70);
+    assert(systemInfo.board.online_device.bq40z50 && std::string(systemInfo.board.hardware_version) == "TEST");
     assert(State::Effective_Record().record_status == On_Off_Status_OFF);
     assert(fake_system_resets == resets);
+    const uint32_t resumed_at = systemInfo.power.pannel_power_on_time;
+    State::Host().online = true;
+    ++fake_ms;
+    const bool repeated = HAL::Power_RequestOn();
+    assert(repeated && systemInfo.host.online && systemInfo.power.pannel_power_on_time == resumed_at);
 
     // 开机后电源策略重新可用：再次强制关机仍进入驻留。
     fake_pins[POWER_KEY_PIN] = LOW;
@@ -689,6 +779,7 @@ test_resident_off() {
 
 int
 main() {
+#ifndef POWER_TESTS_ONLY
     test_parser_boundaries();
     test_slave_transactions();
     test_decoder_boundary();
@@ -696,6 +787,8 @@ main() {
     test_device_failures();
     test_state_requests();
     test_charger_variants();
+#endif
+    test_power_on();
     test_hold_and_blink();
     test_power_policy();
     test_low_battery();

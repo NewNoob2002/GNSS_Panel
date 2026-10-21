@@ -14,6 +14,7 @@ void HAL_Update();
 
 /* Power（Platform/HAL/HAL_Power.cpp） */
 void Power_Init();
+bool Power_RequestOn();
 void Power_OnCheck(void (*idle)() = nullptr);
 void Power_Shutdown(bool en);
 void Power_PowerOffMonitor();

@@ -8,6 +8,7 @@
 
 #include "AppPlatform.h"
 #include "Arduino.h"
+#include "Charger.h"
 #include "Common/SystemService.h"
 #include "HAL.h"
 #include "P4App.h"
@@ -24,8 +25,10 @@ constexpr int kHeight = 126;
 constexpr uint32_t kMinFreeBytes = 8U * 1024U; // 96 KB 池至少保留的余量
 uint32_t now = 0;
 bool power_key = false;
-int shutdown_requests = 0;
-int host_power_level = HIGH;
+int power_on_requests = 0;
+int pin_levels[32] = {};
+int reset_reason = RESET;
+int standby_calls = 0, charger_power_on_calls = 0;
 bool probe_battery_gauge = true, probe_charger = true; // SystemLoading 重新探测 I2C 时的应答
 lv_color_t draw_pixels[kWidth * 20];
 uint32_t peak_used = 0;
@@ -37,9 +40,12 @@ flush(lv_disp_drv_t* driver, const lv_area_t*, lv_color_t*) {
 
 // 与固件主循环相同的顺序：App_Update() 后 lv_timer_handler()。
 void
-run(uint32_t ms) {
+run(uint32_t ms, bool update_power = true) {
     for (uint32_t elapsed = 0; elapsed < ms; elapsed += 5) {
         now += 5;
+        if (update_power) {
+            HAL::HAL_Update();
+        }
         App_Update();
         lv_timer_handler();
     }
@@ -136,27 +142,82 @@ reset_system_info() {
     State::Host().online = true; // 主控已在通信：加载页第 5 步立即通过
 }
 
-// HAL 判定开机：模拟 Power_OnCheck / 驻留中长按开机。
+/** Model charger outputs while running the real firmware power policy. */
+class TestCharger final : public HAL::Charger {
+  public:
+    /** Identify the virtual charger. */
+    const char*
+    name() const override {
+        return "Test";
+    }
+
+    /** Keep board initialization independent of this power sequencing test. */
+    void
+    begin(BatteryInfo_t&) override {}
+
+    /** Count standby entry without touching charger hardware. */
+    void
+    enter_standby() override {
+        ++standby_calls;
+    }
+
+    /** Count output restoration after power-on acceptance. */
+    void
+    power_on() override {
+        ++charger_power_on_calls;
+    }
+
+    /** Leave the explicitly seeded battery sample unchanged. */
+    void
+    update(BatteryInfo_t&) override {}
+
+  protected:
+    /** Accept charger enable changes on the virtual board. */
+    bool
+    apply_enabled(bool, BatteryInfo_t&) override {
+        return true;
+    }
+};
+
+/** Finish the Startup hold in the cold-boot wait, keeping the rail off until it returns. */
+void
+cold_boot_idle() {
+    run(5);
+    assert(now < 6000);
+    assert(digitalRead(POWER_CONTROL_PIN) == LOW);
+    if (systemInfo.power.panel_power_on) {
+        assert(SystemService::snapshot().powered_on);
+    }
+}
+
+/** Resume through the actual Startup hold and verify loading before reaching the home page. */
 void
 hal_power_on_and_boot() {
     assert(on_page("Pages/Startup"));
-    State::Power().ShutdownComplete = false;
-    State::Power().ShutdownGoing = false;
-    State::Power().panel_power_on = true;
-    run(300);
-    assert(on_page("Pages/SystemLoading"));
+    const int before = power_on_requests;
+    power_key = true;
+    run(1500);
+    assert(power_on_requests == before && !systemInfo.power.panel_power_on);
+    assert(on_page("Pages/Startup") && digitalRead(POWER_CONTROL_PIN) == LOW);
+    run(800);
+    assert(power_on_requests == before + 1 && systemInfo.power.panel_power_on);
+    assert(on_page("Pages/SystemLoading") && digitalRead(POWER_CONTROL_PIN) == HIGH);
+    power_key = false;
+    assert(!systemInfo.host.online); // 驻留恢复清除主控数据，随后模拟重新通信。
+    State::Host().online = true;
     run(7000);
     assert(on_page("Pages/Dialplate"));
 }
 
-// HAL 断电延时结束、外部供电仍在：进入驻留。
+/** Complete a real HAL shutdown with external power keeping the MCU alive in standby. */
 void
 hal_enter_standby() {
-    auto& power = State::Power();
-    power.ShutdownGoing = false;
-    power.ShutdownComplete = true;
-    power.panel_power_on = false;
-    power.ShutdownReq = power.LinuxPowerOff = power.LowBatteryPowerOff = power.Force_ShutDown = false;
+    State::Power().ExternalPower = 1;
+    State::Power().Force_ShutDown = true;
+    HAL::Power_PowerOffMonitor();
+    assert(systemInfo.power.ShutdownComplete && !systemInfo.power.panel_power_on);
+    assert(digitalRead(POWER_CONTROL_PIN) == LOW);
+    power_key = false;
     run(800);
     assert(on_page("Pages/Startup"));
 }
@@ -167,23 +228,62 @@ millis(void) {
     return now;
 }
 
+/** Read the independent Power key and host rail levels on the virtual board. */
 int
-digitalRead(int) {
-    return host_power_level;
+digitalRead(int pin) {
+    return pin == POWER_KEY_PIN ? (power_key ? HIGH : LOW) : pin_levels[pin];
+}
+
+/** Record a firmware output write. */
+void
+digitalWrite(int pin, int value) {
+    pin_levels[pin] = value;
+}
+
+/** Apply the initial output level configured by Power_Init. */
+void
+pinMode(int pin, int, int value) {
+    digitalWrite(pin, value);
+}
+
+/** Return the seeded reset reason. */
+en_flag_status_t
+RMU_GetStatus(int) {
+    return reset_reason;
+}
+
+/** Clear the virtual reset flags after firmware reads them. */
+void
+RMU_ClearStatus() {
+    reset_reason = RESET;
+}
+
+/** Run the real firmware power monitor before the application update. */
+void
+HAL::HAL_Update() {
+    Power_PowerOffMonitor();
+}
+
+/** Supply the virtual charger for real HAL power sequencing. */
+HAL::Charger&
+HAL::Charger_Get() {
+    static TestCharger charger;
+    return charger;
+}
+
+extern "C" bool __real__ZN3HAL15Power_RequestOnEv();
+
+/** Count UI requests while preserving the real HAL implementation and return value. */
+extern "C" bool
+__wrap__ZN3HAL15Power_RequestOnEv() {
+    ++power_on_requests;
+    return __real__ZN3HAL15Power_RequestOnEv();
 }
 
 void
 HAL_NVIC_SystemReset() {
     std::fprintf(stderr, "unexpected app_fatal reset\n");
     std::abort();
-}
-
-void
-HAL::Power_Shutdown(bool completed) {
-    if (!completed) {
-        State::Power().ShutdownReq = true;
-        ++shutdown_requests;
-    }
 }
 
 bool
@@ -215,7 +315,9 @@ main() {
     assert(lv_disp_drv_register(&driver));
 
     reset_system_info();
-    // 冷启动：按住 Power 键给板子上电，界面开始轮询时键已按下；待机页的开机进度必须从这次按压开始计。
+    HAL::Power_Init();
+    assert(digitalRead(POWER_CONTROL_PIN) == LOW);
+    // 冷启动：界面开始轮询时键已按下，进度必须从这次按压开始计。
     power_key = true;
     App_Init();
     run(1000);
@@ -223,12 +325,22 @@ main() {
     assert(!find_text(lv_scr_act(), "DEMO")); // 真实数据不显示 DEMO 标记
     assert(startup_progress(lv_scr_act()) >= 30);
 
-    // 开机由 HAL 决定：界面长按 2 s 只发出请求，HAL 未确认时不切页。
-    run(1300);
-    assert(on_page("Pages/Startup"));
-    power_key = false;
     run(500);
-    hal_power_on_and_boot();
+    assert(power_on_requests == 0 && digitalRead(POWER_CONTROL_PIN) == LOW);
+    power_key = false; // 约 1.5 s 松开：不得请求开机，进度回到零。
+    run(1000);
+    assert(on_page("Pages/Startup") && startup_progress(lv_scr_act()) == 0);
+    assert(power_on_requests == 0 && !systemInfo.power.panel_power_on);
+    assert(!SystemService::snapshot().powered_on && digitalRead(POWER_CONTROL_PIN) == LOW);
+    power_key = true;
+    HAL::Power_OnCheck(cold_boot_idle);
+    assert(power_on_requests == 1 && systemInfo.power.panel_power_on);
+    assert(digitalRead(POWER_CONTROL_PIN) == HIGH && charger_power_on_calls == 1 && standby_calls == 1);
+    power_key = false;
+    run(300);
+    assert(on_page("Pages/SystemLoading"));
+    run(7000);
+    assert(on_page("Pages/Dialplate"));
 
     // 逐页进入并返回，检查导航与内存。
     const char* pages[] = {"Pages/WorkSettings", "Pages/RecordConfig", "Pages/SystemInfos", "Pages/SystemDash"};
@@ -426,13 +538,21 @@ main() {
     assert(on_page("Pages/SaveConfig"));
     power_key = false;
     run(10000);
-    assert(shutdown_requests == 1);
-    State::Power().ShutdownGoing = true; // HAL 电源策略进入关机
+    assert(SystemService::snapshot().power_calls == 1);
+    assert(systemInfo.power.ShutdownGoing); // HAL 已开始等待主控确认。
     run(200);
     assert(App_Get()->back() && on_page("Pages/SaveConfig")); // 关机中不能返回
     hal_enter_standby();
 
     // 主控请求关机：显示原因，不能返回，不再向 HAL 重复请求。
+    const int before_resume = power_on_requests;
+    power_key = true;
+    now += 2500;
+    HAL::Power_PowerOffMonitor(); // 只运行 HAL：原始电平按住超过 2 s 仍不得恢复。
+    assert(on_page("Pages/Startup") && !systemInfo.power.panel_power_on);
+    assert(power_on_requests == before_resume && digitalRead(POWER_CONTROL_PIN) == LOW);
+    power_key = false;
+    run(100);
     hal_power_on_and_boot();
     State::Power().LinuxPowerOff = true;
     run(800);
@@ -440,7 +560,7 @@ main() {
     assert(find_text(lv_scr_act(), i18n::text(i18n::TextId::SaveConfigPowerOffBoard)));
     assert(App_Get()->back() && on_page("Pages/SaveConfig"));
     run(10000);
-    assert(shutdown_requests == 1);
+    assert(SystemService::snapshot().power_calls == 1);
     hal_enter_standby();
 
     // V1.3 主板没有 MP2762A（GPIO 控制充电），充电初始化步骤不算失败。
@@ -464,11 +584,12 @@ main() {
 
     // SystemLoading 自检非阻塞：I2C 在加载页重新探测；V1.5 主板 MP2762A 不应答判失败；主控不通信最多等 30 s；
     // 失败都不阻止进入首页，等待期间平台关机照常进行。
+    /** Request loading through Startup while leaving the host offline for initialization checks. */
     const auto power_on_to_loading = [] {
-        State::Power().ShutdownComplete = false;
-        State::Power().ShutdownGoing = false;
-        State::Power().panel_power_on = true;
-        run(300);
+        power_key = true;
+        run(2300);
+        power_key = false;
+        assert(systemInfo.power.panel_power_on && digitalRead(POWER_CONTROL_PIN) == HIGH);
         assert(on_page("Pages/SystemLoading"));
     };
     hal_enter_standby();
@@ -511,11 +632,28 @@ main() {
     run(4000);
     assert(on_page("Pages/SystemLoading"));
     State::Power().Force_ShutDown = true;
-    run(800);
+    // 单独验证 PowerBridge 收到强制关机事件时的页面；下一次 HAL 监控会立即完成强制断电。
+    run(800, false);
     assert(on_page("Pages/SaveConfig"));
     assert(find_text(lv_scr_act(), i18n::text(i18n::TextId::SaveConfigPowerOffForced)));
     hal_enter_standby();
     State::Host().online = true;
+
+    // 模拟软件复位重建应用：HAL 立即保持主控供电，PowerBridge 无需 Startup 请求即可切到加载页。
+    hal_power_on_and_boot(); // 先恢复 Running 电源策略，模拟复位后的静态初值。
+    App_Deinit();
+    reset_system_info();
+    reset_reason = SET;
+    const int before_reset = power_on_requests;
+    HAL::Power_Init();
+    assert(digitalRead(POWER_CONTROL_PIN) == HIGH && reset_reason == RESET);
+    App_Init();
+    HAL::Power_OnCheck();
+    assert(systemInfo.power.panel_power_on && !power_key && power_on_requests == before_reset);
+    run(300);
+    assert(on_page("Pages/SystemLoading"));
+    run(7000);
+    assert(on_page("Pages/Dialplate") && power_on_requests == before_reset);
 
     std::printf("%s: LVGL pool peak %lu / %lu bytes (free margin %lu)\n", PRODUCT_NAME,
                 static_cast<unsigned long>(peak_used), static_cast<unsigned long>(LV_MEM_SIZE),

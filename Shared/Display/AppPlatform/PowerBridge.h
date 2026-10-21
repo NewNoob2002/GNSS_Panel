@@ -1,8 +1,8 @@
 #pragma once
 
 /**
- * HAL 电源状态 -> 共享应用。HAL 是电源状态的唯一判定者：开机（Power 键原始电平 2 s）、
- * 关机请求与断电后的待机驻留；这里只在状态变化时通知 SystemService。
+ * HAL 电源状态 -> 共享应用。Startup 完整长按经 HAL::Power_RequestOn() 确认开机，
+ * HAL 负责软件复位直接开机、关机时序与断电后驻留；这里只在状态变化时幂等通知 SystemService。
  */
 class PowerBridge {
   public:

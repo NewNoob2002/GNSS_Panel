@@ -58,11 +58,11 @@ system_backend::capabilities() {
             .record_settings = PRODUCT_RECORD_SETTINGS != 0};
 }
 
+/** Forward the completed Startup hold to the HAL power policy on the LVGL thread. */
 bool
 system_backend::request_power_on() {
-    // HAL 按 Power 键原始电平判定 2 s 长按（Power_OnCheck / Power_PowerOffMonitor；模拟器运行同一份代码，
-    // 电平来自 Enter 键），PowerBridge 检测到 panel_power_on 后通知共享应用。
-    return false;
+    // Startup 完整长按后请求 HAL 开机；成功时 SystemService 同步发布 powered_on 并进入 SystemLoading。
+    return HAL::Power_RequestOn();
 }
 
 bool

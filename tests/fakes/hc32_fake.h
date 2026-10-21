@@ -313,13 +313,18 @@ I2C_MasterReceiveDataAndStop(CM_I2C_TypeDef*, uint8_t* data, uint8_t length, uin
 #define CM_VALUE_IN_RANGE(value, low, high)     ((value) >= (low) && (value) <= (high))
 #define CM_SET_VALUE_IN_RANGE(value, low, high) ((value) < (low) ? (low) : (value) > (high) ? (high) : (value))
 
+inline int fake_software_reset = RESET;
+
 inline int
 RMU_GetStatus(int) {
-    return RESET;
+    return fake_software_reset;
 }
 
+/** Consume the seeded reset reason after Power_Init reads it. */
 inline void
-RMU_ClearStatus() {}
+RMU_ClearStatus() {
+    fake_software_reset = RESET;
+}
 
 inline void
 pinMode(int pin, int, int value = 0) {

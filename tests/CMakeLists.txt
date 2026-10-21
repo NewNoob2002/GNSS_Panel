@@ -37,7 +37,21 @@ add_executable(clock_tests clock_tests.c)
 target_include_directories(clock_tests PRIVATE time_fakes)
 add_executable(heap_tests heap_tests.c ${ROOT}/Platform/Core/src/Syscalls_GCC.c)
 target_compile_definitions(heap_tests PRIVATE _DEFAULT_SOURCE)
-foreach(target firmware_tests x1_protocol_tests xbase_protocol_tests clock_tests heap_tests)
+# 同一 HAL 电源回归也按 X1/XBase 开关编译，验证无屏按键路径与两种带屏配置。
+foreach(product X1 XBase)
+    string(TOLOWER ${product} name)
+    add_executable(${name}_power_tests firmware_tests.cpp ${STATE_SOURCES}
+        ${ROOT}/Platform/HAL/HAL_Power.cpp ${ROOT}/Platform/HAL/Charger.cpp
+        ${ROOT}/Platform/HAL/HAL_Battery.cpp ${ROOT}/Platform/Core/src/Wire.cpp
+        ${ROOT}/Libraries/Bq40z50/bq40z50.cpp ${ROOT}/Libraries/Mp2762a/mp2762a.cpp)
+    target_include_directories(${name}_power_tests PRIVATE fakes ${STATE_INCLUDE}
+        ${ROOT}/Products/${product} ${ROOT}/Platform/Config ${ROOT}/Platform/Core/inc ${ROOT}/Platform/HAL
+        ${ROOT}/Libraries/Bq40z50 ${ROOT}/Libraries/Mp2762a ${ROOT}/Libraries/Parser/include
+        ${ROOT}/Shared/Comm ${ROOT}/Shared/Display)
+    target_compile_options(${name}_power_tests PRIVATE -include ${CMAKE_CURRENT_LIST_DIR}/fakes/HAL.h)
+    target_compile_definitions(${name}_power_tests PRIVATE __CORE_DEBUG __HAL_H POWER_TESTS_ONLY)
+endforeach()
+foreach(target firmware_tests x1_power_tests xbase_power_tests x1_protocol_tests xbase_protocol_tests clock_tests heap_tests)
     target_compile_options(${target} PRIVATE -Wall -Wextra -UNDEBUG -fsanitize=address,undefined -fno-omit-frame-pointer)
     target_link_options(${target} PRIVATE -fsanitize=address,undefined)
     add_test(NAME ${target} COMMAND ${target})
@@ -54,10 +68,15 @@ file(GLOB APP_PLATFORM_SOURCES CONFIGURE_DEPENDS ${ROOT}/Shared/Display/AppPlatf
 foreach(product X1Pro XBase)
     string(TOLOWER ${product} name)
     add_executable(${name}_display_app_tests display_app_tests.cpp ${SHARED_APP_SOURCES} ${STATE_SOURCES}
-        ${APP_PLATFORM_SOURCES} ${ROOT}/Shared/Display/lvgl_new.cpp)
+        ${APP_PLATFORM_SOURCES} ${ROOT}/Shared/Display/lvgl_new.cpp ${ROOT}/Platform/HAL/HAL_Power.cpp)
+    target_compile_options(${name}_display_app_tests PRIVATE
+        $<$<COMPILE_LANGUAGE:CXX>:-include;${CMAKE_CURRENT_LIST_DIR}/display_fakes/HAL.h>)
+    target_compile_definitions(${name}_display_app_tests PRIVATE __HAL_H)
+    # 统计真实后端的开机请求，验证提前松键从未调用 HAL；电源时序仍执行固件实现。
+    target_link_options(${name}_display_app_tests PRIVATE -Wl,--wrap=_ZN3HAL15Power_RequestOnEv)
     # display_fakes 在前：替换固件的 HAL.h / Arduino.h；core_debug.h 取自 fakes
     target_include_directories(${name}_display_app_tests PRIVATE display_fakes fakes ${STATE_INCLUDE} ${ROOT}/Simulator/App
-        ${ROOT}/Shared/Display ${ROOT}/Products/${product} ${ROOT}/Platform/Config)
+        ${ROOT}/Shared/Display ${ROOT}/Products/${product} ${ROOT}/Platform/Config ${ROOT}/Platform/HAL)
     target_link_libraries(${name}_display_app_tests PRIVATE display_lvgl)
     target_compile_options(${name}_display_app_tests PRIVATE -Wall -Wextra -UNDEBUG)
     add_test(NAME ${name}_display_app_tests COMMAND ${name}_display_app_tests)

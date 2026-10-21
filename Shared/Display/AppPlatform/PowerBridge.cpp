@@ -26,6 +26,7 @@ void
 PowerBridge::update() {
     const Power_Monitor_t& power = systemInfo.power;
     if (power.panel_power_on && !powered_on_) {
+        // Startup 请求已同步发布 powered_on；此处幂等补报，并覆盖软件复位自动开机。
         SystemService::set_powered_on(true);
         shutdown_reported_ = standby_reported_ = false;
     }
