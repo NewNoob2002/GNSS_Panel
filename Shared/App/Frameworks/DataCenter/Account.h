@@ -26,7 +26,7 @@
 #include <stdint.h>
 #include <vector>
 #include "PingPongBuffer/PingPongBuffer.h"
-#include "lvgl.h"
+#include "DataTimer.h"
 
 class DataCenter;
 
@@ -102,7 +102,7 @@ class Account {
 
     struct {
         EventCallback_t eventCallback;
-        lv_timer_t* timer;
+        DataTimer* timer;
         PingPongBuffer_t BufferManager;
         uint32_t BufferSize;
     } priv;
@@ -111,7 +111,7 @@ class Account {
     friend class DataCenter;
     bool registered_ = false;
     uint64_t registration_serial_ = 0;
-    static void TimerCallbackHandler(lv_timer_t* task);
+    static void TimerCallbackHandler(DataTimer* task);
 };
 
 #endif

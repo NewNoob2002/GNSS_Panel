@@ -40,7 +40,7 @@ for top in SOURCES:
         if path.suffix not in {".c", ".cpp", ".h"} or "/build/" in str(path):
             continue
         rel = path.relative_to(ROOT).as_posix()
-        if rel.startswith(EXEMPT) or rel.startswith("Simulator/App/"):
+        if rel.startswith(EXEMPT) or rel.startswith("Shared/App/"):
             continue
         for number, line in enumerate(path.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
             for match in pattern.finditer(line):

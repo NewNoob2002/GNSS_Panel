@@ -28,3 +28,19 @@ If:
   PathMatch: Libraries/Adafruit-GFX-Library/gfxfont\.h
 CompileFlags:
   Add: [-include, stdint.h]
+---
+# 主机测试使用自己的替身头文件与编译参数，不继承固件编译数据库。
+If:
+  PathMatch: tests/.*
+CompileFlags:
+  CompilationDatabase: build/host-tests
+---
+If:
+  PathMatch: tests/.*\.cpp
+CompileFlags:
+  Compiler: c++
+---
+If:
+  PathMatch: tests/.*\.c
+CompileFlags:
+  Compiler: cc

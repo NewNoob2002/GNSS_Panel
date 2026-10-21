@@ -124,6 +124,7 @@ App_Update() {
     app->on_key(P4App::Key::Function, HAL::Key_FunctionPressed());
     app->poll_keys(now);
 #endif
+    app->update();
     bridges.power.update();
     bridges.device.update(now);
     bridges.status.update(*app, now);

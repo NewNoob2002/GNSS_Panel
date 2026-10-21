@@ -1,4 +1,4 @@
-// HC32 带屏产品 PC 模拟器：共享 LVGL 应用（Simulator/App）+ HC32 平台层（Shared/Display/AppPlatform）
+// HC32 带屏产品 PC 模拟器：共享应用（Shared/App）+ HC32 平台层（Shared/Display/AppPlatform）
 // + 模拟 HAL（Simulator/HAL，运行真实的关机策略 PowerPolicy）。窗口 294×126，1:1 像素。
 #define SDL_MAIN_HANDLED
 #include <SDL.h>

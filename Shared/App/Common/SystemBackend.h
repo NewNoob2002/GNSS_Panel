@@ -3,8 +3,8 @@
 #include <cstdint>
 #include "DataProc/DataProc_Def.h"
 
-/** Platform implementation of system operations; exactly one per build (RK simulator:
- * Status/SimulatedSystem.cpp). Called by SystemService on the LVGL thread; must be bounded and must not
+/** Platform implementation of system operations; exactly one per build.
+ * Called by SystemService on the application thread; must be bounded and must not
  * block on I/O. The platform reports asynchronous results through SystemService (see SystemService.h).
  */
 namespace system_backend {

@@ -18,8 +18,8 @@ DataCenter* DataProc::Center() {
     return &center;
 }
 
-bool DataProc_Init() {
-    if (initialized || center.GetAccountLen() != 0) {
+bool DataProc_Init(DataTimerManager::Clock clock) {
+    if (initialized || center.GetAccountLen() != 0 || !center.Timers().set_clock(clock)) {
         APP_LOG_E("DataProc", "initialization rejected: existing Accounts");
         return false;
     }
@@ -50,6 +50,9 @@ bool DataProc_Init() {
     initialized = true;
     APP_LOG_I("DataProc", "providers initialized");
     return true;
+}
+uint32_t DataProc_RunLoop() {
+    return initialized ? center.Timers().handle() : UINT32_MAX;
 }
 bool DataProc_Deinit() {
     if (!initialized)

@@ -1,37 +1,6 @@
 CompileFlags:
-  # Reuse the complete include list from the firmware build, then translate the
-  # target-specific parts to the desktop simulator environment.
-  CompilationDatabase: ../build/gcc-debug
-  Compiler: /usr/bin/g++
-  Remove:
-    - "--target=*"
-    - "-mcpu=*"
-    - "-mthumb"
-    - "-mfpu=*"
-    - "-mfloat-abi=*"
-    - "-DHC32F460"
-    - "-D__PROGRAM_START=*"
-    - "-I*/Platform"
-    - "-I*/Platform/*"
-    - "-I*/Libraries/lvgl"
-    - "-I*/Libraries/lvgl/*"
-  Add:
-    - "--target=x86_64-linux-gnu"
-    - "-DLVGL_SIMULATOR"
-    - "-I../../Simulator"
-    - "-I../../Simulator/lvgl"
-    - "-I../../Simulator/HAL"
-    - "-I../../Platform/Config"
-    - "-I../../Platform/support"
+  # 使用模拟器自身的 SDL、虚拟 HAL 和共享应用编译参数。
+  CompilationDatabase: ../build/simulator-x1pro
+  Compiler: /usr/bin/c++
 Index:
   Background: Build
-Diagnostics:
-  Suppress:
-    # - unused-includes
-    - unknown_typename
-    - unknown_typename_suggest
-    - typename_requires_specqual
-    - using_decl_conflict
-    - macro_redefined
-    - redefinition
-    - conflicting_types

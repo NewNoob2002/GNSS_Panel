@@ -1,25 +1,25 @@
-# Repository Guidelines
+# Simulator Guidelines
 
-## Project Structure & Module Organization
+## Structure
 
-This directory is the desktop SDL simulator for the HC32 display products (X1Pro, XBase). `main.cpp` creates the SDL window and LVGL display, then runs the same code as the firmware: the shared LVGL application in `App/` plus the HC32 platform layer `../Shared/Display/AppPlatform/`. The firmware power sequencing `../Platform/HAL/HAL_Power.cpp` is compiled unchanged (Startup power-on requests, shutdown flow, standby and power-on in place, low-battery shutdown): `HAL/HAL.h` is force-included for that file to hide the firmware `HAL.h`, and `HAL/Arduino.h` + `HAL/HAL_Board.cpp` provide a virtual GPIO array, `millis()` and a no-op charger. Enter / middle click drives the virtual Power key pin and Startup input; only the completed Startup hold calls `HAL::Power_RequestOn()`. The rail starts LOW, and the SDL loop calls `Power_OnCheck()` after cold-boot acceptance to restore outputs; standby requests restore them immediately. Battery sampling and charging (`HAL_Battery.cpp`) are not compiled; `main.cpp` sets the battery values and plays the host (reports data, confirms panel requests and shutdown, comes back online 3 s after power-on from standby). LVGL sources are shared with the firmware at `../Libraries/lvgl/`; the simulator uses its own `lv_conf.h` through `LV_CONF_PATH`.
+This is the SDL simulator for HC32 X1Pro/XBase. It links the same `../Shared/App` CMake targets as firmware and host tests: portable `p4_core`/`p4_data_center` plus LVGL UI `p4_app`. Shared sources come from ATK_RK3506 `application/App`; the pinned commit is in `../Shared/App/UPSTREAM`.
 
-`App/` is a verbatim copy of ATK_RK3506 `application/App` (source commit in `App/UPSTREAM`). Only `App/CMakeLists.txt` (firmware build), `App/UPSTREAM` and `App/.clang-format` are HC32-owned.
+`main.cpp` owns SDL, pointer/keyboard input and simulated host data. `HAL/` provides virtual GPIO, time and a no-op charger. The firmware `../Platform/HAL/HAL_Power.cpp` runs unchanged, with `HAL/HAL.h` force-included to replace hardware declarations. Battery sampling is simulated; GPIO power sequencing and shutdown policy use the firmware implementation.
 
-## Build, Test, and Development Commands
+Enter/middle click and the Startup pointer target request power-on after a complete 2 s hold. The main loop finishes cold boot with `Power_OnCheck()` once accepted. Standby resume restores the outputs directly. `App_Update()` runs the independent core timers, then LVGL runs its UI timers and animations.
 
-- `cmake -S Simulator -B build/simulator -DSIM_PRODUCT=X1Pro|XBase` configures the simulator (run from the repository root; SDL2 development files required).
-- `cmake --build build/simulator` builds `build/simulator/bin/main` (each build directory has its own binary, so X1Pro and XBase can be built side by side).
-- `./build/simulator/bin/main` runs it; the key bindings (focus/press/back/commit and injected HC32 power/battery events) are printed at start.
+## Build and Validation
 
-## Coding Style & Naming Conventions
+- Configure: `cmake -S Simulator -B build/simulator-x1pro -DSIM_PRODUCT=X1Pro` (use XBase and a separate directory for that product).
+- Build: `cmake --build build/simulator-x1pro`.
+- Run: `build/simulator-x1pro/bin/main`.
+- Smoke: `python3 tests/simulator_smoke.py build/simulator-x1pro/bin/main`.
+- Host regressions: `ctest --test-dir build/host-tests`.
 
-`App/` follows the upstream style (snake_case, its own formatting); do not reformat it here. HC32-owned files (`main.cpp`, `HAL/`, `../Shared/Display/AppPlatform*`) follow the repository `.clang-format` and C++17.
+SDL2 development files are required. `.clangd` uses `build/simulator-x1pro/compile_commands.json`; configure the simulator before opening its sources in the editor. Firmware and simulator link the same LVGL sources with separate configuration targets.
 
-## Testing Guidelines
+## Ownership
 
-`ctest --test-dir build/host-tests` runs `x1pro_display_app_tests` / `xbase_display_app_tests` (shared app + AppPlatform firmware path with the firmware `lv_conf.h`, including the LVGL memory margin) and, when `SIMULATOR_EXECUTABLE` is configured, `simulator_smoke`. For UI changes also run the simulator and exercise the affected pages.
+Do not edit `../Shared/App` directly except `UPSTREAM` and `.clang-format`. Change and commit ATK_RK3506 `application/App`, then run `scripts/sync_shared_app.sh`; the CMake file is shared too. HC32 behavior belongs in `../Shared/Display/AppPlatform/`. Keep vendor LVGL changes scoped to explicit LVGL work.
 
-## Agent-Specific Instructions
-
-Do not edit `App/` directly: change ATK_RK3506 `application/App`, commit there, then run `scripts/sync_shared_app.sh <ATK_RK3506 repo> [commit]`. Do not edit the shared `../Libraries/lvgl/` sources unless the task explicitly targets LVGL (changes also affect the firmware).
+The simulator uses C11/C++17 and the repository style. Keep board mocks, host simulation and application services separate; all LVGL and application state access occurs on the main thread.

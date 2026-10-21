@@ -16,12 +16,12 @@ Arduino/           Arduino 兼容核心
 Libraries/         第三方与器件库；LVGL/Adafruit 仅带屏产品构建，MultiButton 仅 X1
 Shared/Comm/       I2C 从机传输 + 面板帧协议核心（全部产品）
 Shared/Display/    带屏产品入口、共享应用的 HC32 平台层 AppPlatform/（入口 + Status/Power/Device 三个 Bridge + 初始化步骤）、显示协议表、显示 HAL、LVGL 内存池 operator new（X1Pro、XBase）
-Simulator/App/     共享 LVGL 应用，ATK_RK3506 application/App 的原样副本（UPSTREAM 记录来源提交，scripts/sync_shared_app.sh 同步）
+Shared/App/        共享应用：独立事件框架、无 LVGL 的核心服务、LVGL 页面；ATK_RK3506 application/App 的原样副本（含共用 CMake，UPSTREAM 记录来源提交）
 Simulator/         PC 模拟器：共享应用 + AppPlatform + 固件电源时序 HAL_Power.cpp（Simulator/HAL 提供虚拟 GPIO 与时基）；LVGL 用 Libraries/lvgl，配置用自身 lv_conf.h（LV_CONF_PATH 指定）
 Products/<产品>/   product.cmake、product_config.h、产品专属源码
 ```
 
-依赖只能自上而下：`Products` → `Shared` → `Platform`/`Libraries`/`Arduino`。`Platform/` 不包含 LVGL 或 `Simulator/App` 头文件；为此做了以下解耦：
+依赖只能自上而下：`Products` → `Shared` → `Platform`/`Libraries`/`Arduino`。`Platform/` 不包含 LVGL 或 `Shared/App` 头文件；为此做了以下解耦：
 
 - LVGL 使用 `LV_TICK_CUSTOM` 直接读取 `millis()`，SysTick 不再调用 `lv_tick_inc()`。
 - C++ `operator new` 平台默认走 C 堆（弱符号），带屏产品在 `Shared/Display/lvgl_new.cpp` 以强符号改用 LVGL 内存池。
@@ -29,6 +29,8 @@ Products/<产品>/   product.cmake、product_config.h、产品专属源码
 - `SPI.cpp` 只声明 `spi_dma_trans()`，实现在显示驱动中。
 
 ## 产品差异放在哪里
+
+共享构建与第一阶段清理见 [Shared/App/ARCHITECTURE.md](../Shared/App/ARCHITECTURE.md)：`p4_data_center` / `p4_core` 不依赖 LVGL，`p4_app` 是 UI；固件、主机测试、模拟器复用同一个 CMake 文件。平台通过 `p4_build_options` 和 `p4_lvgl` 绑定编译选项与显示库，RK 演示后端不再随共享代码同步。
 
 1. **功能开关**：`Products/<产品>/product_config.h` 中的 `PRODUCT_*` 宏，经 `mcu_config.h` 被所有源码看到。带屏产品缺少任一开关时 `mcu_config.h` 直接报错，避免 `#if` 未定义被当作 0。
 2. **弱符号扩展点**（`Platform/HAL/HAL.h`）：`Power_ProductInit`、`Power_ProductUpdate`、`Power_AdjustPercent`、`Key_ProductInit`、`Key_ProductUpdate`。默认无动作，产品源码覆盖（X1：电量补偿、MultiButton 按键动作）。

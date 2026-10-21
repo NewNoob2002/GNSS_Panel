@@ -19,7 +19,7 @@
 
 bool P4App::init(const Options& options) {
     resource_pool::init();
-    if (!DataProc_Init())
+    if (!DataProc_Init(lv_tick_get))
         return false;
     data_ready_ = true;
     group_ = lv_group_create();
@@ -78,6 +78,10 @@ bool P4App::init(const Options& options) {
     if (!navigation_timer_)
         return false;
     return manager_->push("Pages/Startup");
+}
+
+void P4App::update() {
+    (void)DataProc_RunLoop();
 }
 
 P4App::~P4App() {

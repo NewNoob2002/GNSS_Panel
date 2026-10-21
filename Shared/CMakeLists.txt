@@ -29,7 +29,7 @@ if(PRODUCT_HAS_DISPLAY)
     )
     target_link_libraries(hc32_shared_display PUBLIC
         hc32_shared_comm
-        hc32_simulator_app_headers
+        p4_app
         hc32_display_libraries
     )
 
@@ -37,7 +37,6 @@ if(PRODUCT_HAS_DISPLAY)
     add_library(hc32_display_stack INTERFACE)
     target_sources(hc32_display_stack INTERFACE
         $<TARGET_OBJECTS:hc32_shared_display>
-        $<TARGET_OBJECTS:hc32_simulator_app>
     )
     target_link_libraries(hc32_display_stack INTERFACE
         hc32_shared_display

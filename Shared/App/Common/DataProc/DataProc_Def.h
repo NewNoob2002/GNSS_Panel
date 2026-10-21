@@ -4,7 +4,7 @@
 #include <cstdint>
 #include "Utils/I18n/I18n.h"
 
-// Native in-process Account payloads, not a wire/flash format. Delivery is LVGL-thread-only.
+// Native in-process Account payloads, not a wire/flash format. Delivery is application-thread-only.
 namespace DataProc {
 enum class StatusBarStyle { Default = 0, Transparent };
 struct StatusBarPresentation {

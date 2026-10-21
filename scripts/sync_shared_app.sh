@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 把 ATK_RK3506 仓库 application/App 的指定提交原样同步到 Simulator/App（共享 LVGL 应用的唯一源码）。
+# 把 ATK_RK3506 仓库 application/App 的指定提交原样同步到 Shared/App（共享应用的唯一源码）。
 # 用法：scripts/sync_shared_app.sh <ATK_RK3506 仓库路径> [提交，默认 HEAD]
 # 只保留 HC32 自有文件（KEEP 列表）；其余文件以上游为准，HC32 不得直接修改，改动应先提交到上游。
 set -euo pipefail
@@ -11,9 +11,9 @@ fi
 upstream=$1
 commit=${2:-HEAD}
 root=$(cd "$(dirname "$0")/.." && pwd)
-dest="$root/Simulator/App"
-# HC32 自有：固件/模拟器构建文件与上游提交记录
-KEEP=(CMakeLists.txt UPSTREAM .clang-format)
+dest="$root/Shared/App"
+# HC32 自有：来源提交与禁止就地格式化的配置；CMake 与源码都复用上游。
+KEEP=(UPSTREAM .clang-format)
 
 sha=$(git -C "$upstream" rev-parse --verify "$commit^{commit}")
 if [[ -n "$(git -C "$upstream" status --porcelain -- application/App)" ]]; then
@@ -38,4 +38,4 @@ mv "$src" "$dest"
     echo "commit $sha"
     echo "subject $(git -C "$upstream" log -1 --format=%s "$sha")"
 } > "$dest/UPSTREAM"
-echo "Simulator/App synced from $sha"
+echo "Shared/App synced from $sha"

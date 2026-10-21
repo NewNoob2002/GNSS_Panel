@@ -16,7 +16,7 @@ void SaveConfig::on_view_load() {
     view_.create(root);
 }
 
-void SaveConfig::apply_text() const {
+void SaveConfig::apply_text() {
     view_.update(model_.settings());
 }
 
@@ -29,13 +29,14 @@ void SaveConfig::on_view_will_appear() {
     model_.set_change_callback([this] {
         apply_text();
     });
-    apply_text();
     view_.appear();
+    apply_text();
 }
 
 void SaveConfig::on_view_did_appear() {
     // A long host frame cannot execute power completion while navigation is still busy.
-    lv_anim_start(view_.progress_animation());
+    if (!model_.settings().shutting_down)
+        lv_anim_start(view_.progress_animation());
     timer_ = lv_timer_create(on_timeout, lv_anim_get_playtime(view_.progress_animation()) + 500, this);
     if (!timer_)
         LV_LOG_ERROR("SaveConfig: preview timer allocation failed");

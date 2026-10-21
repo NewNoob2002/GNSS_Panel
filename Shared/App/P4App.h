@@ -19,6 +19,8 @@ class P4App {
     }
     bool init(const Options& options);
     ~P4App();
+    /** Run application-service timers before the LVGL handler on the same thread. */
+    void update();
     void update_status(const page::StatusBarState& state);
     enum class InputAction { None, NextFocus, PreviousFocus, Confirm, Back, Press, Release, Commit };
     enum class Key { Power, Function };

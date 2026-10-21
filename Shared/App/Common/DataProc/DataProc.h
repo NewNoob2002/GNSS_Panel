@@ -3,19 +3,21 @@
 #include <cstring>
 #include <type_traits>
 #include "DataProc_Def.h"
-#include "Utils/DataCenter/DataCenter.h"
+#include "Frameworks/DataCenter/DataCenter.h"
 
 #define DATA_PROC_INIT_DEF(name) bool _DP_##name##_Init(Account* account)
 
-/** Initialize service Accounts after lv_init(), before page Models; only one app instance.
+/** Initialize application services before page Models; the injected clock has no LVGL/OS dependency.
  * Failure rolls back partially initialized providers. No HAL/OS/power operations are performed.
  */
-bool DataProc_Init();
+bool DataProc_Init(DataTimerManager::Clock clock);
+/** Execute service timers on the application thread; returns time until the next deadline. */
+uint32_t DataProc_RunLoop();
 /** Call after all page/component Accounts have been destroyed. */
 bool DataProc_Deinit();
 
 namespace DataProc {
-/** Shared center accessor only; routing is implemented by Utils/DataCenter. */
+/** Shared center accessor only; routing is implemented by Frameworks/DataCenter. */
 DataCenter* Center();
 
 /** Validate native payload size and copy, avoiding alignment/aliasing assumptions. */

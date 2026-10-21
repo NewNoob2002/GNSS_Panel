@@ -25,10 +25,11 @@
 
 #include "Account.h"
 
-// Adapted from X-TRACK: LVGL-thread only; the center outlives all Accounts.
+// Adapted from X-TRACK: application-thread only; the center outlives all Accounts.
 // Registered accounts are caller-owned. Do not destroy a publisher from its own callback.
 class DataCenter {
   private:
+    DataTimerManager timers_;
     Account::AccountVector_t account_pool_; // Construct before AccountMain; destroy after it.
     uint64_t next_serial_ = 0;
 
@@ -52,6 +53,7 @@ class DataCenter {
     Account* SearchAccount(const char* id);
     Account* Find(Account::AccountVector_t* vec, const char* id);
     size_t GetAccountLen();
+    DataTimerManager& Timers() { return timers_; }
 };
 
 #endif

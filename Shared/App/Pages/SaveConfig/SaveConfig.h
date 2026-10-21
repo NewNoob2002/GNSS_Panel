@@ -21,7 +21,7 @@ class SaveConfig final : public PageBase {
     bool on_back_request() override;
 
   private:
-    void apply_text() const;
+    void apply_text();
     void cancel_timer();
     static void on_timeout(lv_timer_t* timer);
     SaveConfigView view_{};

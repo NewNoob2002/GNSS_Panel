@@ -24,6 +24,7 @@
 #include <algorithm>
 #include <array>
 #include <cstring>
+#include <new>
 #include "DataCenter.h"
 #include "DataCenterLog.h"
 
@@ -50,7 +51,7 @@ Account::Account(const char* id, DataCenter* center, uint32_t bufSize, void* use
     if (allocation_bytes / 2 != bufSize)
         return;
     if (bufSize != 0) {
-        uint8_t* buffer = (uint8_t*)lv_mem_alloc(allocation_bytes);
+        uint8_t* buffer = new (std::nothrow) uint8_t[allocation_bytes];
 
         if (!buffer) {
             DC_LOG_ERROR("Account[%s] buffer malloc failed!", ID);
@@ -85,12 +86,12 @@ Account::~Account() {
 
     /* Release cache */
     if (priv.BufferSize) {
-        lv_mem_free(priv.BufferManager.buffer[0]);
+        delete[] static_cast<uint8_t*>(priv.BufferManager.buffer[0]);
     }
 
     /* Delete timer */
     if (priv.timer) {
-        lv_timer_del(priv.timer);
+        delete priv.timer;
         DC_LOG_INFO("Account[%s] task deleted", ID);
     }
 
@@ -399,8 +400,8 @@ void Account::SetEventCallback(EventCallback_t callback) {
   * @param  timer: Pointer to timer
   * @retval None
   */
-void Account::TimerCallbackHandler(lv_timer_t* timer) {
-    Account* instance = (Account*)(timer->user_data);
+void Account::TimerCallbackHandler(DataTimer* timer) {
+    Account* instance = static_cast<Account*>(timer->user_data());
     EventCallback_t callback = instance->priv.eventCallback;
     if (callback) {
         EventParam_t param;
@@ -421,7 +422,7 @@ void Account::TimerCallbackHandler(lv_timer_t* timer) {
   */
 void Account::SetTimerPeriod(uint32_t period) {
     if (priv.timer) {
-        lv_timer_del(priv.timer);
+        delete priv.timer;
         priv.timer = nullptr;
     }
 
@@ -429,7 +430,13 @@ void Account::SetTimerPeriod(uint32_t period) {
         return;
     }
 
-    priv.timer = lv_timer_create(TimerCallbackHandler, period, this);
+    priv.timer = new (std::nothrow) DataTimer(Center->Timers(), TimerCallbackHandler, period, this);
+    if (priv.timer && !priv.timer->registered()) {
+        delete priv.timer;
+        priv.timer = nullptr;
+    }
+    if (!priv.timer)
+        DC_LOG_ERROR("Account[%s] timer registration failed", ID);
 }
 
 /**
@@ -438,13 +445,13 @@ void Account::SetTimerPeriod(uint32_t period) {
   * @retval None
   */
 void Account::SetTimerEnable(bool en) {
-    lv_timer_t* timer = priv.timer;
+    DataTimer* timer = priv.timer;
 
     if (timer == nullptr) {
         return;
     }
 
-    en ? lv_timer_resume(timer) : lv_timer_pause(timer);
+    en ? timer->resume() : timer->pause();
 }
 
 /**

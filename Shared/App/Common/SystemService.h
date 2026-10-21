@@ -5,7 +5,7 @@
 namespace SystemService {
 DataProc::SystemState snapshot();
 bool power(DataProc::PowerAction action);
-/** Platform -> App, LVGL thread. Each publishes the System state; P4App performs the navigation. */
+/** Platform -> App, application thread. Each publishes System state; the UI observes it. */
 bool set_powered_on(bool on);                    // Power-on confirmed; leaves standby.
 bool begin_shutdown(DataProc::PowerCause cause); // Platform-initiated, non-cancellable shutdown.
 bool enter_standby();                            // Power-off finished while the UI keeps running.
@@ -15,12 +15,12 @@ unsigned days_in_month(unsigned year, unsigned month);
 } // namespace SystemService
 
 namespace StatusService {
-/** Feed an owned snapshot to Status and its subscribers, on the LVGL thread. */
+/** Feed an owned snapshot to Status and its subscribers, on the application thread. */
 bool update(const DataProc::StatusSnapshot& status);
 } // namespace StatusService
 
 namespace DeviceService {
-/** Platform -> App, LVGL thread: publish device/business data (Device provider). */
+/** Platform -> App, application thread: publish device/business data (Device provider). */
 bool update(const DataProc::DeviceSnapshot& device);
 /** Latest published device data. */
 DataProc::DeviceSnapshot snapshot();

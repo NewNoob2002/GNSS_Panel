@@ -53,11 +53,13 @@
 
 > │   ├── Comm          # 与主控的 I2C 从机通信、面板帧协议核心（全部产品）
 
+> │   ├── App           # 与 RK3506 共用的框架、核心服务及 LVGL UI（同一份源码与 CMake）
+
 > │   └── Display       # 带屏产品入口、共享应用的平台层 AppPlatform/、显示协议表、显示 HAL（X1Pro、XBase）
 
 > ├── Products          # 产品配置与专属代码：X1（无屏）、X1Pro、XBase
 
-> ├── Simulator         # PC 端仿真器；Simulator/App 为与 RK3506 共用的 LVGL 应用（上游 ATK_RK3506，见 docs/shared_app_sync.md）
+> ├── Simulator         # PC 端仿真器；链接 Shared/App 与 HC32 AppPlatform，提供模拟板级设备
 
 > └── tests             # 主机回归测试（协议、传输、电源与各产品协议表）
 

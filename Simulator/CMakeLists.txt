@@ -35,12 +35,13 @@ endif()
 # 与固件共用同一份 LVGL 源码（Libraries/lvgl），配置用本目录的 lv_conf.h（LV_CONF_PATH 指定）。
 set(LVGL_DIR ${CMAKE_CURRENT_LIST_DIR}/../Libraries/lvgl)
 file(GLOB_RECURSE LVGL_SOURCES CONFIGURE_DEPENDS "${LVGL_DIR}/src/*.c")
-# 共享应用（来源 ATK_RK3506，见 App/UPSTREAM）；Status/ 是 RK3506 的模拟后端，HC32 用 AppPlatform。
-file(GLOB_RECURSE APP_SOURCES CONFIGURE_DEPENDS
-    ${CMAKE_CURRENT_LIST_DIR}/App/*.c
-    ${CMAKE_CURRENT_LIST_DIR}/App/*.cpp
-)
-list(FILTER APP_SOURCES EXCLUDE REGEX "/Status/")
+# 共享 UI 通过 p4_lvgl 使用模拟器显示配置；核心不依赖它。
+add_library(sim_lvgl STATIC ${LVGL_SOURCES})
+target_include_directories(sim_lvgl PUBLIC ${CMAKE_CURRENT_LIST_DIR}/../Libraries ${LVGL_DIR})
+target_compile_definitions(sim_lvgl PUBLIC LV_CONF_PATH=${CMAKE_CURRENT_LIST_DIR}/lv_conf.h)
+add_library(p4_lvgl INTERFACE)
+target_link_libraries(p4_lvgl INTERFACE sim_lvgl)
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../Shared/App shared-app)
 file(GLOB HAL_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_LIST_DIR}/HAL/*.cpp)
 # 固件电源时序原样编译：强制包含模拟器 HAL.h（屏蔽固件 HAL.h 的硬件依赖），GPIO/时基由 HAL/Arduino.h 提供
 set(FIRMWARE_POWER_SOURCE ${CMAKE_CURRENT_LIST_DIR}/../Platform/HAL/HAL_Power.cpp)
@@ -53,14 +54,11 @@ add_executable(main
     main.cpp
     ${APP_PLATFORM_SOURCES}
     ${CMAKE_CURRENT_LIST_DIR}/../Platform/State/SystemState.cpp
-    ${APP_SOURCES}
     ${HAL_SOURCES}
     ${FIRMWARE_POWER_SOURCE}
-    ${LVGL_SOURCES}
 )
 target_include_directories(main PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}
-    ${CMAKE_CURRENT_LIST_DIR}/App
     ${CMAKE_CURRENT_LIST_DIR}/HAL
     ${CMAKE_CURRENT_LIST_DIR}/../Shared/Display
     ${CMAKE_CURRENT_LIST_DIR}/../Libraries
@@ -75,11 +73,12 @@ target_compile_definitions(main PRIVATE
     LV_CONF_PATH=${CMAKE_CURRENT_LIST_DIR}/lv_conf.h
     LVGL_SIMULATOR
 )
+target_link_libraries(main PRIVATE p4_app)
 target_compile_options(main PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra>)
 if(TARGET PkgConfig::SDL2)
-    target_link_libraries(main PRIVATE PkgConfig::SDL2)
+    target_link_libraries(sim_lvgl PUBLIC PkgConfig::SDL2)
 else()
-    target_link_libraries(main PRIVATE SDL2::SDL2)
+    target_link_libraries(sim_lvgl PUBLIC SDL2::SDL2)
 endif()
 
 # 输出到各自构建目录的 bin/main：X1Pro 与 XBase 可用两个构建目录并存，互不覆盖。

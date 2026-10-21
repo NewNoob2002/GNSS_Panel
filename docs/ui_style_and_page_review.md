@@ -1,6 +1,6 @@
 # 页面结构、视觉规则与验证
 
-共享应用源码为 ATK_RK3506 `application/App`；修改先在上游提交，再同步到 HC32 `Simulator/App`。当前应用提交为 `95ca2c3be7a8ba99d9b548133836aafd5630cb33`（关机页与待机页改为无卡片的进度环布局；此前 `cba892e`、`a7bd2fb`）；在此前菜单整合、业务反馈与聚焦修复的基础上，提升生成图标清晰度，重排状态栏，重做 RTK 工作模式卡片与动效，记录启停统一为单击。
+共享应用源码为 ATK_RK3506 `application/App`；修改先在上游提交，再同步到 HC32 `Shared/App`，准确提交见 `Shared/App/UPSTREAM`。共享框架、核心服务与 UI 的构建边界见 `Shared/App/ARCHITECTURE.md`。本次统一了上游现有的 SaveConfig 倒计时/等待图标与 Startup 快速重按修复。
 
 ## 当前职责与入口
 
@@ -44,7 +44,7 @@
 
 ## 视觉与动画
 
-通用颜色集中在 `Simulator/App/Utils/PageStyle.h`。
+通用颜色集中在 `Shared/App/Utils/PageStyle.h`。
 
 | 语义 | 颜色 |
 | --- | --- |

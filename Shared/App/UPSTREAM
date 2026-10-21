@@ -1,0 +1,3 @@
+ATK_RK3506 application/App
+commit 5a55a8dfbe35a02573da6a3d32c32e3d8fe392d3
+subject Preserve strict compiler checks in shared application targets
