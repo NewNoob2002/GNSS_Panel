@@ -11,7 +11,7 @@ set(CPU_FLAGS
 
 add_library(hc32_project_options INTERFACE)
 target_include_directories(hc32_project_options INTERFACE
-    ${CMAKE_CURRENT_BINARY_DIR}/generated/Platform/Config
+    ${CMAKE_BINARY_DIR}/generated/Platform/Config
     # 所选产品的 product_config.h
     ${PRODUCT_DIR}
 )

@@ -5,10 +5,10 @@ endif()
 
 add_library(app_log STATIC Utils/Log/Log.cpp)
 add_library(app_framework STATIC
-    Frameworks/DataCenter/Account.cpp
-    Frameworks/DataCenter/DataCenter.cpp
-    Frameworks/DataCenter/DataTimer.cpp
-    Frameworks/DataCenter/PingPongBuffer/PingPongBuffer.c)
+    ../Frameworks/DataCenter/Account.cpp
+    ../Frameworks/DataCenter/DataCenter.cpp
+    ../Frameworks/DataCenter/DataTimer.cpp
+    ../Frameworks/DataCenter/PingPongBuffer/PingPongBuffer.c)
 add_library(app_i18n STATIC
     Utils/I18n/I18n.cpp Utils/I18n/I18n_en.cpp Utils/I18n/I18n_ru.cpp)
 add_library(app_core STATIC
@@ -17,7 +17,7 @@ add_library(app_core STATIC
     Common/DataProc/DP_Device.cpp
     Common/SystemService.cpp)
 foreach(target app_log app_framework app_i18n app_core)
-    target_include_directories(${target} PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+    target_include_directories(${target} PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/..")
     target_link_libraries(${target} PUBLIC app_build_options)
     target_compile_options(${target} PRIVATE -Wall -Wextra -Werror
         $<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions;-fno-rtti>)

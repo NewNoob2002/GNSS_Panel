@@ -17,7 +17,7 @@ HAL_GetTickFreq(void) {
     return frequency;
 }
 
-#include "../Platform/Core/src/delay.c"
+#include "../Vendor/HC32/Platform/Core/src/delay.c"
 
 int
 main(void) {

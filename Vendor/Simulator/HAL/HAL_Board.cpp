@@ -1,6 +1,6 @@
 #include <array>
 
-#include "../../Platform/HAL/Charger.h"
+#include "../../HC32/Platform/HAL/Charger.h"
 #include "Arduino.h"
 #include "HAL.h"
 #include "lvgl/lvgl.h"

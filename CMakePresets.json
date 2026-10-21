@@ -92,6 +92,38 @@
                 "PRODUCT": "XBase",
                 "CMAKE_COLOR_DIAGNOSTICS": "ON"
             }
+        },
+        {
+            "name": "simulator-x1pro",
+            "displayName": "Simulator (X1Pro)",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/simulator-x1pro",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "PLATFORM": "Simulator",
+                "SIM_PRODUCT": "X1Pro"
+            }
+        },
+        {
+            "name": "simulator-xbase",
+            "displayName": "Simulator (XBase)",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/simulator-xbase",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "PLATFORM": "Simulator",
+                "SIM_PRODUCT": "XBase"
+            }
+        },
+        {
+            "name": "linux-host",
+            "displayName": "Linux Port (Host & Tests)",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/linux-host",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "PLATFORM": "Linux"
+            }
         }
     ],
     "buildPresets": [
@@ -126,6 +158,27 @@
         {
             "name": "xbase-release",
             "configurePreset": "xbase-release"
+        },
+        {
+            "name": "simulator-x1pro",
+            "configurePreset": "simulator-x1pro"
+        },
+        {
+            "name": "simulator-xbase",
+            "configurePreset": "simulator-xbase"
+        },
+        {
+            "name": "linux-host",
+            "configurePreset": "linux-host"
+        }
+    ],
+    "testPresets": [
+        {
+            "name": "linux-host",
+            "configurePreset": "linux-host",
+            "output": {
+                "outputOnFailure": true
+            }
         }
     ]
 }

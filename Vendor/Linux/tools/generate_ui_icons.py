@@ -4,7 +4,7 @@ from pathlib import Path
 import math
 import subprocess
 
-ROOT = Path(__file__).resolve().parents[1] / "application/App/Resource/img"
+ROOT = Path(__file__).resolve().parents[3] / "App/Resource/img"
 FILL = 'fill="white" stroke="none"'
 
 

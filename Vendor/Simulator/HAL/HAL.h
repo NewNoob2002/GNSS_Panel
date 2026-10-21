@@ -4,7 +4,7 @@
 #define __HAL_H // 固件 HAL.h 的包含保护：在模拟器中不展开
 
 #include <cstdio>
-#include "../../Platform/Config/mcu_config.h"
+#include "../../HC32/Platform/Config/mcu_config.h"
 
 #define CORE_DEBUG_PRINTF(fmt, ...) std::printf("[HAL] " fmt "\n", ##__VA_ARGS__)
 

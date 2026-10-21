@@ -1,5 +1,5 @@
-# Unified LVGL 8.3.11 from repository Libraries/lvgl
-get_filename_component(LVGL_DIR "${CMAKE_CURRENT_LIST_DIR}/../../../Libraries/lvgl" REALPATH)
+# Unified LVGL 8.3.11 from repository External/lvgl
+get_filename_component(LVGL_DIR "${CMAKE_CURRENT_LIST_DIR}/../../../External/lvgl" REALPATH)
 file(GLOB_RECURSE LVGL_SOURCES CONFIGURE_DEPENDS "${LVGL_DIR}/src/*.c")
 
 add_library(lvgl8311 STATIC ${LVGL_SOURCES})

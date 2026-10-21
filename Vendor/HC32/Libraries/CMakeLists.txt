@@ -132,31 +132,35 @@ target_link_libraries(hc32_adafruit_st77xx PUBLIC
     hc32_adafruit_busio
 )
 
+set(EXTERNAL_DIR ${REPO_ROOT}/External)
+set(LVGL_DIR ${EXTERNAL_DIR}/lvgl)
 file(GLOB_RECURSE LVGL_SOURCES CONFIGURE_DEPENDS
-    lvgl/src/core/*.c
-    lvgl/src/draw/*.c
-    lvgl/src/extra/*.c
-    lvgl/src/extra/layouts/*.c
-    lvgl/src/extra/themes/*.c
-    lvgl/src/extra/widgets/*.c
-    lvgl/src/font/*.c
-    lvgl/src/hal/*.c
-    lvgl/src/misc/*.c
-    lvgl/src/widgets/*.c
-    lvgl/porting/*.c
-    lvgl/porting/*.cpp
+    ${LVGL_DIR}/src/core/*.c
+    ${LVGL_DIR}/src/draw/*.c
+    ${LVGL_DIR}/src/extra/*.c
+    ${LVGL_DIR}/src/extra/layouts/*.c
+    ${LVGL_DIR}/src/extra/themes/*.c
+    ${LVGL_DIR}/src/extra/widgets/*.c
+    ${LVGL_DIR}/src/font/*.c
+    ${LVGL_DIR}/src/hal/*.c
+    ${LVGL_DIR}/src/misc/*.c
+    ${LVGL_DIR}/src/widgets/*.c
 )
 
 foreach(pattern "/draw/arm2d/" "/draw/nxp/" "/draw/renesas/" "/draw/sdl/" "/draw/stm32_dma2d/" "/draw/swm341_dma2d/" "/extra/libs/" "/extra/others/")
     list(FILTER LVGL_SOURCES EXCLUDE REGEX "${pattern}")
 endforeach()
 
-add_library(hc32_lvgl OBJECT
+add_library(hc32_lvgl STATIC
     ${LVGL_SOURCES}
 )
 target_include_directories(hc32_lvgl PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/lvgl
-    ${CMAKE_CURRENT_SOURCE_DIR}/lvgl/porting
+    ${EXTERNAL_DIR}
+    ${LVGL_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../Display
+)
+target_compile_definitions(hc32_lvgl PUBLIC
+    LV_CONF_PATH=${CMAKE_CURRENT_SOURCE_DIR}/../Display/lv_conf.h
 )
 target_link_libraries(hc32_lvgl PUBLIC
     hc32_project_options
@@ -170,7 +174,6 @@ target_sources(hc32_display_libraries INTERFACE
     $<TARGET_OBJECTS:hc32_adafruit_busio>
     $<TARGET_OBJECTS:hc32_adafruit_gfx>
     $<TARGET_OBJECTS:hc32_adafruit_st77xx>
-    $<TARGET_OBJECTS:hc32_lvgl>
 )
 target_link_libraries(hc32_display_libraries INTERFACE
     hc32_libraries_headers

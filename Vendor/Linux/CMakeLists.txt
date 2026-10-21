@@ -12,8 +12,8 @@ option(RK3506_SDL_PREVIEW "Build host SDL preview for RK3506 pages" OFF)
 
 # Locate repository root and shared components
 get_filename_component(REPO_ROOT "${CMAKE_CURRENT_LIST_DIR}/../.." REALPATH)
-set(SHARED_APP_DIR "${REPO_ROOT}/Shared/App")
-set(SHARED_LIBRARIES_DIR "${REPO_ROOT}/Libraries")
+set(SHARED_APP_DIR "${REPO_ROOT}/App")
+set(EXTERNAL_DIR "${REPO_ROOT}/External")
 
 # Modular sub-components
 include(cmake/lvgl.cmake)
@@ -27,7 +27,7 @@ else()
     # The shared module consumes this display contract; core/framework targets never link it.
     add_library(app_lvgl INTERFACE)
     target_link_libraries(app_lvgl INTERFACE lvgl8311)
-    target_include_directories(app_lvgl INTERFACE "${SHARED_LIBRARIES_DIR}")
+    target_include_directories(app_lvgl INTERFACE "${EXTERNAL_DIR}")
     add_subdirectory("${SHARED_APP_DIR}" shared_app)
 
     add_library(demo_backend OBJECT
@@ -47,7 +47,7 @@ else()
 
     if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         add_executable(rk3506_app platform/linux/main.cpp platform/linux_button.c)
-        target_include_directories(rk3506_app PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}" "${REPO_ROOT}/Shared")
+        target_include_directories(rk3506_app PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}" "${REPO_ROOT}")
         target_link_libraries(rk3506_app PRIVATE demo_backend lv_display)
         target_compile_options(rk3506_app PRIVATE -Wall -Wextra -Werror)
 
@@ -59,7 +59,7 @@ else()
         if(RK3506_SDL_PREVIEW)
             find_package(SDL2 REQUIRED CONFIG)
             add_executable(simulator platform/sdl/main.cpp)
-            target_include_directories(simulator PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}" "${REPO_ROOT}/Shared")
+            target_include_directories(simulator PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}" "${REPO_ROOT}")
             target_link_libraries(simulator PRIVATE demo_backend SDL2::SDL2)
             target_compile_options(simulator PRIVATE -Wall -Wextra -Werror)
         endif()
