@@ -28,44 +28,10 @@ mp2762aReadRegister8(uint8_t reg) {
     return value;
 }
 
-bool
-mp2762aReadRegister16Checked(uint8_t reg, uint16_t* value) {
-    uint8_t bytes[2] = {};
-    if (!value || !mp2762aI2c || !mp2762aI2c->writeRead(MP2762A_DEVICE_ADDRESS, reg, bytes, 2)) {
-        return false;
-    }
-    *value = static_cast<uint16_t>((static_cast<uint16_t>(bytes[1]) << 8) | bytes[0]);
-    return true;
-}
-
-uint16_t
-mp2762aReadRegister16(uint8_t reg) {
-    uint16_t value = UINT16_MAX;
-    (void)mp2762aReadRegister16Checked(reg, &value);
-    return value;
-}
-
 uint8_t
 mp2762aWriteRegister8(uint8_t reg, uint8_t data) {
     const uint8_t bytes[2] = {reg, data};
     return mp2762aI2c && mp2762aI2c->write(MP2762A_DEVICE_ADDRESS, bytes, 2);
-}
-
-// Given a bit field, and a startingBitValue
-// Example: Battery voltage is bit 12.5mV per bit
-float
-convertBitsToDoubler(uint16_t bitField, float startingBitValue) {
-    float totalMv = 0;
-    for (int x = 0; x < 16; x++) {
-        if (bitField & 0x0001) {
-            totalMv += startingBitValue;
-        }
-
-        bitField >>= 1;
-
-        startingBitValue *= 2;
-    }
-    return (totalMv);
 }
 
 // Set the Precharge threshold
@@ -152,22 +118,6 @@ mp2762setPrechargeCurrentMa(uint16_t currentLevelMa) {
     mp2762aWriteRegister8(MP2762A_PRECHARGE_CURRENT, status);
 }
 
-float
-mp2762getBatteryVoltageMv() {
-    uint16_t voltage = mp2762aReadRegister16(MP2762A_BATTERY_VOLTAGE);
-    float batteryVoltage =
-        convertBitsToDoubler(voltage >>= 6, 12.5); // Battery voltage is bit 15:6 so we need a 6 bit shift
-    return (batteryVoltage);
-}
-
-float
-mp2762getSystemVoltageMv() {
-    uint16_t voltage = mp2762aReadRegister16(MP2762A_SYSTEM_VOLTAGE);
-    float batteryVoltage =
-        convertBitsToDoubler(voltage >>= 6, 12.5); // Battery voltage is bit 15:6 so we need a 6 bit shift
-    return (batteryVoltage);
-}
-
 uint8_t
 mp2762getChargeStatus() {
     uint8_t status = 0;
@@ -175,59 +125,6 @@ mp2762getChargeStatus() {
     status >>= 2;
     status &= 0x03;
     return (status);
-}
-
-float
-mp2762getChargeCurrentMa() {
-    uint8_t CurrentL = 0, CurrentH = 0;
-    CurrentL = mp2762aReadRegister8(MP2762A_CHARGE_CURRENT_L);
-    CurrentH = mp2762aReadRegister8(MP2762A_CHARGE_CURRENT_H);
-
-    uint16_t Current = (CurrentH << 8) | CurrentL;
-    Current = (Current >> 6) & 0x03FF;
-
-    float charge_current_mA = Current * 12.5;
-    return charge_current_mA;
-}
-
-float
-mp2762getInputVolatgeMv() {
-    uint8_t VoltageL = 0, VoltageH = 0;
-    VoltageL = mp2762aReadRegister8(MP2762A_INPUT_VOLTAGE_L);
-    VoltageH = mp2762aReadRegister8(MP2762A_INPUT_VOLTAGE_H);
-
-    uint16_t Voltage = (static_cast<uint16_t>(VoltageH) << 8) | VoltageL;
-    Voltage = (Voltage >> 6) & 0x03FF;
-
-    float Input_voltage_mV = Voltage * 25;
-    return Input_voltage_mV;
-}
-
-float
-mp2762getInputCurrentMa() {
-    uint8_t CurrentL = 0, CurrentH = 0;
-    CurrentL = mp2762aReadRegister8(MP2762A_INPUT_CURRENT_L);
-    CurrentH = mp2762aReadRegister8(MP2762A_INPUT_CURRENT_H);
-
-    uint16_t Current = (CurrentH << 8) | CurrentL;
-    Current = (Current >> 6) & 0x03FF;
-
-    float charge_current_mA = Current * 6.25;
-    return charge_current_mA;
-}
-
-void
-mp2762resetSafetyTimer() {
-    uint8_t status = 0;
-    if (!mp2762aReadRegister8Checked(MP2762A_CONFIG_0, &status)) {
-        return;
-    }
-
-    status &= ~(1 << 4); // Clear the CHG_EN bit
-    mp2762aWriteRegister8(MP2762A_CONFIG_0, status);
-
-    status |= (1 << 4); // Set the CHG_EN bit
-    mp2762aWriteRegister8(MP2762A_CONFIG_0, status);
 }
 
 bool
@@ -241,25 +138,6 @@ mp2762setChargerEnabled(bool enabled, uint8_t* config) {
         return false;
     }
     return ((*config & (1U << 4)) != 0U) == enabled;
-}
-
-uint8_t
-mp2762disableCharger() {
-    uint8_t config = UINT8_MAX;
-    (void)mp2762setChargerEnabled(false, &config);
-    return config;
-}
-
-uint8_t
-mp2762enableCharger() {
-    uint8_t config = UINT8_MAX;
-    (void)mp2762setChargerEnabled(true, &config);
-    return config;
-}
-
-void
-mp2762updateConfig0Status(uint8_t* config) {
-    *config = mp2762aReadRegister8(MP2762A_CONFIG_0);
 }
 
 void

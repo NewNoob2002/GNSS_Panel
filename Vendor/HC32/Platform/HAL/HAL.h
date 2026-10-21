@@ -12,8 +12,6 @@ namespace HAL {
 void ResetInterruptController();
 void HAL_Init();
 void HAL_Update();
-
-void HAL_Deinit();
 /* I2C */
 int I2C_Scan();
 /* 重新探测单个 I2C 器件（SystemLoading 自检）：开机扫描时未发现、现在应答的器件按扫描流程补登记并初始化；
@@ -70,12 +68,6 @@ typedef enum {
     HAL_TICK_FREQ_DEFAULT = HAL_TICK_FREQ_1KHZ
 } HAL_TickFreqTypeDef;
 
-/** @defgroup HAL_Private_Macros HAL Private Macros
-  * @{
-  */
-#define IS_TICKFREQ(FREQ)                                                                                              \
-    (((FREQ) == HAL_TICK_FREQ_10HZ) || ((FREQ) == HAL_TICK_FREQ_100HZ) || ((FREQ) == HAL_TICK_FREQ_1KHZ))
-
 /** @addtogroup HAL_Exported_Variables
   * @{
   */
@@ -95,8 +87,6 @@ HAL_StatusTypeDef HAL_InitTick(uint32_t TickPriority);
 
 void HAL_IncTick(void);
 uint32_t HAL_GetTick(void);
-uint32_t HAL_GetTickPrio(void);
-HAL_StatusTypeDef HAL_SetTickFreq(HAL_TickFreqTypeDef Freq);
 HAL_TickFreqTypeDef HAL_GetTickFreq(void);
 
 void HAL_SuspendTick(void);

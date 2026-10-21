@@ -33,21 +33,6 @@ extern "C" {
 uint32_t dwt_init(void);
 bool dwt_getStatus();
 
-static inline uint32_t dwt_max_sec(void)
-{
-  return (UINT32_MAX / SystemCoreClock);
-};
-
-static inline uint32_t dwt_max_msec(void)
-{
-  return (UINT32_MAX / (SystemCoreClock / 1000));
-};
-
-static inline uint32_t dwt_max_usec(void)
-{
-  return (UINT32_MAX / (SystemCoreClock / 1000000));
-};
-
 static inline uint32_t dwt_getCycles(void)
 {
   return (DWT->CYCCNT);

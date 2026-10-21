@@ -25,18 +25,6 @@ typedef enum RadioMode_t {
     radio_mode_bridge = 2,
 } RadioMode_t;
 
-typedef enum Protocol_index_t {
-    TRIMTALK,
-    TRIMMK3,
-    TT450S,
-    TRANSEOT,
-    SOUTH,
-    HUACE,
-    SATEL,
-    CCS,
-    PROTOCOL_MAX
-} Protocol_index_t;
-
 typedef enum Channel_index_t {
     Channel1,
     Channel2,
@@ -49,18 +37,6 @@ typedef enum Channel_index_t {
     Channel9,
     ChannelMax
 } Channel_index_t;
-
-typedef enum Redcord_Type_t { Redcord_Type_XYZ, Redcord_Type_Rinex, Redcord_Type_MAX } Redcord_Type_t;
-
-typedef enum Redcord_Interval_t {
-    Redcord_Interval_infinite,
-    Redcord_Interval_15min,
-    Redcord_Interval_60min,
-    Redcord_Interval_120min,
-    Redcord_Interval_240min,
-    Redcord_Interval_24hour,
-    Redcord_Interval_MAX
-} Redcord_Interval_t;
 
 typedef enum WorkMode_t { rover_mode = 0, base_mode, single_mode, autobase_mode } WorkMode_t;
 
@@ -86,13 +62,12 @@ typedef struct BatteryInfo_t {
     uint8_t ChargerDisable;
     uint8_t ChargerDetect;
     uint8_t ChargerPlugCount;
-    uint8_t ChargerCurrent;
     uint8_t mp2762_cfg0;
     bool sample_valid;
     uint32_t last_sample_ms;
     Charger_Status_t chargeStatus;
 
-} BatteryInfo_t, *pBatteryInfo_t;
+} BatteryInfo_t;
 
 typedef struct Power_Monitor_t {
     BatteryInfo_t batteryInfo;
@@ -114,7 +89,7 @@ typedef struct Power_Monitor_t {
     uint8_t ExternalPowerChange;
     bool panel_power_on;
     uint32_t pannel_power_on_time;
-} Power_Monitor_t, *pPower_Monitor_t;
+} Power_Monitor_t;
 
 typedef struct PositionInfo_t {
     PositionStatus_t coordinate_status; // 0- none, 1-single, 4-fixed, 5- float, 7-fixedcoordinate

@@ -114,7 +114,7 @@ main() {
 
     GPIO_SetFunction(PA9, 51);
     assert(lastPort == GPIO_PORT_A && lastMask == (1U << 9));
-    // 全表的端口/位号与枚举保持一一对应；ADC/TimerA 表内容在迁移时与 HEAD 逐字核验。
+    // 全表的端口/位号与枚举保持一一对应；裁剪元数据前后的 83 项映射另与 HEAD 逐项核验。
     for (int pin = 0; pin < BOARD_NR_GPIO_PINS; ++pin) {
         const bool portH = pin >= PH0;
         const int expectedPort = portH ? GPIO_PORT_H : pin / 16;

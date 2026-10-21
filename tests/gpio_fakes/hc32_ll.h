@@ -33,22 +33,6 @@ enum {
     PIN_ATTR_ANALOG = 0x8000,
     PIN_OUT_TYPE_CMOS = 0,
     PIN_OUT_TYPE_NMOS = 0x0004,
-    ADC_CH0 = 0,
-    ADC_CH1,
-    ADC_CH2,
-    ADC_CH3,
-    ADC_CH4,
-    ADC_CH5,
-    ADC_CH6,
-    ADC_CH7,
-    ADC_CH8,
-    ADC_CH9,
-    ADC_CH10,
-    ADC_CH11,
-    ADC_CH12,
-    ADC_CH13,
-    ADC_CH14,
-    ADC_CH15
 };
 
 /** 提供 LL 默认 GPIO 配置。 */

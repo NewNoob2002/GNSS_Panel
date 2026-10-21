@@ -22,10 +22,6 @@
  */
 #include "MillisTaskManager.h"
 
-#ifndef NULL
-#   define NULL 0
-#endif
-
 #define TASK_NEW(task) do{task = new Task_t;                    \
                         if(task == nullptr){return nullptr;}    \
                         }while(0)                               \
@@ -146,114 +142,6 @@ MillisTaskManager::Task_t* MillisTaskManager::Find(const TaskFunction_t func) co
     return task;
 }
 
-/**
-  * @brief  获取当前节点的前一个节点
-  * @param  task:当前任务节点地址
-  * @retval 前一个任务节点地址
-  */
-MillisTaskManager::Task_t* MillisTaskManager::GetPrev(Task_t* task) const
-{
-    Task_t* now = Head;    //当前节点
-    Task_t* prev = nullptr;   //前一节点
-    Task_t* retval = nullptr; //被返回的节点
-    
-    /*开始遍历链表*/
-    while(true)
-    {
-        /*如果当前节点为空*/
-        if(now == nullptr)
-        {
-            /*遍历结束*/
-            break;
-        }
-        
-        /*如果当前节点与被搜索的节点匹配*/
-        if(now == task)
-        {
-            /*保存前一个节点，准备返回*/
-            retval = prev;
-            break;
-        }
-        
-        /*当前节点保存为前一节点*/
-        prev = now;
-        
-        /*节点后移*/
-        now = now->Next;
-    }
-    return retval;
-}
-
-/**
-* @brief  注销任务（谨慎使用，线程不安全）
-  * @param  func:任务函数指针
-  * @retval true:成功 ; false:失败
-  */
-bool MillisTaskManager::Logout(const TaskFunction_t func)
-{
-    Task_t* task = Find(func);
-    if(task == nullptr)
-        return false;
-
-    Task_t* prev = GetPrev(task); //前一个节点
-
-    /*如果被删除节点在链表头*/
-    if(Task_t* next = task->Next; prev == nullptr && next != nullptr)
-    {
-        /*将后一个节点作为链表头*/
-        Head = next;
-    }
-    /*如果被删除节点在链表尾*/
-    else if(prev != nullptr && next == nullptr)
-    {
-        /*将前一个节点作为链表尾*/
-        prev->Next = nullptr;
-    }
-    /*如果被删除节点在链表中间*/
-    else if(prev != nullptr && next != nullptr)
-    {
-        /*将前一个节点对接至后一个节点*/
-        prev->Next = next;
-    }
-    
-    /*删除当前节点*/
-    TASK_DEL(task);
-    
-    return true;
-}
-
-/**
-  * @brief  任务状态控制
-  * @param  func:任务函数指针
-  * @param  state:任务状态
-  * @retval true:成功 ; false:失败
-  */
-bool MillisTaskManager::SetState(const TaskFunction_t func, const bool state) const
-{
-    Task_t* task = Find(func);
-    if(task == nullptr)
-        return false;
-
-    task->State = state;
-    return true;
-}
-
-/**
-  * @brief  任务执行周期设置
-  * @param  func:任务函数指针
-  * @param  timeMs:任务执行周期
-  * @retval true:成功 ; false:失败
-  */
-bool MillisTaskManager::SetIntervalTime(const TaskFunction_t func, const uint32_t timeMs) const
-{
-    Task_t* task = Find(func);
-    if(task == nullptr)
-        return false;
-
-    task->Time = timeMs;
-    return true;
-}
-
 #if (MTM_USE_CPU_USAGE == 1)
 #include "delay.h"                  // 需要使用 micros()
 static uint32_t UserFuncLoopUs = 0; //累计时间
@@ -295,20 +183,6 @@ uint32_t MillisTaskManager::GetTickElaps(const uint32_t nowTick, uint32_t prevTi
     }
 
     return prevTick;
-}
-
-/**
-  * @brief  获取任务单次耗费时间(us)
-  * @param  func:任务函数指针
-  * @retval 任务单次耗费时间(us)
-  */
-uint32_t MillisTaskManager::GetTimeCost(const TaskFunction_t func) const
-{
-    const Task_t* task = Find(func);
-    if(task == nullptr)
-        return 0;
-
-    return task->TimeCost;
 }
 
 /**

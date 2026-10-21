@@ -45,11 +45,3 @@ FlashEraseSector(uint32_t u32Addr) {
     EFM_FWMC_Cmd(DISABLE);
     return result;
 }
-
-void
-FlashRead(uint32_t Address, unsigned char* pdata, uint32_t len) {
-    const unsigned char* pageaddr = (const unsigned char*)(Address);
-    for (uint32_t i = 0; i < len; i++) {
-        pdata[i] = pageaddr[i];
-    }
-}

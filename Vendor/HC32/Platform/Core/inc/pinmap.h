@@ -25,24 +25,10 @@ typedef enum {
 // clang-format on
 
 #define BOARD_NR_GPIO_PINS PIN_MAX
-#define IS_GPIO_PIN(pin)   ((pin) >= 0 && (pin) < BOARD_NR_GPIO_PINS)
-
-typedef struct pin_adc_info_t {
-    const uint8_t device  : 2; /**< 0 表示未分配，1/2 对应 ADC1/ADC2。 */
-    const uint8_t channel : 6; /**< device 非零时有效的 ADC 通道。 */
-} pin_adc_info_t;
-
-typedef struct pin_timera_info_t {
-    const uint8_t unit     : 3; /**< 0 表示未分配，1..6 对应 TimerA 单元。 */
-    const uint8_t channel  : 3; /**< 0..7 对应 TimerA 通道 1..8。 */
-    const uint8_t function : 2; /**< 0..2 对应 Func_Tima0..2（硬件功能号 4..6）。 */
-} pin_timera_info_t;
 
 typedef struct pin_info_t {
     const uint8_t bit_pos : 5;
     const uint8_t port    : 3;
-    const pin_adc_info_t adc_info;
-    const pin_timera_info_t timera_info;
 } pin_info_t;
 
 #ifdef __cplusplus

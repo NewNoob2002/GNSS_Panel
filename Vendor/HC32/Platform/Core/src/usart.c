@@ -26,12 +26,6 @@ usart_init() {
     usart_initialized = true;
 }
 
-void
-usart_deinit() {
-    USART_DeInit(USART_UNIT);
-    usart_initialized = false;
-}
-
 int
 usart_write(int ch) {
     if (!usart_initialized) {

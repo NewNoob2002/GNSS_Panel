@@ -19,21 +19,14 @@
 #define NM_PROTOCOL_MSG_LEN_INDEX_H    13
 #define NM_PROTOCOL_MSG_SENDER_INDEX   16
 #define NM_PROTOCOL_MSG_TYPE_INDEX     17
-#define NM_PROTOCOL_MSG_INTERVAL_INDEX 19
 
-#define NM_PROTOCOL_MSG_SENDER_DEV     0x01
-#define NM_PROTOCOL_MSG_SENDER_APP     0x00
 #define NM_PROTOCOL_MSG_SENDER_PANEL   0x03
 
 #define NM_MSG_QUERY_TYPE              0x00
 #define NM_MSG_QUERY_RES_TYPE          0x01
 #define NM_MSG_SET_TYPE                0x02
 #define NM_MSG_SET_RES_TYPE            0x03
-#define NM_MSG_ERR_REP_TYPE            0x05
 
-#define NM_MSG_CRC_ERR_REP_ID          0x01
-#define NM_MSG_MSG_ID_ERR_REP_ID       0x02
-#define NM_MSG_MODULE_ID_ERR_REP_ID    0x03
 
 /* 设置类请求的通用 ACK：载荷 2 字节 */
 #define NM_PROTOCOL_SET_MSG_LEN        2

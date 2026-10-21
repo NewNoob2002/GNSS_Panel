@@ -1,5 +1,4 @@
 #pragma once
-#include "../support/support.h"
 #include "mcu_define.h"
 // 产品差异（名称、功能开关、带屏与否）由所选产品目录的 product_config.h 提供，见 Products/<产品>/。
 #include "product_config.h"

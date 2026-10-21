@@ -76,11 +76,6 @@ public:
 
     Task_t* Register(TaskFunction_t func, uint32_t timeMs, void * userData = nullptr, const bool state = true);
     Task_t* Find(TaskFunction_t func) const;
-    Task_t* GetPrev(Task_t* task) const;
-    bool Logout(TaskFunction_t func);
-    bool SetState(TaskFunction_t func, bool state) const;
-    bool SetIntervalTime(TaskFunction_t func, uint32_t timeMs) const;
-    uint32_t GetTimeCost(TaskFunction_t func) const;
     static uint32_t GetTickElaps(uint32_t nowTick, uint32_t prevTick);
 #if (MTM_USE_CPU_USAGE == 1)
     float GetCPU_Usage();

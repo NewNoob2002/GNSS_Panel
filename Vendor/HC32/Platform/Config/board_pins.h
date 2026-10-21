@@ -32,23 +32,12 @@
 
 #if PRODUCT_HAS_DISPLAY
 /* Screen */
-// #define CONFIG_SCREEN_CS_PIN   PH2
-// #define CONFIG_SCREEN_DC_PIN   PB8
-// #define CONFIG_SCREEN_RST_PIN  PB9
-// #define CONFIG_SCREEN_SCK_PIN  PB6
-// #define CONFIG_SCREEN_MOSI_PIN PB7
-// #define CONFIG_SCREEN_BLK_PIN  PB3 // TIM3
-// #define CONFIG_SCREEN_HOR_RES  320
-// #define CONFIG_SCREEN_VER_RES  172
-//////////////////////////////////////////
 #define CONFIG_SCREEN_CS_PIN   PB14
 #define CONFIG_SCREEN_DC_PIN   PB1
 #define CONFIG_SCREEN_RST_PIN  PB2
 #define CONFIG_SCREEN_SCK_PIN  PB15
 #define CONFIG_SCREEN_MOSI_PIN PB13
-// #define CONFIG_SCREEN_BLK_PIN  PB3 // TIM3
 #define CONFIG_SCREEN_HOR_RES  294
-#define CONFIG_SCREEN_VER_RES  126
 
 // SPI3、DMA1 CH0、AOS 与 IRQ 分配由 Display/board_display.cpp 的板级实例保存。
 #endif /* PRODUCT_HAS_DISPLAY */

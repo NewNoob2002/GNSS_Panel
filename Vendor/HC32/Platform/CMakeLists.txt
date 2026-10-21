@@ -8,7 +8,6 @@ target_include_directories(hc32_platform_headers INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/Drivers/inc
     ${CMAKE_CURRENT_SOURCE_DIR}/HAL
     ${CMAKE_CURRENT_SOURCE_DIR}/State
-    ${CMAKE_CURRENT_SOURCE_DIR}/support
 )
 target_link_libraries(hc32_platform_headers INTERFACE hc32_project_options hc32_easylogger_headers)
 
@@ -34,12 +33,6 @@ file(GLOB PLATFORM_STATE_SOURCES CONFIGURE_DEPENDS
 file(GLOB PLATFORM_DRIVER_SOURCES CONFIGURE_DEPENDS
     Drivers/src/*.c
 )
-file(GLOB PLATFORM_SUPPORT_SOURCES CONFIGURE_DEPENDS
-    support/*.c
-)
-
-list(FILTER PLATFORM_DRIVER_SOURCES EXCLUDE REGEX "hc32_ll_icg\\.c$")
-
 add_library(hc32_platform OBJECT
     CMSIS/Device/HDSC/hc32f4xx/Source/GCC/startup_hc32f460.S
     CMSIS/Device/HDSC/hc32f4xx/Source/system_hc32f460.c
@@ -48,7 +41,6 @@ add_library(hc32_platform OBJECT
     ${PLATFORM_HAL_SOURCES}
     ${PLATFORM_STATE_SOURCES}
     ${PLATFORM_DRIVER_SOURCES}
-    ${PLATFORM_SUPPORT_SOURCES}
 )
 
 target_link_libraries(hc32_platform PUBLIC

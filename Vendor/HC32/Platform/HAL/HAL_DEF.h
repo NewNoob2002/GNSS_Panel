@@ -12,21 +12,11 @@ extern "C" {
   */
 typedef enum { HAL_OK = 0x00U, HAL_ERROR = 0x01U, HAL_BUSY = 0x02U, HAL_TIMEOUT = 0x03U } HAL_StatusTypeDef;
 
-/**
-  * @brief  HAL Lock structures definition
-  */
-typedef enum { HAL_UNLOCKED = 0x00U, HAL_LOCKED = 0x01U } HAL_LockTypeDef;
-
 /* Exported macro ------------------------------------------------------------*/
 
 #if !defined(UNUSED)
 #define UNUSED(X) (void)X /* To avoid gcc/g++ warnings */
 #endif                    /* UNUSED */
-
-#define HAL_MAX_DELAY            0xFFFFFFFFU
-
-#define HAL_IS_BIT_SET(REG, BIT) (((REG) & (BIT)) == (BIT))
-#define HAL_IS_BIT_CLR(REG, BIT) (((REG) & (BIT)) == 0U)
 
 #if defined(__ARMCC_VERSION) && (__ARMCC_VERSION >= 6010050) /* ARM Compiler V6 */
 #ifndef __weak

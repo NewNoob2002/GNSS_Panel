@@ -93,7 +93,7 @@
 - Release Flash：X1Pro **339788 B / 456 KB**，XBase **339364 B / 456 KB**（删除旧位图与状态栏字体后比上一轮约少 2.4 KB）；静态 RAM 均为 **169624 B / 188 KB**，其中包含 LVGL 静态池。
 - 空闲重绘（主机渲染统计，2 s 内刷新像素折合整屏）：工作页 3.6→0.2、记录页 4.2→0.2 屏/秒，剩余为状态栏充电动画；首页只剩两张 54×44 状态卡的动效。
 
-[首页预览](images/ui-dialplate.png)、[英俄设置页及状态预览](images/ui-settings-bilingual.png)、[Device Info 根页预览](images/ui-device-info.png)。这三张预览纳入版本控制，克隆仓库后可直接查看；首页与设置页预览由当前提交重新渲染。预览含模拟数据；最新可执行文件为 `build/simulator/bin/main`、`build/simulator-x1pro/bin/main`、`build/simulator-xbase/bin/main`。
+[首页预览](images/ui-dialplate.png)、[英俄设置页及状态预览](images/ui-settings-bilingual.png)、[Device Info 根页预览](images/ui-device-info.png)。这三张预览纳入版本控制，克隆仓库后可直接查看；首页与设置页预览由当前提交重新渲染。预览含模拟数据；可执行文件为 `build/sim-demo/bin/main`（Demo 后端）、`build/simulator-x1pro/bin/main`、`build/simulator-xbase/bin/main`。
 
 ## 提交前复审
 

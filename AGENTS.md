@@ -26,7 +26,7 @@ Put a difference between HC32 products in `product_config.h` as a `PRODUCT_*` sw
 ## Build, Test, and Development Commands
 
 - `cmake --preset <product>-debug` / `<product>-release` configures one HC32 product, where `<product>` is `x1`, `x1pro` or `xbase`; build with `cmake --build --preset <same name>`. Outputs go to `build/<preset>/` (`.elf`, `.map`) and `build/<preset>/generated/` (`.hex`, `.bin`).
-- `gcc-debug` / `gcc-release` remain as aliases for X1Pro and provide `build/gcc-debug/compile_commands.json` for clangd; `.clangd` uses `build/x1-debug` for `Vendor/HC32/Products/X1/`.
+- `gcc-debug` / `gcc-release` 仍为 X1Pro 的兼容别名；`.clangd` 默认使用 `build/x1pro-debug/compile_commands.json`，`Vendor/HC32/Products/X1/` 使用 `build/x1-debug`。
 - `cmake --preset simulator-x1pro` / `simulator-xbase` and `cmake --build --preset <same name>` build the PC simulator with the HC32 virtual board backend (`SIM_BACKEND=Board`).
 - `cmake -S . -B build/sim-demo -DPLATFORM=Simulator -DSIM_BACKEND=Demo && cmake --build build/sim-demo` builds the PC simulator with the Linux demo backend (`--random-status [seed]` supported).
 - `cmake --preset linux-host && cmake --build --preset linux-host && ctest --test-dir build/linux-host --output-on-failure` builds and tests the Linux port on the host.

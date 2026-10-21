@@ -8,7 +8,6 @@
 using IRQn_Type = int;
 using en_int_src_t = int;
 using func_ptr_t = void (*)();
-using voidFuncPtrWithArg = void (*)(void*);
 using en_flag_status_t = int;
 
 struct CM_I2C_TypeDef {
@@ -138,9 +137,6 @@ inline uint32_t
 millis() {
     return fake_ms;
 }
-
-inline void
-lv_timer_handler() {}
 
 inline void
 GPIO_REG_Unlock() {

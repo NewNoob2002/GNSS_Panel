@@ -48,11 +48,11 @@ cmake --preset gcc-debug
 cmake --build --preset gcc-debug
 cmake --preset gcc-release
 cmake --build --preset gcc-release
-cmake -S Simulator -B build/simulator -DCMAKE_BUILD_TYPE=Debug
-cmake --build build/simulator -j4
+cmake --preset simulator-x1pro
+cmake --build --preset simulator-x1pro -j4
 cmake -S tests -B build/host-tests -G Ninja -DCMAKE_BUILD_TYPE=Debug \
   -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-  -DSIMULATOR_EXECUTABLE="$PWD/build/simulator/bin/main"
+  -DSIMULATOR_EXECUTABLE="$PWD/build/simulator-x1pro/bin/main"
 cmake --build build/host-tests -j4
 ctest --test-dir build/host-tests --output-on-failure
 ```

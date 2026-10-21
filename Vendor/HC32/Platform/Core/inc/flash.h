@@ -11,7 +11,6 @@ extern "C" {
 
 int32_t FlashWriteData(uint32_t Address, const uint8_t* flashdata, uint32_t len);
 int32_t FlashEraseSector(uint32_t u32Addr);
-void FlashRead(uint32_t Address, unsigned char* pdata, uint32_t len);
 
 #ifdef __cplusplus
 }

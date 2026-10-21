@@ -1,5 +1,5 @@
 CompileFlags:
-  CompilationDatabase: build/gcc-debug
+  CompilationDatabase: build/x1pro-debug
   Add:
     - -D__PROGRAM_START=Reset_Handler
 ---

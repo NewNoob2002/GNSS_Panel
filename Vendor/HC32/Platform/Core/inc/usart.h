@@ -22,7 +22,6 @@ extern "C"
 #endif
 
 void usart_init();
-void usart_deinit();
 size_t usart_write_buffer(const uint8_t *buffer, size_t size);
 int usart_write(int ch);
 #ifdef __cplusplus

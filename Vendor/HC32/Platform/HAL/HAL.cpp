@@ -209,45 +209,6 @@ HAL_GetTick(void) {
 }
 
 /**
- * @brief This function returns a tick priority.
- * @retval tick priority
- */
-uint32_t
-HAL_GetTickPrio(void) {
-    return uwTickPrio;
-}
-
-/**
- * @brief Set new tick Freq.
- * @retval Status
- */
-HAL_StatusTypeDef
-HAL_SetTickFreq(HAL_TickFreqTypeDef Freq) {
-    HAL_StatusTypeDef status = HAL_OK;
-    HAL_TickFreqTypeDef prevTickFreq;
-
-    DDL_ASSERT(IS_TICKFREQ(Freq));
-
-    if (uwTickFreq != Freq) {
-        /* Back up uwTickFreq frequency */
-        prevTickFreq = uwTickFreq;
-
-        /* Update uwTickFreq global variable used by HAL_InitTick() */
-        uwTickFreq = Freq;
-
-        /* Apply the new tick Freq  */
-        status = HAL_InitTick(uwTickPrio);
-
-        if (status != HAL_OK) {
-            /* Restore previous tick frequency */
-            uwTickFreq = prevTickFreq;
-        }
-    }
-
-    return status;
-}
-
-/**
  * @brief Return tick frequency.
  * @retval Tick frequency.
  *         Value of @ref HAL_TickFreqTypeDef.

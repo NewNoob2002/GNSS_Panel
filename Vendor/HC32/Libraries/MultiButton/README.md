@@ -48,117 +48,7 @@
 
 ## 编译和构建
 
-### 使用 Makefile (推荐)
-
-```bash
-# 编译所有内容 (库 + 示例)
-make
-
-# 只编译库
-make library
-
-# 只编译示例
-make examples
-
-# 编译特定示例
-make basic_example
-make advanced_example
-make poll_example
-
-# 运行测试
-make test
-
-# 清理构建文件
-make clean
-
-# 查看帮助
-make help
-```
-
-### 使用构建脚本
-
-```bash
-# 使脚本可执行
-chmod +x build.sh
-
-# 编译所有内容
-./build.sh
-
-# 只编译库
-./build.sh library
-
-# 编译特定示例
-./build.sh basic_example
-
-# 查看帮助
-./build.sh help
-```
-
-### 构建输出
-
-编译完成后，文件结构如下：
-
-```
-build/
-├── lib/
-│   └── libmultibutton.a    # 静态库
-├── bin/
-│   ├── basic_example       # 基础示例
-│   ├── advanced_example    # 高级示例
-│   └── poll_example        # 轮询示例
-└── obj/                    # 目标文件
-```
-
-## 示例程序
-
-### 1. 基础示例 (`examples/basic_example.c`)
-
-演示基本的按键事件处理：
-
-```bash
-./build/bin/basic_example
-```
-
-功能：
-- 单击、双击、长按检测
-- 重复按下计数
-- 按键状态查询
-- 自动化演示序列
-
-### 2. 高级示例 (`examples/advanced_example.c`)
-
-演示高级功能和动态管理：
-
-```bash
-# 运行完整演示
-./build/bin/advanced_example
-
-# 详细输出模式
-./build/bin/advanced_example -v
-
-# 安静模式 (手动测试)
-./build/bin/advanced_example -q
-```
-
-功能：
-- 多按键管理
-- 动态回调函数添加/移除
-- 配置按键
-- 运行时状态监控
-
-### 3. 轮询示例 (`examples/poll_example.c`)
-
-演示轮询模式使用：
-
-```bash
-./build/bin/poll_example
-```
-
-功能：
-- 无回调函数的轮询模式
-- 事件状态查询
-- 主循环集成示例
-- 预定义按键模式演示
+本仓库已裁剪上游示例与独立构建文件；固件通过 `Vendor/HC32/Libraries/CMakeLists.txt` 编译 `multi_button.c`，接口见 `multi_button.h`。
 
 ## 快速开始
 
@@ -281,7 +171,7 @@ typedef enum {
 
 ## 配置选项
 
-在 `multi_button_config.h` 中可以自定义以下参数:
+在 `multi_button.h` 中可以自定义以下参数:
 
 ```c
 #define TICKS_INTERVAL          5       // 定时器中断间隔 (ms)
@@ -311,25 +201,6 @@ typedef enum {
    |       超时|       |快速按下
    |          |       |
    +----------+   [REPEAT]
-```
-
-## 项目结构
-
-```
-MultiButton/
-├── multi_button.h          # 主头文件
-├── multi_button.c          # 主源文件
-├── Makefile               # 构建脚本
-├── build.sh               # 备用构建脚本
-├── examples/              # 示例目录
-│   ├── basic_example.c    # 基础示例
-│   ├── advanced_example.c # 高级示例
-│   └── poll_example.c     # 轮询示例
-├── build/                 # 构建输出目录
-│   ├── lib/              # 库文件
-│   ├── bin/              # 可执行文件
-│   └── obj/              # 目标文件
-└── README.md             # 说明文档
 ```
 
 ## 兼容性
