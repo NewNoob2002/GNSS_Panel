@@ -1,4 +1,4 @@
-// 带屏产品的 C++ 动态内存使用 LVGL 内存池，覆盖 Platform/Core/src/new.cpp 中的弱符号默认实现。
+// 带屏产品的 C++ 动态内存使用 LVGL 内存池，覆盖 Platform/System/new.cpp 中的弱符号默认实现。
 #include <new>
 #include <stdlib.h>
 #include "lvgl.h"

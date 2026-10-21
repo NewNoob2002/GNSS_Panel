@@ -1,5 +1,5 @@
 // 平台默认的 C++ 动态内存：使用链接脚本预留的 C 堆（_sbrk）。
-// 带屏产品在 Shared/Display/lvgl_new.cpp 中以强符号改用 LVGL 内存池，这里全部声明为弱符号。
+// 带屏产品在 Display/Lvgl/lvgl_new.cpp 中以强符号改用 LVGL 内存池，这里全部声明为弱符号。
 #include <new>
 #include <stdlib.h>
 

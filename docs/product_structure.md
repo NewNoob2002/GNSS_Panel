@@ -15,10 +15,10 @@ App/                      共享应用：独立事件框架接入、无 LVGL 的
 Frameworks/               跨平台框架：DataCenter、DataBroker、DeviceManager、PageManager、ResourceManager
 External/lvgl/            上游 LVGL 8.3.11 源码（src/、lvgl.h、demos/，不含平台 lv_conf.h 与 porting/）
 Vendor/HC32/
-  Platform/               MCU 启动、驱动、Core/ 原生外设类（GpioPin、I2cMaster、SpiMaster）、共用 HAL（电源策略、充电/电量计、按键、LED、时基、Flash），Config/（board_pins.h 主板引脚、board_peripherals 板级外设实例）
-  Libraries/              器件与第三方库（Bq40z50、Mp2762a、MillisTaskManager、Parser、easylogger、MultiButton）；LVGL 从 External/lvgl 构建
+  Platform/               CMSIS 启动、DDL/ 小华 LL 库、Peripherals/ 原生外设驱动（GpioPin、I2cMaster、SpiMaster、GPIO、UART、Flash、DWT、OTS）、System/ 系统与运行时胶水（中断、Syscalls、new、delay、调试宏）、Config/（board_pins.h 主板引脚、board_peripherals 板级外设实例）、共用 HAL/（电源策略、充电/电量计、按键、LED、时基）与 State/
+  Libraries/              器件与第三方库（Bq40z50、Mp2762a、MillisTaskManager、Parser、SEGGER_RTT、easylogger、MultiButton）；LVGL 从 External/lvgl 构建
   Comm/                   I2C 从机传输 + 面板帧协议核心（全部产品）
-  Display/                带屏产品入口、共享应用的 HC32 平台层 AppPlatform/（入口 + Status/Power/Device 三个 Bridge + 初始化步骤）、显示协议表、显示 HAL、面板驱动 PanelRm690a0 与板级显示实例 board_display、固件 lv_conf.h 与 lv_port*、LVGL 内存池 operator new（X1Pro、XBase）
+  Display/                带屏产品入口、显示协议表、显示 HAL，以及 AppPlatform/（共享应用的 HC32 平台层：入口 + Status/Power/Device 三个 Bridge + 初始化步骤）、Panel/（面板驱动 PanelRm690a0 与板级显示实例 board_display）、Lvgl/（固件 lv_conf.h、lv_port*、LVGL 内存池 operator new）（X1Pro、XBase）
   Products/<产品>/        product.cmake、product_config.h、产品专属源码
 Vendor/Simulator/         唯一 PC SDL 模拟器：SIM_BACKEND=Board（默认，共享应用 + AppPlatform + 固件 HAL_Power.cpp）或 Demo（Linux 演示后端）；配置用自身 lv_conf.h
 Vendor/Linux/             RK3506 Linux 端口、Backends/Demo 演示后端与主机测试；配置用 config/lv_conf.h
@@ -27,9 +27,9 @@ Vendor/Linux/             RK3506 Linux 端口、Backends/Demo 演示后端与主
 依赖只能自上而下：`Products` → `Display`/`Comm` → `Platform`/`Libraries`。`Vendor/HC32/Platform/` 不包含 LVGL 或 `App/` 头文件；为此做了以下解耦：
 
 - LVGL 使用 `LV_TICK_CUSTOM` 直接读取 `millis()`，SysTick 不再调用 `lv_tick_inc()`。
-- C++ `operator new` 平台默认走 C 堆（弱符号），带屏产品在 `Vendor/HC32/Display/lvgl_new.cpp` 以强符号改用 LVGL 内存池。
+- C++ `operator new` 平台默认走 C 堆（弱符号），带屏产品在 `Vendor/HC32/Display/Lvgl/lvgl_new.cpp` 以强符号改用 LVGL 内存池。
 - `HAL::Power_OnCheck(idle)` 由入口传入等待开机期间的刷新函数；显示 DMA 回收 `lv_port_disp_poll()` 由带屏主循环调用。
-- `Platform/Core/SpiMaster` 仅提供通用 SPI 主机与可选 TX DMA 原语，显示专用的 SPI/DMA 板级实例（`Display/board_display`）与面板驱动（`Display/PanelRm690a0`）放在 `Display/` 中。
+- `Platform/Peripherals/SpiMaster` 仅提供通用 SPI 主机与可选 TX DMA 原语，显示专用的 SPI/DMA 板级实例（`Display/Panel/board_display`）与面板驱动（`Display/Panel/PanelRm690a0`）放在 `Display/Panel/` 中。
 
 ## 产品差异放在哪里
 

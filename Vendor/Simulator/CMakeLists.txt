@@ -97,11 +97,12 @@ else()
         ${CMAKE_CURRENT_LIST_DIR}
         ${CMAKE_CURRENT_LIST_DIR}/HAL
         ${HC32_DIR}/Display
+        ${HC32_DIR}/Display/AppPlatform
         ${HC32_DIR}/Libraries
         ${REPO_ROOT}/External
         ${LVGL_DIR}
         ${HC32_DIR}/Platform/Config
-        ${HC32_DIR}/Platform/Core/inc
+        ${HC32_DIR}/Platform/Peripherals
         ${HC32_DIR}/Platform/State
         ${CMAKE_CURRENT_BINARY_DIR}/generated/Platform/Config
         ${SIM_PRODUCT_DIR}

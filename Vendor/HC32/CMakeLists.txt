@@ -65,14 +65,17 @@ if(PRODUCT_HAS_DISPLAY)
         Display/display_main.cpp
         Display/display_protocol.cpp
         Display/HAL_Display.cpp
-        Display/lvgl_new.cpp
-        Display/lv_port.cpp
-        Display/lv_port_disp.cpp
-        Display/PanelRm690a0.cpp
-        Display/board_display.cpp
+        Display/Lvgl/lvgl_new.cpp
+        Display/Lvgl/lv_port.cpp
+        Display/Lvgl/lv_port_disp.cpp
+        Display/Panel/PanelRm690a0.cpp
+        Display/Panel/board_display.cpp
     )
     target_include_directories(hc32_shared_display PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/Display
+        ${CMAKE_CURRENT_SOURCE_DIR}/Display/AppPlatform
+        ${CMAKE_CURRENT_SOURCE_DIR}/Display/Lvgl
+        ${CMAKE_CURRENT_SOURCE_DIR}/Display/Panel
     )
     target_link_libraries(hc32_shared_display PUBLIC
         hc32_shared_comm

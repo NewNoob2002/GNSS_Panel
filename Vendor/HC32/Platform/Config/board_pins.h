@@ -39,5 +39,5 @@
 #define CONFIG_SCREEN_MOSI_PIN PB13
 #define CONFIG_SCREEN_HOR_RES  294
 
-// SPI3、DMA1 CH0、AOS 与 IRQ 分配由 Display/board_display.cpp 的板级实例保存。
+// SPI3、DMA1 CH0、AOS 与 IRQ 分配由 Display/Panel/board_display.cpp 的板级实例保存。
 #endif /* PRODUCT_HAS_DISPLAY */

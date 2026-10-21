@@ -1,7 +1,7 @@
 #include "I2cMaster.h"
-#include "gpio.h"
+#include <gpio.h>
 
-/* 时序依据：原 Platform/Core/src/Wire.cpp，保留已验证的 LL 调用顺序与超时。 */
+/* 时序依据：原 Wire.cpp，保留已验证的 LL 调用顺序与超时。 */
 #define I2C_MASTER_TIMEOUT 0x40000UL
 
 bool

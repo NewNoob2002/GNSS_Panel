@@ -50,6 +50,17 @@ target_link_libraries(hc32_parser PUBLIC
     hc32_project_options
 )
 
+add_library(hc32_segger_rtt OBJECT
+    SEGGER_RTT/SEGGER_RTT.c
+    SEGGER_RTT/SEGGER_RTT_printf.c
+)
+target_include_directories(hc32_segger_rtt PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/SEGGER_RTT
+)
+target_link_libraries(hc32_segger_rtt PUBLIC
+    hc32_project_options
+)
+
 add_library(hc32_easylogger_headers INTERFACE)
 target_include_directories(hc32_easylogger_headers INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/easylogger/inc
@@ -64,6 +75,7 @@ add_library(hc32_easylogger OBJECT
 target_link_libraries(hc32_easylogger PUBLIC hc32_easylogger_headers)
 target_include_directories(hc32_easylogger PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/SEGGER_RTT
 )
 target_link_libraries(hc32_easylogger PUBLIC
     hc32_project_options
@@ -77,6 +89,7 @@ target_sources(hc32_libraries INTERFACE
     $<TARGET_OBJECTS:hc32_millis_task_manager>
     $<TARGET_OBJECTS:hc32_mp2762a>
     $<TARGET_OBJECTS:hc32_parser>
+    $<TARGET_OBJECTS:hc32_segger_rtt>
     $<TARGET_OBJECTS:hc32_easylogger>
 )
 target_link_libraries(hc32_libraries INTERFACE
@@ -85,6 +98,7 @@ target_link_libraries(hc32_libraries INTERFACE
     hc32_millis_task_manager
     hc32_mp2762a
     hc32_parser
+    hc32_segger_rtt
     hc32_easylogger
 )
 
@@ -116,10 +130,10 @@ add_library(hc32_lvgl STATIC
 target_include_directories(hc32_lvgl PUBLIC
     ${EXTERNAL_DIR}
     ${LVGL_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/../Display
+    ${CMAKE_CURRENT_SOURCE_DIR}/../Display/Lvgl
 )
 target_compile_definitions(hc32_lvgl PUBLIC
-    LV_CONF_PATH=${CMAKE_CURRENT_SOURCE_DIR}/../Display/lv_conf.h
+    LV_CONF_PATH=${CMAKE_CURRENT_SOURCE_DIR}/../Display/Lvgl/lv_conf.h
 )
 target_link_libraries(hc32_lvgl PUBLIC
     hc32_project_options

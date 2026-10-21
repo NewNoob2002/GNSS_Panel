@@ -1,9 +1,9 @@
 #include "SpiMaster.h"
-#include "gpio.h"
+#include <gpio.h>
 
 bool
 SpiMaster::begin() {
-    // 顺序和字段取自原 Platform/Core/src/SPI.cpp 的 begin / SPI_Settings。
+    // 顺序和字段取自原 SPI.cpp 的 begin / SPI_Settings。
     SPI_DeInit(config.regs);
     gpio_set_mode(config.sck, GPIO_OUTPUT_AF_PP, GPIO_LOW);
     gpio_set_mode(config.mosi, GPIO_OUTPUT_AF_PP, GPIO_LOW);
@@ -33,7 +33,7 @@ SpiMaster::begin() {
 
 bool
 SpiMaster::beginDma() {
-    // 字段与调用顺序取自原 Display/lv_port_disp.cpp 的 lv_port_disp_init。
+    // 字段与调用顺序取自原 lv_port_disp.cpp 的 lv_port_disp_init。
     dmaReady = false;
     if (config.txDma == nullptr) {
         return false;
