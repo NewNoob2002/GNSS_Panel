@@ -23,7 +23,7 @@ bool I2C_ProbeDevice(uint8_t address);
 /* Power */
 void Power_Init();
 void Battery_Init();
-/** Accept the completed Startup hold on the LVGL thread; reject pending/in-progress shutdown. */
+/** 在 LVGL 线程接收 Startup 完整长按请求；关机待处理或进行中时拒绝。 */
 bool Power_RequestOn();
 void Power_OnCheck(void (*idle)() = nullptr);
 void Power_Shutdown(bool en);

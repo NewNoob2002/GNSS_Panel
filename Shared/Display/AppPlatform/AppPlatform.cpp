@@ -58,7 +58,7 @@ system_backend::capabilities() {
             .record_settings = PRODUCT_RECORD_SETTINGS != 0};
 }
 
-/** Forward the completed Startup hold to the HAL power policy on the LVGL thread. */
+// 在 LVGL 线程将 Startup 完整长按请求转交 HAL 电源策略。
 bool
 system_backend::request_power_on() {
     // Startup 完整长按后请求 HAL 开机；成功时 SystemService 同步发布 powered_on 并进入 SystemLoading。

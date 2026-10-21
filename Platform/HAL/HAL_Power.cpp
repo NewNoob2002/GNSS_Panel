@@ -104,11 +104,7 @@ power_resume_from_standby(uint32_t now) {
     power_on_outputs();
 }
 
-/**
- * @brief Accept a Startup hold on the LVGL thread, or resume from shutdown standby.
- * @return False while shutdown is pending or in progress; true if accepted or already on.
- * Cold boot defers rail activation to Power_OnCheck; standby restores outputs immediately.
- */
+// 在 LVGL 线程接收 Startup 完整长按请求；冷启动由 Power_OnCheck 接通电源，待机时立即恢复，关机中拒绝。
 bool
 HAL::Power_RequestOn() {
     if (power_policy.state == PowerPolicy::Off) {
