@@ -52,18 +52,19 @@
 
 目标：三端（HC32、模拟器、Linux）切到 LVGL v9.6.0；页面层改用 `Frameworks/PageManager`、`ResourceManager`，数据层改用 `DataBroker`，平台 Bridge 改为 `DeviceManager` 设备对象。界面外观与交互不变。
 
+设计依据见 `docs/lvgl9_migration.md`。调研结论调整了顺序：不依赖 LVGL 的数据/设备/资源框架先在 LVGL 8 上切换并单独验收；`Frameworks/PageManager` 已使用 v9 接口，只能在 LVGL 9 之后切换。
+
 | # | 内容 | 负责 |
 |---|---|---|
-| 3.0 ★ | 只读调研，产出 `docs/lvgl9_migration.md`：LVGL 8→9 API 对照（覆盖 `App/` 实际用到的符号）、图片/字体格式转换方案、内存预算、DataCenter→DataBroker 与 Bridge→DeviceManager 映射、线程与生命周期约束；同时在模拟器中抓取各页面 LVGL 8 截图作为视觉基线 | sol |
-| 3.1 | 用 v9.6.0 上游源码整体替换 `External/lvgl/`；基于 v9 模板重建三份 `lv_conf.h`，保留现有功能开关的等价配置 | argon |
-| 3.2 ★ | 平台端口：HC32 `lv_port_disp`（`lv_display_create`、RGB565 字节交换、DMA 双缓冲、旋转）、输入与 tick；模拟器 SDL；Linux 显示端口 | sol |
-| 3.3 | 图片与字体转换为 v9 格式（脚本化、可重复执行，脚本入库） | argon |
-| 3.4 | `App/` 页面与组件的 API 迁移，按页面分批；`lv_ext`、`lv_anim_label` 等自定义组件由 sol 负责；sonnet 完成的批次由 sol 复核 | sonnet / sol |
-| 3.5 ★ | 切换到 `Frameworks/PageManager` + `ResourceManager`，删除 `App/Utils/PageManager`、`App/Utils/ResourceManager` | sol |
-| 3.6 ★ | DataCenter → DataBroker、Bridge → DeviceManager；移植 `App/tests` 覆盖的行为（定时器回绕、回调中销毁、注册容量、订阅者删除） | sol |
-| 3.7 ★ | HC32 内存与性能调优：`LV_MEM_SIZE`、绘制缓冲、字体/图片占用，达到体积门槛；记录帧率与 `lv_mem` 峰值 | sol |
+| 3.0 | 调研（3.0a/3.0b）与 LVGL 8 视觉基线截图 —— 已完成，见 `docs/lvgl9_migration.md` | argon / 主控 |
+| 3.1 ★ | 在 LVGL 8 上加固并切换 `DataBroker`、`DeviceManager`、`ResourceManager`：修复定时器/发布遍历的释放后使用、容量与参数校验、`-Werror` 告警；`App/` 与三端 Bridge 改用新框架；删除 `Frameworks/DataCenter`、`App/Utils/ResourceManager`；`App/tests` 与 Linux 框架测试全部行为在新框架上通过 | sol |
+| 3.2 | 图片转换脚本（入库、可重复执行、逐像素回读校验）：v8 数组 → v9 `lv_image_dsc_t`（`RGB565A8`/`RGB565`，无索引格式）；更新 `generate_ui_icons.py`；产物在 3.3 一并接入 | argon（与 3.1 并行） |
+| 3.3 ★ | 切换 LVGL v9.6.0：导入 `External/lvgl`（含 `include/`），重建三份 `lv_conf.h`，HC32/模拟器/Linux 显示、输入、时基端口，`lvgl_new.cpp`，`App/` 全部 API 迁移（含 Dialplate 自定义绘制）与现有 `App/Utils/PageManager` 的最小 v9 适配，接入 3.2 的资源；`App/`、`Vendor/` 定义 `LV_DISABLE_API_MAPPING` | sol（sonnet 复核） |
+| 3.4 ★ | 加固并切换 `Frameworks/PageManager`：补齐应用依赖的接口与虚函数、页面池释放、出现顺序、动画复位、返回值语义、告警；迁移全部页面；删除 `App/Utils/PageManager` | sol（sonnet 复核） |
+| 3.5 | 主控截图对比（与 LVGL 8 基线逐页）与视觉/交互差异修正 | 主控 / sol |
+| 3.6 ★ | HC32 内存与性能调优：`LV_DRAW_LAYER_SIMPLE_BUF_SIZE`、C 堆缩减、`LV_MEM_SIZE`、图片 `A8` 取舍；记录 `lv_mem` 峰值、栈水印、帧率与 debug/release 体积 | sol |
 
-阶段 3 额外验收：模拟器截图与 3.0 基线逐页对比；`App/` 不再出现 LVGL 8 专有符号；`Frameworks/` 只剩被使用的模块。
+阶段 3 额外验收：截图与 3.0 基线逐页对比；HC32 RAM 以链接符号 `__RamEnd - __StackTop` 为准，余量不少于 8 KiB；`App/` 不再出现 LVGL 8 专有符号；`Frameworks/` 只剩被使用的模块。
 
 实机清单：阶段 2 清单全部重复；每个页面进入/返回/动画；长时间运行（≥ 30 分钟）无内存泄漏（`lv_mem` 监视）；刷新流畅度不低于 LVGL 8 版本。
 
