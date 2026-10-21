@@ -11,11 +11,11 @@ using namespace page;
 bool SystemLoadingModel::init() {
     if (account_)
         return true;
-    account_ = std::make_unique<Account>("SystemLoadingModel", DataProc::Center(), 0, this);
-    account_->SetEventCallback(on_event);
-    if (!account_->IsRegistered() || !model_utils::subscribe(*account_, status_, state_)) {
+    account_ = std::make_unique<DataNode>("SystemLoadingModel", DataProc::Broker(), this);
+    account_->setEventCallback(on_event);
+    if (!account_->isRegistered() || !model_utils::subscribe(*account_, status_, state_)) {
         account_.reset();
-        APP_LOG_E("SystemLoadingModel", "Account initialization failed");
+        APP_LOG_E("SystemLoadingModel", "DataNode initialization failed");
         return false;
     }
     return true;
@@ -25,7 +25,7 @@ void SystemLoadingModel::deinit() {
 }
 bool SystemLoadingModel::set_status_bar(bool visible, DataProc::StatusBarStyle style) const {
     const DataProc::StatusBarPresentation request{visible, style};
-    const bool ok = account_ && account_->Notify("StatusBar", &request, sizeof(request)) == Account::RES_OK;
+    const bool ok = account_ && account_->notify("StatusBar", &request, sizeof(request)) == DataNode::RES_OK;
     if (!ok)
         APP_LOG_E("SystemLoadingModel", "StatusBar notification rejected");
     return ok;
@@ -33,7 +33,7 @@ bool SystemLoadingModel::set_status_bar(bool visible, DataProc::StatusBarStyle s
 bool SystemLoadingModel::begin_initialization() const {
     DataProc::SystemRequest request{};
     request.command = DataProc::SystemCommand::BeginInitialization;
-    const bool ok = account_ && account_->Notify("System", &request, sizeof(request)) == Account::RES_OK;
+    const bool ok = account_ && account_->notify("System", &request, sizeof(request)) == DataNode::RES_OK;
     if (!ok)
         APP_LOG_E("SystemLoading", "initialization report reset rejected");
     return ok;
@@ -67,12 +67,12 @@ DataProc::InitializationStatus SystemLoadingModel::poll_step(unsigned step, std:
     app_log_write(success ? APP_LOG_INFO : APP_LOG_WARN, "SystemLoading", "step %u/5 %s: %s%s after %lu ms (%s)",
                   step + 1, name, success ? "OK" : "FAILED", tag, static_cast<unsigned long>(elapsed_ms),
                   detail.data());
-    if (account_->Notify("System", &request, sizeof(request)) != Account::RES_OK)
+    if (account_->notify("System", &request, sizeof(request)) != DataNode::RES_OK)
         APP_LOG_E("SystemLoading", "step %u report rejected", step + 1);
     return status;
 }
 
-int SystemLoadingModel::on_event(Account* account, Account::EventParam_t* event) {
-    auto* self = static_cast<SystemLoadingModel*>(account->UserData);
+int SystemLoadingModel::on_event(DataNode* account, DataNode::EventParam_t* event) {
+    auto* self = static_cast<SystemLoadingModel*>(account->getUserData());
     return model_utils::receive(event, self->status_, self->state_);
 }

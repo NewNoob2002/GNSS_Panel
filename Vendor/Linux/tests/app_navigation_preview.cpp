@@ -229,8 +229,8 @@ int main(int argc, char** argv) {
             assert(find_label(lv_scr_act(), i18n::text(i18n::TextId::ReadyWithWarnings)));
             advance(1400);
             assert(std::strcmp(app.current_page(), "Pages/Dialplate") == 0);
-            assert(!DataProc::Center()->SearchAccount("StartupModel"));
-            assert(!DataProc::Center()->SearchAccount("SystemLoadingModel"));
+            assert(!DataProc::Broker()->search("StartupModel"));
+            assert(!DataProc::Broker()->search("SystemLoadingModel"));
             assert(!app.back()); // Dialplate is the root, not a child of the boot pages.
             lv_obj_t* initial_focus = app.focused();
             assert(initial_focus);
@@ -422,7 +422,7 @@ int main(int argc, char** argv) {
                 assert(app.back());
                 advance(4000);
                 assert(std::strcmp(app.current_page(), "Pages/Dialplate") == 0);
-                assert(!DataProc::Center()->SearchAccount("SystemLoadingModel"));
+                assert(!DataProc::Broker()->search("SystemLoadingModel"));
                 assert(!app.back());
             }
             lv_tick_inc(300);

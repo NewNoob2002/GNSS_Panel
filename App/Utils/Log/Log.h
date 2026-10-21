@@ -20,7 +20,7 @@ void app_log_set_sink(AppLogSink sink, void* context); /* NULL restores stderr. 
 __attribute__((format(printf, 3, 4)))
 #endif
 int app_log_write(AppLogLevel level, const char* module, const char* format, ...);
-/** Unrecoverable application error (e.g. a page Model failed to register its Account). Logs at ERROR and
+/** Unrecoverable application error (e.g. a page Model failed to register its DataNode). Logs at ERROR and
  * never returns. The default aborts the process; a platform may provide its own strong definition
  * (e.g. an MCU that records the reason and resets) because the default is a weak symbol.
  */

@@ -20,114 +20,66 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#ifndef __DATA_BROKER_H
-#define __DATA_BROKER_H
-
+#pragma once
 #include "DataNode.h"
+#include "DataTimer.h"
 
-class DataTimerManager;
-
+/** 同步数据路由；应用线程独占，必须比节点及其定时器长寿。 */
 class DataBroker {
     friend class DataNode;
-
 public:
-    /**
-     * @brief  Data broker constructor
-     * @param  name: The name of the data broker
-     */
-    DataBroker(const char* name);
+  static constexpr size_t MaxNodes = 16;
+  /** 构造值成员，避免在禁用异常的固件上隐式分配失败。 */
+  explicit DataBroker(const char* name);
+  /** 释放主节点订阅；调用前必须已销毁所有外部节点。 */
+  ~DataBroker() = default;
+  DataBroker(const DataBroker&) = delete;
+  DataBroker& operator=(const DataBroker&) = delete;
+  /** 返回外部节点数，不包含主节点。 */
+  size_t getNodeNumber() const;
 
-    /**
-     * @brief  Data broker destructor
-     */
-    ~DataBroker();
+  /** 返回自动订阅所有外部节点的主节点。 */
+  DataNode*
+  mainNode() {
+      return &_mainNode;
+  }
 
-    /**
-     * @brief  Get the number of nodes in the node pool
-     * @retval Number of nodes
-     */
-    size_t getNodeNumber();
+  /** 设置毫秒时钟；存在定时器时禁止更换时钟。 */
+  bool
+  initTimerManager(DataTimerManager::TickFunction_t clock) {
+      return _timerManager.setTickCallback(clock);
+  }
 
-    /**
-     * @brief  Get the main node
-     * @retval Pointer to the main node
-     */
-    DataNode* mainNode()
-    {
-        return _mainNode;
-    }
+  /** 处理一次到期事件，不追赶遗漏周期。 */
+  uint32_t
+  handleTimer() {
+      return _timerManager.handler();
+  }
 
-    /**
-     * @brief  Set the main node
-     * @param  node: Pointer to the main node
-     */
-    void initTimerManager(uint32_t (*tickFunction)(void));
+  /** 按名称查找注册节点；空参数返回空指针。 */
+  DataNode* search(const char* id);
 
-    /**
-     * @brief  Handle timer
-     * @retval Time till next timer event in millisecond
-     */
-    uint32_t handleTimer();
-
-protected:
-    /**
-     * @brief  Add an node to the node pool
-     * @param  node: Pointer to node
-     * @retval If the addition is successful, return true
-     */
-    bool add(DataNode* node);
-
-    /**
-     * @brief  Remove the node from the node pool
-     * @param  node: Pointer to node
-     * @retval Return true if the removal is successful
-     */
-    bool remove(DataNode* node);
-
-    /**
-     * @brief  Remove node in vector
-     * @param  vec: Pointer to vector
-     * @param  id:  DataNode ID
-     * @retval Return true if the removal is successful
-     */
-    bool remove(DataNode::DataNodeList_t* vec, DataNode* node);
-
-    /**
-     * @brief  Search node
-     * @param  id: DataNode ID
-     * @retval If the search is successful, return the pointer of the node
-     */
-    DataNode* search(const char* id);
-
-    /**
-     * @brief  Search node in vector
-     * @param  vec: Pointer to vector
-     * @param  id:  DataNode ID
-     * @retval If the search is successful, return the pointer of the node
-     */
-    DataNode* search(DataNode::DataNodeList_t* vec, const char* id);
-
-    /**
-     * @brief  Get the timer manager
-     * @retval Pointer to the timer manager
-     */
-    DataTimerManager* timerManager()
-    {
-        return _timerManager;
-    }
+  /** 返回独立于 LVGL 的定时器管理器。 */
+  DataTimerManager*
+  timerManager() {
+      return &_timerManager;
+  }
 
 private:
-    /* DataNode pool */
-    DataNode::DataNodeList_t* _nodePool;
-
-    /* Main node, will automatically follow all nodes */
-    DataNode* _mainNode;
-
-    /* Timer manager */
-    DataTimerManager* _timerManager;
-
-    /* The name of the data center will be used as the ID of the main node */
-    const char* _name;
+  /** 注册节点并分配不会重复的存活序号。 */
+  bool add(DataNode* node);
+  /** 注销节点，不释放调用方拥有的对象。 */
+  bool remove(DataNode* node);
+  /** 从定长关系表中移除节点并保持顺序。 */
+  static bool remove(DataNode::DataNodeList_t* list, DataNode* node);
+  /** 向关系表加入节点，容量不足返回失败。 */
+  static bool append(DataNode::DataNodeList_t& list, DataNode* node);
+  /** 在关系表中按名称查找。 */
+  static DataNode* search(const DataNode::DataNodeList_t* list, const char* id);
+  /** 不解引用失效指针，校验地址与注册序号。 */
+  bool alive(const DataNode* node, uint64_t serial) const;
+  DataNode::DataNodeList_t _nodePool{};
+  uint64_t _nextSerial = 0;
+  DataTimerManager _timerManager;
+  DataNode _mainNode;
 };
-
-#endif

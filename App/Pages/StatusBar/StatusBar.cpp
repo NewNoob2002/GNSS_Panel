@@ -55,9 +55,9 @@ void compact(const NumberFlow* number) {
 bool StatusBar::create(lv_obj_t* parent) {
     if (root_ || !parent)
         return false;
-    account_ = std::make_unique<Account>("StatusBar", DataProc::Center(), 0, this);
-    account_->SetEventCallback(on_event);
-    if (!account_->IsRegistered() || !account_->Subscribe("Status")) {
+    account_ = std::make_unique<DataNode>("StatusBar", DataProc::Broker(), this);
+    account_->setEventCallback(on_event);
+    if (!account_->isRegistered() || !account_->subscribe("Status")) {
         account_.reset();
         return false;
     }
@@ -144,22 +144,22 @@ bool StatusBar::on_presentation(void* owner, const DataProc::StatusBarPresentati
     return true;
 }
 
-int StatusBar::on_event(Account* account, Account::EventParam_t* event) {
-    auto* self = static_cast<StatusBar*>(account->UserData);
+int StatusBar::on_event(DataNode* account, DataNode::EventParam_t* event) {
+    auto* self = static_cast<StatusBar*>(account->getUserData());
     if (!event)
-        return Account::RES_PARAM_ERROR;
-    if (event->event == Account::EVENT_NOTIFY) {
+        return DataNode::RES_PARAM_ERROR;
+    if (event->event == DataNode::EVENT_NOTIFY) {
         DataProc::StatusBarPresentation request;
         const int result = DataProc::ReadPayload(event, request);
-        if (result != Account::RES_OK)
+        if (result != DataNode::RES_OK)
             return result;
-        return on_presentation(self, request) ? Account::RES_OK : Account::RES_PARAM_ERROR;
+        return on_presentation(self, request) ? DataNode::RES_OK : DataNode::RES_PARAM_ERROR;
     }
-    if (event->event != Account::EVENT_PUB_PUBLISH || !event->tran || std::strcmp(event->tran->ID, "Status") != 0)
-        return Account::RES_UNSUPPORTED_REQUEST;
+    if (event->event != DataNode::EVENT_PUBLISH || !event->tran || std::strcmp(event->tran->getID(), "Status") != 0)
+        return DataNode::RES_UNSUPPORTED_REQUEST;
     DataProc::StatusSnapshot snapshot;
     const int result = DataProc::ReadPayload(event, snapshot);
-    if (result != Account::RES_OK)
+    if (result != DataNode::RES_OK)
         return result;
     StatusBarState state;
     state.position = snapshot.position.data();
@@ -177,7 +177,7 @@ int StatusBar::on_event(Account* account, Account::EventParam_t* event) {
     state.wifi = snapshot.wifi;
     state.recording = snapshot.recording;
     self->update(state);
-    return Account::RES_OK;
+    return DataNode::RES_OK;
 }
 
 void StatusBar::update(const StatusBarState& state) {

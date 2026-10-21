@@ -21,115 +21,96 @@
  * SOFTWARE.
  */
 #include "DataBroker.h"
-#include "DataBrokerLog.h"
-#include "DataTimer.h"
 #include <algorithm>
 #include <cstring>
+#include <limits>
 
-DataBroker::DataBroker(const char* name)
-    : _nodePool(nullptr)
-    , _mainNode(nullptr)
-    , _timerManager(nullptr)
-{
-    _name = name;
-    _nodePool = new DataNode::DataNodeList_t;
-    _mainNode = new DataNode(name, this);
+DataBroker::DataBroker(const char* name) : _mainNode(name, this) {
+    // 主节点仅作观察入口，默认接收成功，避免无业务订阅者时返回无回调错误。
+    _mainNode.setEventCallback([](DataNode*, DataNode::EventParam_t*) -> int { return DataNode::RES_OK; });
 }
 
-DataBroker::~DataBroker()
-{
-    DN_LOG_WARN("DataBroker[%s] closing...", _name);
+DataNode*
+DataBroker::search(const char* id) {
+    return search(&_nodePool, id);
+}
 
-    DN_LOG_INFO("Deleting main node: %p", _mainNode);
-    delete _mainNode;
-    _mainNode = nullptr;
-
-    /* check leak */
-    for (auto iter : *_nodePool) {
-        (void)iter;
-        DN_LOG_WARN("Leak: DataNode[%s]", iter->getID());
+DataNode*
+DataBroker::search(const DataNode::DataNodeList_t* list, const char* id) {
+    if (!list || !id || !*id) {
+        return nullptr;
     }
-
-    DN_LOG_INFO("Deleting node pool: %p", _nodePool);
-    delete _nodePool;
-    _nodePool = nullptr;
-
-    if (_timerManager) {
-        DN_LOG_INFO("Deleting timer manager: %p", _timerManager);
-        delete _timerManager;
-        _timerManager = nullptr;
-    }
-
-    DN_LOG_WARN("DataBroker[%s] closed.", _name);
-}
-
-DataNode* DataBroker::search(const char* id)
-{
-    return search(_nodePool, id);
-}
-
-DataNode* DataBroker::search(DataNode::DataNodeList_t* vec, const char* id)
-{
-    for (auto iter : *vec) {
-        if (strcmp(id, iter->getID()) == 0) {
-            return iter;
+    for (auto* node : *list) {
+        if (node && std::strcmp(id, node->getID()) == 0) {
+            return node;
         }
     }
     return nullptr;
 }
 
-bool DataBroker::add(DataNode* node)
-{
-    if (_mainNode == nullptr || node == _mainNode) {
+bool
+DataBroker::add(DataNode* node) {
+    if (!node || !node->getID() || !*node->getID()) {
         return false;
     }
-
-    if (search(node->getID()) != nullptr) {
-        DN_LOG_ERROR("Multi add DataNode[%s]", node->getID());
+    if (node == &_mainNode) {
+        node->_serial = ++_nextSerial;
+        return true;
+    }
+    if (getNodeNumber() >= MaxNodes || search(node->getID()) || std::strcmp(node->getID(), _mainNode.getID()) == 0
+        || _nextSerial == std::numeric_limits<uint64_t>::max()) {
         return false;
     }
-
-    _nodePool->push_back(node);
-
-    _mainNode->subscribe(node->getID());
-
+    if (!append(_nodePool, node)) {
+        return false;
+    }
+    node->_serial = ++_nextSerial;
+    // 注册期间尚未置 registered；主节点只建立关系，不触发回调。
+    append(_mainNode._publishers, node);
+    append(node->_subscribers, &_mainNode);
     return true;
 }
 
-bool DataBroker::remove(DataNode* node)
-{
-    return remove(_nodePool, node);
+bool
+DataBroker::remove(DataNode* node) {
+    return remove(&_nodePool, node);
 }
 
-bool DataBroker::remove(DataNode::DataNodeList_t* vec, DataNode* node)
-{
-    auto iter = std::find(vec->begin(), vec->end(), node);
-
-    if (iter == vec->end()) {
-        DN_LOG_ERROR("DataNode[%s] was not found", node->getID());
+bool
+DataBroker::remove(DataNode::DataNodeList_t* list, DataNode* node) {
+    auto it = std::find(list->begin(), list->end(), node);
+    if (it == list->end()) {
         return false;
     }
-
-    vec->erase(iter);
-
+    std::move(it + 1, list->end(), it);
+    list->back() = nullptr;
     return true;
 }
 
-size_t DataBroker::getNodeNumber()
-{
-    return _nodePool->size();
-}
-
-void DataBroker::initTimerManager(uint32_t (*tickFunction)(void))
-{
-    if (!_timerManager) {
-        _timerManager = new DataTimerManager;
+bool
+DataBroker::append(DataNode::DataNodeList_t& list, DataNode* node) {
+    auto it = std::find(list.begin(), list.end(), nullptr);
+    if (it == list.end()) {
+        return false;
     }
-
-    _timerManager->setTickCallback(tickFunction);
+    *it = node;
+    return true;
 }
 
-uint32_t DataBroker::handleTimer()
-{
-    return _timerManager->handler();
+size_t
+DataBroker::getNodeNumber() const {
+    return std::count_if(_nodePool.begin(), _nodePool.end(), [](const DataNode* n) { return n != nullptr; });
+}
+
+bool
+DataBroker::alive(const DataNode* node, uint64_t serial) const {
+    if (node == &_mainNode) {
+        return _mainNode._serial == serial;
+    }
+    for (auto* live : _nodePool) {
+        if (live == node && live && live->_serial == serial) {
+            return true;
+        }
+    }
+    return false;
 }

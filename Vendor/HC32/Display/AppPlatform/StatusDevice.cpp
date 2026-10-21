@@ -1,15 +1,17 @@
-#include "StatusBridge.h"
+#include "StatusDevice.h"
+#include <cstdio>
 
-#include "App.h"
+#include "Common/SystemService.h"
 #include "SystemState.h"
 #include "Utils/I18n/I18n.h"
+#include "lvgl.h"
 #include "mcu_config.h"
 
 namespace {
 
 // 与旧状态栏一致：基站模式显示 BASE（蓝），否则按定位状态着色。
 void
-position_text(page::StatusBarState& state) {
+position_text(DataProc::StatusSnapshot& state) {
     i18n::TextId id = i18n::TextId::PositionNone;
     lv_color_t color = lv_palette_main(LV_PALETTE_RED);
     const WorkMode_t mode = State::Effective_Work().work_mode;
@@ -33,21 +35,28 @@ position_text(page::StatusBarState& state) {
             default: break;
         }
     }
-    state.position = i18n::text(id);
-    state.position_color = color;
+    std::snprintf(state.position.data(), state.position.size(), "%s", i18n::text(id));
+    state.position_color_rgb = lv_color_to32(color) & 0xffffffu;
 }
 
 } // namespace
 
+/** 保持原 200 ms 发布节拍，数据经设备 read 按值传递。 */
 void
-StatusBridge::update(App& app, std::uint32_t now) {
+StatusDevice::update(std::uint32_t now) {
     if (sent_ && now - last_ms_ < kPeriodMs) {
         return;
     }
     sent_ = true;
     last_ms_ = now;
+    (void)StatusService::update(system_backend::read_status());
+}
 
-    page::StatusBarState state;
+/** 保留原定位颜色、运行时钟和主控实际录制状态。 */
+DataProc::StatusSnapshot
+StatusDevice::status_snapshot() {
+    const auto now = lv_tick_get();
+    DataProc::StatusSnapshot state;
     position_text(state);
     state.satellites = systemInfo.host.position.satellite_number_used;
     state.satellites_valid = true;
@@ -67,5 +76,5 @@ StatusBridge::update(App& app, std::uint32_t now) {
     state.battery_voltage = battery.Voltage_f;
     state.battery_temperature_valid = battery.sample_valid;
     state.battery_temperature = battery.Temp_f;
-    app.update_status(state);
+    return state;
 }

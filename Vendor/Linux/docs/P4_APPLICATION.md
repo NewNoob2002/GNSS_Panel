@@ -50,7 +50,7 @@ SystemLoading 按 **Logo 800ms → 五节点各 600ms → 100% 200ms → 完成�
 
 `Pages/SystemInfos` 是固定 294×126 的滚动视口，纵向排列 Work → GPS → Wi-Fi → Battery → Storage → System 六张信息卡；焦点变化滚动当前页，不切换路由子页。按最新要求，初始化标题与五条结果行已删除。System 卡仍显示 `Init errors`，统计最近初始化报告的失败数。Next/Down/Function 单击按可见顺序前进，Previous/Up 后退，两端循环；Power 单击或 Function 双击返回。仅此页开启竖直滚动，焦点通过 LVGL 原生 scroll-to-view 显示完整条目。
 
-结果由现有 System 服务保存在固定大小的 `SystemState` 中，通过页面 Model 的 Account 订阅/拉取；SystemLoading 卸载、SystemInfos 离开再进入或切换语言后仍可查看同一报告。开始新的初始化尝试时清空旧报告；未执行的节点保持 NOT RUN。仅保留当前进程的最近一次尝试，每节点详情上限 95 字节；不是历史日志浏览器，也不写文件或存储。服务拒绝错误来源、越界节点、无效状态及未终止消息。
+结果由现有 System 服务保存在固定大小的 `SystemState` 中，通过页面 Model 的 DataNode 订阅/拉取；SystemLoading 卸载、SystemInfos 离开再进入或切换语言后仍可查看同一报告。开始新的初始化尝试时清空旧报告；未执行的节点保持 NOT RUN。仅保留当前进程的最近一次尝试，每节点详情上限 95 字节；不是历史日志浏览器，也不写文件或存储。服务拒绝错误来源、越界节点、无效状态及未终止消息。
 
 最新根工程 Debug/SDL 构建与主机 CTest **9/9** 通过，回归覆盖六卡顺序、首个 Next/Previous、正向滚动、两端循环、英俄布局、初始化错误数及返回。额外临时 SDL fixture 向真实事件队列注入 Down/Up，并使用生产 `platform/sdl/main.cpp` 事件循环，确认 Down: Work → GPS、Up: GPS → Work 和完整六卡循环。此前仍运行的 `out/host-init-info/application/simulator` 是导航修正前的旧二进制，本轮已在此路径重建并重启。验证记录/键盘 fixture 位于 `out/host-info-clean/`。`out/host-info-scroll/` 和旧 diagnostics 截图保留为历史；本轮未 ARM 构建或部署板端。
 
@@ -91,7 +91,7 @@ build/sim-demo/bin/main
 build/sim-demo/bin/main --random-status 42
 ```
 
-随机模式每 3 秒生成新的 0%～100% 电量、充电状态、卫星数、Wi-Fi 与录制状态；电压按演示范围 6.80～8.40 V 随电量变化。状态每 200 ms 经 `App → StatusService/DataCenter → Model → View` 发布，沿用 SDL/LVGL 主循环线程。Startup 和 StatusBar 共用带槽框及电池正极端头的样式：充电时槽框和填充均为绿色，1.2 秒从空槽增长到满槽、停留 0.3 秒后从空槽重新开始，数字仍显示实际电量；停止充电后恢复实际电量宽度及四级颜色，数据无效时清空槽并取消动画。重复发布和充电期间实际电量变化不重置循环。Startup 空闲 10 秒后显示 StatusBar，可同时观察两处。页面导航与长按操作由用户控制，Q 退出；数据属于 DEMO，不代表电池测量或充放电模型。`app_system_dash` 回归强制检查 0/9/10/19/20/49/50/100/101% 边界，运行 seed=42 的 128 组随机状态，检查两处颜色、实际数值、从空到满的循环、无效数据及页面离开/返回；`app_status` 检查 StatusBar 在充电时销毁/重建和取消动画。
+随机模式每 3 秒生成新的 0%～100% 电量、充电状态、卫星数、Wi-Fi 与录制状态；电压按演示范围 6.80～8.40 V 随电量变化。状态每 200 ms 经 `App → StatusService/DataBroker → Model → View` 发布，沿用 SDL/LVGL 主循环线程。Startup 和 StatusBar 共用带槽框及电池正极端头的样式：充电时槽框和填充均为绿色，1.2 秒从空槽增长到满槽、停留 0.3 秒后从空槽重新开始，数字仍显示实际电量；停止充电后恢复实际电量宽度及四级颜色，数据无效时清空槽并取消动画。重复发布和充电期间实际电量变化不重置循环。Startup 空闲 10 秒后显示 StatusBar，可同时观察两处。页面导航与长按操作由用户控制，Q 退出；数据属于 DEMO，不代表电池测量或充放电模型。`app_system_dash` 回归强制检查 0/9/10/19/20/49/50/100/101% 边界，运行 seed=42 的 128 组随机状态，检查两处颜色、实际数值、从空到满的循环、无效数据及页面离开/返回；`app_status` 检查 StatusBar 在充电时销毁/重建和取消动画。
 
 窗口为与原 Simulator 相同的 294×126、1:1 像素尺寸，复用同一 `App` 与 LVGL 配置，不触碰板端设备。启动显示 Startup：鼠标左键、Enter 或中键 **按住约 2 秒**，经过 SystemLoading（Logo、五阶段初始化及完成窗口，约 5 秒）进入主表盘。主表盘的电源按钮进入 SystemDash；选择 Power 后弹出 Cancel / Shutdown / Reboot，默认 Cancel。移动焦点到目标动作后用 Ctrl+Enter 提交，SaveConfig 演示结束后 Shutdown 回 Startup、Reboot 回 Dialplate。鼠标左键点击可操作按钮、中键确认焦点、右键返回、滚轮移动焦点；键盘方向键移动焦点、短按 Enter 确认、Esc 返回、Q 退出。工作设置/记录配置的方向按钮可预览选项；SystemInfos 六卡按焦点滚动并可点击返回，StarMap 同样可聚焦返回；SystemDash 的 Settings 进入语言设置。**整个开关机流程只演示页面**，不执行真实硬件检查、配置保存、系统断电或重启；未接入业务后端的模式、录制、Wi-Fi 按钮仍禁用。页面只通过焦点按钮导航，不另设翻页快捷键。页面管理器沿用 [X-TRACK](https://github.com/FASTSHIFT/X-TRACK/tree/main/Software/X-Track) 同系生命周期/路由机制。SDL 窗口不能替代真实屏幕遮挡和时序验收。
 

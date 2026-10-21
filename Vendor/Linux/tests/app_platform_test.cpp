@@ -124,36 +124,111 @@ void boot_to_dialplate() {
 } // namespace
 
 // Test platform: power-on is decided outside the UI, Reboot is not offered, data is real.
-system_backend::Capabilities system_backend::capabilities() {
+
+namespace {
+/** 演示/测试电源设备，保留原即时或延后确认行为。 */
+class BackendPower : public system_backend::PowerObject {
+  public:
+    /** 读取服务已有的电源报告，无硬件操作。 */
+    system_backend::PowerReport
+    power_report() override {
+        const auto s = SystemService::snapshot();
+        return {s.powered_on, s.shutting_down, s.standby, s.power_cause};
+    }
+
+    /** 原后端开机操作。 */
+    bool request_power_on() override;
+    /** 原后端关机/重启操作。 */
+    bool execute_power(DataProc::PowerAction) override;
+};
+
+/** 演示/测试业务设备，保留原请求结果及快照。 */
+class BackendDevice : public system_backend::BusinessObject {
+  public:
+    /** 返回设备及服务已知的 Wi-Fi 状态。 */
+    system_backend::DeviceReport device_report() override;
+    /** 原后端业务请求。 */
+    bool execute_device(const DataProc::DeviceRequest&) override;
+    /** 原后端 Wi-Fi 请求。 */
+    bool request_wifi(bool) override;
+};
+
+/** 演示/测试状态设备，提供能力与初始化检查。 */
+class BackendStatus : public system_backend::StatusObject {
+  public:
+    /** 返回已发布状态，测试可继续直接注入快照。 */
+    DataProc::StatusSnapshot
+    status_snapshot() override {
+        return {};
+    }
+
+    /** 原后端能力。 */
+    system_backend::Capabilities capabilities() override;
+    /** 原后端初始化元数据。 */
+    const char* initialization_name(unsigned) override;
+    /** 原后端步骤标题。 */
+    i18n::TextId initialization_title(unsigned) override;
+    /** 原后端非阻塞检查。 */
+    DataProc::InitializationStatus poll_initialization_step(unsigned, uint32_t, char*, size_t) override;
+};
+} // namespace
+
+/** 三个静态设备不依赖 LVGL 或实际屏幕即可初始化。 */
+DeviceManager&
+system_backend::devices() {
+    static BackendPower power;
+    static BackendDevice device;
+    static BackendStatus status;
+    static ::DeviceObject* list[] = {&power, &device, &status};
+    static DeviceManager manager(list, 3);
+    static const bool initialized = (manager.init(), true);
+    (void)initialized;
+    return manager;
+}
+
+system_backend::Capabilities
+BackendStatus::capabilities() {
     return {.simulated = false,
             .reboot_available = false,
             .wifi_available = true,
             .star_map = false,
             .record_settings = false};
 }
-bool system_backend::request_power_on() {
+
+bool
+BackendPower::request_power_on() {
     ++power_on_requests;
     return false;
 }
-bool system_backend::execute_power(DataProc::PowerAction action) {
+
+bool
+BackendPower::execute_power(DataProc::PowerAction action) {
     ++(action == DataProc::PowerAction::Off ? off_calls : reboot_calls);
     return true; // Completion is reported later with SystemService::enter_standby().
 }
-i18n::TextId system_backend::initialization_title(unsigned step) {
+
+i18n::TextId
+BackendStatus::initialization_title(unsigned step) {
     constexpr i18n::TextId titles[] = {i18n::TextId::LoadingConfiguration, i18n::TextId::CheckingBatteryGauge,
                                        i18n::TextId::CheckingCharger, i18n::TextId::PoweringHostBoard,
                                        i18n::TextId::CheckingHostLink};
     return titles[step];
 }
-bool system_backend::request_wifi(bool on) {
+
+bool
+BackendDevice::request_wifi(bool on) {
     ++wifi_requests;
     requested_wifi = on;
     return true; // Applied later by the test through SystemService::set_wifi().
 }
-DataProc::DeviceSnapshot system_backend::initial_device() {
+
+system_backend::DeviceReport
+BackendDevice::device_report() {
     return {}; // Nothing known until the platform publishes.
 }
-bool system_backend::execute_device(const DataProc::DeviceRequest& request) {
+
+bool
+BackendDevice::execute_device(const DataProc::DeviceRequest& request) {
     if (reject_device)
         return false;
     device_requests.push_back(request);
@@ -164,11 +239,14 @@ bool system_backend::execute_device(const DataProc::DeviceRequest& request) {
         device.record_pending = true;
     return DeviceService::update(device);
 }
-const char* system_backend::initialization_name(unsigned) {
+
+const char*
+BackendStatus::initialization_name(unsigned) {
     return "device";
 }
-DataProc::InitializationStatus system_backend::poll_initialization_step(unsigned step, std::uint32_t elapsed_ms,
-                                                                        char* detail, std::size_t size) {
+
+DataProc::InitializationStatus
+BackendStatus::poll_initialization_step(unsigned step, std::uint32_t elapsed_ms, char* detail, std::size_t size) {
     // Checks take different times; the last one waits for the host and may never answer.
     if ((step == 1 && elapsed_ms < 500) || (step == 4 && stall_last_step))
         return DataProc::InitializationStatus::Pending;
@@ -242,8 +320,8 @@ int main() {
         boot_to_dialplate();
         assert(!find_text(lv_scr_act(), "DEMO"));
         // SystemLoading built the power-off page ahead (home is the current page); other pages load on entry.
-        assert(DataProc::Center()->SearchAccount("SaveConfigModel"));
-        assert(!DataProc::Center()->SearchAccount("WorkSettingsModel"));
+        assert(DataProc::Broker()->search("SaveConfigModel"));
+        assert(!DataProc::Broker()->search("WorkSettingsModel"));
 
         // Before the platform publishes, device fields show N/A; afterwards pages show the real data.
         assert(find_text(lv_scr_act(), "N/A") || on_page("Pages/Dialplate"));
@@ -445,8 +523,8 @@ int main() {
         DataProc::SystemRequest reboot{};
         reboot.command = DataProc::SystemCommand::PreparePower;
         reboot.action = DataProc::PowerAction::Reboot;
-        auto* dash = DataProc::Center()->SearchAccount("SystemDashModel");
-        assert(dash && dash->Notify("System", &reboot, sizeof(reboot)) == Account::RES_PARAM_ERROR);
+        auto* dash = DataProc::Broker()->search("SystemDashModel");
+        assert(dash && dash->notify("System", &reboot, sizeof(reboot)) == DataNode::RES_PARAM_ERROR);
         assert(!SystemService::snapshot().power_pending);
         assert(find_text(app.focused(), i18n::text(i18n::TextId::ShutdownAction)));
 

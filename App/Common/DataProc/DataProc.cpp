@@ -1,33 +1,34 @@
 #include "DataProc.h"
 #include <array>
 #include <memory>
+#include <new>
 #include "Utils/Log/Log.h"
 
 namespace {
 // Explicit initialization follows X-TRACK; Center is not a page/service implementation.
-DataCenter center("CENTER");
+DataBroker center("CENTER");
 constexpr size_t provider_count = 0
 #define DP_DEF(NAME, SIZE) +1
 #include "DP_LIST.inc"
 #undef DP_DEF
     ;
-std::array<std::unique_ptr<Account>, provider_count> providers;
+std::array<std::unique_ptr<DataNode>, provider_count> providers;
 bool initialized = false;
 } // namespace
-DataCenter* DataProc::Center() {
+DataBroker* DataProc::Broker() {
     return &center;
 }
 
-bool DataProc_Init(DataTimerManager::Clock clock) {
-    if (initialized || center.GetAccountLen() != 0 || !center.Timers().set_clock(clock)) {
-        APP_LOG_E("DataProc", "initialization rejected: existing Accounts");
+bool DataProc_Init(DataTimerManager::TickFunction_t clock) {
+    if (initialized || center.getNodeNumber() != 0 || !center.initTimerManager(clock)) {
+        APP_LOG_E("DataProc", "initialization rejected: existing DataNodes");
         return false;
     }
     size_t index = 0;
     bool ok = true;
 #define DP_DEF(NAME, SIZE)                                                                                             \
-    providers[index] = std::make_unique<Account>(#NAME, &center, SIZE);                                                \
-    ok = ok && providers[index]->IsRegistered();                                                                       \
+    providers[index] = std::unique_ptr<DataNode>(new (std::nothrow) DataNode(#NAME, &center));                                                \
+    ok = ok && providers[index] && providers[index]->isRegistered();                                                                       \
     ++index;
 #include "DP_LIST.inc"
 #undef DP_DEF
@@ -52,13 +53,13 @@ bool DataProc_Init(DataTimerManager::Clock clock) {
     return true;
 }
 uint32_t DataProc_RunLoop() {
-    return initialized ? center.Timers().handle() : UINT32_MAX;
+    return initialized ? center.handleTimer() : UINT32_MAX;
 }
 bool DataProc_Deinit() {
     if (!initialized)
         return true;
-    if (center.GetAccountLen() != providers.size()) {
-        APP_LOG_E("DataProc", "destroy page/component Accounts before providers");
+    if (center.getNodeNumber() != providers.size()) {
+        APP_LOG_E("DataProc", "destroy page/component DataNodes before providers");
         return false;
     }
     for (auto& provider : providers)

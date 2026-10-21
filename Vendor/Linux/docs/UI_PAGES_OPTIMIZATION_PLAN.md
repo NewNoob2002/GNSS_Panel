@@ -29,13 +29,13 @@ Latest icon refresh replaces the enlarged 16px artwork with newly drawn **40×40
 
 Every routed page has `<Page>.h/.cpp`, `<Page>View.h/.cpp`, **`<Page>Model.h/.cpp` in its own directory**. Includes Dialplate, RecordConfig, WorkSettings, SystemDash, SystemSettings, SystemInfos, StarMap, Startup, SystemLoading and SaveConfig. StatusBar is a shared component.
 
-- `Utils/DataCenter` ports/adapts X-TRACK Account/DataCenter, preserving MIT license. Routing, subscriptions, Publish/Pull/Notify live there.
-- `Common/DataProc` initializes named processing Accounts from `DP_LIST.inc` and exposes `DataProc::Center()`. It is not an injected router object.
-- Each Model owns its Account and snapshots, initializes/deinitializes with the page, subscribes/pulls Status/System, handles publications and peer pulls, and sends StatusBar/service requests. Shared `Common/PageModel` was removed; Model constructors do not accept DataProc.
+- `Frameworks/DataBroker` 使用加固后的 X-TRACK DataNode/DataBroker，保留 MIT 许可；同步路由、subscribe/publish/pull/notify 在该框架实现。
+- `Common/DataProc` initializes named processing DataNodes from `DP_LIST.inc` and exposes `DataProc::Broker()`. It is not an injected router object.
+- Each Model owns its DataNode and snapshots, initializes/deinitializes with the page, subscribes/pulls Status/System, handles publications and peer pulls, and sends StatusBar/service requests. Shared `Common/PageModel` was removed; Model constructors do not accept DataProc.
 - `Common/ModelUtils.h` shares transport validation only, not Model ownership or a base Model.
-- `DP_Status.cpp` and `SystemService.cpp` own processing behavior. Providers outlive Models; teardown refuses to destroy providers beneath live UI Accounts.
+- `DP_Status.cpp` and `SystemService.cpp` own processing behavior. Providers outlive Models; teardown refuses to destroy providers beneath live UI DataNodes.
 - Synchronous LVGL-thread delivery only; callbacks borrow payloads during the call. Owned arrays avoid retained producer string pointers. No ISR/background-thread transport or wire-format ABI claim.
-- Account registry is bounded at 16 (excluding CENTER); serial-checked publication snapshots tolerate subscriber removal/recreation. A publishing Account/center must not be destroyed from its own callback.
+- DataNode registry is bounded at 16 (excluding CENTER); serial-checked publication snapshots tolerate subscriber removal/recreation. A publishing DataNode/center must not be destroyed from its own callback.
 
 ## Phase 3 — system flow and separate input adapters (implemented)
 
@@ -96,7 +96,7 @@ No new selectable hardware-failure scenarios are introduced without a backend co
 
 ## Shared logging (implemented)
 
-`Utils/Log/Log.h/.cpp`: C-compatible DEBUG/INFO/WARN/ERROR/OFF level control, configurable synchronous sink, stderr default, 256-byte bounded formatting/truncation, recursive logging suppression. PageManager/DataCenter/service lifecycle and delivery use this API; routine deliveries are DEBUG. Main/LVGL thread only, no ISR/concurrent sink transport, no sensitive payload dumps. Example: `app_log_set_level(APP_LOG_DEBUG); APP_LOG_D("Input", "focus changed");`.
+`Utils/Log/Log.h/.cpp`: C-compatible DEBUG/INFO/WARN/ERROR/OFF level control, configurable synchronous sink, stderr default, 256-byte bounded formatting/truncation, recursive logging suppression. PageManager/DataBroker/service lifecycle and delivery use this API; routine deliveries are DEBUG. Main/LVGL thread only, no ISR/concurrent sink transport, no sensitive payload dumps. Example: `app_log_set_level(APP_LOG_DEBUG); APP_LOG_D("Input", "focus changed");`.
 
 ## Phase 4 — validation
 

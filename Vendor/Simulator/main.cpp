@@ -456,7 +456,7 @@ main(int argc, char** argv) {
                     SDL_Delay(5);
                 }
 #if !SIM_BACKEND_DEMO
-                App_Deinit(); // 页面与 Account 在 LVGL 对象仍有效时清理
+                App_Deinit(); // 页面与 DataNode 在 LVGL 对象仍有效时清理
 #endif
             }
             lv_indev_delete(indev);

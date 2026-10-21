@@ -2,8 +2,8 @@
 // 每步耗时即实际检查时间；I2C 探测有 WIRE_TIMEOUT 上限，等待主控有 kHostLinkTimeoutMs 上限。
 #include <cstdio>
 
-#include "Common/SystemBackend.h"
 #include "HAL.h"
+#include "StatusDevice.h"
 #include "mcu_config.h"
 
 #include "GpioPin.h"
@@ -41,17 +41,17 @@ result(bool ok) {
 } // namespace
 
 const char*
-system_backend::initialization_name(unsigned step) {
+StatusDevice::initialization_name(unsigned step) {
     return step < DataProc::kInitializationStepCount ? kInitSteps[step].name : "invalid";
 }
 
 i18n::TextId
-system_backend::initialization_title(unsigned step) {
+StatusDevice::initialization_title(unsigned step) {
     return step < DataProc::kInitializationStepCount ? kInitSteps[step].title : i18n::TextId::Initializing;
 }
 
 DataProc::InitializationStatus
-system_backend::poll_initialization_step(unsigned step, std::uint32_t elapsed_ms, char* detail, std::size_t size) {
+StatusDevice::poll_initialization_step(unsigned step, std::uint32_t elapsed_ms, char* detail, std::size_t size) {
     if (!detail || size == 0) {
         return Status::Failed;
     }

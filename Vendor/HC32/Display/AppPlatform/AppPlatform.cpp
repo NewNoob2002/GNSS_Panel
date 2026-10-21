@@ -1,29 +1,28 @@
-// HC32 平台层入口：创建共享应用，把 HAL/systemInfo 接到它（各方向的转换见 *Bridge），
-// 并实现 system_backend 中与电源、业务相关的接口（初始化步骤见 InitSteps.cpp）。
+// HC32 平台入口：通过静态 DeviceManager 连接三个设备对象，保留主循环及 HAL 时序。
 #include "AppPlatform.h"
 
 #include <cstdio>
 
-#include "Common/SystemBackend.h"
-#include "DeviceBridge.h"
-#include "HAL.h"
 #include "App.h"
-#include "PowerBridge.h"
-#include "StatusBridge.h"
+#include "BusinessDevice.h"
+#include "Common/SystemBackend.h"
+#include "HAL.h"
+#include "PowerDevice.h"
+#include "StatusDevice.h"
 #include "Utils/Log/Log.h"
 #include "mcu_config.h"
 
 namespace {
 
 /** 平台侧状态随应用实例重建（主机测试与模拟器会多次创建应用）。 */
-struct Bridges {
-    StatusBridge status;
-    PowerBridge power;
-    DeviceBridge device;
+struct Devices {
+    StatusDevice status;
+    PowerDevice power;
+    BusinessDevice device;
 };
 
 App* app = nullptr;
-Bridges bridges;
+Devices objects;
 
 uint32_t
 now_ms() {
@@ -47,47 +46,23 @@ log_sink(AppLogLevel level, const char* module, const char* message, void*) {
 
 } // namespace
 
-// ---- system_backend：HC32 实现 --------------------------------------------------------------
+/** 固件和 Board 模拟器共用三个设备对象，初始化不访问硬件。 */
+DeviceManager&
+system_backend::devices() {
+    static ::DeviceObject* list[] = {&objects.power, &objects.device, &objects.status};
+    static DeviceManager manager(list, 3);
+    // App_Init 可重建对象，因此重新标记设备可用；onInit 无硬件副作用。
+    manager.init();
+    return manager;
+}
 
 system_backend::Capabilities
-system_backend::capabilities() {
+StatusDevice::capabilities() {
     return {.simulated = false,
             .reboot_available = false, // HC32 产品不提供重启
             .wifi_available = PRODUCT_SHUTDOWN_WIFI_BUTTON != 0,
             .star_map = PRODUCT_PAGE_STAR_MAP != 0,
             .record_settings = PRODUCT_RECORD_SETTINGS != 0};
-}
-
-// 在 LVGL 线程将 Startup 完整长按请求转交 HAL 电源策略。
-bool
-system_backend::request_power_on() {
-    // Startup 完整长按后请求 HAL 开机；成功时 SystemService 同步发布 powered_on 并进入 SystemLoading。
-    return HAL::Power_RequestOn();
-}
-
-bool
-system_backend::execute_power(DataProc::PowerAction action) {
-    if (action != DataProc::PowerAction::Off) {
-        return false;
-    }
-    // 只发出关机请求；断电时序（等待主控确认、延时）由 HAL 电源策略完成，结束后上报待机。
-    HAL::Power_Shutdown(false);
-    return true;
-}
-
-bool
-system_backend::request_wifi(bool on) {
-    return bridges.device.request_wifi(on, now_ms());
-}
-
-DataProc::DeviceSnapshot
-system_backend::initial_device() {
-    return bridges.device.snapshot(now_ms());
-}
-
-bool
-system_backend::execute_device(const DataProc::DeviceRequest& request) {
-    return bridges.device.execute(request, now_ms());
 }
 
 #if !defined(LVGL_SIMULATOR)
@@ -105,7 +80,7 @@ app_fatal(const char* module, const char* reason) {
 void
 App_Init() {
     app_log_set_sink(log_sink, nullptr);
-    bridges = Bridges{};
+    objects = Devices{};
     app = new App;
     if (!app->init({.battery_warning = PRODUCT_PAGE_BATTERY_WARNING != 0})) {
         app_fatal("App", "shared LVGL application initialization failed");
@@ -125,9 +100,9 @@ App_Update() {
     app->poll_keys(now);
 #endif
     app->update();
-    bridges.power.update();
-    bridges.device.update(now);
-    bridges.status.update(*app, now);
+    objects.power.update();
+    objects.device.update(now);
+    objects.status.update(now);
 }
 
 void

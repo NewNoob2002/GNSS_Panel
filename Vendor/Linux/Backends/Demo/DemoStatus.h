@@ -1,12 +1,23 @@
 #pragma once
 
+#include "Common/SystemBackend.h"
 #include "Pages/StatusBar/StatusBar.h"
 
 #include <cstdint>
 
 /** Deterministic placeholder status producer used until the real backend exists. */
-class DemoStatus {
+class DemoStatus : public system_backend::StatusObject {
   public:
+    /** 按当前预览时间和模式生成状态栏值快照。 */
+    DataProc::StatusSnapshot status_snapshot() override;
+    /** 演示平台的功能能力。 */
+    system_backend::Capabilities capabilities() override;
+    /** 演示初始化步骤名称。 */
+    const char* initialization_name(unsigned step) override;
+    /** 演示初始化步骤标题。 */
+    i18n::TextId initialization_title(unsigned step) override;
+    /** 保留原演示步骤耗时及失败结果。 */
+    DataProc::InitializationStatus poll_initialization_step(unsigned, uint32_t, char*, size_t) override;
     /**
      * Build a synthetic status snapshot from monotonic elapsed milliseconds.
      * The result contains no hardware or business data and is safe to copy.

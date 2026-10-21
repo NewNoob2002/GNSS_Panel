@@ -21,154 +21,120 @@
  * SOFTWARE.
  */
 #include "DataTimer.h"
+#include <algorithm>
+#include <limits>
 
-#ifndef UINT32_MAX
-#define UINT32_MAX 0xFFFFFFFF
-#endif
-
-DataTimer::DataTimer(DataTimerManager* manager, TimerFunction_t timerFunc, uint32_t period, void* userData)
-    : _manager(manager)
-    , _timerFunc(timerFunc)
-    , _userData(userData)
-    , _period(period)
-    , _lastTick(0)
-    , _isPause(false)
-{
-    _manager->add(this);
+DataTimer::DataTimer(DataTimerManager* manager, TimerFunction_t callback, uint32_t period, void* user_data)
+    : manager_(manager), callback_(callback), user_data_(user_data), period_(period),
+      last_tick_(manager ? manager->getTick() : 0) {
+    if (manager && callback && period) {
+        serial_ = manager_->add(this);
+    }
 }
 
-DataTimer::~DataTimer()
-{
-    _manager->remove(this);
+DataTimer::~DataTimer() {
+    if (isRegistered()) {
+        manager_->remove(this);
+    }
 }
 
-void DataTimer::pause()
-{
-    _isPause = true;
+void
+DataTimer::reset() {
+    last_tick_ = manager_ ? manager_->getTick() : 0;
 }
 
-void DataTimer::resume()
-{
-    _isPause = false;
-}
-
-void DataTimer::reset()
-{
-    _lastTick = _manager->getTick();
-}
-
-uint32_t DataTimer::remain()
-{
-    auto elaps = _manager->getTickElaps(_lastTick);
-    return elaps > _period ? 0 : _period - elaps;
-}
-
-void DataTimer::setPeriod(uint32_t period)
-{
-    _period = period;
-}
-
-uint32_t DataTimer::getPeriod()
-{
-    return _period;
-}
-
-void* DataTimer::getUserData()
-{
-    return _userData;
-}
-
-bool DataTimer::isReady()
-{
-    if (_isPause) {
+bool
+DataTimerManager::setTickCallback(TickFunction_t clock) {
+    if (!clock || (clock_ != clock && std::any_of(entries_.begin(), entries_.end(), [](const Entry& entry) {
+                       return entry.timer != nullptr;
+                   }))) {
         return false;
     }
-
-    if (remain() > 0) {
-        return false;
-    }
-
+    clock_ = clock;
     return true;
 }
 
-bool DataTimer::isPause()
-{
-    return _isPause;
-}
-
-void DataTimer::invoke()
-{
-    _timerFunc(this);
-}
-
-DataTimerManager::DataTimerManager(TickFunction_t tickCallback)
-{
-    _getTick = tickCallback;
-}
-
-DataTimerManager::~DataTimerManager()
-{
-}
-
-void DataTimerManager::setTickCallback(TickFunction_t tickCallback)
-{
-    _getTick = tickCallback;
-}
-
-void DataTimerManager::add(DataTimer* timer)
-{
-    _timerList.push_back(timer);
-}
-
-void DataTimerManager::remove(DataTimer* timer)
-{
-    _timerList.remove(timer);
-}
-
-uint32_t DataTimerManager::getTick()
-{
-    return _getTick();
-}
-
-uint32_t DataTimerManager::getTickElaps(uint32_t prevTick)
-{
-    uint32_t act_time = getTick();
-
-    /*If there is no overflow in sys_time simple subtract*/
-    if (act_time >= prevTick) {
-        prevTick = act_time - prevTick;
-    } else {
-        prevTick = UINT32_MAX - prevTick + 1;
-        prevTick += act_time;
+uint64_t
+DataTimerManager::add(DataTimer* timer) {
+    if (!clock_ || next_serial_ == std::numeric_limits<uint64_t>::max()) {
+        return 0;
     }
-
-    return prevTick;
-}
-
-uint32_t DataTimerManager::handler()
-{
-    /* invoke all timers that are ready */
-    for (const auto& iter : _timerList) {
-        if (iter->isReady()) {
-            iter->reset();
-            iter->invoke();
+    for (auto& entry : entries_) {
+        if (!entry.timer) {
+            entry = {timer, ++next_serial_};
+            return entry.serial;
         }
     }
+    return 0;
+}
 
-    uint32_t timeTillNext = UINT32_MAX;
+void
+DataTimerManager::remove(DataTimer* timer) {
+    for (auto& entry : entries_) {
+        if (entry.timer == timer) {
+            entry = {};
+            return;
+        }
+    }
+}
 
-    /* Find the minimum remaining time */
-    for (const auto& iter : _timerList) {
-        /* Ignore paused timers */
-        if (iter->isPause()) {
+bool
+DataTimerManager::alive(const Entry& entry) const {
+    return entry.timer && std::any_of(entries_.begin(), entries_.end(), [&](const Entry& live) {
+               return live.timer == entry.timer && live.serial == entry.serial;
+           });
+}
+
+uint32_t
+DataTimerManager::handler() {
+    if (!clock_) {
+        return UINT32_MAX;
+    }
+    if (handling_) {
+        return 0; // 嵌套分发延后到下一轮应用循环。
+    }
+    handling_ = true;
+    const auto snapshot = entries_;
+    for (const auto& entry : snapshot) {
+        if (!alive(entry)) {
             continue;
         }
-
-        uint32_t remain = iter->remain();
-        if (remain < timeTillNext) {
-            timeTillNext = remain;
+        auto* timer = entry.timer;
+        const uint32_t tick = getTick();
+        if (!timer->paused_ && tick - timer->last_tick_ >= timer->period_) {
+            timer->last_tick_ = tick;
+            timer->callback_(timer); // 回调可能删除自身，此后不可访问 timer。
         }
     }
+    uint32_t next = UINT32_MAX;
+    const uint32_t after_callbacks = getTick();
+    for (const auto& entry : entries_) {
+        const auto* timer = entry.timer;
+        if (timer && !timer->paused_) {
+            const uint32_t elapsed = after_callbacks - timer->last_tick_;
+            next = std::min(next, elapsed >= timer->period_ ? 0U : timer->period_ - elapsed);
+        }
+    }
+    handling_ = false;
+    return next;
+}
 
-    return timeTillNext;
+/** 零周期暂停，避免忙循环；恢复时仍由调用者决定是否重置时间。 */
+void
+DataTimer::setPeriod(uint32_t period) {
+    if (period) {
+        period_ = period;
+    } else {
+        pause();
+    }
+}
+
+/** 无符号差值支持 tick 回绕；暂停定时器不参与下次唤醒。 */
+uint32_t
+DataTimer::remain() const {
+    if (!isRegistered() || paused_) {
+        return UINT32_MAX;
+    }
+    const auto elapsed = manager_->getTick() - last_tick_;
+    return elapsed >= period_ ? 0U : period_ - elapsed;
 }

@@ -1,4 +1,4 @@
-#include "DeviceBridge.h"
+#include "BusinessDevice.h"
 
 #include <algorithm>
 #include <array>
@@ -8,6 +8,7 @@
 #include "Common/SystemService.h"
 #include "SystemState.h"
 #include "Utils/Log/Log.h"
+#include "lvgl.h"
 #include "mcu_config.h"
 
 namespace {
@@ -45,7 +46,7 @@ copy_text(std::array<char, N>& dst, const void* src, std::size_t max) {
 } // namespace
 
 DataProc::DeviceSnapshot
-DeviceBridge::snapshot(std::uint32_t now) {
+BusinessDevice::snapshot(std::uint32_t now) {
     DataProc::DeviceSnapshot device;
     // 填零后再赋值，便于按字节比较判断内容是否变化（含填充字节）。
     std::memset(static_cast<void*>(&device), 0, sizeof(device));
@@ -114,7 +115,7 @@ DeviceBridge::snapshot(std::uint32_t now) {
 }
 
 void
-DeviceBridge::update(std::uint32_t now) {
+BusinessDevice::update(std::uint32_t now) {
     forward_wifi(now);
     if (!polled_ || now - last_poll_ms_ >= kPeriodMs) {
         polled_ = true;
@@ -125,8 +126,9 @@ DeviceBridge::update(std::uint32_t now) {
 
 /** 内容变化时发布设备快照（运行时长每秒变化，即最多约每秒一次）。 */
 void
-DeviceBridge::publish(std::uint32_t now) {
-    const DataProc::DeviceSnapshot device = snapshot(now);
+BusinessDevice::publish(std::uint32_t now) {
+    const DataProc::DeviceSnapshot device = system_backend::read_device().snapshot;
+    (void)now;
     if (sent_ && std::memcmp(&device, &last_, sizeof(device)) == 0) {
         return;
     }
@@ -137,7 +139,7 @@ DeviceBridge::publish(std::uint32_t now) {
 }
 
 bool
-DeviceBridge::execute(const DataProc::DeviceRequest& request, std::uint32_t now) {
+BusinessDevice::execute(const DataProc::DeviceRequest& request, std::uint32_t now) {
     switch (request.command) {
         case DataProc::DeviceCommand::ApplyWork: {
             WorkConfig_t work = State::Effective_Work();
@@ -185,7 +187,7 @@ DeviceBridge::execute(const DataProc::DeviceRequest& request, std::uint32_t now)
 }
 
 bool
-DeviceBridge::request_wifi(bool on, std::uint32_t now) {
+BusinessDevice::request_wifi(bool on, std::uint32_t now) {
 #if PRODUCT_SHUTDOWN_WIFI_BUTTON
     // 设定值由面板协议发给主控，主控回报 wifi_status 后 forward_wifi() 结束等待。
     State::Request_Wifi(on);
@@ -202,7 +204,7 @@ DeviceBridge::request_wifi(bool on, std::uint32_t now) {
 /** 上报主控的 Wi-Fi 状态（无开关按钮的产品也在 SystemInfos 显示）。
  * 回报与设定值一致前视为切换中；超时后放弃等待。 */
 void
-DeviceBridge::forward_wifi(std::uint32_t now) {
+BusinessDevice::forward_wifi(std::uint32_t now) {
     const WifiInfo_t& wifi = systemInfo.host.wifi;
     const On_Off_Status_t target = systemInfo.request.wifi_on;
     if (wifi_requested_ && wifi.wifi_status == target) {
@@ -213,4 +215,22 @@ DeviceBridge::forward_wifi(std::uint32_t now) {
                   static_cast<unsigned long>(kWifiTimeoutMs));
     }
     SystemService::set_wifi(wifi.wifi_status == On_Off_Status_ON, wifi_requested_);
+}
+
+/** 同步返回快照和 Wi-Fi 状态；主控协议仍拥有请求确认。 */
+system_backend::DeviceReport
+BusinessDevice::device_report() {
+    return {snapshot(lv_tick_get()), systemInfo.host.wifi.wifi_status == On_Off_Status_ON, wifi_requested_};
+}
+
+/** write 已按值解码和校验范围，此处保留原协议映射及发布。 */
+bool
+BusinessDevice::execute_device(const DataProc::DeviceRequest& request) {
+    return execute(request, lv_tick_get());
+}
+
+/** ioctl 请求不等待主控回应。 */
+bool
+BusinessDevice::request_wifi(bool on) {
+    return request_wifi(on, lv_tick_get());
 }

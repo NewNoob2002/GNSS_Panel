@@ -4,7 +4,7 @@
 #include "Common/DataProc/DataProc.h"
 
 namespace page {
-/** Page-owned Account and received data. Init on view load, Deinit on unload, LVGL thread only. */
+/** Page-owned DataNode and received data. Init on view load, Deinit on unload, LVGL thread only. */
 class SaveConfigModel {
   public:
     bool init();
@@ -25,8 +25,8 @@ class SaveConfigModel {
 
   private:
     std::function<void()> change_cb_;
-    static int on_event(Account* account, Account::EventParam_t* event);
-    std::unique_ptr<Account> account_;
+    static int on_event(DataNode* account, DataNode::EventParam_t* event);
+    std::unique_ptr<DataNode> account_;
     DataProc::StatusSnapshot status_{};
     DataProc::SystemState state_{};
 };

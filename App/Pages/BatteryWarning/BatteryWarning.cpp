@@ -42,9 +42,9 @@ void start(lv_obj_t* obj, lv_anim_exec_xcb_t exec, int32_t from, int32_t to, uin
 bool BatteryWarning::create(lv_obj_t* parent) {
     if (banner_ || !parent)
         return false;
-    account_ = std::make_unique<Account>("BatteryWarning", DataProc::Center(), 0, this);
-    account_->SetEventCallback(on_event);
-    if (!account_->IsRegistered() || !account_->Subscribe("Status")) {
+    account_ = std::make_unique<DataNode>("BatteryWarning", DataProc::Broker(), this);
+    account_->setEventCallback(on_event);
+    if (!account_->isRegistered() || !account_->subscribe("Status")) {
         account_.reset();
         return false;
     }
@@ -91,7 +91,7 @@ bool BatteryWarning::create(lv_obj_t* parent) {
 
     lv_obj_add_flag(banner_, LV_OBJ_FLAG_HIDDEN);
     DataProc::StatusSnapshot status;
-    if (account_->Pull("Status", &status, sizeof(status)) == Account::RES_OK)
+    if (account_->pull("Status", &status, sizeof(status)) == DataNode::RES_OK)
         update(status.battery_temperature_valid, status.battery_temperature);
     return true;
 }
@@ -111,13 +111,13 @@ void BatteryWarning::apply_language() {
         update_text();
 }
 
-int BatteryWarning::on_event(Account* account, Account::EventParam_t* event) {
-    if (!event || event->event != Account::EVENT_PUB_PUBLISH)
-        return Account::RES_UNSUPPORTED_REQUEST;
+int BatteryWarning::on_event(DataNode* account, DataNode::EventParam_t* event) {
+    if (!event || event->event != DataNode::EVENT_PUBLISH)
+        return DataNode::RES_UNSUPPORTED_REQUEST;
     DataProc::StatusSnapshot status;
     const int result = DataProc::ReadPayload(event, status);
-    if (result == Account::RES_OK)
-        static_cast<BatteryWarning*>(account->UserData)
+    if (result == DataNode::RES_OK)
+        static_cast<BatteryWarning*>(account->getUserData())
             ->update(status.battery_temperature_valid, status.battery_temperature);
     return result;
 }

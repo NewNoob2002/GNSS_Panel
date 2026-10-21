@@ -57,7 +57,7 @@ if(PRODUCT_HAS_DISPLAY)
     target_link_libraries(app_lvgl INTERFACE hc32_lvgl)
     add_subdirectory(${REPO_ROOT}/App ${CMAKE_CURRENT_BINARY_DIR}/App)
 
-    # 共享应用的 HC32 平台层：入口 + 各方向的 *Bridge + 初始化步骤
+    # 共享应用的 HC32 平台层：入口 + DeviceManager 的 Power/Device/Status 对象 + 初始化步骤
     file(GLOB APP_PLATFORM_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/Display/AppPlatform/*.cpp)
     # X1Pro / XBase 共用：带屏入口、共享 LVGL 应用的平台层、显示协议表、显示 HAL、LVGL 内存分配与显示端口
     add_library(hc32_shared_display OBJECT

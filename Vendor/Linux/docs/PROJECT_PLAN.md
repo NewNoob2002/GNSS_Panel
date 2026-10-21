@@ -76,7 +76,7 @@ flowchart TD
 | 业务接入 | 原数据字段、请求和状态流程 | P5 明确实际提供方及 I²C 替代通路，不阻塞当前屏点亮 |
 | SDK 集成 | 厂商 CMake 包的集成模式 | 应用包、固定依赖、项目配置、权限、自启动 |
 
-以用户态屏协议实现首版，复用内核 SPI/GPIO；有明确 framebuffer/DRM 需求时再评估，不能与 spidev 同时绑定同一片选。原页面、ResourceManager、PageManager、DataCenter 已存在，不重新设计平行框架。
+以用户态屏协议实现首版，复用内核 SPI/GPIO；有明确 framebuffer/DRM 需求时再评估，不能与 spidev 同时绑定同一片选。原页面、ResourceManager、PageManager、DataBroker 已存在，不重新设计平行框架。
 
 ## 5. 显示实现约束
 
@@ -92,7 +92,7 @@ flowchart TD
 ```text
 <repo-root>/
 ├── App/                        共享九页 View/Model/Controller、状态栏、I18n、资源与核心测试 App/tests/
-├── Frameworks/                 跨平台框架（DataCenter、DataBroker、DeviceManager、PageManager、ResourceManager）
+├── Frameworks/                 跨平台框架（DataBroker、DeviceManager、PageManager、ResourceManager）
 ├── External/lvgl/              共享 LVGL 8.3.11 源码
 ├── Vendor/
 │   ├── HC32/                   HC32F460xE 固件

@@ -648,14 +648,14 @@ main() {
     run(4000);
     assert(on_page("Pages/SystemLoading"));
     State::Power().Force_ShutDown = true;
-    // 单独验证 PowerBridge 收到强制关机事件时的页面；下一次 HAL 监控会立即完成强制断电。
+    // 单独验证 PowerDevice 收到强制关机事件时的页面；下一次 HAL 监控会立即完成强制断电。
     run(800, false);
     assert(on_page("Pages/SaveConfig"));
     assert(find_text(lv_scr_act(), i18n::text(i18n::TextId::SaveConfigPowerOffForced)));
     hal_enter_standby();
     State::Host().online = true;
 
-    // 模拟软件复位重建应用：HAL 立即保持主控供电，PowerBridge 无需 Startup 请求即可切到加载页。
+    // 模拟软件复位重建应用：HAL 立即保持主控供电，PowerDevice 无需 Startup 请求即可切到加载页。
     hal_power_on_and_boot(); // 先恢复 Running 电源策略，模拟复位后的静态初值。
     App_Deinit();
     reset_system_info();

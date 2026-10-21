@@ -732,7 +732,7 @@ void saveconfig_scenarios(lv_disp_t* display, const std::string& output) {
                 active = nullptr;
             }
             advance(9000); // Destruction must clear callbacks and timers borrowing the old page.
-            assert(DataProc::Center()->GetAccountLen() == 0);
+            assert(DataProc::Broker()->getNodeNumber() == 0);
             assert(lv_anim_count_running() == 0);
         }
     }
@@ -843,7 +843,7 @@ int main(int argc, char** argv) {
             assert(label(lv_scr_act(), "31.230400\n121.473700\n12.50 m")); // Simulated Device data.
             assert(label(lv_scr_act(), "1.0.0\n02:15:30\n1\nDEMO-001"));
             assert(!label(lv_scr_act(), "N/A"));
-            assert(!DataProc::Center()->SearchAccount("SystemLoadingModel"));
+            assert(!DataProc::Broker()->search("SystemLoadingModel"));
             assert(!label(lv_scr_act(), i18n::text(i18n::TextId::SystemInitialization)));
             assert(!label(lv_scr_act(), i18n::text(i18n::TextId::InitializationConfig)));
             assert(lv_group_get_obj_count(lv_group_get_default()) == 7);
@@ -933,9 +933,9 @@ int main(int argc, char** argv) {
             if (action == DataProc::PowerAction::Off) {
                 assert(std::strcmp(app.current_page(), "Pages/Startup") == 0 && !app.back());
                 assert(label(lv_scr_act(), "0%"));
-                assert(!DataProc::Center()->SearchAccount("DialplateModel"));
-                assert(!DataProc::Center()->SearchAccount("SystemDashModel"));
-                assert(!DataProc::Center()->SearchAccount("SaveConfigModel"));
+                assert(!DataProc::Broker()->search("DialplateModel"));
+                assert(!DataProc::Broker()->search("SystemDashModel"));
+                assert(!DataProc::Broker()->search("SaveConfigModel"));
                 capture(display, output, "PowerOff-Startup", false);
                 product_click(App::Key::Power); // Short click cannot restart after shutdown.
                 assert(std::strcmp(app.current_page(), "Pages/Startup") == 0);
@@ -967,7 +967,7 @@ int main(int argc, char** argv) {
         assert(on_screen(label(lv_layer_top(), "DEMO"))); // Returning to the working root restores the bar.
         active = nullptr;
     }
-    assert(DataProc::Center()->GetAccountLen() == 0);
+    assert(DataProc::Broker()->getNodeNumber() == 0);
     // A fresh application before any startup reports zero initialization errors and six inventory controls.
     for (auto language : {i18n::Language::English, i18n::Language::Russian}) {
         i18n::set_language(language);
@@ -994,7 +994,7 @@ int main(int argc, char** argv) {
         assert(std::strcmp(app.current_page(), "Pages/Startup") == 0);
         active = nullptr;
     }
-    assert(DataProc::Center()->GetAccountLen() == 0);
+    assert(DataProc::Broker()->getNodeNumber() == 0);
     saveconfig_scenarios(display, output);
     app_log_set_sink(nullptr, nullptr);
     // The View also handles all-success and multiple-failure outcomes, then resets on fresh initialization.
@@ -1067,7 +1067,7 @@ int main(int argc, char** argv) {
                 active = nullptr;
             }
             advance(16000);
-            assert(DataProc::Center()->GetAccountLen() == 0);
+            assert(DataProc::Broker()->getNodeNumber() == 0);
         }
     }
     // Test battery levels and charging animations on Startup page
@@ -1142,6 +1142,6 @@ int main(int argc, char** argv) {
 
         active = nullptr;
     }
-    assert(DataProc::Center()->GetAccountLen() == 0);
+    assert(DataProc::Broker()->getNodeNumber() == 0);
     lv_disp_remove(display);
 }

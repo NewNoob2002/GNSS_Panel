@@ -3,31 +3,31 @@
 #include <cstring>
 #include <type_traits>
 #include "DataProc_Def.h"
-#include "Frameworks/DataCenter/DataCenter.h"
+#include "Frameworks/DataBroker/DataBroker.h"
 
-#define DATA_PROC_INIT_DEF(name) bool _DP_##name##_Init(Account* account)
+#define DATA_PROC_INIT_DEF(name) bool _DP_##name##_Init(DataNode* account)
 
 /** Initialize application services before page Models; the injected clock has no LVGL/OS dependency.
  * Failure rolls back partially initialized providers. No HAL/OS/power operations are performed.
  */
-bool DataProc_Init(DataTimerManager::Clock clock);
+bool DataProc_Init(DataTimerManager::TickFunction_t clock);
 /** Execute service timers on the application thread; returns time until the next deadline. */
 uint32_t DataProc_RunLoop();
-/** Call after all page/component Accounts have been destroyed. */
+/** Call after all page/component DataNodes have been destroyed. */
 bool DataProc_Deinit();
 
 namespace DataProc {
-/** Shared center accessor only; routing is implemented by Frameworks/DataCenter. */
-DataCenter* Center();
+/** Shared center accessor only; routing is implemented by Frameworks/DataBroker. */
+DataBroker* Broker();
 
 /** Validate native payload size and copy, avoiding alignment/aliasing assumptions. */
-template <class T> int ReadPayload(const Account::EventParam_t* event, T& value) {
-    static_assert(std::is_trivially_copyable<T>::value, "Account payload must be trivially copyable");
+template <class T> int ReadPayload(const DataNode::EventParam_t* event, T& value) {
+    static_assert(std::is_trivially_copyable<T>::value, "DataNode payload must be trivially copyable");
     if (!event || !event->data_p)
-        return Account::RES_PARAM_ERROR;
+        return DataNode::RES_PARAM_ERROR;
     if (event->size != sizeof(T))
-        return Account::RES_SIZE_MISMATCH;
+        return DataNode::RES_SIZE_MISMATCH;
     std::memcpy(&value, event->data_p, sizeof(T));
-    return Account::RES_OK;
+    return DataNode::RES_OK;
 }
 } // namespace DataProc

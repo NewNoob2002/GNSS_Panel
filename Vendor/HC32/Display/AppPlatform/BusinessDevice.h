@@ -1,16 +1,23 @@
 #pragma once
 #include <cstdint>
+#include "Common/SystemBackend.h"
 
 #include "Common/DataProc/DataProc_Def.h"
 
 /**
- * systemInfo（主控上报与面板请求）<-> 共享应用的 Device Account 与业务命令。
+ * systemInfo（主控上报与面板请求）<-> 共享应用的 Device DataNode 与业务命令。
  * 页面只使用选项索引；与主控协议编码的映射在这里完成。新增业务数据时扩展
  * snapshot()（读）与 execute()（写），并在 display_protocol.cpp 中收发对应字段。
  */
-class DeviceBridge {
+class BusinessDevice : public system_backend::BusinessObject {
   public:
-    /** 当前设备快照（Device 提供者首次发布前也用它）。会消费星图的 syncStatus。 */
+    /** 设备 read 报告；协议码转换仍由本对象完成。 */
+    system_backend::DeviceReport device_report() override;
+    /** 设备 write 命令在当前 tick 执行。 */
+    bool execute_device(const DataProc::DeviceRequest& request) override;
+    /** ioctl Wi-Fi 请求沿用原超时与状态确认。 */
+    bool request_wifi(bool on) override;
+    /** 当前设备快照（Device 提供者首次发布前也用它）。不消费协议确认状态。 */
     DataProc::DeviceSnapshot snapshot(std::uint32_t now);
     /** 每轮主循环：同步 Wi-Fi 状态；周期检查快照，内容变化才发布。 */
     void update(std::uint32_t now);

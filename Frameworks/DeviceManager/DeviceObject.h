@@ -107,17 +107,22 @@ public:
 
     int ioctl(uint32_t cmd, void* data = nullptr, size_t size = 0)
     {
-        IO_Cmd_t* c = (IO_Cmd_t*)&cmd;
+        // 按值解码命令，避免把 uint32_t 对象强转为联合体造成严格别名违规。
+        IO_Cmd_t c{};
+        c.ch.number = cmd & 0xffU;
+        c.ch.type = (cmd >> 8) & 0xffU;
+        c.ch.size = (cmd >> 16) & 0x3fffU;
+        c.ch.dir = (cmd >> 30) & 3U;
 
         if (!initOK) {
             return RES_INIT_FAILED;
         }
 
-        if (size != c->ch.size) {
+        if (size != c.ch.size || (size && !data)) {
             return RES_PARAM_ERROR;
         }
 
-        return onIoctl(*c, data);
+        return onIoctl(c, data);
     }
 
     const char* getName()
@@ -130,10 +135,24 @@ private:
     bool initOK;
 
 private:
-    virtual int onInit() { return RES_NO_IMPLEMENTED; };
-    virtual int onRead(void* buffer, size_t size) { return RES_NO_IMPLEMENTED; }
-    virtual int onWrite(const void* buffer, size_t size) { return RES_NO_IMPLEMENTED; }
-    virtual int onIoctl(IO_Cmd_t cmd, void* data) { return RES_NO_IMPLEMENTED; }
+    virtual int onInit() { return RES_NO_IMPLEMENTED;
+    };
+
+    // 省略默认实现未使用的形参，兼容共享应用的 -Wextra/-Werror。
+    virtual int
+    onRead(void*, size_t) {
+        return RES_NO_IMPLEMENTED;
+    }
+
+    virtual int
+    onWrite(const void*, size_t) {
+        return RES_NO_IMPLEMENTED;
+    }
+
+    virtual int
+    onIoctl(IO_Cmd_t, void*) {
+        return RES_NO_IMPLEMENTED;
+    }
 };
 
 #endif

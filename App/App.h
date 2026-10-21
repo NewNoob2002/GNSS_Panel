@@ -55,10 +55,10 @@ class App {
     bool style_ready_ = false;
     bool data_ready_ = false;
     i18n::Language language_{};
-    std::unique_ptr<Account> account_;
-    static int on_system_event(Account* account, Account::EventParam_t* event);
-    // Platform power events (System publications) are applied by navigation_timer_, outside the Account
-    // callback chain: a page must not be unloaded while its own Notify is still running.
+    std::unique_ptr<DataNode> account_;
+    static int on_system_event(DataNode* account, DataNode::EventParam_t* event);
+    // Platform power events (System publications) are applied by navigation_timer_, outside the DataNode
+    // callback chain: a page must not be unloaded while its own notify is still running.
     static void on_navigation(lv_timer_t* timer);
     lv_timer_t* navigation_timer_ = nullptr;
     bool powered_on_ = false, shutting_down_ = false, standby_ = false;

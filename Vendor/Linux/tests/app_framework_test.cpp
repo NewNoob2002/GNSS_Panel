@@ -2,7 +2,7 @@
 #include <cstring>
 #include <memory>
 #include <string>
-#include "Frameworks/DataCenter/DataCenter.h"
+#include "Frameworks/DataBroker/DataBroker.h"
 #include "Utils/Log/Log.h"
 
 namespace {
@@ -21,17 +21,19 @@ void sink(AppLogLevel level, const char* module, const char* message, void* cont
 }
 struct Received {
     unsigned value = 0, calls = 0;
-    std::unique_ptr<Account>* remove = nullptr;
+    std::unique_ptr<DataNode>* remove = nullptr;
 };
-int receive(Account* account, Account::EventParam_t* event) {
+
+int
+receive(DataNode* account, DataNode::EventParam_t* event) {
     if (!event || !event->data_p || event->size != sizeof(unsigned))
-        return Account::RES_PARAM_ERROR;
-    auto& target = *static_cast<Received*>(account->UserData);
+        return DataNode::RES_PARAM_ERROR;
+    auto& target = *static_cast<Received*>(account->getUserData());
     std::memcpy(&target.value, event->data_p, sizeof(target.value));
     ++target.calls;
     if (target.remove)
         target.remove->reset();
-    return Account::RES_OK;
+    return DataNode::RES_OK;
 }
 } // namespace
 int main() {
@@ -52,31 +54,30 @@ int main() {
     assert(app_log_set_level(APP_LOG_OFF));
     assert(!APP_LOG_E("Test", "filtered"));
     {
-        DataCenter center("CENTER");
-        auto publisher = std::make_unique<Account>("Publisher", &center, sizeof(unsigned));
-        Account duplicate("Publisher", &center);
-        assert(publisher->IsRegistered() && !duplicate.IsRegistered());
+        DataBroker center("CENTER");
+        auto publisher = std::make_unique<DataNode>("Publisher", &center);
+        DataNode duplicate("Publisher", &center);
+        assert(publisher->isRegistered() && !duplicate.isRegistered());
         Received first, second, third;
-        Account a("A", &center, 0, &first), c("C", &center, 0, &third);
-        auto b = std::make_unique<Account>("B", &center, 0, &second);
+        DataNode a("A", &center, &first), c("C", &center, &third);
+        auto b = std::make_unique<DataNode>("B", &center, &second);
         for (auto* account : {&a, b.get(), &c}) {
-            assert(account->Subscribe("Publisher"));
-            account->SetEventCallback(receive);
+            assert(account->subscribe("Publisher"));
+            account->setEventCallback(receive);
         }
         first.remove = &b;
         unsigned value = 42;
-        assert(publisher->Commit(&value, sizeof(value)));
-        assert(publisher->Publish() == Account::RES_OK);
+        assert(publisher->publish(&value, sizeof(value)) == DataNode::RES_OK);
         assert(first.calls == 1 && second.calls == 0 && third.calls == 1);
         assert(first.value == 42 && third.value == 42);
-        assert(!a.Subscribe("Publisher"));
-        publisher->SetEventCallback(receive);
-        publisher->UserData = &second;
-        assert(a.Notify("Publisher", &value, sizeof(value)) == Account::RES_OK);
+        assert(!a.subscribe("Publisher"));
+        publisher->setEventCallback(receive);
+        publisher->setUserData(&second);
+        assert(a.notify("Publisher", &value, sizeof(value)) == DataNode::RES_OK);
         assert(second.value == 42 && second.calls == 1);
         publisher.reset(); // Regression: publisher teardown with several subscribers.
-        assert(a.GetPublishersSize() == 0 && c.GetPublishersSize() == 0);
-        assert(a.Notify("Publisher", &value, sizeof(value)) == Account::RES_NOT_FOUND);
+        assert(a.getPublishersNumber() == 0 && c.getPublishersNumber() == 0);
+        assert(a.notify("Publisher", &value, sizeof(value)) == DataNode::RES_NOT_FOUND);
     }
     app_log_set_sink(nullptr, nullptr);
     assert(app_log_set_level(APP_LOG_INFO));

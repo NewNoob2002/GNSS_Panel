@@ -174,9 +174,9 @@ LVGL 绘制并执行软件旋转
 | Shutdown | 关机请求、输入禁用与页面切换 |
 | SaveConfig | 原 MCU shared_info、NVIC 复位、电源关闭；不能视作已完成 Linux 持久化 |
 
-状态栏独立创建在 `lv_layer_top()`。I18n 已支持 English/Russian 动态切换；字体、图片、符号和语言包应随应用完整迁移。保留原框架版权及资源来源信息，不重写现有 PageManager/DataCenter/ResourceManager。
+状态栏独立创建在 `lv_layer_top()`。I18n 已支持 English/Russian 动态切换；字体、图片、符号和语言包应随应用完整迁移。保留原框架版权及资源来源信息，不重写现有 PageManager/旧消息框架/ResourceManager。
 
-`DataProc/DP_LIST.inc` 当前仅注册 StatusBar 节点；业务状态广泛通过全局 `SystemInfo_t systemInfo` 访问，不能把所有数据流都概括为 DataCenter 消息。
+`DataProc/DP_LIST.inc` 当前仅注册 StatusBar 节点；业务状态广泛通过全局 `SystemInfo_t systemInfo` 访问，不能把所有数据流都概括为 旧消息框架消息。
 
 `Simulator/main.cpp` 写入卫星数、Wi-Fi 名称、电量等演示值；`Simulator/HAL` 中多项电源函数为空或模拟实现。它适合 UI 对照，不是目标业务后端。EasyLogger 已有 __linux__ 分支，可评估复用 stdout、pthread 与时间实现。
 

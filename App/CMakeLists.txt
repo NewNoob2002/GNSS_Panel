@@ -5,17 +5,19 @@ endif()
 
 add_library(app_log STATIC Utils/Log/Log.cpp)
 add_library(app_framework STATIC
-    ../Frameworks/DataCenter/Account.cpp
-    ../Frameworks/DataCenter/DataCenter.cpp
-    ../Frameworks/DataCenter/DataTimer.cpp
-    ../Frameworks/DataCenter/PingPongBuffer/PingPongBuffer.c)
+    ../Frameworks/DataBroker/DataNode.cpp
+    ../Frameworks/DataBroker/DataBroker.cpp
+    ../Frameworks/DataBroker/DataTimer.cpp
+    ../Frameworks/DeviceManager/DeviceManager.cpp
+    ../Frameworks/ResourceManager/ResourceManager.h)
 add_library(app_i18n STATIC
     Utils/I18n/I18n.cpp Utils/I18n/I18n_en.cpp Utils/I18n/I18n_ru.cpp)
 add_library(app_core STATIC
     Common/DataProc/DataProc.cpp
     Common/DataProc/DP_Status.cpp
     Common/DataProc/DP_Device.cpp
-    Common/SystemService.cpp)
+    Common/SystemService.cpp
+    Common/SystemBackend.cpp)
 foreach(target app_log app_framework app_i18n app_core)
     target_include_directories(${target} PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/..")
     target_link_libraries(${target} PUBLIC app_build_options)
@@ -24,6 +26,8 @@ foreach(target app_log app_framework app_i18n app_core)
 endforeach()
 target_link_libraries(app_framework PRIVATE app_log)
 target_link_libraries(app_core PUBLIC app_framework app_i18n app_log)
+# 平台继承核心设备接口，必须与核心保持一致的 RTTI 设置。
+target_compile_options(app_core PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-fno-rtti>)
 
 # A headless parent builds only the targets above; no LVGL headers or library are required.
 if(NOT TARGET app_lvgl)
@@ -44,7 +48,6 @@ file(GLOB APP_RESOURCES CONFIGURE_DEPENDS "Resource/font/*.c" "Resource/img/*.c"
 add_library(app_dialplate STATIC
     Pages/Dialplate/DialplateView.cpp
     Resource/ResourcePool.cpp
-    Utils/ResourceManager/ResourceManager.cpp
     Utils/lv_anim_label/numberFlow.cpp
     Utils/lv_anim_label/numberFlow_clock.cpp
     Utils/lv_ext/lv_anim_timeline_wrapper.c

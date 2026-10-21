@@ -23,9 +23,9 @@
 #ifndef __DATA_NODE_H
 #define __DATA_NODE_H
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
-#include <list>
 
 class DataBroker;
 class DataTimer;
@@ -75,14 +75,13 @@ public:
     /* Event callback function pointer */
     typedef int (*EventCallback_t)(DataNode* node, EventParam_t* param);
 
-    typedef std::list<DataNode*> DataNodeList_t;
+    using DataNodeList_t = std::array<DataNode*, 17>;
 
-public:
+  public:
     /**
      * @brief  DataNode constructor
      * @param  id:       Unique name
      * @param  broker:   Pointer to the data broker
-     * @param  bufSize:  The length of the data to be cached
      * @param  userData: Point to the address of user-defined data
      */
     DataNode(
@@ -94,6 +93,14 @@ public:
      * @brief  DataNode destructor
      */
     virtual ~DataNode();
+    DataNode(const DataNode&) = delete;
+    DataNode& operator=(const DataNode&) = delete;
+
+    /** 查询注册是否成功；重复名称、空名称或超过 16 个节点时失败。 */
+    bool
+    isRegistered() const {
+        return _registered;
+    }
 
     /**
      * @brief  Subscribe to Publisher
@@ -122,7 +129,8 @@ public:
     size_t getSubscribersNumber();
 
     /**
-     * @brief  Publish data to subscribers
+     * @brief  同步发布调用方持有的数据，回调返回后不保存参数。
+     * @note   回调可删除订阅者，禁止销毁当前发布者或其 broker。
      * @param  data_p: Pointer to data
      * @param  size:   The size of the data
      * @retval error code
@@ -235,16 +243,20 @@ public:
     }
 
 private:
-    DataNodeList_t _publishers; /* Followed publishers */
-    DataNodeList_t _subscribers; /* Followed subscribers */
+  // 禁用异常的固件使用定长关系表，地址加序号校验发布期间的节点寿命。
+  friend class DataBroker;
+  bool _registered = false;
+  uint64_t _serial = 0;
+  DataNodeList_t _publishers{};  /* Followed publishers */
+  DataNodeList_t _subscribers{}; /* Followed subscribers */
 
-    const char* _ID; /* Node ID */
-    DataBroker* _broker; /* Pointer to the data broker */
-    void* _userData;
+  const char* _ID;     /* Node ID */
+  DataBroker* _broker; /* Pointer to the data broker */
+  void* _userData;
 
-    EventCallback_t _eventCallback;
-    uint32_t _eventFilterMask;
-    DataTimer* _timer;
+  EventCallback_t _eventCallback;
+  uint32_t _eventFilterMask;
+  DataTimer* _timer;
 
 private:
     /**

@@ -20,151 +20,116 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#ifndef __DATA_TIMER_H
-#define __DATA_TIMER_H
-
+#pragma once
+#include <array>
+#include <cstddef>
 #include <cstdint>
-#include <list>
 
 class DataTimerManager;
 
+/** 应用线程独占；管理器比定时器长寿，回调允许删除任意定时器。 */
 class DataTimer {
-    friend class DataTimerManager;
-
 public:
-    typedef void (*TimerFunction_t)(DataTimer*);
+  using TimerFunction_t = void (*)(DataTimer*);
+  /** 注入毫秒周期与借用的用户数据；无时钟、空回调、零周期或满额时注册失败。 */
+  DataTimer(DataTimerManager* manager, TimerFunction_t callback, uint32_t period, void* user_data = nullptr);
+  /** 从管理器注销，不释放用户数据。 */
+  ~DataTimer();
+  DataTimer(const DataTimer&) = delete;
+  DataTimer& operator=(const DataTimer&) = delete;
 
-public:
-    /**
-     * @brief create a timer
-     * @param manager the timer manager
-     * @param timerFunc the timer function to be invoked
-     * @param period the timer period in millisecond
-     * @param userData the user data to be passed to the timer function
-     */
-    DataTimer(DataTimerManager* manager, TimerFunction_t timerFunc, uint32_t period, void* userData = nullptr);
+  /** 查询是否成功占用定长注册表。 */
+  bool
+  isRegistered() const {
+      return serial_ != 0;
+  }
 
-    ~DataTimer();
+  /** 返回调用方拥有的用户数据，不延长其生命周期。 */
+  void*
+  getUserData() const {
+      return user_data_;
+  }
 
-    /**
-     * @brief pause the timer
-     */
-    void pause();
+  /** 以当前 tick 重置起点，不改变暂停状态。 */
+  void reset();
+  /** 设置非零周期；零值暂停，保留之前的周期。 */
+  void setPeriod(uint32_t period);
 
-    /**
-     * @brief resume the timer
-     */
-    void resume();
+  /** 返回当前周期，单位毫秒。 */
+  uint32_t
+  getPeriod() const {
+      return period_;
+  }
 
-    /**
-     * @brief reset the timer
-     */
-    void reset();
+  /** 返回剩余毫秒；暂停或未注册时返回 UINT32_MAX。 */
+  uint32_t remain() const;
 
-    /**
-     * @brief get the remaining time of the timer
-     * @return the remaining time in millisecond
-     */
-    uint32_t remain();
+  /** 暂停到期分发。 */
+  void
+  pause() {
+      paused_ = true;
+  }
 
-    /**
-     * @brief set the timer period
-     * @param period the timer period in millisecond
-     */
-    void setPeriod(uint32_t period);
-
-    /**
-     * @brief get the timer period
-     * @return the timer period in millisecond
-     */
-    uint32_t getPeriod();
-
-    /**
-     * @brief get the user data
-     * @return the user data
-     */
-    void* getUserData();
-
-protected:
-    /**
-     * @brief get the timer is ready to invoke
-     * @return true if the timer is ready to invoke, false otherwise
-     */
-    bool isReady();
-
-    /**
-     * @brief get the timer is pause
-     * @return true if the timer is pause, false otherwise
-     */
-    bool isPause();
-
-    /**
-     * @brief invoke the timer function
-     */
-    void invoke();
+  /** 恢复分发，不重置时间；如需重新计时先调用 reset。 */
+  void
+  resume() {
+      paused_ = false;
+  }
 
 private:
-    DataTimerManager* _manager;
-    TimerFunction_t _timerFunc;
-    void* _userData;
-    uint32_t _period;
-    uint32_t _lastTick;
-    bool _isPause;
+  friend class DataTimerManager;
+  DataTimerManager* manager_;
+  TimerFunction_t callback_;
+  void* user_data_;
+  uint32_t period_, last_tick_;
+  uint64_t serial_ = 0;
+  bool paused_ = false;
 };
 
+/** 移植原调度器：32 项定长表和序号快照避免回调删除导致释放后使用。 */
 class DataTimerManager {
 public:
-    typedef uint32_t (*TickFunction_t)(void);
+  using TickFunction_t = uint32_t (*)();
+  static constexpr std::size_t kMaxTimers = 32;
 
-public:
-    /**
-     * @brief create a timer manager
-     * @param tickCallback the tick callback function to get the current tick
-     */
-    DataTimerManager(TickFunction_t tickCallback = nullptr);
+  /** 借用单调毫秒时钟，空时钟时不分发事件。 */
+  explicit DataTimerManager(TickFunction_t clock = nullptr) : clock_(clock) {}
 
-    ~DataTimerManager();
+  DataTimerManager(const DataTimerManager&) = delete;
+  DataTimerManager& operator=(const DataTimerManager&) = delete;
+  /** 拒绝空时钟；存在已注册定时器时禁止切换时钟源。 */
+  bool setTickCallback(TickFunction_t clock);
+  /** 每个到期定时器至多调用一次；回调期间新建的定时器延到下一轮。 */
+  uint32_t handler();
 
-    /**
-     * @brief set the tick callback function
-     * @param tickCallback the tick callback function to get the current tick
-     */
-    void setTickCallback(TickFunction_t tickCallback);
+  /** 未设置时钟时返回零，不调用空指针。 */
+  uint32_t
+  getTick() const {
+      return clock_ ? clock_() : 0;
+  }
 
-    /**
-     * @brief add a timer
-     * @param timer the timer to be added
-     */
-    void add(DataTimer* timer);
-
-    /**
-     * @brief remove a timer
-     * @param timer the timer to be removed
-     */
-    void remove(DataTimer* timer);
-
-    /**
-     * @brief get the current tick
-     * @return the current tick
-     */
-    uint32_t getTick();
-
-    /**
-     * @brief get the elapsed time from the previous tick
-     * @param prevTick the previous tick
-     * @return the elapsed time in millisecond
-     */
-    uint32_t getTickElaps(uint32_t prevTick);
-
-    /**
-     * @brief handle the timer events
-     * @return time till next timer event in millisecond
-     */
-    uint32_t handler();
+  /** 无符号差值支持一次 tick 回绕，单位毫秒。 */
+  uint32_t
+  getTickElaps(uint32_t previous) const {
+      return getTick() - previous;
+  }
 
 private:
-    TickFunction_t _getTick;
-    std::list<DataTimer*> _timerList;
-};
+  friend class DataTimer;
 
-#endif /* __DATA_TIMER_H */
+  struct Entry {
+      DataTimer* timer = nullptr;
+      uint64_t serial = 0;
+  };
+
+  TickFunction_t clock_ = nullptr;
+  std::array<Entry, kMaxTimers> entries_{};
+  uint64_t next_serial_ = 0;
+  bool handling_ = false;
+  /** 返回非零且不重复的序号，满额或无时钟返回零。 */
+  uint64_t add(DataTimer* timer);
+  /** 清除匹配地址的注册项，不访问已删除对象。 */
+  void remove(DataTimer* timer);
+  /** 对照当前表校验地址与序号，避免原地址重建误用旧快照。 */
+  bool alive(const Entry& entry) const;
+};

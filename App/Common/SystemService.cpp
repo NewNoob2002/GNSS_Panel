@@ -6,43 +6,43 @@
 
 namespace {
 DataProc::SystemState state;
-Account* provider = nullptr;
+DataNode* provider = nullptr;
 std::uint64_t executed_token = 0;
 
-bool sender_is(const Account::EventParam_t* event, const char* name) {
-    return event->tran && std::strcmp(event->tran->ID, name) == 0;
+bool sender_is(const DataNode::EventParam_t* event, const char* name) {
+    return event->tran && std::strcmp(event->tran->getID(), name) == 0;
 }
 bool provider_ready() {
-    return provider && DataProc::Center()->SearchAccount("System") == provider;
+    return provider && DataProc::Broker()->search("System") == provider;
 }
 /** Commit the state and publish it; a subscriber rejecting the update is logged, not fatal. */
 bool publish_state() {
-    if (!provider->Commit(&state, sizeof(state)))
-        return false;
-    const int published = provider->Publish();
-    if (published != Account::RES_OK && published != Account::RES_UNKNOW)
+    // 发布局部值快照，避免重入请求改变后续订阅者接收的同一事件。
+    const auto snapshot = state;
+    const int published = provider->publish(&snapshot, sizeof(snapshot));
+    if (published != DataNode::RES_OK && published != DataNode::RES_UNKNOWN)
         APP_LOG_W("SystemService", "subscriber rejected state: %d", published);
     return true;
 }
-int on_event(Account* account, Account::EventParam_t* event) {
+int on_event(DataNode* account, DataNode::EventParam_t* event) {
     if (!event || !event->data_p)
-        return Account::RES_PARAM_ERROR;
-    if (event->event == Account::EVENT_SUB_PULL) {
+        return DataNode::RES_PARAM_ERROR;
+    if (event->event == DataNode::EVENT_PULL) {
         if (event->size != sizeof(state))
-            return Account::RES_SIZE_MISMATCH;
+            return DataNode::RES_SIZE_MISMATCH;
         std::memcpy(event->data_p, &state, sizeof(state));
-        return Account::RES_OK;
+        return DataNode::RES_OK;
     }
-    if (event->event != Account::EVENT_NOTIFY)
-        return Account::RES_UNSUPPORTED_REQUEST;
+    if (event->event != DataNode::EVENT_NOTIFY)
+        return DataNode::RES_UNSUPPORTED_REQUEST;
     DataProc::SystemRequest request;
     const int decoded = DataProc::ReadPayload(event, request);
-    if (decoded != Account::RES_OK)
+    if (decoded != DataNode::RES_OK)
         return decoded;
     switch (request.command) {
         case DataProc::SystemCommand::BeginInitialization:
             if (!sender_is(event, "SystemLoadingModel"))
-                return Account::RES_PARAM_ERROR;
+                return DataNode::RES_PARAM_ERROR;
             state.initialization_started = true;
             state.initialization = {}; // A fresh attempt replaces earlier results, including cached-page re-entry.
             break;
@@ -53,19 +53,19 @@ int on_event(Account* account, Account::EventParam_t* event) {
                     && request.initialization.status != DataProc::InitializationStatus::Failed)
                 || std::find(request.initialization.detail.begin(), request.initialization.detail.end(), '\0')
                        == request.initialization.detail.end())
-                return Account::RES_PARAM_ERROR;
+                return DataNode::RES_PARAM_ERROR;
             state.initialization[request.initialization_step] = request.initialization;
             break;
         case DataProc::SystemCommand::SetLanguage:
             if (!sender_is(event, "SystemDashModel")
                 || (request.language != i18n::Language::English && request.language != i18n::Language::Russian))
-                return Account::RES_PARAM_ERROR;
+                return DataNode::RES_PARAM_ERROR;
             i18n::set_language(request.language);
             state.language = request.language;
             break;
         case DataProc::SystemCommand::SetTime:
             if (!sender_is(event, "SystemDashModel") || !SystemService::valid_date(request.date))
-                return Account::RES_PARAM_ERROR;
+                return DataNode::RES_PARAM_ERROR;
             state.date = request.date; // Explicit RAM simulation: no system clock or persistent write.
             APP_LOG_I("SystemService", "demo date/time committed to RAM");
             break;
@@ -74,7 +74,7 @@ int on_event(Account* account, Account::EventParam_t* event) {
                 || (request.action != DataProc::PowerAction::Off && request.action != DataProc::PowerAction::Reboot)
                 || (request.action == DataProc::PowerAction::Reboot && !state.reboot_available) // 平台无重启时兜底。
                 || state.power_token == std::numeric_limits<std::uint64_t>::max())
-                return Account::RES_PARAM_ERROR;
+                return DataNode::RES_PARAM_ERROR;
             ++state.power_token;
             state.power_action = request.action;
             state.power_pending = true;
@@ -82,47 +82,47 @@ int on_event(Account* account, Account::EventParam_t* event) {
         case DataProc::SystemCommand::CancelPower:
             if ((!sender_is(event, "SystemDashModel") && !sender_is(event, "SaveConfigModel"))
                 || request.token != state.power_token)
-                return Account::RES_PARAM_ERROR;
+                return DataNode::RES_PARAM_ERROR;
             state.power_pending = false;
             break;
         case DataProc::SystemCommand::RequestPowerOn:
             if (!sender_is(event, "StartupModel"))
-                return Account::RES_PARAM_ERROR;
+                return DataNode::RES_PARAM_ERROR;
             if (state.powered_on || !system_backend::request_power_on())
-                return Account::RES_OK; // A platform that decides power-on reports it later.
+                return DataNode::RES_OK; // A platform that decides power-on reports it later.
             state.powered_on = true;
             state.standby = state.shutting_down = false;
             break;
         case DataProc::SystemCommand::SetWifi:
             if (!sender_is(event, "SystemDashModel") || !state.wifi_available || state.wifi_pending)
-                return Account::RES_PARAM_ERROR;
+                return DataNode::RES_PARAM_ERROR;
             if (request.wifi_on == state.wifi_on)
-                return Account::RES_OK;
+                return DataNode::RES_OK;
             // Pending until the platform reports the applied state; a platform that applies it at once calls
             // set_wifi() inside request_wifi(), so mark pending first.
             state.wifi_pending = true;
             if (!system_backend::request_wifi(request.wifi_on)) {
                 state.wifi_pending = false;
-                return Account::RES_UNKNOW;
+                return DataNode::RES_UNKNOWN;
             }
             break;
         case DataProc::SystemCommand::ExecutePower:
             if (!sender_is(event, "SaveConfigModel") || !request.token)
-                return Account::RES_PARAM_ERROR;
+                return DataNode::RES_PARAM_ERROR;
             if (request.token == executed_token)
-                return Account::RES_OK; // Retry is not another power operation.
+                return DataNode::RES_OK; // Retry is not another power operation.
             if (!state.power_pending || request.token != state.power_token)
-                return Account::RES_PARAM_ERROR;
+                return DataNode::RES_PARAM_ERROR;
             state.power_pending = false; // Consume before calling the service, guarding reentrant confirmation.
             executed_token = request.token;
             if (!SystemService::power(state.power_action))
-                return Account::RES_UNKNOW;
+                return DataNode::RES_UNKNOWN;
             break;
         default:
-            return Account::RES_UNSUPPORTED_REQUEST;
+            return DataNode::RES_UNSUPPORTED_REQUEST;
     }
     (void)account;
-    return publish_state() ? Account::RES_OK : Account::RES_NO_CACHE;
+    return publish_state() ? DataNode::RES_OK : DataNode::RES_NO_DATA;
 }
 } // namespace
 DATA_PROC_INIT_DEF(System) {
@@ -136,8 +136,8 @@ DATA_PROC_INIT_DEF(System) {
     state.star_map = capabilities.star_map;
     state.record_settings = capabilities.record_settings;
     executed_token = 0;
-    account->SetEventCallback(on_event);
-    return account->Commit(&state, sizeof(state));
+    account->setEventCallback(on_event);
+    return account->isRegistered();
 }
 DataProc::SystemState SystemService::snapshot() {
     return state;

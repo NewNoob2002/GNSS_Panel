@@ -25,12 +25,12 @@ class BatteryWarning {
     }
 
   private:
-    static int on_event(Account* account, Account::EventParam_t* event);
+    static int on_event(DataNode* account, DataNode::EventParam_t* event);
     void update(bool valid, float temperature);
     void update_text();
     void start_effects();
     void stop_effects();
-    std::unique_ptr<Account> account_;
+    std::unique_ptr<DataNode> account_;
     lv_obj_t *banner_ = nullptr, *label_ = nullptr, *marker_ = nullptr, *shine_ = nullptr;
     bool active_ = false;
     float temperature_ = 0.0f;

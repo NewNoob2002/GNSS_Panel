@@ -70,9 +70,9 @@ bool App::init(const Options& options) {
     if (options.battery_warning && !battery_warning_.create(lv_layer_top()))
         return false;
     language_ = i18n::get_language();
-    account_ = std::make_unique<Account>("Application", DataProc::Center(), 0, this);
-    account_->SetEventCallback(on_system_event);
-    if (!account_->IsRegistered() || !account_->Subscribe("System"))
+    account_ = std::make_unique<DataNode>("Application", DataProc::Broker(), this);
+    account_->setEventCallback(on_system_event);
+    if (!account_->isRegistered() || !account_->subscribe("System"))
         return false;
     navigation_timer_ = lv_timer_create(on_navigation, 20, this);
     if (!navigation_timer_)
@@ -101,14 +101,14 @@ App::~App() {
         lv_style_reset(&root_style_);
 }
 
-int App::on_system_event(Account* account, Account::EventParam_t* event) {
-    if (!event || event->event != Account::EVENT_PUB_PUBLISH)
-        return Account::RES_UNSUPPORTED_REQUEST;
+int App::on_system_event(DataNode* account, DataNode::EventParam_t* event) {
+    if (!event || event->event != DataNode::EVENT_PUBLISH)
+        return DataNode::RES_UNSUPPORTED_REQUEST;
     DataProc::SystemState state;
     const int result = DataProc::ReadPayload(event, state);
-    if (result != Account::RES_OK)
+    if (result != DataNode::RES_OK)
         return result;
-    auto* self = static_cast<App*>(account->UserData);
+    auto* self = static_cast<App*>(account->getUserData());
     if (state.language != self->language_) {
         self->language_ = state.language;
         self->manager_->notify_language_changed();
@@ -126,7 +126,7 @@ int App::on_system_event(Account* account, Account::EventParam_t* event) {
     self->standby_ = state.standby;
     self->shutting_down_ = state.shutting_down;
     self->powered_on_ = state.powered_on;
-    return Account::RES_OK;
+    return DataNode::RES_OK;
 }
 
 void App::on_navigation(lv_timer_t* timer) {

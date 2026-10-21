@@ -53,13 +53,13 @@ int main() {
     };
     auto* display = lv_disp_drv_register(&driver);
     assert(display && DataProc_Init(lv_tick_get));
-    assert(!DataProc_Init(lv_tick_get)); // No reset beneath live Accounts.
+    assert(!DataProc_Init(lv_tick_get)); // No reset beneath live DataNodes.
     {
         page::StatusBar bar;
         assert(bar.create(lv_layer_top()));
         page::SystemInfosModel info;
         assert(info.init() && info.init());
-        assert(DataProc::Center()->SearchAccount("SystemInfosModel"));
+        assert(DataProc::Broker()->search("SystemInfosModel"));
         assert(lv_obj_get_y(bar.root()) == -26 && !lv_obj_has_flag(bar.root(), LV_OBJ_FLAG_HIDDEN));
         assert(info.set_status_bar(true));
         advance(600);
@@ -83,10 +83,10 @@ int main() {
         assert(lv_obj_get_y(bar.root()) == hiding_y); // Identical requests do not restart the animation.
         advance(400);
         assert(lv_obj_get_y(bar.root()) == -26 && bar.root()->coords.y2 < 0);
-        Account peer("Peer", DataProc::Center());
-        assert(peer.Subscribe("SystemInfosModel"));
+        DataNode peer("Peer", DataProc::Broker());
+        assert(peer.subscribe("SystemInfosModel"));
         DataProc::StatusSnapshot pulled;
-        assert(peer.Pull("SystemInfosModel", &pulled, sizeof(pulled)) == Account::RES_OK);
+        assert(peer.pull("SystemInfosModel", &pulled, sizeof(pulled)) == DataNode::RES_OK);
         assert(std::strcmp(pulled.position.data(), "UPDATED") == 0); // Model accepts a peer's pull request.
         assert(info.set_status_bar(true));
         advance(150);
@@ -141,20 +141,20 @@ int main() {
         DataProc::SystemRequest time_request{};
         time_request.command = DataProc::SystemCommand::SetTime;
         time_request.date = {2026, 10, 1, 12, 30};
-        assert(peer.Subscribe("System"));
-        assert(peer.Notify("System", &time_request, sizeof(time_request)) == Account::RES_PARAM_ERROR);
+        assert(peer.subscribe("System"));
+        assert(peer.notify("System", &time_request, sizeof(time_request)) == DataNode::RES_PARAM_ERROR);
         // Startup results belong to System, survive loading-page teardown, and reach information Models.
         page::SystemLoadingModel loading;
         assert(loading.init());
         assert(!info.settings().initialization_started);
-        auto* loading_account = DataProc::Center()->SearchAccount("SystemLoadingModel");
+        auto* loading_account = DataProc::Broker()->search("SystemLoadingModel");
         assert(loading_account);
         DataProc::SystemRequest boot_request{};
         boot_request.command = DataProc::SystemCommand::RecordInitialization;
         boot_request.initialization.status = DataProc::InitializationStatus::Ok;
-        assert(loading_account->Notify("System", &boot_request, sizeof(boot_request)) == Account::RES_PARAM_ERROR);
+        assert(loading_account->notify("System", &boot_request, sizeof(boot_request)) == DataNode::RES_PARAM_ERROR);
         boot_request.command = DataProc::SystemCommand::BeginInitialization;
-        assert(peer.Notify("System", &boot_request, sizeof(boot_request)) == Account::RES_PARAM_ERROR);
+        assert(peer.notify("System", &boot_request, sizeof(boot_request)) == DataNode::RES_PARAM_ERROR);
         assert(loading.begin_initialization() && info.settings().initialization_started);
         using Status = DataProc::InitializationStatus;
         assert(loading.poll_step(0, 0) == Status::Ok);
@@ -171,35 +171,35 @@ int main() {
         assert(loading.poll_step(DataProc::kInitializationStepCount, 0) == Status::Failed);
         loading.deinit();
         info.deinit();
-        assert(info.init()); // A new information Account pulls the retained report after loading is gone.
-        assert(!DataProc::Center()->SearchAccount("SystemLoadingModel"));
+        assert(info.init()); // A new information DataNode pulls the retained report after loading is gone.
+        assert(!DataProc::Broker()->search("SystemLoadingModel"));
         assert(info.settings().initialization[3].status == DataProc::InitializationStatus::Failed);
         assert(std::strcmp(info.settings().initialization[3].detail.data(), "Wi-Fi backend reserved; continue offline")
                == 0);
         assert(info.settings().initialization[4].status == DataProc::InitializationStatus::Ok);
         assert(loading.init());
-        loading_account = DataProc::Center()->SearchAccount("SystemLoadingModel");
+        loading_account = DataProc::Broker()->search("SystemLoadingModel");
         boot_request.command = DataProc::SystemCommand::RecordInitialization;
         boot_request.initialization_step = DataProc::kInitializationStepCount;
-        assert(loading_account->Notify("System", &boot_request, sizeof(boot_request)) == Account::RES_PARAM_ERROR);
+        assert(loading_account->notify("System", &boot_request, sizeof(boot_request)) == DataNode::RES_PARAM_ERROR);
         boot_request.initialization_step = 3;
         boot_request.initialization.status = static_cast<DataProc::InitializationStatus>(99);
-        assert(loading_account->Notify("System", &boot_request, sizeof(boot_request)) == Account::RES_PARAM_ERROR);
+        assert(loading_account->notify("System", &boot_request, sizeof(boot_request)) == DataNode::RES_PARAM_ERROR);
         boot_request.initialization.status = DataProc::InitializationStatus::Ok;
         boot_request.initialization.detail.fill('x');
-        assert(loading_account->Notify("System", &boot_request, sizeof(boot_request)) == Account::RES_PARAM_ERROR);
+        assert(loading_account->notify("System", &boot_request, sizeof(boot_request)) == DataNode::RES_PARAM_ERROR);
         assert(info.settings().initialization[3].status == DataProc::InitializationStatus::Failed);
         boot_request.initialization.detail.back() = '\0'; // The maximum terminated message is accepted.
-        assert(loading_account->Notify("System", &boot_request, sizeof(boot_request)) == Account::RES_OK);
+        assert(loading_account->notify("System", &boot_request, sizeof(boot_request)) == DataNode::RES_OK);
         assert(std::strlen(info.settings().initialization[3].detail.data()) == 95);
         assert(loading.begin_initialization());
         for (const auto& node : info.settings().initialization)
             assert(node.status == DataProc::InitializationStatus::NotRun && node.detail[0] == '\0');
         loading.deinit();
-        assert(peer.Unsubscribe("System"));
-        auto* settings_account = DataProc::Center()->SearchAccount("SystemDashModel");
+        assert(peer.unsubscribe("System"));
+        auto* settings_account = DataProc::Broker()->search("SystemDashModel");
         assert(settings_account
-               && settings_account->Notify("System", &time_request, sizeof(time_request)) == Account::RES_OK);
+               && settings_account->notify("System", &time_request, sizeof(time_request)) == DataNode::RES_OK);
         assert(settings.settings().date.month == 10 && SystemService::snapshot().date.month == 10);
         assert(settings.toggle_language() && settings.settings().language == i18n::Language::Russian);
         assert(settings.toggle_language() && settings.settings().language == i18n::Language::English);
@@ -213,7 +213,7 @@ int main() {
         assert(!SystemService::snapshot().power_pending && SystemService::snapshot().power_calls == 1);
         assert(save.finish_power() && SystemService::snapshot().power_calls == 1); // Duplicate request is idempotent.
         assert(SystemService::snapshot().power_action == DataProc::PowerAction::Reboot);
-        assert(!DataProc_Deinit()); // Live page Accounts prevent provider teardown.
+        assert(!DataProc_Deinit()); // Live page DataNodes prevent provider teardown.
         assert(info.set_status_bar(false));
         advance(100);
         auto* bar_root = bar.root();
@@ -237,10 +237,10 @@ int main() {
         advance(40);
         assert(!lv_anim_get(battery_fill, nullptr) && lv_obj_get_width(battery_fill) == 0);
         info.deinit();
-        assert(!DataProc::Center()->SearchAccount("SystemInfosModel"));
-        assert(peer.GetPublishersSize() == 0);
+        assert(!DataProc::Broker()->search("SystemInfosModel"));
+        assert(peer.getPublishersNumber() == 0);
     }
-    assert(DataProc_Deinit() && DataProc::Center()->GetAccountLen() == 0);
+    assert(DataProc_Deinit() && DataProc::Broker()->getNodeNumber() == 0);
     assert(DataProc_Init(lv_tick_get) && DataProc_Deinit()); // Reinitialization after full cleanup.
     lv_disp_remove(display);
 }

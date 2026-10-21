@@ -12,13 +12,13 @@
 
 ```text
 App/                      共享应用：独立事件框架接入、无 LVGL 的核心服务、LVGL 页面及核心测试 App/tests/（本仓库为唯一来源）
-Frameworks/               跨平台框架：DataCenter、DataBroker、DeviceManager、PageManager、ResourceManager
+Frameworks/               跨平台框架：DataBroker、DeviceManager、PageManager、ResourceManager
 External/lvgl/            上游 LVGL 8.3.11 源码（src/、lvgl.h、demos/，不含平台 lv_conf.h 与 porting/）
 Vendor/HC32/
   Platform/               CMSIS 启动、DDL/ 小华 LL 库、Peripherals/ 原生外设驱动（GpioPin、I2cMaster、SpiMaster、GPIO、UART、Flash、DWT、OTS）、System/ 系统与运行时胶水（中断、Syscalls、new、delay、调试宏）、Config/（board_pins.h 主板引脚、board_peripherals 板级外设实例）、共用 HAL/（电源策略、充电/电量计、按键、LED、时基）与 State/
   Libraries/              器件与第三方库（Bq40z50、Mp2762a、MillisTaskManager、Parser、SEGGER_RTT、easylogger、MultiButton）；LVGL 从 External/lvgl 构建
   Comm/                   I2C 从机传输 + 面板帧协议核心（全部产品）
-  Display/                带屏产品入口、显示协议表、显示 HAL，以及 AppPlatform/（共享应用的 HC32 平台层：入口 + Status/Power/Device 三个 Bridge + 初始化步骤）、Panel/（面板驱动 PanelRm690a0 与板级显示实例 board_display）、Lvgl/（固件 lv_conf.h、lv_port*、LVGL 内存池 operator new）（X1Pro、XBase）
+  Display/                带屏产品入口、显示协议表、显示 HAL，以及 AppPlatform/（共享应用的 HC32 平台层：入口 + DeviceManager 的 Power/Device/Status 三个设备对象 + 初始化步骤）、Panel/（面板驱动 PanelRm690a0 与板级显示实例 board_display）、Lvgl/（固件 lv_conf.h、lv_port*、LVGL 内存池 operator new）（X1Pro、XBase）
   Products/<产品>/        product.cmake、product_config.h、产品专属源码
 Vendor/Simulator/         唯一 PC SDL 模拟器：SIM_BACKEND=Board（默认，共享应用 + AppPlatform + 固件 HAL_Power.cpp）或 Demo（Linux 演示后端）；配置用自身 lv_conf.h
 Vendor/Linux/             RK3506 Linux 端口、Backends/Demo 演示后端与主机测试；配置用 config/lv_conf.h
@@ -33,7 +33,7 @@ Vendor/Linux/             RK3506 Linux 端口、Backends/Demo 演示后端与主
 
 ## 产品差异放在哪里
 
-共享构建与架构边界见 [App/ARCHITECTURE.md](../App/ARCHITECTURE.md)：`app_framework` / `app_core` 不依赖 LVGL，`app_ui` 是 UI；固件、主机测试、模拟器与 Linux 端口复用同一个 `App/CMakeLists.txt`。平台通过 `app_build_options` 和 `app_lvgl` 绑定编译选项与显示库。`App/` 与 `Frameworks/` 直接在本仓库修改；平台相关行为放在 `Vendor/<平台>`。
+共享构建与架构边界见 [App/ARCHITECTURE.md](../App/ARCHITECTURE.md)：`app_framework` / `app_core` 不依赖 LVGL，`app_ui` 是 UI；固件、主机测试、模拟器与 Linux 端口复用同一个 `App/CMakeLists.txt`。平台通过 `app_build_options` 和 `app_lvgl` 绑定编译选项与显示库。`app_framework` 构建 DataBroker/DeviceManager，ResourceManager 使用静态数组模板；DataNode 同步分发，最多 16 个节点、32 个独立时钟定时器。资源池与页面外观不变，LVGL 仍为 8.3.11，页面管理仍使用 `App/Utils/PageManager`。`App/` 与 `Frameworks/` 直接在本仓库修改；平台相关行为放在 `Vendor/<平台>`。
 
 1. **功能开关**：`Vendor/HC32/Products/<产品>/product_config.h` 中的 `PRODUCT_*` 宏，经 `mcu_config.h` 被所有源码看到。带屏产品缺少任一开关时 `mcu_config.h` 直接报错，避免 `#if` 未定义被当作 0。
 2. **弱符号扩展点**（`Vendor/HC32/Platform/HAL/HAL.h`）：`Power_ProductInit`、`Power_ProductUpdate`、`Power_AdjustPercent`、`Key_ProductInit`、`Key_ProductUpdate`。默认无动作，产品源码覆盖（X1：电量补偿、MultiButton 按键动作）。
@@ -71,7 +71,7 @@ XBase 的差异取自其分支相对分叉点的产品级改动（无星图/过�
 | `board` | 软硬件版本、器件在线（BQ40Z50、MP2762A） | HAL I2C 扫描 | `State::Board()` |
 | `power` | 电池采样、开关机与关机流程标志 | HAL 电源策略 | `State::Power()`；其它模块经 `HAL::Power_Shutdown()`、`State::Request_ForcedShutdown()`、`State::Host_*()` 请求 |
 | `host` | 主控上报：定位、星图、Wi-Fi、录制、工作模式、NTRIP、主控在线 | 面板协议 | `State::Host()` |
-| `request` | 面板请求：工作模式、录制启停/设置、Wi-Fi 开关 | 界面（`DeviceBridge`）、X1 按键、低电策略 | `State::Request_*()`；协议 `State::Confirm_*()` |
+| `request` | 面板请求：工作模式、录制启停/设置、Wi-Fi 开关 | 界面（`BusinessDevice`）、X1 按键、低电策略 | `State::Request_*()`；协议 `State::Confirm_*()` |
 | `diag` | 报文计数、I2C 错误 | 通信层 | `State::Diagnostics()` |
 
 - 面板请求与主控上报分开保存。请求待确认时，界面与协议响应用请求值（`State::Effective_Work()/Effective_Record()`）；主控上报照常写入 `host`，不再整帧忽略。
@@ -89,18 +89,18 @@ XBase 的差异取自其分支相对分叉点的产品级改动（无星图/过�
 | 电池与充电监控 | `Vendor/HC32/Platform/HAL/HAL_Battery.cpp` | BQ40Z50 采样、充电保护与控制、片内温度、看门狗（仅固件与主机测试） |
 | `HoldTimer` | `Vendor/HC32/Platform/HAL/HoldTimer.h` | 按住计时；Function 键 2.5 s 强制关机（`HAL_Key.cpp`，三产品共用） |
 | `BlinkLed` | `Vendor/HC32/Platform/HAL/BlinkLed.h` | 固定周期闪烁的指示灯 |
-| `StatusBridge` / `PowerBridge` / `DeviceBridge` | `Vendor/HC32/Display/AppPlatform/` | `systemInfo`/HAL 与共享应用之间各一个方向的转换，状态在对象内 |
+| `StatusDevice` / `PowerDevice` / `BusinessDevice` | `Vendor/HC32/Display/AppPlatform/` | DeviceManager 注册名为 Status/Power/Device，按值读取快照、写入业务请求和精确尺寸 ioctl；状态在对象内，Board 模拟器复用实现 |
 
 ### 常见扩展
 
 - **新的主板版本或充电方案**：在 `Charger.cpp` 增加一个 `HAL::Charger` 实现，并在 `Charger_Get()` 中按检测结果返回；电源与 LED 代码不需要改。
-- **新的业务数据或命令（带屏）**：共享接口在 `App/` 增加（`DeviceSnapshot`/`DeviceRequest`），在 `DeviceBridge::snapshot()/execute()` 中映射：读 `systemInfo.host` 或 `State::Effective_*()`，写经 `State::Request_*()`；主控上报的新字段加到 `HostReport_t` 并在 `display_protocol.cpp` 收发。
+- **新的业务数据或命令（带屏）**：共享接口在 `App/` 增加（`DeviceSnapshot`/`DeviceRequest`），在 `BusinessDevice::snapshot()/execute()` 中映射：读 `systemInfo.host` 或 `State::Effective_*()`，写经 `State::Request_*()`；主控上报的新字段加到 `HostReport_t` 并在 `display_protocol.cpp` 收发。
 - **产品专属按键动作**：实现 `HAL::Key_ProductInit()/Key_ProductUpdate()`；强制关机等共用行为不要复制。
 
 ## 产品行为约定
 
 - **上电等待与电源保持**（三产品共用引脚）：普通上电时 `Power_Init()` 将 `POWER_CONTROL_PIN` 配置为输出 LOW，确认开机后才拉 HIGH，给 Linux 主板供电并锁存电源。Type-C 独立供电给 MCU，等待期间主板保持断电；电池供电时 MCU 仅靠按住 Power 键维持，确认前松开不得锁存。带屏产品仅在 Startup 完成 2 s 长按后，经 LVGL 线程调用 `HAL::Power_RequestOn()`，`Power_OnCheck()` 随后退出等待并恢复输出；原始键电平长按不能开机。X1 仍由 HAL 原始键电平长按 2 s 决定。软件复位（SWRF）例外：初始化立即拉 HIGH 并自动开机，保留 Boot 与 `app_fatal` 的直接恢复契约。
-- **外部供电关机驻留**（三产品共用 HAL）：断电延时到期后若 MCU 仍有电，清除关机请求、熄灭电源/功能灯、继续充电，置 `ShutdownComplete`。带屏产品由 AppPlatform 上报待机，共享应用重置页面栈回到 Startup；仅当 Startup 完成 2 s 长按后调用 `HAL::Power_RequestOn()` 才原地开机，原始键电平长按不能恢复。X1 保留 HAL 原始电源键长按 2 s 恢复。恢复时重置电源策略、清除主控上报数据（电池采样、器件在线与版本保留）、拉高电源保持与指示灯；带屏后端成功返回后，SystemService 同步发布 `powered_on`，进入 SystemLoading，PowerBridge 幂等补报。关机进行中拒绝开机请求。不使用软件复位开机：Boot 保留 SWRF 会直接开机，且升级窗口会停留约 1 s。
+- **外部供电关机驻留**（三产品共用 HAL）：断电延时到期后若 MCU 仍有电，清除关机请求、熄灭电源/功能灯、继续充电，置 `ShutdownComplete`。带屏产品由 AppPlatform 上报待机，共享应用重置页面栈回到 Startup；仅当 Startup 完成 2 s 长按后调用 `HAL::Power_RequestOn()` 才原地开机，原始键电平长按不能恢复。X1 保留 HAL 原始电源键长按 2 s 恢复。恢复时重置电源策略、清除主控上报数据（电池采样、器件在线与版本保留）、拉高电源保持与指示灯；带屏后端成功返回后，SystemService 同步发布 `powered_on`，进入 SystemLoading，PowerDevice 幂等补报。关机进行中拒绝开机请求。不使用软件复位开机：Boot 保留 SWRF 会直接开机，且升级窗口会停留约 1 s。
 - **电量计不可用时充电**：电量计从未识别时交由充电芯片保护继续充电；在线但样本失效/过期时禁止充电。
 - **关机确认**：主控完整读出含关机标志的状态帧（X1Pro/XBase 为 INFO2 `0x02`，X1 为 CTRL `0x02`）即确认，8 s 后断电；X1Pro/XBase 也接受 `0x05`（n=1）。均未确认时从首次请求起 20 s 兜底。
 
