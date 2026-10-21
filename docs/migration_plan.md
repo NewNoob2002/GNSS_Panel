@@ -40,6 +40,8 @@
 | 2.3 ★ | `SpiMaster` 类替换 `SPIClass`，面板驱动类替换 `Adafruit_ST7789/GFX/BusIO`（同 2.2b 原则）：初始化序列、MADCTL、偏移逐项照搬原库（注明出处），保留现有 DMA 刷新与旋转 | sol |
 | 2.4 | 删除 `Arduino/`、`Adafruit*` 目录与 `hc32_arduino*` 目标，更新 `AGENTS.md`、`docs/product_structure.md`、`readme.md` | argon |
 
+进度（2026-10-21）：2.1 `7889f10`、2.2+2.2b `e523fa1`、2.3 `2b8a027`、2.4 `d7209d4` 已合入 `dev2`，编译与主机测试验收通过，**待实机清单确认**。release 体积（text/data/bss）：X1 25808/136/19136，X1Pro 336548/860/169268，XBase 336108/860/169268；相对阶段 1 基线，带屏产品 flash 约 −5.9 KiB、静态 RAM −80 B。
+
 阶段 2 额外验收：`rg -n 'Arduino\.h|TwoWire|SPIClass|Adafruit|pinMode|digitalWrite' Vendor/HC32` 无结果（第三方示例除外）。
 
 实机清单：三产品上电/长按开机/强制断电；X1Pro/XBase 显示无偏移、无撕裂、颜色正确；按键与长按；I2C 主机侧电量计/充电芯片读数；面板 I2C 从机与主机通信正常；X1 LED 与按键。
