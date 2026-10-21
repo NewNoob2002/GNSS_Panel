@@ -1,4 +1,5 @@
 #pragma once
+#include <functional>
 #include <memory>
 #include "Common/DataProc/DataProc.h"
 
@@ -16,9 +17,15 @@ class SystemDashModel {
         return state_;
     }
     bool prepare_power(DataProc::PowerAction action);
+    bool toggle_language();
+    bool set_wifi(bool on) const;
+    void set_change_callback(std::function<void()> callback) {
+        change_cb_ = std::move(callback);
+    }
     bool cancel_power();
 
   private:
+    std::function<void()> change_cb_;
     static int on_event(Account* account, Account::EventParam_t* event);
     std::unique_ptr<Account> account_;
     DataProc::StatusSnapshot status_{};

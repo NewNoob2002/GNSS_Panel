@@ -19,6 +19,7 @@ bool SystemDashModel::init() {
     return true;
 }
 void SystemDashModel::deinit() {
+    change_cb_ = {};
     account_.reset();
 }
 bool SystemDashModel::set_status_bar(bool visible, DataProc::StatusBarStyle style) const {
@@ -30,7 +31,23 @@ bool SystemDashModel::set_status_bar(bool visible, DataProc::StatusBarStyle styl
 }
 int SystemDashModel::on_event(Account* account, Account::EventParam_t* event) {
     auto* self = static_cast<SystemDashModel*>(account->UserData);
-    return model_utils::receive(event, self->status_, self->state_);
+    const int result = model_utils::receive(event, self->status_, self->state_);
+    if (result == Account::RES_OK && event->event == Account::EVENT_PUB_PUBLISH && event->tran
+        && std::strcmp(event->tran->ID, "System") == 0 && self->change_cb_)
+        self->change_cb_();
+    return result;
+}
+bool SystemDashModel::toggle_language() {
+    DataProc::SystemRequest request{};
+    request.command = DataProc::SystemCommand::SetLanguage;
+    request.language = state_.language == i18n::Language::English ? i18n::Language::Russian : i18n::Language::English;
+    return account_ && account_->Notify("System", &request, sizeof(request)) == Account::RES_OK;
+}
+bool SystemDashModel::set_wifi(bool on) const {
+    DataProc::SystemRequest request{};
+    request.command = DataProc::SystemCommand::SetWifi;
+    request.wifi_on = on;
+    return account_ && account_->Notify("System", &request, sizeof(request)) == Account::RES_OK;
 }
 bool SystemDashModel::prepare_power(DataProc::PowerAction action) {
     DataProc::SystemRequest request{};

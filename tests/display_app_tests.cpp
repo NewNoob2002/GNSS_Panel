@@ -74,6 +74,14 @@ find_text(lv_obj_t* root, const char* text) {
 }
 
 void
+choose(i18n::TextId id) {
+    for (unsigned step = 0; step < 8 && !find_text(App_Get()->focused(), i18n::text(id)); ++step) {
+        App_Get()->on_input(P4App::InputAction::NextFocus);
+    }
+    assert(find_text(App_Get()->focused(), i18n::text(id)));
+}
+
+void
 reset_system_info() {
     State::Reset();
     BoardInfo_t& board = State::Board();
@@ -177,14 +185,23 @@ main() {
     hal_power_on_and_boot();
 
     // 逐页进入并返回，检查导航与内存。
-    const char* pages[] = {"Pages/WorkSettings", "Pages/RecordConfig", "Pages/SystemInfos", "Pages/SystemDash",
-                           "Pages/SystemSettings"};
+    const char* pages[] = {"Pages/WorkSettings", "Pages/RecordConfig", "Pages/SystemInfos", "Pages/SystemDash"};
+    assert(!App_Get()->show_page("Pages/SystemSettings"));
     for (const char* name : pages) {
         assert(App_Get()->show_page(name));
         run(800);
         assert(on_page(name));
-        assert(App_Get()->back());
+        if (std::strcmp(name, "Pages/SystemInfos") == 0) {
+            assert(lv_obj_get_parent(App_Get()->focused()) == lv_scr_act());
+            assert(lv_group_get_obj_count(lv_group_get_default()) == 7);
+            App_Get()->on_input(P4App::InputAction::NextFocus);
+            assert(find_text(App_Get()->focused(), i18n::text(i18n::TextId::SystemWorkTitle)));
+            App_Get()->on_input(P4App::InputAction::Confirm);
+        } else {
+            assert(App_Get()->back());
+        }
         run(800);
+        assert(on_page("Pages/Dialplate"));
     }
     assert(App_Get()->show_page("Pages/StarMap") == (PRODUCT_PAGE_STAR_MAP != 0));
     run(800);
@@ -217,59 +234,66 @@ main() {
         assert(device.power_valid && device.battery_voltage == 7.8f);
     }
 
-    // WorkSettings：Base 以当前协议/信道下发（控件顺序 滚轮, Base, Rover, NTRIP, Return）。
+    // 选择预设仅改草稿，点击 Apply 才下发；发出后留页等待主控读走。
     assert(App_Get()->show_page("Pages/WorkSettings"));
     run(800);
-    for (int i = 0; i < 3; ++i) { // Return -> NTRIP -> Rover -> Base
-        App_Get()->on_input(P4App::InputAction::PreviousFocus);
-    }
+    App_Get()->on_input(P4App::InputAction::Confirm); // Radio rover -> Radio base
+    assert(!request.work_pending);
+    choose(i18n::TextId::Apply);
     App_Get()->on_input(P4App::InputAction::Confirm);
     run(800);
-    assert(on_page("Pages/Dialplate"));
+    assert(on_page("Pages/WorkSettings"));
     {
         const WorkConfig_t work = State::Effective_Work();
         assert(request.work_pending && work.work_mode == autobase_mode && work.radio_mode == radio_mode_tx);
         assert(work.radio_protocol == 5 && work.radio_channel == 5 && work.gprs_status == On_Off_Status_OFF);
     }
-    // 面板请求与主控上报分开：主控仍上报旧模式时，界面显示待确认的请求。
     assert(host.work.work_mode == rover_mode);
-    run(600);
-    assert(DeviceService::snapshot().work_mode == DataProc::WorkMode::Base);
-    // 主控读走请求后确认，请求值视为主控已采用。
+    assert(DeviceService::snapshot().work_pending);
+    assert(find_text(lv_scr_act(), i18n::text(i18n::TextId::RequestWaiting)));
     State::Confirm_Work(State::Work_Revision());
-    assert(!request.work_pending && host.work.work_mode == autobase_mode);
-    // NTRIP：关闭电台，打开网络基站。
+    run(600);
+    assert(!DeviceService::snapshot().work_pending && host.work.work_mode == autobase_mode);
+    assert(find_text(lv_scr_act(), i18n::text(i18n::TextId::RequestReceived)));
+    assert(App_Get()->back());
+    run(800);
+
+    // 网络基站不需要电台字段，选择后同样通过 Apply 下发。
     assert(App_Get()->show_page("Pages/WorkSettings"));
     run(800);
-    App_Get()->on_input(P4App::InputAction::PreviousFocus); // Return -> NTRIP
+    App_Get()->on_input(P4App::InputAction::Confirm); // Radio base -> Network base
+    assert(lv_group_get_obj_count(lv_group_get_default()) == 3);
+    choose(i18n::TextId::Apply);
     App_Get()->on_input(P4App::InputAction::Confirm);
     run(800);
-    assert(on_page("Pages/Dialplate"));
     {
         const WorkConfig_t work = State::Effective_Work();
         assert(request.work_pending && work.radio_status == On_Off_Status_OFF);
         assert(work.gprs_status == On_Off_Status_ON && work.NtripServer_status == On_Off_Status_ON);
     }
     assert(DeviceService::snapshot().ntrip == DataProc::NtripRole::Server && !DeviceService::snapshot().radio_on);
-    // Rover 选中 CUSTOM 信道（索引 0）：不下发，页面仍返回。
     State::Confirm_Work(State::Work_Revision());
+    run(600);
+    assert(App_Get()->back());
+    run(800);
     host.work.radio_channel = 0;
     run(600);
     assert(App_Get()->show_page("Pages/WorkSettings"));
     run(800);
-    for (int i = 0; i < 2; ++i) { // Return -> NTRIP -> Rover
-        App_Get()->on_input(P4App::InputAction::PreviousFocus);
-    }
+    App_Get()->on_input(P4App::InputAction::Confirm); // Network -> Radio rover
+    choose(i18n::TextId::Apply);
     App_Get()->on_input(P4App::InputAction::Confirm);
     run(800);
-    assert(on_page("Pages/Dialplate"));
-    assert(!request.work_pending && State::Effective_Work().work_mode == autobase_mode);
+    assert(on_page("Pages/WorkSettings") && !request.work_pending);
+    assert(find_text(lv_scr_act(), i18n::text(i18n::TextId::SelectChannel)));
+    assert(App_Get()->back());
+    run(800);
 
     // RecordConfig：双击 Power（Commit）开始，单击（Confirm）停止。
     assert(App_Get()->show_page("Pages/RecordConfig"));
     run(800);
-    App_Get()->on_input(P4App::InputAction::PreviousFocus); // Return -> 录制按钮
-    App_Get()->on_input(P4App::InputAction::Confirm);       // 未录制时单击不开始
+    assert(find_text(App_Get()->focused(), i18n::text(i18n::TextId::StartupStart)));
+    App_Get()->on_input(P4App::InputAction::Confirm); // 未录制时单击不开始
     assert(!request.record_op && !request.record_settings_pending);
     App_Get()->on_input(P4App::InputAction::Commit);
     {
@@ -277,10 +301,16 @@ main() {
         assert(record.record_status == On_Off_Status_ON && request.record_op && request.record_settings_pending);
         assert(record.record_type == 2 && record.record_interval == 0x01);
     }
-    assert(DeviceService::snapshot().recording);
-    run(100);
+    assert(DeviceService::snapshot().recording && DeviceService::snapshot().record_pending);
+    assert(find_text(lv_scr_act(), i18n::text(i18n::TextId::RequestWaiting)));
+    const auto revision = State::Record_Revision();
+    App_Get()->on_input(P4App::InputAction::Commit);
+    assert(State::Record_Revision() == revision);
     State::Confirm_Record(State::Record_Revision(), true);
+    run(600);
+    assert(!DeviceService::snapshot().record_pending);
     assert(host.record.record_status == On_Off_Status_ON && !request.record_op);
+    choose(i18n::TextId::Stop);
     App_Get()->on_input(P4App::InputAction::Confirm);
     assert(State::Effective_Record().record_status == On_Off_Status_OFF && request.record_settings_pending);
     assert(App_Get()->back());
@@ -298,7 +328,7 @@ main() {
     assert(!SystemService::snapshot().wifi_on);
     if (PRODUCT_SHUTDOWN_WIFI_BUTTON) {
         auto& wifi = host.wifi;
-        assert(App_Get()->show_page("Pages/SystemSettings"));
+        assert(App_Get()->show_page("Pages/SystemDash"));
         run(800);
         App_Get()->on_input(P4App::InputAction::NextFocus); // Language -> Wi-Fi
         App_Get()->on_input(P4App::InputAction::Confirm);
@@ -322,6 +352,7 @@ main() {
     // 用户关机：SystemDash 电源弹窗（无 Reboot）→ SaveConfig 结束时向 HAL 发出一次关机请求。
     assert(App_Get()->show_page("Pages/SystemDash"));
     run(800);
+    choose(i18n::TextId::PowerTitle);
     App_Get()->on_input(P4App::InputAction::Confirm); // 打开电源弹窗，默认焦点 Cancel
     run(100);
     assert(!find_text(lv_scr_act(), i18n::text(i18n::TextId::RebootDouble)));

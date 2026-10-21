@@ -2,80 +2,112 @@
 #include "Utils/Log/Log.h"
 #include "Utils/PageManager/PageManager.h"
 #include "Utils/PageManager/PageUtils.h"
-
 using namespace page;
 
 void WorkSettings::on_custom_attr_config() {
     set_custom_load_anim_type(PageManager::LOAD_ANIM_MOVE_LEFT, 300, lv_anim_path_ease_in_out);
 }
-
-std::array<lv_obj_t*, 8> WorkSettings::controls() const {
-    const auto& r = view_.ui.roller;
-    const auto& b = view_.ui.btn_cont;
-    // Rollers, then the mode buttons, Return last.
-    return {r.left_roller.btn_up,
-            r.left_roller.btn_down,
-            r.right_roller.btn_up,
-            r.right_roller.btn_down,
-            b.btn_base,
-            b.btn_rover,
-            b.btn_ntrip,
-            r.btn_reset};
-}
-
 void WorkSettings::on_view_load() {
     if (!model_.init())
         app_fatal("WorkSettings", "Model initialization failed");
     view_.create(root);
-    utils::attach_controls(controls(), clicked, this);
+    utils::attach_controls(view_.controls(), clicked, this);
 }
-
+void WorkSettings::refresh() {
+    const bool pending = model_.device().work_pending;
+    const bool controls_changed =
+        lv_obj_has_state(view_.ui.apply, LV_STATE_DISABLED) != pending
+        || lv_obj_has_flag(view_.ui.protocol, LV_OBJ_FLAG_HIDDEN) != (target_ == DataProc::WorkTarget::Ntrip);
+    feedback_.poll(pending);
+    view_.update(target_, pending, feedback_.text);
+    if (controls_changed)
+        utils::focus_controls(view_.controls(), lv_group_get_focused(lv_group_get_default()));
+}
 void WorkSettings::on_view_will_appear() {
     model_.set_status_bar(true);
-    // Start from the device's current radio settings; later device updates do not move the user's selection.
-    if (model_.device().work_valid)
-        view_.set_selection(model_.device().radio_protocol, model_.device().radio_channel);
-    utils::focus_controls(controls(), last_focus_ ? last_focus_ : view_.ui.roller.btn_reset);
+    const auto& device = model_.device();
+    target_ = device.ntrip == DataProc::NtripRole::Server && !device.radio_on ? DataProc::WorkTarget::Ntrip
+              : device.work_mode == DataProc::WorkMode::Base                  ? DataProc::WorkTarget::Base
+                                                                              : DataProc::WorkTarget::Rover;
+    view_.set_selection(device.radio_protocol, device.radio_channel);
+    feedback_ = {};
+    if (device.work_pending)
+        feedback_.begin();
+    model_.set_change_callback([this] {
+        refresh();
+    });
+    refresh();
+    utils::focus_controls(view_.controls(), device.work_pending ? view_.ui.back : view_.ui.preset);
+    view_.appear();
+    timer_ = lv_timer_create(
+        [](lv_timer_t* timer) {
+            static_cast<WorkSettings*>(timer->user_data)->refresh();
+        },
+        200, this);
+    if (!timer_)
+        app_fatal("WorkSettings", "Feedback timer allocation failed");
 }
-
 void WorkSettings::on_view_will_disappear() {
-    last_focus_ = utils::leave_focus_group();
+    view_.stop();
+    model_.set_change_callback({});
+    if (timer_) {
+        lv_timer_del(timer_);
+        timer_ = nullptr;
+    }
+    utils::leave_focus_group();
 }
-
 void WorkSettings::on_view_unload() {
+    if (timer_) {
+        lv_timer_del(timer_);
+        timer_ = nullptr;
+    }
+    model_.set_change_callback({});
     model_.deinit();
     view_.destroy();
-    last_focus_ = nullptr;
 }
-
 void WorkSettings::on_language_changed() {
-    view_.apply_language();
+    view_.update(target_, model_.device().work_pending, feedback_.text);
+    if (priv.state != PAGE_STATE_ACTIVITY)
+        view_.stop();
 }
-
+void WorkSettings::apply() {
+    if (model_.device().work_pending)
+        return;
+    if (target_ != DataProc::WorkTarget::Ntrip && view_.channel() == 0) {
+        feedback_.text = i18n::TextId::SelectChannel;
+        refresh();
+        return;
+    }
+    feedback_.begin();
+    const bool accepted = model_.apply_work(target_, view_.protocol(), view_.channel());
+    feedback_.finish(accepted, model_.device().work_pending);
+    refresh();
+}
+void WorkSettings::on_commit_request() {
+    if (lv_group_get_focused(lv_group_get_default()) == view_.ui.apply)
+        apply();
+}
 void WorkSettings::clicked(lv_event_t* event) {
     auto* self = static_cast<WorkSettings*>(lv_event_get_user_data(event));
-    auto* obj = lv_event_get_current_target(event);
-    const auto& r = self->view_.ui.roller;
-    if (obj == r.left_roller.btn_up || obj == r.left_roller.btn_down)
-        self->view_.scroll(r.left_roller.label, obj == r.left_roller.btn_up ? -1 : 1);
-    else if (obj == r.right_roller.btn_up || obj == r.right_roller.btn_down)
-        self->view_.scroll(r.right_roller.label, obj == r.right_roller.btn_up ? -1 : 1);
-    else if (obj == r.btn_reset)
+    auto* control = lv_event_get_current_target(event);
+    if (control == self->view_.ui.back) {
         self->page_manager->pop();
-    else if (obj == self->view_.ui.btn_cont.btn_base || obj == self->view_.ui.btn_cont.btn_rover
-             || obj == self->view_.ui.btn_cont.btn_ntrip)
-        self->apply(obj);
-}
-
-void WorkSettings::apply(lv_obj_t* button) {
-    const auto& b = view_.ui.btn_cont;
-    const auto target = button == b.btn_base    ? DataProc::WorkTarget::Base
-                        : button == b.btn_rover ? DataProc::WorkTarget::Rover
-                                                : DataProc::WorkTarget::Ntrip;
-    // A radio mode needs a fixed channel; CUSTOM (index 0) leaves the device unchanged, as before on HC32.
-    if (target == DataProc::WorkTarget::Ntrip || view_.channel() != 0) {
-        if (!model_.apply_work(target, view_.protocol(), view_.channel()))
-            APP_LOG_E("WorkSettings", "work mode request rejected");
+        return;
     }
-    page_manager->pop();
+    if (self->model_.device().work_pending)
+        return;
+    if (control == self->view_.ui.apply) {
+        self->apply();
+        return;
+    }
+    self->feedback_ = {};
+    if (control == self->view_.ui.preset) {
+        self->target_ = self->target_ == DataProc::WorkTarget::Rover  ? DataProc::WorkTarget::Base
+                        : self->target_ == DataProc::WorkTarget::Base ? DataProc::WorkTarget::Ntrip
+                                                                      : DataProc::WorkTarget::Rover;
+    } else if (control == self->view_.ui.protocol)
+        self->view_.cycle_protocol();
+    else if (control == self->view_.ui.channel)
+        self->view_.cycle_channel();
+    self->refresh();
 }

@@ -37,12 +37,12 @@ struct DeviceSnapshot {
     unsigned satellites_used = 0, satellites_tracked = 0;
     bool constellations_valid = false;
     std::array<unsigned, kConstellationCount> constellations{};
-    bool work_valid = false;
+    bool work_valid = false, work_pending = false; // pending until the host receives the request.
     WorkMode work_mode{};
     bool radio_on = false;
     unsigned radio_protocol = 0, radio_channel = 0; // Option indexes; channel 0 is CUSTOM.
     NtripRole ntrip{};
-    bool record_valid = false, recording = false;
+    bool record_valid = false, recording = false, record_pending = false;
     unsigned record_type = 0, record_interval = 0; // Option indexes.
     std::array<char, 17> record_name{};
     float record_space_mb = 0.0f;

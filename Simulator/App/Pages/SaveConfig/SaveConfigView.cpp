@@ -1,4 +1,5 @@
 #include "SaveConfigView.h"
+#include "Utils/PageStyle.h"
 #include "src/misc/lv_log.h"
 
 using namespace page;
@@ -23,10 +24,10 @@ constexpr lv_coord_t kBrandHeight = 20;
 constexpr lv_coord_t kBrandPadX = 8;
 constexpr lv_coord_t kShineLength = 12;
 constexpr lv_coord_t kShineThickness = 2;
-constexpr lv_color_t kAmber = LV_COLOR_MAKE(0xE1, 0xAA, 0x22);
-constexpr lv_color_t kAmberBright = LV_COLOR_MAKE(0xF6, 0xD0, 0x62);
-constexpr lv_color_t kLineGrey = LV_COLOR_MAKE(0x72, 0x6E, 0x63);
-constexpr lv_color_t kTextWarm = LV_COLOR_MAKE(0xE8, 0xE1, 0xCF);
+constexpr lv_color_t kAmber = style::kAccent;
+constexpr lv_color_t kAmberBright = style::kHighlight;
+constexpr lv_color_t kLineGrey = style::kBorder;
+constexpr lv_color_t kTextWarm = style::kText;
 
 const char* get_brand_name() {
 #if defined(APP_BRAND_NAME)
@@ -45,7 +46,7 @@ lv_obj_t* create_brand_logo(lv_obj_t* parent, const char* brand_name, const lv_f
     lv_obj_remove_style_all(cont);
     lv_obj_clear_flag(cont, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_flag(cont, LV_OBJ_FLAG_OVERFLOW_VISIBLE);
-    lv_obj_set_style_bg_color(cont, lv_color_hex(0x1D1C18), 0);
+    lv_obj_set_style_bg_color(cont, style::kCard, 0);
     lv_obj_set_style_bg_opa(cont, LV_OPA_60, 0);
     lv_obj_set_style_border_color(cont, kLineGrey, 0);
     lv_obj_set_style_border_width(cont, 2, 0);
@@ -111,8 +112,8 @@ void SaveConfigView::create(lv_obj_t* root) {
     lv_obj_set_size(main_cont, LV_HOR_RES, LV_VER_RES);
     lv_obj_center(main_cont);
     lv_obj_set_style_bg_opa(main_cont, LV_OPA_COVER, 0);
-    lv_obj_set_style_bg_color(main_cont, lv_color_hex(0x151513), 0);
-    lv_obj_set_style_bg_grad_color(main_cont, lv_color_hex(0x2A2924), 0);
+    lv_obj_set_style_bg_color(main_cont, style::kBackground, 0);
+    lv_obj_set_style_bg_grad_color(main_cont, style::kPanel, 0);
     lv_obj_set_style_bg_grad_dir(main_cont, LV_GRAD_DIR_VER, 0);
 
     lv_obj_t* second_cont = lv_obj_create(root);
@@ -173,7 +174,7 @@ void SaveConfigView::create(lv_obj_t* root) {
 
     lv_obj_t* bar_cont = lv_obj_create(second_cont);
     lv_obj_remove_style_all(bar_cont);
-    lv_obj_set_style_bg_color(bar_cont, lv_color_hex(0x272722), 0);
+    lv_obj_set_style_bg_color(bar_cont, style::kCard, 0);
     lv_obj_set_style_bg_opa(bar_cont, LV_OPA_COVER, 0);
     lv_obj_set_style_border_color(bar_cont, kLineGrey, 0);
     lv_obj_set_style_border_width(bar_cont, 1, 0);
@@ -235,13 +236,13 @@ void SaveConfigView::create(lv_obj_t* root) {
 
     ui.anim_timeline = lv_anim_timeline_create();
 #define ANIM_DEF(start_time, obj, attr, start, end)                                                                    \
-    { start_time, obj, LV_ANIM_EXEC(attr), start, end, 500, lv_anim_path_ease_out, true }
+    { start_time, obj, LV_ANIM_EXEC(attr), start, end, 280, lv_anim_path_ease_out, true }
 
     const lv_anim_timeline_wrapper_t wrapper[] = {
         ANIM_DEF(0, top_line, width, 0, lv_obj_get_style_width(top_line, 0)),
-        ANIM_DEF(100, brand_cont, opa_scale, LV_OPA_TRANSP, LV_OPA_COVER),
-        ANIM_DEF(220, sync_label, y, lv_obj_get_style_height(second_cont, 0), lv_obj_get_y(sync_label)),
-        ANIM_DEF(350, bar_cont, width, 0, lv_obj_get_style_width(bar_cont, 0)),
+        ANIM_DEF(50, brand_cont, opa_scale, LV_OPA_TRANSP, LV_OPA_COVER),
+        ANIM_DEF(100, sync_label, y, lv_obj_get_style_height(second_cont, 0), lv_obj_get_y(sync_label)),
+        ANIM_DEF(150, bar_cont, width, 0, lv_obj_get_style_width(bar_cont, 0)),
         // ANIM_DEF(450, percent_label, opa_scale, LV_OPA_TRANSP, LV_OPA_COVER),
         LV_ANIM_TIMELINE_WRAPPER_END};
 

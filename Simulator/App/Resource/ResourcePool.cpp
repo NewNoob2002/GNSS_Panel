@@ -40,6 +40,25 @@ static void resource_init() {
     IMPORT_IMG(mode);
     IMPORT_IMG(settings);
     IMPORT_IMG(menu);
+    IMPORT_IMG(ui_info);
+    IMPORT_IMG(ui_work);
+    IMPORT_IMG(ui_record);
+    IMPORT_IMG(ui_record_large);
+    IMPORT_IMG(ui_settings);
+    IMPORT_IMG(ui_settings_large);
+    IMPORT_IMG(ui_base_large);
+    IMPORT_IMG(ui_rover_large);
+    IMPORT_IMG(ui_network);
+    IMPORT_IMG(ui_network_large);
+    IMPORT_IMG(ui_protocol);
+    IMPORT_IMG(ui_channel);
+    IMPORT_IMG(ui_clock);
+    IMPORT_IMG(ui_apply);
+    IMPORT_IMG(ui_back);
+    IMPORT_IMG(ui_play);
+    IMPORT_IMG(ui_stop);
+    IMPORT_IMG(ui_power);
+    IMPORT_IMG(ui_wifi);
     IMPORT_IMG(start);
     IMPORT_IMG(stop);
     IMPORT_IMG(satellite_small);
@@ -60,6 +79,7 @@ static void resource_init() {
     IMPORT_IMG(system_dash_return);
     IMPORT_IMG(rover);
     IMPORT_IMG(base);
+    IMPORT_IMG(radio);
     IMPORT_IMG(ntrip);
 
     IMPORT_IMG(NationalFlag_EN);

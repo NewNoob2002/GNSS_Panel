@@ -58,6 +58,7 @@ class SystemInfosView {
     } style_;
 
   private:
+    lv_obj_t* root_ = nullptr;
     void style_init();
 
     void style_reset();

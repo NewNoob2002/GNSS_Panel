@@ -6,10 +6,10 @@ using namespace page;
 
 namespace {
 constexpr lv_coord_t kStatusBarHeight = 26;
-constexpr lv_color_t kBackground = LV_COLOR_MAKE(0x15, 0x15, 0x13);
-constexpr lv_color_t kAmber = LV_COLOR_MAKE(0xFF, 0x93, 0x1E);
-constexpr lv_color_t kAmberBright = LV_COLOR_MAKE(0xF6, 0xD0, 0x62);
-constexpr lv_color_t kMuted = LV_COLOR_MAKE(0x99, 0x99, 0x99);
+constexpr lv_color_t kBackground = style::kBackground;
+constexpr lv_color_t kAmber = style::kAccent;
+constexpr lv_color_t kAmberBright = style::kHighlight;
+constexpr lv_color_t kMuted = style::kMuted;
 constexpr lv_coord_t kBarMaxWidth = 90;
 
 lv_obj_t* create_info_card(lv_obj_t* parent, const lv_font_t* font, const char* title, int x) {
@@ -75,7 +75,7 @@ void StartupView::create(lv_obj_t* root) {
     style::card(btn_press);
     lv_obj_set_style_border_width(btn_press, 1, LV_STATE_FOCUSED);
     lv_obj_set_style_border_color(btn_press, kAmber, LV_STATE_FOCUSED);
-    lv_obj_set_style_bg_color(btn_press, lv_color_hex(0x30271d), LV_STATE_PRESSED);
+    lv_obj_set_style_bg_color(btn_press, style::kFocus, LV_STATE_PRESSED);
     lv_obj_set_style_border_width(btn_press, 2, LV_STATE_PRESSED);
     lv_obj_set_style_border_color(btn_press, kAmberBright, LV_STATE_PRESSED);
     ui.btn_press = btn_press;
@@ -91,7 +91,7 @@ void StartupView::create(lv_obj_t* root) {
     lv_obj_clear_flag(arc, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_set_style_arc_width(arc, 3, LV_PART_MAIN);
     lv_obj_set_style_arc_width(arc, 3, LV_PART_INDICATOR);
-    lv_obj_set_style_arc_color(arc, lv_color_hex(0x555555), LV_PART_MAIN);
+    lv_obj_set_style_arc_color(arc, style::kBorder, LV_PART_MAIN);
     lv_obj_set_style_arc_color(arc, kAmberBright, LV_PART_INDICATOR);
     ui.arc = arc;
     auto* power = lv_img_create(btn_press);

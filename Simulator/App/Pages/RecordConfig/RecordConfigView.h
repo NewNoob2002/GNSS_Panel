@@ -1,82 +1,40 @@
-//
-// Created by gtc on 2026/5/9.
-//
-
-#ifndef LVGL_RECORDCONFIGVIEW_H
-#define LVGL_RECORDCONFIGVIEW_H
-
+#pragma once
+#include <array>
 #include "Common/DataProc/DataProc_Def.h"
 #include "Resource/ResourcePool.h"
-#include "Utils/I18n/I18n.h"
-#include "lvgl.h"
-
 namespace page {
 class RecordConfigView {
   public:
-    struct {
-        struct {
-            lv_obj_t* cont;
-
-            struct {
-                lv_obj_t* cont;
-                lv_obj_t* label;
-
-                lv_obj_t* btn_cont;
-                lv_obj_t* btn_up;
-                lv_obj_t* btn_down;
-            } left_roller;
-
-            struct {
-                lv_obj_t* cont;
-                lv_obj_t* label;
-
-                lv_obj_t* btn_cont;
-                lv_obj_t* btn_up;
-                lv_obj_t* btn_down;
-            } right_roller;
-        } roller;
-
-        struct {
-            lv_obj_t* cont;
-            lv_obj_t* btn_record;
-            lv_obj_t* btn_return;
-        } btn_cont;
-
-    } ui;
-
     void create(lv_obj_t* root);
-
-    void destroy();
-
-    void apply_language() const;
-    /** 仅更新本页滚轮预览，不控制录制状态。delta 为 -1（上一项）或 1（下一项）。 */
-    void scroll(lv_obj_t* label, int delta);
-    /** Show the device's record type/interval (option indexes; out-of-range values are ignored). */
+    void destroy() {
+        stop();
+    }
+    void appear() const;
+    void stop() const;
     void set_selection(unsigned type, unsigned interval);
+    void update(const DataProc::DeviceSnapshot& device, bool configurable, i18n::TextId feedback) const;
+    void cycle_type() {
+        type_ = (type_ + 1) % DataProc::kRecordTypeCount;
+    }
+    void cycle_interval() {
+        interval_ = (interval_ + 1) % DataProc::kRecordIntervalCount;
+    }
     unsigned type() const {
-        return static_cast<unsigned>(left_roller_index);
+        return type_;
     }
     unsigned interval() const {
-        return static_cast<unsigned>(right_roller_index);
+        return interval_;
     }
-    /** Record button shows stop while recording, start otherwise. */
-    void set_recording(bool recording) const;
-
-    void roller_create(lv_obj_t* par);
-
-    static void roller_style_init(lv_obj_t* obj);
-
-    void btn_cont_create(lv_obj_t* par);
-
-    static lv_obj_t* btn_create(lv_obj_t* par, const void* img_src, lv_coord_t x_ofs, lv_coord_t y_ofs);
-
-    static void roller_to_index(lv_obj_t* obj, uint8_t index);
+    std::array<lv_obj_t*, 4> controls() const {
+        return {ui.type, ui.interval, ui.record, ui.back};
+    }
+    struct {
+        lv_obj_t *type{}, *interval{}, *record{}, *back{};
+    } ui;
 
   private:
-    static int8_t left_roller_index;
-    static int8_t right_roller_index;
+    unsigned type_ = 0, interval_ = 0;
+    lv_obj_t *state_{}, *space_{}, *type_text_{}, *interval_text_{}, *record_text_{}, *back_text_{}, *feedback_{};
+    lv_obj_t *hero_{}, *status_dot_{}, *record_icon_{};
 };
-
 } // namespace page
-
-#endif //LVGL_RECORDCONFIGVIEW_H

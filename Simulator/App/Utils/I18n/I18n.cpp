@@ -1,4 +1,6 @@
 #include "I18n.h"
+#include <cstdio>
+#include <cstring>
 
 namespace {
 
@@ -59,6 +61,19 @@ const char* text(const Language language, const TextId id) {
 
     entry = english_pack().texts[index];
     return entry != nullptr ? entry : "";
+}
+
+void option_text(TextId id, unsigned index, char* buffer, std::size_t size) {
+    if (!buffer || !size)
+        return;
+    const char* entry = text(id);
+    for (unsigned line = 0; line < index && entry; ++line) {
+        entry = std::strchr(entry, '\n');
+        entry = entry ? entry + 1 : nullptr;
+    }
+    const char* end = entry ? std::strchr(entry, '\n') : nullptr;
+    const int length = entry ? static_cast<int>(end ? end - entry : std::strlen(entry)) : 0;
+    std::snprintf(buffer, size, "%.*s", length, entry ? entry : "");
 }
 
 } // namespace i18n

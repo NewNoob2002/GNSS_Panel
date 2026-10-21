@@ -25,6 +25,7 @@ Language get_language();
 bool set_language(Language language);
 const char* text(TextId id);
 const char* text(Language language, TextId id);
+void option_text(TextId id, unsigned index, char* buffer, std::size_t size);
 
 const LanguagePack& english_pack();
 const LanguagePack& russian_pack();

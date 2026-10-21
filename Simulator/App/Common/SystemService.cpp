@@ -57,14 +57,14 @@ int on_event(Account* account, Account::EventParam_t* event) {
             state.initialization[request.initialization_step] = request.initialization;
             break;
         case DataProc::SystemCommand::SetLanguage:
-            if (!sender_is(event, "SystemSettingsModel")
+            if (!sender_is(event, "SystemDashModel")
                 || (request.language != i18n::Language::English && request.language != i18n::Language::Russian))
                 return Account::RES_PARAM_ERROR;
             i18n::set_language(request.language);
             state.language = request.language;
             break;
         case DataProc::SystemCommand::SetTime:
-            if (!sender_is(event, "SystemSettingsModel") || !SystemService::valid_date(request.date))
+            if (!sender_is(event, "SystemDashModel") || !SystemService::valid_date(request.date))
                 return Account::RES_PARAM_ERROR;
             state.date = request.date; // Explicit RAM simulation: no system clock or persistent write.
             APP_LOG_I("SystemService", "demo date/time committed to RAM");
@@ -93,7 +93,7 @@ int on_event(Account* account, Account::EventParam_t* event) {
             state.standby = state.shutting_down = false;
             break;
         case DataProc::SystemCommand::SetWifi:
-            if (!sender_is(event, "SystemSettingsModel") || !state.wifi_available || state.wifi_pending)
+            if (!sender_is(event, "SystemDashModel") || !state.wifi_available || state.wifi_pending)
                 return Account::RES_PARAM_ERROR;
             if (request.wifi_on == state.wifi_on)
                 return Account::RES_OK;

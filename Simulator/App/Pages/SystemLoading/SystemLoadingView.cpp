@@ -7,11 +7,11 @@ using namespace page;
 
 namespace {
 constexpr lv_coord_t kTrackWidth = 246;
-constexpr lv_color_t kOrange = LV_COLOR_MAKE(0xFF, 0x93, 0x1E);
-constexpr lv_color_t kGreen = LV_COLOR_MAKE(0x28, 0xC7, 0x6F);
-constexpr lv_color_t kRed = LV_COLOR_MAKE(0xD0, 0x3C, 0x3B);
-constexpr lv_color_t kGrey = LV_COLOR_MAKE(0x99, 0x99, 0x99);
-constexpr lv_color_t kTrack = LV_COLOR_MAKE(0x33, 0x33, 0x33);
+constexpr lv_color_t kOrange = style::kAccent;
+constexpr lv_color_t kGreen = style::kSuccess;
+constexpr lv_color_t kRed = style::kDanger;
+constexpr lv_color_t kGrey = style::kMuted;
+constexpr lv_color_t kTrack = style::kBorder;
 
 void set_opa(void* obj, int32_t opa) {
     lv_obj_set_style_opa(static_cast<lv_obj_t*>(obj), static_cast<lv_opa_t>(opa), 0);
@@ -56,9 +56,9 @@ void animate(lv_obj_t* obj, lv_anim_exec_xcb_t exec, int32_t from, int32_t to, u
 } // namespace
 
 void SystemLoadingView::create(lv_obj_t* root) {
-    lv_obj_set_style_bg_color(root, lv_color_black(), 0);
+    lv_obj_set_style_bg_color(root, style::kBackground, 0);
     ui_.cont = style::box(root, 8, 2, 278, 122);
-    lv_obj_set_style_bg_color(ui_.cont, lv_color_black(), 0);
+    lv_obj_set_style_bg_color(ui_.cont, style::kBackground, 0);
     lv_obj_set_style_bg_opa(ui_.cont, LV_OPA_COVER, 0);
     lv_obj_set_style_radius(ui_.cont, 10, 0);
     lv_obj_set_user_data(ui_.cont, this);
@@ -248,7 +248,7 @@ void SystemLoadingView::update_text() const {
     lv_obj_set_style_text_color(ui_.service,
                                 ready_   ? (has_failures() ? kOrange : kGreen)
                                 : failed ? kRed
-                                         : lv_color_white(),
+                                         : style::kText,
                                 0);
     lv_label_set_text(ui_.subtitle, i18n::text(subtitle));
     lv_label_set_text(ui_.footer, i18n::text(i18n::TextId::SystemLoadingTitle));

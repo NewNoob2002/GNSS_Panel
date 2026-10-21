@@ -6,11 +6,17 @@
 using namespace page;
 
 #define ITEM_HEIGHT_MIN (LV_VER_RES - 8)
-#define ITEM_PAD        ((LV_VER_RES - ITEM_HEIGHT_MIN) / 2)
+#define ITEM_PAD        4
 
 void SystemInfosView::create(lv_obj_t* root) {
-    lv_obj_add_flag(root, LV_OBJ_FLAG_SCROLLABLE); // PageManager roots default to non-scrollable.
+    root_ = root;
+    lv_obj_set_style_outline_width(root, 0, LV_STATE_FOCUSED);
+    lv_obj_set_style_border_width(root, 0, LV_STATE_FOCUSED);
+    lv_obj_add_flag(root, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_scroll_dir(root, LV_DIR_VER);
+    lv_obj_set_style_width(root, 3, LV_PART_SCROLLBAR);
+    lv_obj_set_style_bg_color(root, style::kMuted, LV_PART_SCROLLBAR);
+    lv_obj_set_style_bg_opa(root, LV_OPA_50, LV_PART_SCROLLBAR);
     lv_obj_set_style_pad_ver(root, ITEM_PAD, 0);
     lv_obj_set_style_pad_row(root, 2, 0);
 
@@ -54,10 +60,12 @@ void SystemInfosView::group_init() {
     lv_group_set_wrap(group, true);
     lv_group_set_focus_cb(group, on_focus);
 
-    // Group order matches the visual column for Next/Previous and the two-button Function action.
+    // 根页面是进入时的焦点，其后按可见顺序翻阅六个信息项。
+    lv_group_add_obj(group, root_);
     for (auto* control : controls())
         lv_group_add_obj(group, control);
-    lv_group_focus_obj(ui.work.icon);
+    lv_group_focus_obj(root_);
+    lv_obj_scroll_to_y(root_, 0, LV_ANIM_OFF);
 }
 
 void SystemInfosView::destroy() {
@@ -73,25 +81,28 @@ void SystemInfosView::set_scroll_to_y(lv_obj_t* obj, lv_coord_t y, lv_anim_enabl
 }
 
 void SystemInfosView::on_focus(lv_group_t* g) {
-    // Reveal the selected inventory card within this page's viewport.
-    lv_obj_scroll_to_view(lv_obj_get_parent(lv_group_get_focused(g)), LV_ANIM_ON);
+    auto* focused = lv_group_get_focused(g);
+    if (lv_obj_get_parent(focused) == lv_scr_act())
+        lv_obj_scroll_to_y(focused, 0, LV_ANIM_ON);
+    else
+        lv_obj_scroll_to_view(lv_obj_get_parent(focused), LV_ANIM_ON);
 }
 
 void SystemInfosView::style_init() {
     lv_style_init(&style_.icon);
     lv_style_set_width(&style_.icon, 260);
     lv_style_set_height(&style_.icon, ITEM_HEIGHT_MIN);
-    lv_style_set_bg_color(&style_.icon, lv_color_black());
+    lv_style_set_bg_color(&style_.icon, style::kCard);
     lv_style_set_bg_opa(&style_.icon, LV_OPA_COVER);
     lv_style_set_text_font(&style_.icon, resource_pool::get_font("oswaldBold_18"));
-    lv_style_set_text_color(&style_.icon, lv_color_white());
+    lv_style_set_text_color(&style_.icon, style::kText);
 
     lv_style_init(&style_.focus);
     lv_style_set_width(&style_.focus, 70);
     lv_style_set_height(&style_.focus, ITEM_HEIGHT_MIN - 16);
     lv_style_set_border_side(&style_.focus, LV_BORDER_SIDE_RIGHT);
     lv_style_set_border_width(&style_.focus, 2);
-    lv_style_set_border_color(&style_.focus, lv_color_hex(0xff931e));
+    lv_style_set_border_color(&style_.focus, style::kAccent);
 
     static constexpr lv_style_prop_t style_prop[] = {LV_STYLE_WIDTH, LV_STYLE_PROP_INV};
 
@@ -102,11 +113,11 @@ void SystemInfosView::style_init() {
 
     lv_style_init(&style_.info);
     lv_style_set_text_font(&style_.info, resource_pool::get_font("oswaldBold_12"));
-    lv_style_set_text_color(&style_.info, lv_color_hex(0x999999));
+    lv_style_set_text_color(&style_.info, style::kMuted);
 
     lv_style_init(&style_.data);
     lv_style_set_text_font(&style_.data, resource_pool::get_font("oswaldBold_12"));
-    lv_style_set_text_color(&style_.data, lv_color_white());
+    lv_style_set_text_color(&style_.data, style::kText);
 }
 
 void SystemInfosView::style_reset() {
@@ -122,8 +133,10 @@ void SystemInfosView::item_create(item_t* item, lv_obj_t* par, const char* name,
     lv_obj_enable_style_refresh(false);
     lv_obj_remove_style_all(cont);
     lv_obj_set_size(cont, LV_HOR_RES, ITEM_HEIGHT_MIN);
+    style::panel(cont);
 
     lv_obj_clear_flag(cont, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(cont, LV_OBJ_FLAG_EVENT_BUBBLE);
     item->cont = cont;
 
     /* icon */
@@ -131,6 +144,7 @@ void SystemInfosView::item_create(item_t* item, lv_obj_t* par, const char* name,
     lv_obj_enable_style_refresh(false);
     lv_obj_remove_style_all(icon);
     lv_obj_clear_flag(icon, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(icon, LV_OBJ_FLAG_EVENT_BUBBLE);
 
     lv_obj_add_style(icon, &style_.icon, 0);
     lv_obj_add_style(icon, &style_.focus, LV_STATE_FOCUSED);
@@ -177,6 +191,7 @@ void SystemInfosView::item_create(item_t* item, lv_obj_t* par, const char* name,
     lv_obj_align(demo, LV_ALIGN_TOP_RIGHT, -15, 4);
 
     lv_obj_move_foreground(icon);
+    lv_obj_move_foreground(demo);
     lv_obj_enable_style_refresh(true);
 
     /* get real max height */
@@ -201,20 +216,6 @@ void SystemInfosView::apply_language() const {
     lv_label_set_text(ui.system.label_name, i18n::text(i18n::TextId::SystemTitle));
     lv_label_set_text(ui.system.label_info, i18n::text(i18n::TextId::SystemInfo));
 }
-
-namespace {
-/** Option labels are one per line in an I18n text; copy line index into buffer (empty when out of range). */
-void option_text(i18n::TextId id, unsigned index, char* buffer, std::size_t size) {
-    const char* text = i18n::text(id);
-    for (unsigned line = 0; line < index && text; ++line) {
-        text = std::strchr(text, '\n');
-        text = text ? text + 1 : nullptr;
-    }
-    const char* end = text ? std::strchr(text, '\n') : nullptr;
-    const int length = text ? static_cast<int>(end ? end - text : std::strlen(text)) : 0;
-    std::snprintf(buffer, size, "%.*s", length, text ? text : "");
-}
-} // namespace
 
 void SystemInfosView::update(const DataProc::DeviceSnapshot& device, const DataProc::SystemState& state) const {
     using i18n::TextId;

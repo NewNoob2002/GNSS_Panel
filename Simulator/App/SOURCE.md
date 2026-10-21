@@ -1,5 +1,18 @@
 # P4 原应用源码来源
 
+## 当前页面结构
+
+- 首页四个入口为工作配置、记录管理、设备信息、系统，使用原创同规格 16x16 白色 alpha 图标，不显示焦点文字；卫星区保持纯数值。图标源路径和生成检查位于上游 `tools/generate_ui_icons.py`。
+- `SystemDash` 已合并原 `SystemSettings`：语言、Wi-Fi、电源和返回同屏。移除原设置页及路由，系统命令仍由所属 Model 发起；电源确认默认取消且必须显式 Commit。
+- 工作页提供电台移动站、电台基站、网络基站三种预设；选择预设/协议/信道只改草稿，点击 Apply 才发送，CUSTOM 拒绝时留页提示。网络预设隐藏电台字段。
+- 记录页默认聚焦启停，单击停止、双击提交开始。固定参数产品显示只读参数，参数在记录或等待期间锁定。
+- `DeviceSnapshot` 的 `work_pending/record_pending` 表达主控接收等待，通用反馈区分等待、收到、拒绝与 15 秒超时；超时不取消平台请求，返回不隐式撤销请求。已接收不代表物理操作完成。
+- 设备信息恢复全屏浏览：每次进入默认聚焦根页面，滚轮/方向键切到 Work/GPS/Wi-Fi/Battery/Storage/System，根页或信息项点击即返回；不保留上次查看项、不显示新增浏览提示。卫星页可见名称为 Satellites/Спутники，内部路由不变。
+- 工作/记录/系统设置使用图形主卡、原生尺寸参数图标和渐变，控件按 40 ms 间隔淡入并上移 6 px；值变化短淡入，只有主控等待或记录进行时状态点呼吸，离页停止。正常状态不显示新增操作说明，业务错误和确认反馈保留。
+- 下面记录了早期迁移过程；其中十页、三卡系统菜单、设置子页与信息卡点击返回等布局描述已由上述结构替代。
+
+## 迁移历史与平台边界
+
 - 原 View/资源/工具来源：`HC32F460xE_Arduino/Simulator/App`，提交 `37b069a0e76061dbac07e9345e653d1796945bac`；保留许可说明。PageManager 后续已加固路由、卸载和边界，不再是仅头文件适配。
 - 本分支移植 `FASTSHIFT/X-TRACK/Software/X-Track/USER/App/Utils/DataCenter`（MIT），源提交 `c42b8e5605e50838f4c0c9828385948fa33ab485`。适配 LVGL include、Account 注册有效性/容量/序号、发布时订阅者删除、多个订阅者销毁清理、参数/分配边界与公共日志；未引入 X-TRACK HAL。
 - 每个路由页在自身目录拥有 Controller、View、Model。Model 独占 Account 并订阅/拉取/接收数据、通知服务和 StatusBar；构造函数不注入 DataProc，已删除共享 PageModel。`Common/DataProc` 仅初始化处理 Accounts 并提供 `DataProc::Center()`；路由在 Utils/DataCenter，行为在处理模块/SystemService。

@@ -20,7 +20,7 @@ inline lv_obj_t* create_slot(lv_obj_t* parent, int x, int y, int width, int heig
     auto* slot = style::box(parent, x, y, width + 4, height + 4);
     lv_obj_set_style_radius(slot, 2, 0);
     lv_obj_set_style_border_width(slot, 1, 0);
-    lv_obj_set_style_bg_color(slot, lv_color_hex(0x444444), 0);
+    lv_obj_set_style_bg_color(slot, style::kBorder, 0);
     lv_obj_set_style_bg_opa(slot, LV_OPA_COVER, 0);
     lv_obj_add_flag(slot, LV_OBJ_FLAG_OVERFLOW_VISIBLE);
     auto* fill = style::box(slot, 1, 1, 0, height);
@@ -46,7 +46,7 @@ inline void stop(lv_obj_t* fill) {
  * 非充电时按实际电量静态显示，越界电量截到 100%；无效数据清空槽并停止动画。 */
 inline void update_fill(lv_obj_t* fill, unsigned percent, bool charging, bool valid) {
     percent = percent > 100 ? 100 : percent;
-    const auto tint = valid ? color(percent, charging) : lv_color_hex(0x999999);
+    const auto tint = valid ? color(percent, charging) : style::kMuted;
     auto* slot = lv_obj_get_parent(fill);
     lv_obj_set_style_bg_color(fill, tint, 0);
     lv_obj_set_style_border_color(slot, tint, 0);

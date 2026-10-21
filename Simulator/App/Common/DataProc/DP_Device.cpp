@@ -14,16 +14,19 @@ bool sender_is(const Account::EventParam_t* event, const char* name) {
 bool valid(const Account::EventParam_t* event, const DataProc::DeviceRequest& request) {
     switch (request.command) {
         case DataProc::DeviceCommand::ApplyWork:
-            return sender_is(event, "WorkSettingsModel")
+            return sender_is(event, "WorkSettingsModel") && !latest.work_pending
                    && (request.target == DataProc::WorkTarget::Rover || request.target == DataProc::WorkTarget::Base
                        || request.target == DataProc::WorkTarget::Ntrip)
                    && request.radio_protocol < DataProc::kRadioProtocolCount
-                   && request.radio_channel < DataProc::kRadioChannelCount;
+                   && request.radio_channel < DataProc::kRadioChannelCount
+                   && (request.target == DataProc::WorkTarget::Ntrip || request.radio_channel != 0);
         case DataProc::DeviceCommand::StartRecord:
-            return sender_is(event, "RecordConfigModel") && request.record_type < DataProc::kRecordTypeCount
+            return sender_is(event, "RecordConfigModel") && latest.record_valid && !latest.record_pending
+                   && !latest.recording && request.record_type < DataProc::kRecordTypeCount
                    && request.record_interval < DataProc::kRecordIntervalCount;
         case DataProc::DeviceCommand::StopRecord:
-            return sender_is(event, "RecordConfigModel");
+            return sender_is(event, "RecordConfigModel") && latest.record_valid && !latest.record_pending
+                   && latest.recording;
         default:
             return false;
     }

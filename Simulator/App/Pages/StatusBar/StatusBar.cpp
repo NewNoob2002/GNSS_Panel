@@ -21,7 +21,7 @@ bool StatusBar::create(lv_obj_t* parent) {
     lv_obj_set_size(root_, LV_HOR_RES, 26);
     lv_obj_set_y(root_, -26);
     visible_ = false;
-    lv_obj_set_style_bg_color(root_, lv_color_black(), 0);
+    lv_obj_set_style_bg_color(root_, style::kBackground, 0);
     lv_obj_set_style_bg_opa(root_, LV_OPA_COVER, 0);
     lv_obj_clear_flag(root_, LV_OBJ_FLAG_SCROLLABLE);
 
@@ -42,7 +42,7 @@ bool StatusBar::create(lv_obj_t* parent) {
     lv_obj_align_to(position_icon_, satellites_->get_cont(), LV_ALIGN_OUT_RIGHT_MID, 5, 0);
     position_label_ = lv_label_create(root_);
     lv_obj_set_style_text_font(position_label_, small, 0);
-    lv_obj_set_style_text_color(position_label_, lv_color_white(), 0);
+    lv_obj_set_style_text_color(position_label_, style::kText, 0);
     lv_label_set_text(position_label_, "NONE");
     lv_obj_align_to(position_label_, position_icon_, LV_ALIGN_OUT_RIGHT_MID, 5, 0);
 
@@ -157,8 +157,8 @@ void StatusBar::update(const StatusBarState& state) {
         lv_obj_clear_flag(clock_->get_cont(), LV_OBJ_FLAG_HIDDEN);
     else
         lv_obj_add_flag(clock_->get_cont(), LV_OBJ_FLAG_HIDDEN);
-    lv_obj_set_style_text_color(sd_icon_, state.recording ? lv_palette_main(LV_PALETTE_BLUE) : lv_color_white(), 0);
-    lv_obj_set_style_text_color(wifi_icon_, state.wifi ? lv_palette_main(LV_PALETTE_BLUE) : lv_color_white(), 0);
+    lv_obj_set_style_text_color(sd_icon_, state.recording ? style::kInfo : style::kText, 0);
+    lv_obj_set_style_text_color(wifi_icon_, state.wifi ? style::kInfo : style::kText, 0);
     const unsigned percent = state.battery_percent > 100 ? 100 : state.battery_percent;
     battery::update_fill(battery_fill_, percent, state.charging, state.battery_valid);
     if (state.battery_valid) {

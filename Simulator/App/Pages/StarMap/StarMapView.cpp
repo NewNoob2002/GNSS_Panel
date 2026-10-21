@@ -5,11 +5,11 @@
 using namespace page;
 
 namespace {
-constexpr lv_color_t kBackground = LV_COLOR_MAKE(0x15, 0x15, 0x13);
-constexpr lv_color_t kDivider = LV_COLOR_MAKE(0x33, 0x33, 0x30);
-constexpr lv_color_t kLabel = LV_COLOR_MAKE(0x72, 0x6E, 0x63);
-constexpr lv_color_t kValue = LV_COLOR_MAKE(0xE8, 0xE1, 0xCF);
-constexpr lv_color_t kActivity = LV_COLOR_MAKE(0x2E, 0xCC, 0x71);
+constexpr lv_color_t kBackground = style::kBackground;
+constexpr lv_color_t kDivider = style::kBorder;
+constexpr lv_color_t kLabel = style::kMuted;
+constexpr lv_color_t kValue = style::kText;
+constexpr lv_color_t kActivity = style::kSuccess;
 
 constexpr lv_color_t kColors[7] = {
     LV_COLOR_MAKE(0xE1, 0xAA, 0x22), LV_COLOR_MAKE(0x34, 0x98, 0xDB), LV_COLOR_MAKE(0x2E, 0xCC, 0x71),
@@ -69,6 +69,7 @@ void StarMapView::create(lv_obj_t* root) {
         lv_obj_set_size(cont, item_width, item_height);
         lv_obj_set_pos(cont, item_start_x + i * item_width, 36);
         ui.constell[i].cont = cont;
+        style::appear(cont, static_cast<uint32_t>(i) * 30);
 
         lv_obj_t* accent = lv_obj_create(cont);
         lv_obj_remove_style_all(accent);

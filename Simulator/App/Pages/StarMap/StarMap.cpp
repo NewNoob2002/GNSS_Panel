@@ -7,7 +7,7 @@
 using namespace page;
 
 void StarMap::on_custom_attr_config() {
-    set_custom_load_anim_type(PageManager::LOAD_ANIM_MOVE_TOP, 280, lv_anim_path_ease_in_out);
+    set_custom_load_anim_type(PageManager::LOAD_ANIM_FADE_ON, 280, lv_anim_path_ease_in_out);
 }
 
 void StarMap::on_view_load() {

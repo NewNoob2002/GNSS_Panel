@@ -7,7 +7,7 @@
 using namespace page;
 
 void SystemInfos::on_custom_attr_config() {
-    set_custom_load_anim_type(PageManager::LOAD_ANIM_FADE_ON, 280, lv_anim_path_ease_in_out);
+    set_custom_load_anim_type(PageManager::LOAD_ANIM_MOVE_TOP, 280, lv_anim_path_ease_in_out);
 }
 
 void SystemInfos::on_view_load() {
@@ -15,7 +15,7 @@ void SystemInfos::on_view_load() {
         app_fatal("SystemInfos", "Model initialization failed");
     view_.create(root);
     style::show_demo(root, model_.settings().simulated);
-    utils::attach_controls(view_.controls(), clicked, this);
+    utils::attach_controls(std::array{root}, clicked, this);
 }
 
 void SystemInfos::on_view_will_appear() {
@@ -25,7 +25,7 @@ void SystemInfos::on_view_will_appear() {
     model_.set_change_callback([this] {
         view_.update(model_.device(), model_.settings());
     });
-    view_.group_init(); // Register after the outgoing page has emptied the focus group.
+    view_.group_init();
 }
 
 void SystemInfos::on_view_will_disappear() {
@@ -46,5 +46,6 @@ void SystemInfos::on_language_changed() {
 
 void SystemInfos::clicked(lv_event_t* event) {
     auto* self = static_cast<SystemInfos*>(lv_event_get_user_data(event));
-    self->page_manager->pop();
+    if (!self->page_manager->is_switching())
+        self->page_manager->pop();
 }

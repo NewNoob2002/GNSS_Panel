@@ -10,7 +10,7 @@ namespace system_backend {
 struct Capabilities {
     bool simulated;        // Show DEMO markers; data and power actions are not real.
     bool reboot_available; // SystemDash offers Reboot.
-    bool wifi_available;   // SystemSettings may toggle Wi-Fi.
+    bool wifi_available;   // SystemDash may toggle Wi-Fi.
     bool star_map;         // StarMap page, reached from the Dialplate satellite icon.
     bool record_settings;  // RecordConfig type/interval can be changed (otherwise display only).
 };
@@ -23,14 +23,16 @@ bool request_power_on();
  * SystemService::enter_standby(), possibly later or never (when power is really removed).
  */
 bool execute_power(DataProc::PowerAction action);
-/** Wi-Fi on/off requested on SystemSettings (only when wifi_available). The platform reports the applied
+/** Wi-Fi on/off requested on SystemDash (only when wifi_available). The platform reports the applied
  * state, and whether a change is still pending, with SystemService::set_wifi().
  */
 bool request_wifi(bool on);
 /** Device/business data before the platform's first DeviceService::update(). */
 DataProc::DeviceSnapshot initial_device();
 /** Execute a validated business request (indexes already range-checked); false on failure. The platform
- * publishes the resulting data with DeviceService::update().
+ * publishes data with DeviceService::update(). For asynchronous requests, set work_pending/record_pending
+ * before returning true and clear it only when the host has received the request. Receipt is not proof
+ * that the physical operation has finished.
  */
 bool execute_device(const DataProc::DeviceRequest& request);
 /** Short name of initialization step 0..kInitializationStepCount-1, for logs. */

@@ -2,98 +2,112 @@
 #include "Utils/Log/Log.h"
 #include "Utils/PageManager/PageManager.h"
 #include "Utils/PageManager/PageUtils.h"
-
 using namespace page;
 
 void RecordConfig::on_custom_attr_config() {
-    set_custom_load_anim_type(PageManager::LOAD_ANIM_MOVE_LEFT, 300, lv_anim_path_ease_in_out);
+    set_custom_load_anim_type(PageManager::LOAD_ANIM_OVER_TOP, 280, lv_anim_path_ease_out);
 }
-
-bool RecordConfig::recording() const {
-    return model_.device().record_valid && model_.device().recording;
-}
-
-std::array<lv_obj_t*, 6> RecordConfig::controls() const {
-    const auto& r = view_.ui.roller;
-    const auto& b = view_.ui.btn_cont;
-    // Type/interval are fixed on display-only products and while a recording uses them.
-    if (!model_.settings().record_settings || recording())
-        return {nullptr, nullptr, nullptr, nullptr, b.btn_record, b.btn_return};
-    return {r.left_roller.btn_up,    r.left_roller.btn_down, r.right_roller.btn_up,
-            r.right_roller.btn_down, b.btn_record,           b.btn_return};
-}
-
-void RecordConfig::refresh() {
-    const bool editable = model_.settings().record_settings && !recording();
-    const auto& r = view_.ui.roller;
-    for (auto* button :
-         {r.left_roller.btn_up, r.left_roller.btn_down, r.right_roller.btn_up, r.right_roller.btn_down}) {
-        if (editable)
-            lv_obj_clear_state(button, LV_STATE_DISABLED);
-        else
-            lv_obj_add_state(button, LV_STATE_DISABLED);
-    }
-    view_.set_recording(recording());
-}
-
 void RecordConfig::on_view_load() {
     if (!model_.init())
         app_fatal("RecordConfig", "Model initialization failed");
     view_.create(root);
-    const auto& r = view_.ui.roller;
-    utils::attach_controls(std::array{r.left_roller.btn_up, r.left_roller.btn_down, r.right_roller.btn_up,
-                                      r.right_roller.btn_down, view_.ui.btn_cont.btn_record,
-                                      view_.ui.btn_cont.btn_return},
-                           clicked, this);
+    utils::attach_controls(view_.controls(), clicked, this);
 }
-
+void RecordConfig::refresh() {
+    const auto& device = model_.device();
+    const bool configurable = model_.settings().record_settings;
+    const bool editable = configurable && device.record_valid && !device.recording && !device.record_pending;
+    const bool changed =
+        lv_obj_has_state(view_.ui.type, LV_STATE_DISABLED) == editable
+        || lv_obj_has_state(view_.ui.record, LV_STATE_DISABLED) != (device.record_pending || !device.record_valid);
+    feedback_.poll(device.record_pending);
+    if (!editable && device.record_valid)
+        view_.set_selection(device.record_type, device.record_interval);
+    view_.update(device, configurable, feedback_.text);
+    if (changed)
+        utils::focus_controls(view_.controls(), lv_group_get_focused(lv_group_get_default()));
+}
 void RecordConfig::on_view_will_appear() {
     model_.set_status_bar(true);
-    if (model_.device().record_valid)
-        view_.set_selection(model_.device().record_type, model_.device().record_interval);
-    refresh();
+    view_.set_selection(model_.device().record_type, model_.device().record_interval);
+    feedback_ = {};
+    if (model_.device().record_pending)
+        feedback_.begin();
     model_.set_change_callback([this] {
         refresh();
-        utils::focus_controls(controls(), lv_group_get_focused(lv_group_get_default()));
     });
-    utils::focus_controls(controls(), last_focus_ ? last_focus_ : view_.ui.btn_cont.btn_return);
+    refresh();
+    utils::focus_controls(view_.controls(), view_.ui.record);
+    view_.appear();
+    timer_ = lv_timer_create(
+        [](lv_timer_t* timer) {
+            static_cast<RecordConfig*>(timer->user_data)->refresh();
+        },
+        200, this);
+    if (!timer_)
+        app_fatal("RecordConfig", "Feedback timer allocation failed");
 }
-
 void RecordConfig::on_view_will_disappear() {
+    view_.stop();
     model_.set_change_callback({});
-    last_focus_ = utils::leave_focus_group();
+    if (timer_) {
+        lv_timer_del(timer_);
+        timer_ = nullptr;
+    }
+    utils::leave_focus_group();
 }
-
 void RecordConfig::on_view_unload() {
+    if (timer_) {
+        lv_timer_del(timer_);
+        timer_ = nullptr;
+    }
+    model_.set_change_callback({});
     model_.deinit();
     view_.destroy();
-    last_focus_ = nullptr;
 }
-
 void RecordConfig::on_language_changed() {
-    view_.apply_language();
+    view_.update(model_.device(), model_.settings().record_settings, feedback_.text);
+    if (priv.state != PAGE_STATE_ACTIVITY)
+        view_.stop();
 }
-
+void RecordConfig::send(bool start) {
+    const auto& device = model_.device();
+    if (device.record_pending || !device.record_valid || start == device.recording)
+        return;
+    feedback_.begin();
+    const bool accepted = start ? model_.start_record(view_.type(), view_.interval()) : model_.stop_record();
+    feedback_.finish(accepted, model_.device().record_pending);
+    refresh();
+}
+void RecordConfig::on_commit_request() {
+    if (lv_group_get_focused(lv_group_get_default()) == view_.ui.record && !model_.device().recording)
+        send(true);
+}
 void RecordConfig::clicked(lv_event_t* event) {
     auto* self = static_cast<RecordConfig*>(lv_event_get_user_data(event));
-    auto* obj = lv_event_get_current_target(event);
-    const auto& r = self->view_.ui.roller;
-    const bool editable = self->model_.settings().record_settings && !self->recording();
-    if (editable && (obj == r.left_roller.btn_up || obj == r.left_roller.btn_down))
-        self->view_.scroll(r.left_roller.label, obj == r.left_roller.btn_up ? -1 : 1);
-    else if (editable && (obj == r.right_roller.btn_up || obj == r.right_roller.btn_down))
-        self->view_.scroll(r.right_roller.label, obj == r.right_roller.btn_up ? -1 : 1);
-    else if (obj == self->view_.ui.btn_cont.btn_record && self->recording()) {
-        // Select stops; starting needs an explicit Commit (on_commit_request).
-        if (!self->model_.stop_record())
-            APP_LOG_E("RecordConfig", "stop request rejected");
-    } else if (obj == self->view_.ui.btn_cont.btn_return)
+    auto* control = lv_event_get_current_target(event);
+    if (control == self->view_.ui.back) {
         self->page_manager->pop();
-}
-
-void RecordConfig::on_commit_request() {
-    if (lv_group_get_focused(lv_group_get_default()) != view_.ui.btn_cont.btn_record || recording())
         return;
-    if (!model_.start_record(view_.type(), view_.interval()))
-        APP_LOG_E("RecordConfig", "start request rejected");
+    }
+    const auto& device = self->model_.device();
+    if (device.record_pending || !device.record_valid)
+        return;
+    if (control == self->view_.ui.record) {
+        if (device.recording)
+            self->send(false);
+        else {
+            self->feedback_ = {};
+            self->refresh();
+        }
+        return;
+    }
+    if (!self->model_.settings().record_settings || device.recording)
+        return;
+    self->feedback_ = {};
+    if (control == self->view_.ui.type)
+        self->view_.cycle_type();
+    else if (control == self->view_.ui.interval)
+        self->view_.cycle_interval();
+    self->refresh();
 }

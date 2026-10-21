@@ -69,6 +69,7 @@ DeviceBridge::snapshot(std::uint32_t now) {
 
     const WorkConfig_t work = State::Effective_Work();
     device.work_valid = true;
+    device.work_pending = systemInfo.request.work_pending;
     device.work_mode = (work.work_mode == base_mode || work.work_mode == autobase_mode) ? DataProc::WorkMode::Base
                                                                                         : DataProc::WorkMode::Rover;
     device.radio_on = work.radio_status == On_Off_Status_ON;
@@ -80,6 +81,7 @@ DeviceBridge::snapshot(std::uint32_t now) {
 
     const RecordInfo_t record = State::Effective_Record();
     device.record_valid = true;
+    device.record_pending = systemInfo.request.record_op || systemInfo.request.record_settings_pending;
     device.recording = record.record_status == On_Off_Status_ON;
     device.record_type = code_index(kRecordTypeCode, record.record_type);
     device.record_interval = code_index(kRecordIntervalCode, record.record_interval);

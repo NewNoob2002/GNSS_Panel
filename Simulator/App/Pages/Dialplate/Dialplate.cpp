@@ -30,9 +30,11 @@ void Dialplate::on_view_will_appear() {
     });
     utils::focus_controls(controls(), last_focus_ ? last_focus_ : view_.ui.btn_cont.btn_menu);
     view_.appear_anim_start();
+    view_.anim_start();
 }
 
 void Dialplate::on_view_will_disappear() {
+    view_.anim_stop();
     model_.set_change_callback({});
     last_focus_ = utils::leave_focus_group();
 }

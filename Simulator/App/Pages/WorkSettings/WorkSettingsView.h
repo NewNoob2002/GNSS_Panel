@@ -1,83 +1,41 @@
-#ifndef WorkSettings_VIEW_H
-#define WorkSettings_VIEW_H
-
+#pragma once
+#include <array>
 #include "Common/DataProc/DataProc_Def.h"
 #include "Resource/ResourcePool.h"
-#include "Utils/I18n/I18n.h"
-#include "lvgl.h"
 
 namespace page {
 class WorkSettingsView {
   public:
-    struct {
-        struct {
-            lv_obj_t* cont;
-
-            struct {
-                lv_obj_t* cont;
-                lv_obj_t* label;
-
-                lv_obj_t* btn_cont;
-                lv_obj_t* btn_up;
-                lv_obj_t* btn_down;
-            } left_roller;
-
-            struct {
-                lv_obj_t* cont;
-                lv_obj_t* label;
-
-                lv_obj_t* btn_cont;
-                lv_obj_t* btn_up;
-                lv_obj_t* btn_down;
-            } right_roller;
-
-            lv_obj_t* btn_reset;
-        } roller;
-
-        struct {
-            lv_obj_t* cont;
-            lv_obj_t* btn_base;
-            lv_obj_t* btn_rover;
-            lv_obj_t* btn_ntrip;
-        } btn_cont;
-
-    } ui;
-
-    WorkSettingsView() = default;
-
-    ~WorkSettingsView() = default;
-
     void create(lv_obj_t* root);
-
-    void destroy();
-
-    void apply_language() const;
-    /** 仅更新本页滚轮预览，不写入电台配置。delta 为 -1（上一项）或 1（下一项）。 */
-    void scroll(lv_obj_t* label, int delta);
-    /** Show the device's radio protocol/channel (option indexes; out-of-range values are ignored). */
+    void destroy() {
+        stop();
+    }
+    void appear() const;
+    void stop() const;
     void set_selection(unsigned protocol, unsigned channel);
+    void update(DataProc::WorkTarget target, bool pending, i18n::TextId feedback) const;
+    void cycle_protocol() {
+        protocol_ = (protocol_ + 1) % DataProc::kRadioProtocolCount;
+    }
+    void cycle_channel() {
+        channel_ = (channel_ + 1) % DataProc::kRadioChannelCount;
+    }
     unsigned protocol() const {
-        return static_cast<unsigned>(left_roller_index);
+        return protocol_;
     }
     unsigned channel() const {
-        return static_cast<unsigned>(right_roller_index);
+        return channel_;
     }
-
-    void roller_create(lv_obj_t* par);
-
-    static void roller_style_init(lv_obj_t* obj);
-
-    void btn_cont_create(lv_obj_t* par);
-
-    static lv_obj_t* btn_create(lv_obj_t* par, const void* img_src, lv_coord_t x_ofs, lv_coord_t y_ofs);
-
-    static void roller_to_index(lv_obj_t* obj, uint8_t index);
+    std::array<lv_obj_t*, 5> controls() const {
+        return {ui.preset, ui.protocol, ui.channel, ui.apply, ui.back};
+    }
+    struct {
+        lv_obj_t *preset{}, *protocol{}, *channel{}, *apply{}, *back{};
+    } ui;
 
   private:
-    static int8_t left_roller_index;
-    static int8_t right_roller_index;
+    unsigned protocol_ = 0, channel_ = 0;
+    lv_obj_t *preset_text_{}, *protocol_text_{}, *channel_text_{}, *apply_text_{}, *feedback_{};
+    lv_obj_t *mode_icon_{}, *network_card_{}, *status_dot_{};
 };
-
 } // namespace page
-
-#endif // WorkSettings_VIEW_H

@@ -8,7 +8,6 @@
 namespace page {
 
 class DialplateView {
-
     typedef struct Transform {
         lv_coord_t width_default;
         lv_coord_t height_default;
@@ -23,8 +22,16 @@ class DialplateView {
             lv_obj_t* icon_satellite;
             lv_obj_t* icon_radio;
             lv_obj_t* icon_mode;
+            lv_obj_t* radio_card;
+            lv_obj_t* radio_img;
+            lv_obj_t* radio_label;
+            lv_obj_t* mode_card;
+            lv_obj_t* mode_img;
+            lv_obj_t* mode_label;
             NumberFlow* satellite_used;
-            NumberFlow* satellite_tacked;
+            NumberFlow* satellite_tracked;
+            lv_obj_t* satellite_separator;
+            lv_obj_t* satellite_missing;
         } top_info;
 
         struct {
@@ -45,15 +52,28 @@ class DialplateView {
     void destroy();
 
     void appear_anim_start(bool reverse = false) const;
-    /** Satellites, work mode/radio icons and the record button from device data. */
-    void update(const DataProc::DeviceSnapshot& device) const;
+    /** 启动/停止电台波形与工作模式信标手绘动效。 */
+    void anim_start();
+    void anim_stop();
+
+    /** 卫星数、电台与工作模式状态及录制按钮更新。 */
+    void update(const DataProc::DeviceSnapshot& device);
 
   private:
     void top_info_create(lv_obj_t* par);
-
     void btn_cont_create(lv_obj_t* par);
 
-    static lv_obj_t* btn_create(lv_obj_t* par, const void* img_src, lv_coord_t x_ofs, const TransformInfo_t& transform);
+    static lv_obj_t* btn_create(lv_obj_t* par, const void* img_src, lv_coord_t x, lv_coord_t y,
+                                const TransformInfo_t& transform);
+
+    static void anim_step_exec(void* var, int32_t value);
+    static void radio_draw_event_cb(lv_event_t* e);
+    static void mode_draw_event_cb(lv_event_t* e);
+
+    uint32_t anim_phase_ = 0;
+    bool anim_running_ = false;
+    lv_anim_t anim_loop_{};
+    DataProc::DeviceSnapshot last_device_{};
 };
 
 } // namespace page
