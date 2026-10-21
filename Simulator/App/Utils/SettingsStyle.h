@@ -23,9 +23,10 @@ inline void hero(lv_obj_t* obj) {
 inline void move_in(void* obj, int32_t y) {
     lv_obj_set_style_translate_y(static_cast<lv_obj_t*>(obj), static_cast<lv_coord_t>(y), 0);
 }
+// 入场只做 6 px 上移、不做透明度：页面切换期间同时运行，逐控件淡入要为每个控件建透明度图层逐像素混合，
+// 在 MCU 上与整页滑动叠加会掉帧；位移只改绘制位置，不增加混合开销。
 inline void reveal(lv_obj_t* obj, uint32_t delay = 0) {
     lv_anim_del(obj, move_in);
-    style::appear(obj, delay);
     lv_anim_t animation;
     lv_anim_init(&animation);
     lv_anim_set_var(&animation, obj);

@@ -1,276 +1,79 @@
 #include "SaveConfigView.h"
-#include "Utils/PageStyle.h"
-#include "src/misc/lv_log.h"
+#include "Utils/SettingsStyle.h"
 
 using namespace page;
-
-namespace {
-
-void set_width(void* obj, int32_t width) {
-    lv_obj_set_width(static_cast<lv_obj_t*>(obj), width);
-}
-void set_y(void* obj, int32_t y) {
-    lv_obj_set_y(static_cast<lv_obj_t*>(obj), y);
-}
-void set_opa_scale(void* obj, int32_t opa) {
-    lv_obj_set_style_opa(static_cast<lv_obj_t*>(obj), opa, 0);
-}
-#define LV_ANIM_EXEC(attr) set_##attr
-
-constexpr lv_coord_t kProgressWidth = 184;
-constexpr lv_coord_t kProgressHeight = 12;
-constexpr lv_coord_t kBrandMaxWidth = 210;
-constexpr lv_coord_t kBrandHeight = 20;
-constexpr lv_coord_t kBrandPadX = 8;
-constexpr lv_coord_t kShineLength = 12;
-constexpr lv_coord_t kShineThickness = 2;
-constexpr lv_color_t kAmber = style::kAccent;
-constexpr lv_color_t kAmberBright = style::kHighlight;
-constexpr lv_color_t kLineGrey = style::kBorder;
-constexpr lv_color_t kTextWarm = style::kText;
-
-const char* get_brand_name() {
-#if defined(APP_BRAND_NAME)
-    return APP_BRAND_NAME;
-#elif defined(RGK_LOGO_USE)
-    return "RGK";
-#elif defined(MIDDLE_LOGO_USE)
-    return "X";
-#else
-    return "SINGULARXYZ";
-#endif
-}
-
-lv_obj_t* create_brand_logo(lv_obj_t* parent, const char* brand_name, const lv_font_t* font) {
-    lv_obj_t* cont = lv_obj_create(parent);
-    lv_obj_remove_style_all(cont);
-    lv_obj_clear_flag(cont, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_add_flag(cont, LV_OBJ_FLAG_OVERFLOW_VISIBLE);
-    lv_obj_set_style_bg_color(cont, style::kCard, 0);
-    lv_obj_set_style_bg_opa(cont, LV_OPA_60, 0);
-    lv_obj_set_style_border_color(cont, kLineGrey, 0);
-    lv_obj_set_style_border_width(cont, 2, 0);
-    lv_obj_set_style_radius(cont, 0, 0);
-
-    lv_obj_t* label = lv_label_create(cont);
-    lv_obj_remove_style_all(label);
-    lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_set_style_text_font(label, font, 0);
-    lv_obj_set_style_text_color(label, kAmberBright, 0);
-    lv_obj_set_style_text_letter_space(label, 1, 0);
-    lv_obj_set_style_bg_opa(label, LV_OPA_TRANSP, 0);
-    lv_label_set_text(label, brand_name);
-    lv_obj_update_layout(label);
-
-    lv_coord_t label_width = lv_obj_get_width(label);
-    lv_coord_t cont_width = label_width + kBrandPadX * 2;
-    if (cont_width > kBrandMaxWidth) {
-        cont_width = kBrandMaxWidth;
-        label_width = kBrandMaxWidth - kBrandPadX * 2;
-        lv_obj_set_width(label, label_width);
-        lv_label_set_long_mode(label, LV_LABEL_LONG_DOT);
-    }
-    LV_LOG_USER("BrandWidth [1] :%d", cont_width);
-    lv_obj_set_size(cont, cont_width, kBrandHeight + kBrandPadX);
-    lv_obj_align(label, LV_ALIGN_CENTER, 0, 0);
-    lv_obj_update_layout(cont);
-
-    return cont;
-}
-
-void brand_shine_bottom_exec(void* obj, int32_t value) {
-    auto* shine = static_cast<lv_obj_t*>(obj);
-    if (shine == nullptr) {
-        return;
-    }
-
-    lv_obj_t* cont = lv_obj_get_parent(shine);
-    const lv_coord_t bottom_y = lv_obj_get_height(cont) - kShineThickness;
-    lv_obj_set_pos(shine, static_cast<lv_coord_t>(value), bottom_y);
-}
-
-void syncbar_progress_exec(void* obj, const int32_t width) {
-    lv_obj_set_width(static_cast<lv_obj_t*>(obj), width);
-
-    auto* view = static_cast<SaveConfigView*>(lv_obj_get_user_data(static_cast<lv_obj_t*>(obj)));
-    if (view == nullptr || view->ui.sync.percent_label == nullptr) {
-        return;
-    }
-
-    const int32_t percent = width * 100 / kProgressWidth;
-    lv_label_set_text_fmt(view->ui.sync.percent_label, "%ld%%", static_cast<long>(percent));
-}
-
-} // namespace
+using i18n::TextId;
 
 void SaveConfigView::create(lv_obj_t* root) {
-    const lv_font_t* font_small = resource_pool::get_font("oswaldBold_12");
-    const lv_font_t* font_brand = resource_pool::get_font("oswaldBold_18");
+    const auto* small = resource_pool::get_font("oswaldBold_12");
+    const auto* large = resource_pool::get_font("oswaldBold_18");
+    ring_ = style::ring(root, 14, 34, 84, 5, style::kDanger);
+    icon_ = settings_style::icon(ring_, "ui_power_large", 26, 14, style::kDanger);
+    percent_ = style::label(ring_, small, 10, 50, 64);
+    lv_obj_set_style_text_align(percent_, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_style_text_color(percent_, style::kMuted, 0);
+    lv_obj_set_user_data(ring_, this);
+    set_progress(ring_, 0);
 
-    lv_obj_t* main_cont = lv_obj_create(root);
-    lv_obj_remove_style_all(main_cont);
-    lv_obj_set_size(main_cont, LV_HOR_RES, LV_VER_RES);
-    lv_obj_center(main_cont);
-    lv_obj_set_style_bg_opa(main_cont, LV_OPA_COVER, 0);
-    lv_obj_set_style_bg_color(main_cont, style::kBackground, 0);
-    lv_obj_set_style_bg_grad_color(main_cont, style::kPanel, 0);
-    lv_obj_set_style_bg_grad_dir(main_cont, LV_GRAD_DIR_VER, 0);
+    column_ = style::box(root, 114, 28, 174, 96);
+    lv_obj_set_flex_flow(column_, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(column_, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    lv_obj_set_style_pad_row(column_, 2, 0);
+    action_ = style::label(column_, small, 0, 0, 174);
+    headline_ = style::label(column_, large, 0, 0, 174);
+    lv_obj_set_style_text_line_space(headline_, -4, 0);
+    subtitle_ = style::label(column_, small, 0, 0, 174);
+    lv_obj_set_style_text_color(subtitle_, style::kMuted, 0);
+    lv_obj_set_style_pad_top(subtitle_, 2, 0);
 
-    lv_obj_t* second_cont = lv_obj_create(root);
-    lv_obj_remove_style_all(second_cont);
-    lv_obj_set_size(second_cont, LV_HOR_RES, LV_VER_RES);
-    lv_obj_center(second_cont);
-    ui.sync.cont = second_cont;
-
-    lv_obj_t* top_line = lv_obj_create(second_cont);
-    lv_obj_remove_style_all(top_line);
-    lv_obj_set_size(top_line, 246, 2);
-    lv_obj_set_style_bg_color(top_line, kAmber, 0);
-    lv_obj_set_style_bg_grad_color(top_line, kLineGrey, 0);
-    lv_obj_set_style_bg_grad_dir(top_line, LV_GRAD_DIR_HOR, 0);
-    lv_obj_set_style_bg_opa(top_line, LV_OPA_50, 0);
-    lv_obj_align(top_line, LV_ALIGN_TOP_MID, 0, 28);
-
-    lv_obj_t* brand_cont = create_brand_logo(second_cont, get_brand_name(), font_brand);
-    lv_obj_align(brand_cont, LV_ALIGN_TOP_MID, 0, 32);
-    ui.sync.brand_cont = brand_cont;
-
-    lv_obj_t* brand_shine = lv_obj_create(brand_cont);
-    lv_obj_remove_style_all(brand_shine);
-    lv_obj_clear_flag(brand_shine, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_size(brand_shine, kShineLength, kShineThickness);
-    lv_obj_set_style_bg_color(brand_shine, kLineGrey, 0);
-    lv_obj_set_style_bg_grad_color(brand_shine, kAmberBright, 0);
-    lv_obj_set_style_bg_grad_dir(brand_shine, LV_GRAD_DIR_HOR, 0);
-    lv_obj_set_style_bg_opa(brand_shine, LV_OPA_90, 0);
-    lv_obj_set_pos(brand_shine, 0, lv_obj_get_height(brand_cont) - kShineThickness);
-    ui.sync.brand_shine = brand_shine;
-
-    lv_anim_init(&ui.sync.shine_anim);
-    lv_anim_set_var(&ui.sync.shine_anim, brand_shine);
-    lv_anim_set_exec_cb(&ui.sync.shine_anim, brand_shine_bottom_exec);
-    const lv_coord_t brand_width = lv_obj_get_width(brand_cont);
-    LV_LOG_USER("BrandWidth [2]:%d", brand_width);
-    const lv_coord_t shine_start = kBrandPadX;
-    const lv_coord_t shine_end = brand_width - kBrandPadX - kShineLength;
-    lv_anim_set_values(&ui.sync.shine_anim, shine_start, LV_MAX(shine_start, shine_end));
-    lv_anim_set_time(&ui.sync.shine_anim, 1000);
-    lv_anim_set_playback_time(&ui.sync.shine_anim, 1000);
-    lv_anim_set_delay(&ui.sync.shine_anim, 500);
-    lv_anim_set_repeat_delay(&ui.sync.shine_anim, 0);
-    lv_anim_set_repeat_count(&ui.sync.shine_anim, LV_ANIM_REPEAT_INFINITE);
-    lv_anim_set_path_cb(&ui.sync.shine_anim, lv_anim_path_linear);
-    lv_anim_start(&ui.sync.shine_anim);
-
-    lv_obj_t* sync_label = lv_label_create(second_cont);
-    lv_obj_remove_style_all(sync_label);
-    lv_obj_set_width(sync_label, 260);
-    lv_label_set_long_mode(sync_label, LV_LABEL_LONG_WRAP);
-    lv_obj_set_style_text_align(sync_label, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_set_style_text_font(sync_label, font_small, 0);
-    lv_obj_set_style_text_color(sync_label, kTextWarm, 0);
-    lv_obj_align(sync_label, LV_ALIGN_TOP_MID, 0, 66);
-    ui.sync.label = sync_label;
-
-    lv_obj_t* bar_cont = lv_obj_create(second_cont);
-    lv_obj_remove_style_all(bar_cont);
-    lv_obj_set_style_bg_color(bar_cont, style::kCard, 0);
-    lv_obj_set_style_bg_opa(bar_cont, LV_OPA_COVER, 0);
-    lv_obj_set_style_border_color(bar_cont, kLineGrey, 0);
-    lv_obj_set_style_border_width(bar_cont, 1, 0);
-    lv_obj_set_style_radius(bar_cont, kProgressHeight / 2, 0);
-    lv_obj_set_size(bar_cont, kProgressWidth + 2, kProgressHeight + 2);
-    lv_obj_align(bar_cont, LV_ALIGN_BOTTOM_MID, 0, -6);
-    ui.sync.bar.track = bar_cont;
-
-    lv_obj_t* sync_bar = lv_obj_create(bar_cont);
-    lv_obj_remove_style_all(sync_bar);
-    lv_obj_set_size(sync_bar, 0, kProgressHeight);
-    lv_obj_set_style_bg_color(sync_bar, kAmber, 0);
-    lv_obj_set_style_bg_grad_color(sync_bar, kAmberBright, 0);
-    lv_obj_set_style_bg_grad_dir(sync_bar, LV_GRAD_DIR_HOR, 0);
-    lv_obj_set_style_bg_opa(sync_bar, LV_OPA_COVER, 0);
-    lv_obj_set_style_opa(sync_bar, LV_OPA_COVER, 0);
-    lv_obj_set_style_radius(sync_bar, kProgressHeight / 2, 0);
-    lv_obj_align(sync_bar, LV_ALIGN_LEFT_MID, 1, 0);
-    lv_obj_set_user_data(sync_bar, this);
-    ui.sync.bar.obj = sync_bar;
-
-    lv_obj_t* percent_label = lv_label_create(second_cont);
-    lv_obj_remove_style_all(percent_label);
-    lv_obj_set_style_text_font(percent_label, font_small, 0);
-    lv_obj_set_style_text_color(percent_label, kAmberBright, 0);
-    lv_label_set_text(percent_label, "0%");
-    lv_obj_set_style_opa(percent_label, LV_OPA_TRANSP, 0);
-    lv_obj_align_to(percent_label, bar_cont, LV_ALIGN_OUT_RIGHT_MID, 8, 0);
-    ui.sync.percent_label = percent_label;
-
-    for (uint8_t i = 0; i < 3; i++) {
-        lv_obj_t* dot = lv_obj_create(second_cont);
-        lv_obj_remove_style_all(dot);
-        lv_obj_set_size(dot, 4, 4);
-        lv_obj_set_style_radius(dot, 0, 0);
-        lv_obj_set_style_bg_color(dot, kAmber, 0);
-        lv_obj_set_style_bg_opa(dot, LV_OPA_60, 0);
-        lv_obj_align(dot, LV_ALIGN_BOTTOM_MID, static_cast<lv_coord_t>(-128 + i * 8), -11);
-        ui.sync.dots[i] = dot;
-
-        lv_anim_init(&ui.sync.dot_anims[i]);
-        lv_anim_set_var(&ui.sync.dot_anims[i], dot);
-        lv_anim_set_exec_cb(&ui.sync.dot_anims[i], LV_ANIM_EXEC(opa_scale));
-        lv_anim_set_values(&ui.sync.dot_anims[i], LV_OPA_30, LV_OPA_COVER);
-        lv_anim_set_time(&ui.sync.dot_anims[i], 600);
-        lv_anim_set_playback_time(&ui.sync.dot_anims[i], 600);
-        lv_anim_set_delay(&ui.sync.dot_anims[i], i * 180);
-        lv_anim_set_repeat_count(&ui.sync.dot_anims[i], LV_ANIM_REPEAT_INFINITE);
-        lv_anim_start(&ui.sync.dot_anims[i]);
-    }
-
-    lv_anim_init(&ui.sync.bar.anim);
-    lv_anim_set_var(&ui.sync.bar.anim, sync_bar);
-    lv_anim_set_exec_cb(&ui.sync.bar.anim, syncbar_progress_exec);
-    lv_anim_set_values(&ui.sync.bar.anim, 0, kProgressWidth);
-    lv_anim_set_time(&ui.sync.bar.anim, 8000);
-    lv_anim_set_playback_time(&ui.sync.bar.anim, 0);
-    lv_anim_set_repeat_count(&ui.sync.bar.anim, 0);
-
-    ui.anim_timeline = lv_anim_timeline_create();
-#define ANIM_DEF(start_time, obj, attr, start, end)                                                                    \
-    { start_time, obj, LV_ANIM_EXEC(attr), start, end, 280, lv_anim_path_ease_out, true }
-
-    const lv_anim_timeline_wrapper_t wrapper[] = {
-        ANIM_DEF(0, top_line, width, 0, lv_obj_get_style_width(top_line, 0)),
-        ANIM_DEF(50, brand_cont, opa_scale, LV_OPA_TRANSP, LV_OPA_COVER),
-        ANIM_DEF(100, sync_label, y, lv_obj_get_style_height(second_cont, 0), lv_obj_get_y(sync_label)),
-        ANIM_DEF(150, bar_cont, width, 0, lv_obj_get_style_width(bar_cont, 0)),
-        // ANIM_DEF(450, percent_label, opa_scale, LV_OPA_TRANSP, LV_OPA_COVER),
-        LV_ANIM_TIMELINE_WRAPPER_END};
-
-    lv_anim_timeline_add_wrapper(ui.anim_timeline, wrapper);
-    apply_language();
+    lv_anim_init(&progress_animation_);
+    lv_anim_set_var(&progress_animation_, ring_);
+    lv_anim_set_exec_cb(&progress_animation_, set_progress);
+    lv_anim_set_values(&progress_animation_, 0, 100);
+    lv_anim_set_time(&progress_animation_, 8000);
 }
 
-void SaveConfigView::destroy() {
-    if (ui.anim_timeline) {
-        lv_anim_timeline_del(ui.anim_timeline);
-        ui.anim_timeline = nullptr;
-    }
-    if (ui.sync.brand_shine) {
-        lv_anim_del(ui.sync.brand_shine, brand_shine_bottom_exec);
-    }
-    for (auto& dot : ui.sync.dots) {
-        if (dot) {
-            lv_anim_del(dot, nullptr);
-        }
-    }
+void SaveConfigView::stop() const {
+    lv_anim_del(ring_, set_progress);
+    for (auto* obj : {ring_, column_})
+        lv_anim_del(obj, settings_style::move_in);
 }
 
-void SaveConfigView::apply_language() const {
-    lv_label_set_text(ui.sync.label, i18n::text(i18n::TextId::SaveConfigWarning));
-    lv_obj_align(ui.sync.label, LV_ALIGN_TOP_MID, 0, 66);
+void SaveConfigView::appear() {
+    stop();
+    set_progress(ring_, 0);
+    settings_style::reveal(ring_);
+    settings_style::reveal(column_, 40);
 }
 
-void SaveConfigView::set_power_off_cause(const i18n::TextId cause_id) const {
-    lv_label_set_text_fmt(ui.sync.label, i18n::text(i18n::TextId::SaveConfigMessage), i18n::text(cause_id));
-    lv_obj_align(ui.sync.label, LV_ALIGN_TOP_MID, 0, 66);
+void SaveConfigView::update(const DataProc::SystemState& state) const {
+    const bool restart = !state.shutting_down && state.power_action == DataProc::PowerAction::Reboot;
+    const auto color = restart ? style::kAccent : style::kDanger;
+    if (lv_obj_get_style_arc_color(ring_, LV_PART_INDICATOR).full != color.full)
+        lv_obj_set_style_arc_color(ring_, color, LV_PART_INDICATOR);
+    settings_style::set_recolor(icon_, color);
+    settings_style::set_text_color(action_, color);
+    settings_style::set_text(action_,
+                             i18n::text(restart ? TextId::SaveConfigRestarting : TextId::SaveConfigPoweringOff));
+    auto headline = TextId::SaveConfigWarning;
+    if (state.shutting_down) {
+        headline = state.power_cause == DataProc::PowerCause::Host         ? TextId::SaveConfigPowerOffBoard
+                   : state.power_cause == DataProc::PowerCause::LowBattery ? TextId::SaveConfigPowerOffLowBattery
+                   : state.power_cause == DataProc::PowerCause::User       ? TextId::SaveConfigPowerOffPushKey
+                                                                           : TextId::SaveConfigPowerOffForced;
+    }
+    settings_style::set_text(headline_, i18n::text(headline));
+    settings_style::set_text(subtitle_,
+                             i18n::text(state.power_pending && !state.shutting_down ? TextId::SaveConfigCancelHint
+                                                                                    : TextId::SaveConfigKeepPower));
+}
+
+void SaveConfigView::set_progress(void* obj, int32_t percent) {
+    auto* view = static_cast<SaveConfigView*>(lv_obj_get_user_data(static_cast<lv_obj_t*>(obj)));
+    percent = percent < 0 ? 0 : percent > 100 ? 100 : percent;
+    if (lv_arc_get_value(view->ring_) != percent)
+        lv_arc_set_value(view->ring_, static_cast<int16_t>(percent));
+    char text[8];
+    lv_snprintf(text, sizeof(text), "%ld%%", static_cast<long>(percent));
+    settings_style::set_text(view->percent_, text);
 }

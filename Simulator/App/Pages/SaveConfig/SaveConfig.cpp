@@ -2,11 +2,12 @@
 #include "Utils/Log/Log.h"
 #include "Utils/PageManager/PageManager.h"
 #include "Utils/PageManager/PageUtils.h"
+#include "Utils/PageStyle.h"
 
 using namespace page;
 
 void SaveConfig::on_custom_attr_config() {
-    set_custom_load_anim_type(PageManager::LOAD_ANIM_FADE_ON, 240, lv_anim_path_ease_in_out);
+    set_custom_load_anim_type(PageManager::LOAD_ANIM_OVER_TOP, style::kPageTransitionMs, lv_anim_path_ease_out);
 }
 
 void SaveConfig::on_view_load() {
@@ -16,16 +17,7 @@ void SaveConfig::on_view_load() {
 }
 
 void SaveConfig::apply_text() const {
-    const auto& state = model_.settings();
-    if (!state.shutting_down || state.power_cause == DataProc::PowerCause::User) {
-        view_.apply_language();
-        return;
-    }
-    const auto cause = state.power_cause == DataProc::PowerCause::Host ? i18n::TextId::SaveConfigPowerOffBoard
-                       : state.power_cause == DataProc::PowerCause::LowBattery
-                           ? i18n::TextId::SaveConfigPowerOffLowBattery
-                           : i18n::TextId::SaveConfigPowerOffForced;
-    view_.set_power_off_cause(cause);
+    view_.update(model_.settings());
 }
 
 bool SaveConfig::on_back_request() {
@@ -34,14 +26,17 @@ bool SaveConfig::on_back_request() {
 
 void SaveConfig::on_view_will_appear() {
     model_.set_status_bar(true);
+    model_.set_change_callback([this] {
+        apply_text();
+    });
     apply_text();
-    lv_anim_timeline_start(view_.ui.anim_timeline);
+    view_.appear();
 }
 
 void SaveConfig::on_view_did_appear() {
     // A long host frame cannot execute power completion while navigation is still busy.
-    lv_anim_start(&view_.ui.sync.bar.anim);
-    timer_ = lv_timer_create(on_timeout, lv_anim_get_playtime(&view_.ui.sync.bar.anim) + 500, this);
+    lv_anim_start(view_.progress_animation());
+    timer_ = lv_timer_create(on_timeout, lv_anim_get_playtime(view_.progress_animation()) + 500, this);
     if (!timer_)
         LV_LOG_ERROR("SaveConfig: preview timer allocation failed");
 }
@@ -54,6 +49,8 @@ void SaveConfig::cancel_timer() {
 }
 
 void SaveConfig::on_view_will_disappear() {
+    model_.set_change_callback({});
+    view_.stop();
     cancel_timer();
     if (model_.settings().power_pending && !model_.cancel_power())
         LV_LOG_ERROR("SaveConfig: cancellation failed");
@@ -63,7 +60,7 @@ void SaveConfig::on_view_will_disappear() {
 void SaveConfig::on_view_unload() {
     model_.deinit();
     cancel_timer();
-    view_.destroy();
+    view_.stop();
 }
 
 void SaveConfig::on_language_changed() {

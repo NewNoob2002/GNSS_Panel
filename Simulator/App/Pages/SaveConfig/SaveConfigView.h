@@ -1,43 +1,39 @@
 #ifndef SAVECONFIG_VIEW_H
 #define SAVECONFIG_VIEW_H
 
+#include "Common/DataProc/DataProc.h"
 #include "Resource/ResourcePool.h"
 #include "Utils/I18n/I18n.h"
-#include "Utils/lv_ext/lv_anim_timeline_wrapper.h"
 #include "lvgl.h"
 
 namespace page {
 class SaveConfigView {
   public:
+    /** Create the power progress ring and text column below the visible status bar. */
     void create(lv_obj_t* root);
+    /** Cancel animations borrowing widgets before the page is hidden or destroyed. */
+    void stop() const;
+    /** Reset progress and reveal the ring and text using translation only. */
+    void appear();
+    /** Refresh the action, cause and cancellation hint from the latest System state. */
+    void update(const DataProc::SystemState& state) const;
+    /** Return the unchanged eight-second progress animation for controller scheduling. */
+    lv_anim_t* progress_animation() {
+        return &progress_animation_;
+    }
 
-    void destroy();
-
-    void apply_language() const;
-
-    void set_power_off_cause(i18n::TextId cause_id) const;
-
-    struct {
-        struct {
-            lv_obj_t* cont;
-            lv_obj_t* label;
-            lv_obj_t* brand_cont;
-            lv_obj_t* brand_shine;
-            lv_obj_t* percent_label;
-            lv_obj_t* dots[3];
-            lv_anim_t dot_anims[3];
-            lv_anim_t shine_anim;
-
-            struct {
-                lv_obj_t* track;
-                lv_obj_t* obj;
-                lv_anim_t anim;
-            } bar;
-        } sync;
-
-        lv_anim_timeline_t* anim_timeline;
-    } ui;
+  private:
+    /** Apply animation progress to the ring and the visible percentage. */
+    static void set_progress(void* obj, int32_t percent);
+    lv_obj_t* ring_ = nullptr;
+    lv_obj_t* icon_ = nullptr;
+    lv_obj_t* action_ = nullptr;
+    lv_obj_t* column_ = nullptr;
+    lv_obj_t* headline_ = nullptr;
+    lv_obj_t* subtitle_ = nullptr;
+    lv_obj_t* percent_ = nullptr;
+    lv_anim_t progress_animation_{};
 };
 } // namespace page
 
-#endif // !SHUTDOWN_VIEW_H
+#endif // SAVECONFIG_VIEW_H

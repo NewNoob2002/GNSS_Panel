@@ -2,10 +2,11 @@
 #include "Utils/Log/Log.h"
 #include "Utils/PageManager/PageManager.h"
 #include "Utils/PageManager/PageUtils.h"
+#include "Utils/PageStyle.h"
 using namespace page;
 
 void SystemDash::on_custom_attr_config() {
-    set_custom_load_anim_type(PageManager::LOAD_ANIM_OVER_BOTTOM, 280, lv_anim_path_ease_out);
+    set_custom_load_anim_type(PageManager::LOAD_ANIM_OVER_BOTTOM, style::kPageTransitionMs, lv_anim_path_ease_out);
 }
 void SystemDash::on_view_load() {
     if (!model_.init())
@@ -28,8 +29,17 @@ void SystemDash::on_view_will_appear() {
 void SystemDash::on_view_will_disappear() {
     view_.stop();
     model_.set_change_callback({});
-    cancel_hold();
+    // Stop the hold but keep the dialog and its full bar on screen while the next page slides over this one;
+    // changing this page now would flash a different picture under the transition.
+    if (hold_timer_) {
+        lv_timer_del(hold_timer_);
+        hold_timer_ = nullptr;
+    }
+    lv_anim_del(this, set_hold_progress);
     last_focus_ = utils::leave_focus_group();
+}
+void SystemDash::on_view_did_disappear() {
+    cancel_hold();
     if (view_.power_open()) {
         // Leaving (SaveConfig or a platform shutdown) ends the confirmation; return lands on the Power row.
         view_.show_power(false);

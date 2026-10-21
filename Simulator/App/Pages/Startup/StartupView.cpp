@@ -1,33 +1,19 @@
 #include "StartupView.h"
 #include "Utils/BatteryStyle.h"
-#include "Utils/PageStyle.h"
+#include "Utils/SettingsStyle.h"
 
 using namespace page;
 
 namespace {
 constexpr lv_coord_t kStatusBarHeight = 26;
-constexpr lv_color_t kBackground = style::kBackground;
-constexpr lv_color_t kAmber = style::kAccent;
-constexpr lv_color_t kAmberBright = style::kHighlight;
-constexpr lv_color_t kMuted = style::kMuted;
-constexpr lv_coord_t kBarMaxWidth = 90;
-
-lv_obj_t* create_info_card(lv_obj_t* parent, const lv_font_t* font, const char* title, int x) {
-    auto* card = style::box(parent, x, 3, 78, 44);
-    style::card(card);
-    auto* caption = style::label(card, font, 8, 4, 62);
-    lv_obj_set_style_text_color(caption, kMuted, 0);
-    lv_label_set_text(caption, title);
-    auto* data = style::label(card, font, 8, 22, 62);
-    lv_label_set_text(data, "N/A");
-    return data;
-}
+constexpr lv_coord_t kBarMaxWidth = 148;
 } // namespace
 
 void StartupView::create(lv_obj_t* root) {
     const auto* font_small = resource_pool::get_font("oswaldBold_12");
     const auto* font_main = resource_pool::get_font("oswaldBold_18");
-    lv_obj_set_style_bg_color(root, kBackground, 0);
+    const auto* font_digits = resource_pool::get_font("rajdhaniBold_40");
+    lv_obj_set_style_bg_color(root, style::kBackground, 0);
     lv_obj_set_style_bg_opa(root, LV_OPA_COVER, 0);
 
     // Reserve the header band for the status bar that appears after the idle delay.
@@ -37,79 +23,61 @@ void StartupView::create(lv_obj_t* root) {
     style::card(badge);
     auto* demo = style::label(badge, font_small, 0, 0, 40);
     lv_obj_set_style_text_align(demo, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_set_style_text_color(demo, kMuted, 0);
+    lv_obj_set_style_text_color(demo, style::kMuted, 0);
     lv_label_set_text(demo, "DEMO");
 
     auto* content = style::box(root, 0, kStatusBarHeight, LV_HOR_RES, LV_VER_RES - kStatusBarHeight);
-    // Demo inventory until target providers supply firmware, board and power measurements.
-    // Firmware and board versions come from the platform's device data (update_device()).
-    ui.firmware = create_info_card(content, font_small, "FW", 8);
-    ui.hardware = create_info_card(content, font_small, "HW", 94);
-    auto* battery = style::box(content, 8, 55, 164, 42);
-    style::card(battery);
-    auto* icon = lv_img_create(battery);
-    lv_img_set_src(icon, resource_pool::get_image("battery_info"));
-    lv_img_set_zoom(icon, LV_IMG_ZOOM_NONE / 2);
-    lv_img_set_pivot(icon, 0, 0);
-    lv_obj_set_pos(icon, 8, 4);
-    lv_obj_set_style_img_recolor(icon, kAmber, 0);
-    lv_obj_set_style_img_recolor_opa(icon, LV_OPA_COVER, 0);
-    ui.bat_icon = icon;
-    auto* caption = style::label(battery, font_small, 30, 4, 46);
-    lv_obj_set_style_text_color(caption, kMuted, 0);
-    lv_label_set_text(caption, "BAT");
-    ui.bat_caption = caption;
-    auto* charge = style::label(battery, font_main, 108, 0, 48);
-    lv_obj_set_style_text_align(charge, LV_TEXT_ALIGN_RIGHT, 0);
-    lv_label_set_text(charge, "85%");
-    ui.bat_charge = charge;
-    auto* voltage = style::label(battery, font_small, 108, 24, 48);
-    lv_obj_set_style_text_align(voltage, LV_TEXT_ALIGN_RIGHT, 0);
-    lv_obj_set_style_text_color(voltage, kMuted, 0);
-    lv_label_set_text(voltage, "7.60 V");
-    ui.bat_voltage = voltage;
-    ui.bat_fill = battery::create_slot(battery, 8, 27, kBarMaxWidth, 6);
-    ui.bat_level = lv_obj_get_parent(ui.bat_fill);
+    auto* battery = style::box(content, 12, 6, 156, 94);
+    ui.bat_caption = style::label(battery, font_small, 0, 0, 40);
+    lv_obj_set_style_text_color(ui.bat_caption, style::kMuted, 0);
+    lv_label_set_text(ui.bat_caption, "BAT");
+    ui.bat_voltage = style::label(battery, font_small, 60, 0, 92);
+    lv_obj_set_style_text_align(ui.bat_voltage, LV_TEXT_ALIGN_RIGHT, 0);
+    lv_obj_set_style_text_color(ui.bat_voltage, style::kMuted, 0);
+    lv_label_set_text(ui.bat_voltage, "N/A");
 
-    auto* btn_press = style::box(content, 180, 3, 106, 94, true);
-    style::card(btn_press);
-    lv_obj_set_style_border_width(btn_press, 1, LV_STATE_FOCUSED);
-    lv_obj_set_style_border_color(btn_press, kAmber, LV_STATE_FOCUSED);
-    lv_obj_set_style_bg_color(btn_press, style::kFocus, LV_STATE_PRESSED);
-    lv_obj_set_style_border_width(btn_press, 2, LV_STATE_PRESSED);
-    lv_obj_set_style_border_color(btn_press, kAmberBright, LV_STATE_PRESSED);
-    ui.btn_press = btn_press;
+    auto* reading = style::box(battery, 0, 16, 156, 34);
+    lv_obj_set_flex_flow(reading, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(reading, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_START);
+    lv_obj_set_style_pad_column(reading, 2, 0);
+    ui.bat_charge = style::label(reading, font_digits, 0, 0, LV_SIZE_CONTENT);
+    // Rajdhani's baseline is six pixels lower than Oswald's at the same line height.
+    lv_obj_set_style_pad_bottom(ui.bat_charge, 6, 0);
+    lv_label_set_text(ui.bat_charge, "0");
+    ui.bat_unit = style::label(reading, font_main, 0, 0, LV_SIZE_CONTENT);
+    lv_obj_set_style_text_color(ui.bat_unit, style::kMuted, 0);
+    lv_label_set_text(ui.bat_unit, "%");
+    ui.bat_fill = battery::create_slot(battery, 0, 52, kBarMaxWidth, 6);
 
-    auto* arc = lv_arc_create(btn_press);
-    lv_obj_set_size(arc, 46, 46);
-    lv_obj_set_pos(arc, 30, 4);
-    lv_arc_set_range(arc, 0, 100);
-    lv_arc_set_value(arc, 0);
-    lv_arc_set_bg_angles(arc, 135, 45);
-    lv_arc_set_rotation(arc, 90);
-    lv_obj_remove_style(arc, nullptr, LV_PART_KNOB);
-    lv_obj_clear_flag(arc, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_set_style_arc_width(arc, 3, LV_PART_MAIN);
-    lv_obj_set_style_arc_width(arc, 3, LV_PART_INDICATOR);
-    lv_obj_set_style_arc_color(arc, style::kBorder, LV_PART_MAIN);
-    lv_obj_set_style_arc_color(arc, kAmberBright, LV_PART_INDICATOR);
-    ui.arc = arc;
-    auto* power = lv_img_create(btn_press);
-    lv_img_set_src(power, resource_pool::get_image("shutdown"));
-    lv_obj_set_pos(power, 45, 11);
-    lv_obj_set_style_img_recolor(power, kAmberBright, 0);
-    lv_obj_set_style_img_recolor_opa(power, LV_OPA_COVER, 0);
-    auto* percent = style::label(btn_press, font_small, 11, 29, 84);
-    lv_obj_set_style_text_align(percent, LV_TEXT_ALIGN_CENTER, 0);
-    lv_label_set_text(percent, "0%");
-    ui.arc_percent = percent;
-    auto* label_btn = style::label(btn_press, font_main, 7, 50, 92);
-    lv_obj_set_style_text_align(label_btn, LV_TEXT_ALIGN_CENTER, 0);
-    ui.btn_label = label_btn;
-    auto* hint = style::label(btn_press, font_small, 7, 76, 92);
-    lv_obj_set_style_text_align(hint, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_set_style_text_color(hint, kMuted, 0);
-    ui.hold_hint = hint;
+    auto* firmware_caption = style::label(battery, font_small, 0, 72, 18);
+    lv_obj_set_style_text_color(firmware_caption, style::kMuted, 0);
+    lv_label_set_text(firmware_caption, "FW");
+    ui.firmware = style::label(battery, font_small, 22, 72, 56);
+    auto* hardware_caption = style::label(battery, font_small, 82, 72, 18);
+    lv_obj_set_style_text_color(hardware_caption, style::kMuted, 0);
+    lv_label_set_text(hardware_caption, "HW");
+    ui.hardware = style::label(battery, font_small, 104, 72, 52);
+
+    ui.btn_press = style::box(content, 178, 2, 110, 96, true);
+    lv_obj_set_flex_flow(ui.btn_press, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(ui.btn_press, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_END);
+    lv_obj_set_style_pad_column(ui.btn_press, 6, 0);
+    lv_obj_set_style_pad_bottom(ui.btn_press, 4, 0);
+    lv_obj_set_style_text_color(ui.btn_press, style::kHighlight, LV_STATE_PRESSED);
+    ui.arc = style::ring(ui.btn_press, 20, 0, 70, 4, style::kHighlight);
+    // Keep the ring above the flex row while both labels remain direct children of the hold target.
+    lv_obj_add_flag(ui.arc, LV_OBJ_FLAG_FLOATING);
+    settings_style::icon(ui.arc, "ui_power_large", 19, 10, style::kHighlight);
+    ui.arc_percent = style::label(ui.arc, font_small, 8, 46, 54);
+    lv_obj_set_style_text_align(ui.arc_percent, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_style_text_color(ui.arc_percent, style::kMuted, 0);
+    lv_label_set_text(ui.arc_percent, "0%");
+    ui.btn_label = style::label(ui.btn_press, font_small, 0, 0, LV_SIZE_CONTENT);
+    // Inherit the target's pressed color without a timer or an opacity transition.
+    lv_obj_remove_local_style_prop(ui.btn_label, LV_STYLE_TEXT_COLOR, 0);
+    lv_obj_set_style_text_color(ui.btn_press, style::kText, 0);
+    ui.hold_hint = style::label(ui.btn_press, font_small, 0, 0, LV_SIZE_CONTENT);
+    lv_obj_set_style_text_color(ui.hold_hint, style::kMuted, 0);
 
     lv_anim_init(&ui.arc_anim);
     lv_anim_set_var(&ui.arc_anim, ui.arc);
@@ -128,27 +96,30 @@ void StartupView::update(const DataProc::StatusSnapshot& status) {
     if (!ui.bat_charge || !ui.bat_fill)
         return;
     const unsigned percent = status.battery_percent > 100 ? 100 : status.battery_percent;
+    settings_style::set_visible(ui.bat_charge, status.battery_valid);
+    settings_style::set_text(ui.bat_unit, status.battery_valid ? "%" : "N/A");
     if (status.battery_valid) {
-        lv_label_set_text_fmt(ui.bat_charge, "%u%%", percent);
-        lv_label_set_text_fmt(ui.bat_voltage, "%.2f V", status.battery_voltage);
+        char text[24];
+        lv_snprintf(text, sizeof(text), "%u", percent);
+        settings_style::set_text(ui.bat_charge, text);
+        lv_snprintf(text, sizeof(text), "%.2f V", status.battery_voltage);
+        settings_style::set_text(ui.bat_voltage, text);
     } else {
-        lv_label_set_text(ui.bat_charge, "N/A");
-        lv_label_set_text(ui.bat_voltage, "N/A");
+        settings_style::set_text(ui.bat_voltage, "N/A");
     }
     const bool charging = status.battery_valid && status.charging;
-    const auto color = status.battery_valid ? battery::color(percent, charging) : kMuted;
-    lv_label_set_text(ui.bat_caption, charging ? "CHG" : "BAT");
-    lv_obj_set_style_text_color(ui.bat_caption, charging ? color : kMuted, 0);
-    lv_obj_set_style_img_recolor(ui.bat_icon, color, 0);
+    const auto color = status.battery_valid ? battery::color(percent, charging) : style::kMuted;
+    settings_style::set_text(ui.bat_caption, charging ? "CHG" : "BAT");
+    settings_style::set_text_color(ui.bat_caption, charging ? color : style::kMuted);
     battery::update_fill(ui.bat_fill, percent, charging, status.battery_valid);
 }
 
 void StartupView::apply_language() const {
-    lv_label_set_text(ui.btn_label, i18n::text(i18n::TextId::StartupStart));
-    lv_label_set_text(ui.hold_hint, i18n::text(i18n::TextId::StartupHoldHint));
+    settings_style::set_text(ui.btn_label, i18n::text(i18n::TextId::StartupStart));
+    settings_style::set_text(ui.hold_hint, i18n::text(i18n::TextId::StartupHoldHint));
 }
 
 void StartupView::update_device(const DataProc::DeviceSnapshot& device) const {
-    lv_label_set_text(ui.firmware, device.firmware[0] ? device.firmware.data() : "N/A");
-    lv_label_set_text(ui.hardware, device.hardware[0] ? device.hardware.data() : "N/A");
+    settings_style::set_text(ui.firmware, device.firmware[0] ? device.firmware.data() : "N/A");
+    settings_style::set_text(ui.hardware, device.hardware[0] ? device.hardware.data() : "N/A");
 }

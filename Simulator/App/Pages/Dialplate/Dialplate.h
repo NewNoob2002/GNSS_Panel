@@ -22,5 +22,6 @@ class Dialplate final : public PageBase {
     DialplateView view_{};
     DialplateModel model_;
     lv_obj_t* last_focus_ = nullptr;
+    bool entrance_pending_ = true; // Play the entrance once per load (boot), not on every return.
 };
 } // namespace page

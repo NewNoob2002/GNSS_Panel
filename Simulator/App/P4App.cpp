@@ -37,10 +37,16 @@ bool P4App::init(const Options& options) {
     lv_style_set_border_width(&root_style_, 0);
     lv_style_set_radius(&root_style_, 0);
 
+    // Sliding page roots overflow the screen during transitions; the screen itself never scrolls, so it must not draw
+    // a scrollbar over every transition frame.
+    lv_obj_clear_flag(lv_scr_act(), LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollbar_mode(lv_scr_act(), LV_SCROLLBAR_MODE_OFF);
+
     manager_ = std::make_unique<PageManager>();
     manager_->set_root_default_style(&root_style_);
     // Default forward navigation is a smooth horizontal push; pages override this for boot/modal/context changes.
-    manager_->set_global_load_anim_type(PageManager::LOAD_ANIM_MOVE_LEFT, 320, lv_anim_path_ease_in_out);
+    manager_->set_global_load_anim_type(PageManager::LOAD_ANIM_MOVE_LEFT, page::style::kPageTransitionMs,
+                                        lv_anim_path_ease_out);
     auto register_page = [this](PageBase* page, const char* name) {
         if (!manager_->register_page(page, name)) {
             delete page;
@@ -146,6 +152,22 @@ void P4App::on_navigation(lv_timer_t* timer) {
         // Only the standby page advances; power-on confirmed elsewhere needs no navigation.
         if (page && std::strcmp(page, "Pages/Startup") == 0 && !self->manager_->replace("Pages/SystemLoading"))
             self->pending_power_on_ = true;
+        return;
+    }
+    if (page && std::strcmp(page, "Pages/SystemLoading") == 0)
+        self->preload_next();
+    else
+        self->preload_index_ = 0; // A later boot (after standby) preloads what was unloaded again.
+}
+
+void P4App::preload_next() {
+    // While SystemLoading runs (often waiting for the host), build the pages entered right after it (home) and right
+    // after a confirmed power-off (SaveConfig). Others are created on entry: the 96 KB LVGL pool cannot keep every
+    // page resident (popped pages are unloaded), and PageManager keeps creation time out of the transition anyway.
+    static constexpr const char* kPreload[] = {"Pages/Dialplate", "Pages/SaveConfig"};
+    while (preload_index_ < sizeof(kPreload) / sizeof(kPreload[0])) {
+        if (manager_->preload(kPreload[preload_index_++]))
+            return; // One page per tick; an already loaded one is skipped at once.
     }
 }
 
@@ -287,10 +309,11 @@ void P4App::poll_keys(std::uint64_t now_ms) {
         return; // power/function were sampled before the cancel; start fresh on the next poll.
     }
     if (hold) {
-        // The page consumes the debounced hold without cancelling it as a direct host action would.
-        dispatch_input(power_gesture_.pressed() ? InputAction::Press : InputAction::Release);
+        // The page consumes the debounced level without cancelling it as a direct host action would. held(), not
+        // pressed(): a cold boot starts with Power already held, and that hold must still count.
+        dispatch_input(power_gesture_.held() ? InputAction::Press : InputAction::Release);
         // Function still moves focus / goes back, but never while Power is held (that would cancel the hold).
-        if (function != ButtonGesture::Action::None && !power_gesture_.pressed())
+        if (function != ButtonGesture::Action::None && !power_gesture_.held())
             on_input(function == ButtonGesture::Action::Single ? InputAction::NextFocus : InputAction::Back);
         return;
     }

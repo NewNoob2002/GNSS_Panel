@@ -6,12 +6,9 @@
 
 using namespace page;
 
-static void animate_y(void* object, int32_t value) {
-    lv_obj_set_y(static_cast<lv_obj_t*>(object), static_cast<lv_coord_t>(value));
-}
-
-static void animate_height(void* object, int32_t value) {
-    lv_obj_set_height(static_cast<lv_obj_t*>(object), static_cast<lv_coord_t>(value));
+// 入场动画只改 translate：不触发重新布局（原先改 y/高度，按钮每帧重排），也不改透明度（不需要混合图层）。
+static void animate_translate_y(void* object, int32_t value) {
+    lv_obj_set_style_translate_y(static_cast<lv_obj_t*>(object), static_cast<lv_coord_t>(value), 0);
 }
 
 void DialplateView::create(lv_obj_t* root) {
@@ -21,15 +18,17 @@ void DialplateView::create(lv_obj_t* root) {
 
     ui.anim_timeline = lv_anim_timeline_create();
 
-    constexpr lv_coord_t y_tar_top = 28;
-    constexpr lv_coord_t h_tar_btn = 32;
+    // 与页面切换同向（开机时首页从下方推入）：面板和按钮稍晚于页面从下方升起，像跟着页面落定，
+    // 不与页面运动方向相反。按钮行裁剪子对象，按钮起点在行外不可见。
+    constexpr lv_coord_t top_from = 24;
+    constexpr lv_coord_t btn_from = 40;
 
     const lv_anim_timeline_wrapper_t wrapper[] = {
-        {0, ui.top_info.cont, animate_y, -54, y_tar_top, 260, lv_anim_path_ease_out, true},
-        {80, ui.btn_cont.btn_map, animate_height, 0, h_tar_btn, 180, lv_anim_path_ease_out, true},
-        {120, ui.btn_cont.btn_rec, animate_height, 0, h_tar_btn, 180, lv_anim_path_ease_out, true},
-        {160, ui.btn_cont.btn_menu, animate_height, 0, h_tar_btn, 180, lv_anim_path_ease_out, true},
-        {200, ui.btn_cont.btn_shutdown, animate_height, 0, h_tar_btn, 180, lv_anim_path_ease_out, true},
+        {0, ui.top_info.cont, animate_translate_y, top_from, 0, 260, lv_anim_path_ease_out, true},
+        {80, ui.btn_cont.btn_map, animate_translate_y, btn_from, 0, 200, lv_anim_path_ease_out, true},
+        {120, ui.btn_cont.btn_rec, animate_translate_y, btn_from, 0, 200, lv_anim_path_ease_out, true},
+        {160, ui.btn_cont.btn_menu, animate_translate_y, btn_from, 0, 200, lv_anim_path_ease_out, true},
+        {200, ui.btn_cont.btn_shutdown, animate_translate_y, btn_from, 0, 200, lv_anim_path_ease_out, true},
         LV_ANIM_TIMELINE_WRAPPER_END};
     lv_anim_timeline_add_wrapper(ui.anim_timeline, wrapper);
 }

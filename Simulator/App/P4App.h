@@ -67,6 +67,8 @@ class P4App {
     bool power_down_ = false, function_down_ = false;
     ButtonGesture power_gesture_, function_gesture_;
     bool power_hold_ = false; // The current page took the raw Power hold at the last poll.
+    unsigned preload_index_ = 0;
+    void preload_next();
     std::uint64_t last_poll_ms_ = 0;
     const char* key_page_ = nullptr;
     void cancel_keys();

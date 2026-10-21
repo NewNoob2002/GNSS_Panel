@@ -57,6 +57,7 @@ static void resource_init() {
     IMPORT_IMG(ui_play);
     IMPORT_IMG(ui_stop);
     IMPORT_IMG(ui_power);
+    IMPORT_IMG(ui_power_large);
     IMPORT_IMG(ui_wifi);
     IMPORT_IMG(ui_location);
     IMPORT_IMG(ui_sd_card);

@@ -89,6 +89,20 @@ find_image(lv_obj_t* root, const void* source) {
     return nullptr;
 }
 
+// 待机页开机进度环的当前值（%）。
+int
+startup_progress(lv_obj_t* root) {
+    if (lv_obj_check_type(root, &lv_arc_class)) {
+        return lv_arc_get_value(root);
+    }
+    for (uint32_t i = 0; i < lv_obj_get_child_cnt(root); ++i) {
+        if (const int value = startup_progress(lv_obj_get_child(root, static_cast<int32_t>(i))); value >= 0) {
+            return value;
+        }
+    }
+    return -1;
+}
+
 // 状态栏 SD 图标是否以录制色显示。
 bool
 status_recording() {
@@ -201,14 +215,16 @@ main() {
     assert(lv_disp_drv_register(&driver));
 
     reset_system_info();
+    // 冷启动：按住 Power 键给板子上电，界面开始轮询时键已按下；待机页的开机进度必须从这次按压开始计。
+    power_key = true;
     App_Init();
-    run(400);
+    run(1000);
     assert(on_page("Pages/Startup"));
     assert(!find_text(lv_scr_act(), "DEMO")); // 真实数据不显示 DEMO 标记
+    assert(startup_progress(lv_scr_act()) >= 30);
 
     // 开机由 HAL 决定：界面长按 2 s 只发出请求，HAL 未确认时不切页。
-    power_key = true;
-    run(2300);
+    run(1300);
     assert(on_page("Pages/Startup"));
     power_key = false;
     run(500);

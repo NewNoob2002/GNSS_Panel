@@ -108,6 +108,10 @@ class PageManager {
     bool push(const char* name, const PageBase::Stash_t* stash = nullptr);
     bool pop();
     bool back_home();
+    /** Create a registered page's view ahead of its first push (UI thread, no animation, root hidden) so the
+     * first entry appears from the cache instead of building widgets inside its transition. False if it is
+     * unknown or already loaded. */
+    bool preload(const char* name);
     /** Unload the navigation stack and load name as its sole root on the UI thread.
      * Only valid outside switching/dragging; null/unregistered names or busy state return false unchanged.
      * Loaded page views are destroyed synchronously, including the caller's view; registered controllers remain.

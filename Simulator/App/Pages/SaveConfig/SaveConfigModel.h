@@ -1,4 +1,5 @@
 #pragma once
+#include <functional>
 #include <memory>
 #include "Common/DataProc/DataProc.h"
 
@@ -15,10 +16,15 @@ class SaveConfigModel {
     const DataProc::SystemState& settings() const {
         return state_;
     }
+    /** Observe accepted System publications while the page is visible. */
+    void set_change_callback(std::function<void()> callback) {
+        change_cb_ = std::move(callback);
+    }
     bool finish_power();
     bool cancel_power();
 
   private:
+    std::function<void()> change_cb_;
     static int on_event(Account* account, Account::EventParam_t* event);
     std::unique_ptr<Account> account_;
     DataProc::StatusSnapshot status_{};

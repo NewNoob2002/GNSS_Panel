@@ -10,6 +10,12 @@ class ButtonGesture {
     bool pressed() const {
         return stable_ && !suppressed_;
     }
+    /** Debounced key level, including a key already held when gestures were cancelled (e.g. the Power key that
+     * powered the board on). For holds, which must count from the actual press; clicks still use pressed().
+     */
+    bool held() const {
+        return stable_;
+    }
     /** Discard pending gestures; a held key must release before another click is accepted. */
     void cancel(bool pressed);
 

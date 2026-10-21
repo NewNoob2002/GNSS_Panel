@@ -9,6 +9,7 @@ class SystemDash final : public PageBase {
     void on_view_load() override;
     void on_view_will_appear() override;
     void on_view_will_disappear() override;
+    void on_view_did_disappear() override;
     void on_view_unload() override;
     void on_language_changed() override;
     bool on_back_request() override;

@@ -135,8 +135,10 @@ PageBase::State_t PageManager::state_load_execute(PageBase* base) {
   */
 PageBase::State_t PageManager::state_will_appear_execute(PageBase* base) const {
     PM_LOG_INFO("Page(%s) state will appear", base->page_name);
-    base->on_view_will_appear();
+    // Show the root before the page sets up focus: a cached or preloaded root is still hidden here, and a page
+    // that focuses its root (StarMap) would otherwise skip it. Nothing renders until this timer cycle ends.
     lv_obj_clear_flag(base->root, LV_OBJ_FLAG_HIDDEN);
+    base->on_view_will_appear();
     switch_anim_create(base);
     return PageBase::PAGE_STATE_DID_APPEAR;
 }

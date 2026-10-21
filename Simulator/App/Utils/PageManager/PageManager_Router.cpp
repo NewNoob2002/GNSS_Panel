@@ -219,16 +219,6 @@ bool PageManager::switch_to(PageBase* new_node, const bool is_enter_act, const P
     /* Record current page */
     page_current_ = new_node;
 
-    /* If the current page has a cache */
-    if (page_current_->priv.is_cached) {
-        /* Direct display, no need to load */
-        PM_LOG_INFO("Page(%s) has cached, appear directly", page_current_->page_name);
-        page_current_->priv.state = PageBase::PAGE_STATE_WILL_APPEAR;
-    } else {
-        /* Load page */
-        page_current_->priv.state = PageBase::PAGE_STATE_LOAD;
-    }
-
     if (page_prev_ != nullptr) {
         page_prev_->priv.anim.is_enter = false;
     }
@@ -241,6 +231,20 @@ bool PageManager::switch_to(PageBase* new_node, const bool is_enter_act, const P
         /* Update the animation configuration according to the current page */
         switch_anim_type_update(page_current_);
     }
+
+    /* If the current page has a cache */
+    if (page_current_->priv.is_cached) {
+        /* Direct display, no need to load */
+        PM_LOG_INFO("Page(%s) has cached, appear directly", page_current_->page_name);
+    } else {
+        /* Build the page before any transition animation starts. */
+        page_current_->priv.state = state_load_execute(page_current_);
+    }
+    page_current_->priv.state = PageBase::PAGE_STATE_WILL_APPEAR;
+    // LVGL credits a new animation with all the time since the animation timer last ran. Creating a page can take
+    // tens of milliseconds on the MCU; without this refresh the first transition frame would jump by that much.
+    // Safe here: switches start from timers/input, never from inside an animation callback.
+    lv_anim_refr_now();
 
     /* Update the state machine of the previous page */
     state_update(page_prev_);
@@ -298,6 +302,22 @@ bool PageManager::reset_root(const char* name) {
     set_stack_clear();
     page_current_ = page_prev_ = nullptr;
     return push(name);
+}
+
+bool PageManager::preload(const char* name) {
+    PageBase* base = find_page_in_pool(name);
+    if (base == nullptr || base->root != nullptr || base->priv.state != PageBase::PAGE_STATE_IDLE)
+        return false;
+    // Same creation as a push's LOAD state; the page then waits like a cached page that has disappeared.
+    base->priv.state = state_load_execute(base);
+    lv_obj_add_flag(base->root, LV_OBJ_FLAG_HIDDEN);
+    if (!base->priv.is_cached) {
+        // Manual-cache pages are not kept between pushes; preloading them would only waste memory.
+        base->priv.state = state_unload_execute(base);
+        return false;
+    }
+    PM_LOG_INFO("Page(%s) preloaded", base->page_name);
+    return true;
 }
 
 /**

@@ -7,7 +7,7 @@
 using namespace page;
 
 void Startup::on_custom_attr_config() {
-    set_custom_load_anim_type(PageManager::LOAD_ANIM_FADE_ON, 280, lv_anim_path_ease_out);
+    set_custom_load_anim_type(PageManager::LOAD_ANIM_OVER_BOTTOM, style::kPageTransitionMs, lv_anim_path_ease_out);
 }
 
 void Startup::on_view_load() {

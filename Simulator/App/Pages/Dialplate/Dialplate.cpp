@@ -2,11 +2,12 @@
 #include "Utils/Log/Log.h"
 #include "Utils/PageManager/PageManager.h"
 #include "Utils/PageManager/PageUtils.h"
+#include "Utils/PageStyle.h"
 
 using namespace page;
 
 void Dialplate::on_custom_attr_config() {
-    set_custom_load_anim_type(PageManager::LOAD_ANIM_FADE_ON, 320, lv_anim_path_ease_in_out);
+    set_custom_load_anim_type(PageManager::LOAD_ANIM_OVER_TOP, style::kPageTransitionMs, lv_anim_path_ease_out);
 }
 
 std::array<lv_obj_t*, 5> Dialplate::controls() const {
@@ -20,6 +21,7 @@ void Dialplate::on_view_load() {
         app_fatal("Dialplate", "Model initialization failed");
     view_.create(root);
     utils::attach_controls(controls(), clicked, this);
+    entrance_pending_ = true;
 }
 
 void Dialplate::on_view_will_appear() {
@@ -29,7 +31,11 @@ void Dialplate::on_view_will_appear() {
         view_.update(model_.device());
     });
     utils::focus_controls(controls(), last_focus_ ? last_focus_ : view_.ui.btn_cont.btn_menu);
-    view_.appear_anim_start();
+    if (entrance_pending_) {
+        // Returning from a child slides the page back already; replaying the entrance would double the work.
+        entrance_pending_ = false;
+        view_.appear_anim_start();
+    }
     view_.anim_start();
 }
 

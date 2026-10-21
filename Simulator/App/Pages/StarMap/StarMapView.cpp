@@ -69,7 +69,6 @@ void StarMapView::create(lv_obj_t* root) {
         lv_obj_set_size(cont, item_width, item_height);
         lv_obj_set_pos(cont, item_start_x + i * item_width, 36);
         ui.constell[i].cont = cont;
-        style::appear(cont, static_cast<uint32_t>(i) * 30);
 
         lv_obj_t* accent = lv_obj_create(cont);
         lv_obj_remove_style_all(accent);

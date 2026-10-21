@@ -2,10 +2,11 @@
 #include "Utils/Log/Log.h"
 #include "Utils/PageManager/PageManager.h"
 #include "Utils/PageManager/PageUtils.h"
+#include "Utils/PageStyle.h"
 using namespace page;
 
 void WorkSettings::on_custom_attr_config() {
-    set_custom_load_anim_type(PageManager::LOAD_ANIM_MOVE_LEFT, 300, lv_anim_path_ease_in_out);
+    set_custom_load_anim_type(PageManager::LOAD_ANIM_MOVE_LEFT, style::kPageTransitionMs, lv_anim_path_ease_out);
 }
 void WorkSettings::on_view_load() {
     if (!model_.init())

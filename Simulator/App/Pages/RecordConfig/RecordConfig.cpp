@@ -2,10 +2,11 @@
 #include "Utils/Log/Log.h"
 #include "Utils/PageManager/PageManager.h"
 #include "Utils/PageManager/PageUtils.h"
+#include "Utils/PageStyle.h"
 using namespace page;
 
 void RecordConfig::on_custom_attr_config() {
-    set_custom_load_anim_type(PageManager::LOAD_ANIM_OVER_TOP, 280, lv_anim_path_ease_out);
+    set_custom_load_anim_type(PageManager::LOAD_ANIM_OVER_TOP, style::kPageTransitionMs, lv_anim_path_ease_out);
 }
 void RecordConfig::on_view_load() {
     if (!model_.init())

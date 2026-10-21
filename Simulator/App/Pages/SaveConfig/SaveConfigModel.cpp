@@ -1,5 +1,5 @@
 #include "SaveConfigModel.h"
-#include <algorithm>
+#include <cstring>
 #include "Common/ModelUtils.h"
 #include "Common/SystemService.h"
 #include "Utils/Log/Log.h"
@@ -19,6 +19,7 @@ bool SaveConfigModel::init() {
     return true;
 }
 void SaveConfigModel::deinit() {
+    change_cb_ = {};
     account_.reset();
 }
 bool SaveConfigModel::set_status_bar(bool visible, DataProc::StatusBarStyle style) const {
@@ -30,7 +31,11 @@ bool SaveConfigModel::set_status_bar(bool visible, DataProc::StatusBarStyle styl
 }
 int SaveConfigModel::on_event(Account* account, Account::EventParam_t* event) {
     auto* self = static_cast<SaveConfigModel*>(account->UserData);
-    return model_utils::receive(event, self->status_, self->state_);
+    const int result = model_utils::receive(event, self->status_, self->state_);
+    if (result == Account::RES_OK && event->event == Account::EVENT_PUB_PUBLISH && event->tran
+        && std::strcmp(event->tran->ID, "System") == 0 && self->change_cb_)
+        self->change_cb_();
+    return result;
 }
 bool SaveConfigModel::cancel_power() {
     DataProc::SystemRequest request{};

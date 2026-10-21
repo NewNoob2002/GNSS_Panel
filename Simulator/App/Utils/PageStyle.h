@@ -5,6 +5,11 @@
 
 namespace page::style {
 
+/** Page transitions slide whole opaque roots (no page-level opacity): a page fade renders the page into an alpha
+ * layer chunk by chunk, the most expensive transition on an MCU, and LVGL 8.3 draws pages with a full-screen child
+ * wrongly inside such a layer. Ease-out spends most of the short time on the first frames. */
+inline constexpr uint16_t kPageTransitionMs = 260;
+
 inline constexpr lv_color_t kBackground = LV_COLOR_MAKE(0x10, 0x12, 0x14);
 inline constexpr lv_color_t kPanel = LV_COLOR_MAKE(0x20, 0x24, 0x28);
 inline constexpr lv_color_t kCard = LV_COLOR_MAKE(0x18, 0x1C, 0x20);
@@ -37,6 +42,27 @@ inline lv_obj_t* label(lv_obj_t* parent, const lv_font_t* font, int x, int y, in
     lv_label_set_long_mode(obj, LV_LABEL_LONG_CLIP);
     lv_obj_set_style_text_font(obj, font, 0);
     lv_obj_set_style_text_color(obj, kText, 0);
+    return obj;
+}
+
+/** Create an opaque full-circle progress arc starting at twelve o'clock without input handling. */
+inline lv_obj_t* ring(lv_obj_t* parent, int x, int y, int size, int width, lv_color_t color) {
+    auto* obj = lv_arc_create(parent);
+    lv_obj_remove_style_all(obj);
+    lv_obj_clear_flag(obj, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_pos(obj, x, y);
+    lv_obj_set_size(obj, size, size);
+    lv_arc_set_bg_angles(obj, 0, 360);
+    lv_arc_set_rotation(obj, 270);
+    lv_arc_set_range(obj, 0, 100);
+    lv_arc_set_value(obj, 0);
+    lv_obj_set_style_arc_width(obj, width, LV_PART_MAIN);
+    lv_obj_set_style_arc_width(obj, width, LV_PART_INDICATOR);
+    lv_obj_set_style_arc_color(obj, kPanel, LV_PART_MAIN);
+    lv_obj_set_style_arc_color(obj, color, LV_PART_INDICATOR);
+    lv_obj_set_style_arc_rounded(obj, true, LV_PART_INDICATOR);
+    lv_obj_set_style_arc_opa(obj, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_arc_opa(obj, LV_OPA_COVER, LV_PART_INDICATOR);
     return obj;
 }
 
