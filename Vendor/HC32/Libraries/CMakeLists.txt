@@ -89,42 +89,7 @@ target_link_libraries(hc32_libraries INTERFACE
 )
 
 if(PRODUCT_HAS_DISPLAY)
-# 带屏产品：屏幕驱动、LVGL 与编码器按键事件
-add_library(hc32_adafruit_busio OBJECT
-    Adafruit_BusIO/Adafruit_SPIDevice.cpp
-)
-target_include_directories(hc32_adafruit_busio PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/Adafruit_BusIO
-)
-target_link_libraries(hc32_adafruit_busio
-    PRIVATE hc32_arduino_headers
-    PUBLIC hc32_project_options hc32_platform_headers
-)
-
-add_library(hc32_adafruit_gfx OBJECT
-    Adafruit-GFX-Library/glcdfont.c
-    Adafruit-GFX-Library/Adafruit_GFX.cpp
-    Adafruit-GFX-Library/Adafruit_SPITFT.cpp
-)
-target_include_directories(hc32_adafruit_gfx PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/Adafruit-GFX-Library
-)
-target_link_libraries(hc32_adafruit_gfx
-    PRIVATE hc32_arduino_headers
-    PUBLIC hc32_project_options hc32_platform_headers hc32_adafruit_busio
-)
-
-add_library(hc32_adafruit_st77xx OBJECT
-    Adafruit-ST7735-Library/Adafruit_ST77xx.cpp
-    Adafruit-ST7735-Library/Adafruit_ST7789.cpp
-)
-target_include_directories(hc32_adafruit_st77xx PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/Adafruit-ST7735-Library
-)
-target_link_libraries(hc32_adafruit_st77xx
-    PRIVATE hc32_arduino_headers
-    PUBLIC hc32_project_options hc32_platform_headers hc32_adafruit_gfx hc32_adafruit_busio
-)
+# 带屏产品：LVGL；原生面板由显示目标编译，SPI 主机由平台目标编译。
 
 set(EXTERNAL_DIR ${REPO_ROOT}/External)
 set(LVGL_DIR ${EXTERNAL_DIR}/lvgl)
@@ -162,16 +127,8 @@ target_link_libraries(hc32_lvgl PUBLIC
 )
 
 add_library(hc32_display_libraries INTERFACE)
-target_sources(hc32_display_libraries INTERFACE
-    $<TARGET_OBJECTS:hc32_adafruit_busio>
-    $<TARGET_OBJECTS:hc32_adafruit_gfx>
-    $<TARGET_OBJECTS:hc32_adafruit_st77xx>
-)
 target_link_libraries(hc32_display_libraries INTERFACE
     hc32_libraries_headers
-    hc32_adafruit_busio
-    hc32_adafruit_gfx
-    hc32_adafruit_st77xx
     hc32_lvgl
 )
 else()

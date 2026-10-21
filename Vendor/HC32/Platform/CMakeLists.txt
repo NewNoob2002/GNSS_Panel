@@ -16,6 +16,10 @@ file(GLOB PLATFORM_CORE_SOURCES CONFIGURE_DEPENDS
     Core/src/*.c
     Core/src/*.cpp
 )
+# SpiMaster 当前只有显示产品使用，保留平台目标归属；X1 不编译显示 SPI 代码。
+if(NOT PRODUCT_HAS_DISPLAY)
+    list(FILTER PLATFORM_CORE_SOURCES EXCLUDE REGEX "SpiMaster\\.cpp$")
+endif()
 file(GLOB PLATFORM_CONFIG_SOURCES CONFIGURE_DEPENDS
     Config/*.cpp
 )

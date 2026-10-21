@@ -31,12 +31,6 @@
 #define USB_SWITCH_PIN         PB8
 
 #if PRODUCT_HAS_DISPLAY
-/* SPI Class */
-#define SPI_CLASS_3_ENABLE     1
-#if SPI_CLASS_3_ENABLE
-#define SPI_CLASS_3_SPI CM_SPI3
-#endif
-
 /* Screen */
 // #define CONFIG_SCREEN_CS_PIN   PH2
 // #define CONFIG_SCREEN_DC_PIN   PB8
@@ -44,7 +38,6 @@
 // #define CONFIG_SCREEN_SCK_PIN  PB6
 // #define CONFIG_SCREEN_MOSI_PIN PB7
 // #define CONFIG_SCREEN_BLK_PIN  PB3 // TIM3
-// #define CONFIG_SCREEN_SPI      SPI_3
 // #define CONFIG_SCREEN_HOR_RES  320
 // #define CONFIG_SCREEN_VER_RES  172
 //////////////////////////////////////////
@@ -54,15 +47,8 @@
 #define CONFIG_SCREEN_SCK_PIN  PB15
 #define CONFIG_SCREEN_MOSI_PIN PB13
 // #define CONFIG_SCREEN_BLK_PIN  PB3 // TIM3
-#define CONFIG_SCREEN_SPI      SPI_3
 #define CONFIG_SCREEN_HOR_RES  294
 #define CONFIG_SCREEN_VER_RES  126
 
-/* DMA definition */
-#define DMA_UNIT               (CM_DMA1)
-#define DMA_CLK                (FCG0_PERIPH_DMA1 | FCG0_PERIPH_AOS)
-#define DMA_TX_CH              (DMA_CH0)
-#define DMA_TX_TRIG_CH         (AOS_DMA1_0)
-
-#define SPI_TX_EVT_SRC         (EVT_SRC_SPI3_SPTI)
+// SPI3、DMA1 CH0、AOS 与 IRQ 分配由 Display/board_display.cpp 的板级实例保存。
 #endif /* PRODUCT_HAS_DISPLAY */

@@ -96,6 +96,21 @@ foreach(product X1Pro XBase)
     set_tests_properties(${name}_display_app_tests PROPERTIES TIMEOUT 120)
 endforeach()
 
+# 原生面板与真实显示端口：逐字节/控制线核对、DMA 回收与产品偏移回归。
+foreach(product X1Pro XBase)
+    string(TOLOWER ${product} name)
+    add_executable(${name}_spi_panel_tests spi_panel_tests.cpp
+        ${HC32}/Platform/Core/src/SpiMaster.cpp
+        ${HC32}/Display/PanelRm690a0.cpp ${HC32}/Display/board_display.cpp ${HC32}/Display/lv_port_disp.cpp)
+    target_include_directories(${name}_spi_panel_tests PRIVATE spi_fakes ${HC32}/Platform/Core/inc
+        ${HC32}/Products/${product} ${HC32}/Platform/Config ${HC32}/Display)
+    target_link_libraries(${name}_spi_panel_tests PRIVATE display_lvgl)
+    target_compile_options(${name}_spi_panel_tests PRIVATE -Wall -Wextra -UNDEBUG
+        -fsanitize=address,undefined -fno-omit-frame-pointer)
+    target_link_options(${name}_spi_panel_tests PRIVATE -fsanitize=address,undefined)
+    add_test(NAME ${name}_spi_panel_tests COMMAND ${name}_spi_panel_tests)
+endforeach()
+
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 # 系统状态写入口只由对应写入者调用
 add_test(NAME state_ownership

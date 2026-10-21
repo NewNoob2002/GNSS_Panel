@@ -34,7 +34,6 @@ set(LINKER_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/HC32F460xE.ld)
 include(${REPO_ROOT}/cmake/ProjectOptions.cmake)
 
 add_subdirectory(Platform)
-add_subdirectory(Arduino)
 add_subdirectory(Libraries)
 
 # 三产品共用：与 Linux 主控的 I2C 从机通信及面板帧协议核心
@@ -69,11 +68,12 @@ if(PRODUCT_HAS_DISPLAY)
         Display/lvgl_new.cpp
         Display/lv_port.cpp
         Display/lv_port_disp.cpp
+        Display/PanelRm690a0.cpp
+        Display/board_display.cpp
     )
     target_include_directories(hc32_shared_display PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/Display
     )
-    target_link_libraries(hc32_shared_display PRIVATE hc32_arduino_headers)
     target_link_libraries(hc32_shared_display PUBLIC
         hc32_shared_comm
         app_ui
@@ -98,7 +98,6 @@ set_target_properties(${TARGET_NAME} PROPERTIES
 )
 target_link_libraries(${TARGET_NAME} PRIVATE
     hc32_platform
-    hc32_arduino
     hc32_libraries
     hc32_shared_comm
     hc32_product

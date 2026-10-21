@@ -1,9 +1,9 @@
-#include "Adafruit_ST7789.h"
+#include "board_display.h"
+#include "delay.h"
 #include "lv_port.h"
+#include "mcu_config.h"
 
-typedef Adafruit_ST7789 SCREEN_CLASS;
-
-static SCREEN_CLASS screen(&CONFIG_SCREEN_SPI, CONFIG_SCREEN_CS_PIN, CONFIG_SCREEN_DC_PIN, CONFIG_SCREEN_RST_PIN);
+static PanelRm690a0& screen = board_display_panel;
 
 // 逻辑横屏宽度为 CONFIG_SCREEN_HOR_RES；42 行使 126 行高的整屏正好分 3 块刷新。
 #define SCREEN_BUFFER_ROWS 42U
@@ -23,25 +23,9 @@ static lv_disp_drv_t disp_drv; /*Descriptor of a display driver*/
 static lv_disp_draw_buf_t draw_buf_dsc;
 static lv_color_t draw_buf[SCREEN_BUFFER_SIZE] __attribute__((aligned(4)));
 static lv_color_t tx_buf[SCREEN_BUFFER_SIZE] __attribute__((aligned(4)));
-static volatile bool dma_done;
 static bool flush_active;
 static uint32_t flush_started_ms;
 volatile uint32_t display_dma_timeouts;
-
-void
-spi_dma_trans(void* buf, uint16_t len) {
-    if (SPI_CLASS_3_SPI->CR1 & SPI_CR1_SPE) {
-        SPI_Cmd(SPI_CLASS_3_SPI, DISABLE);
-    }
-    DMA_ChCmd(DMA_UNIT, DMA_TX_CH, DISABLE);
-    DMA_ClearTransCompleteStatus(DMA_UNIT, DMA_FLAG_TC_CH0);
-    DMA_SetSrcAddr(DMA_UNIT, DMA_TX_CH, (uint32_t)buf);
-    DMA_SetTransCount(DMA_UNIT, DMA_TX_CH, len);
-
-    DMA_ChCmd(DMA_UNIT, DMA_TX_CH, ENABLE);
-
-    SPI_Cmd(SPI_CLASS_3_SPI, ENABLE);
-}
 
 void
 my_rounder_cb(lv_disp_drv_t* disp_drv, lv_area_t* area) {
@@ -99,23 +83,19 @@ disp_flush(lv_disp_drv_t* disp_drv, const lv_area_t* area, lv_color_t* color_p) 
         return; // 整块都在玻璃外
     }
 
-    dma_done = false;
     flush_active = true;
     flush_started_ms = millis();
 
-    // setAddrWindow() 不操作 CS；上一块结束时 CS 已拉高，必须先选中屏幕，
-    // 否则 CASET/RASET/RAMWR 被丢弃，像素数据会写到旧窗口。
-    digitalWrite(CONFIG_SCREEN_CS_PIN, LOW);
-    screen.setAddrWindow(area->y1, first_row, h, rows);
-    digitalWrite(CONFIG_SCREEN_DC_PIN, HIGH);
-    spi_dma_trans(tx_buf + (uint32_t)skipped * h, (uint32_t)rows * h * sizeof(lv_color_t));
-}
-
-static void
-DMA_TransCompleteCallback(void) {
-    DMA_ClearTransCompleteStatus(DMA_UNIT, DMA_FLAG_TC_CH0);
-
-    dma_done = true;
+    // setWindow 不操作 CS；先选中屏幕，再发送窗口命令和像素，完成/超时后才释放 CS。
+    screen.select();
+    screen.setWindow(area->y1, first_row, area->y1 + h - 1, first_row + rows - 1);
+    screen.dataMode();
+    if (!board_display_spi.startDmaWrite(tx_buf + (uint32_t)skipped * h, (uint32_t)rows * h * sizeof(lv_color_t))) {
+        // 静态缓冲和长度已受编译期约束；初始化异常时也必须释放片选，避免卡住下一帧。
+        board_display_spi.abort();
+        screen.deselect();
+        flush_active = false;
+    }
 }
 
 void
@@ -125,10 +105,9 @@ lv_port_disp_poll() {
     }
     const bool expired = millis() - flush_started_ms >= 100U;
     // IDLNF 为 1 表示 SPI 仍忙；DMA 结束时最后一个字节可能还在移位。
-    if ((dma_done && (SPI_CLASS_3_SPI->SR & SPI_FLAG_IDLE) == 0U) || expired) {
-        DMA_ChCmd(DMA_UNIT, DMA_TX_CH, DISABLE);
-        SPI_Cmd(SPI_CLASS_3_SPI, DISABLE);
-        digitalWrite(CONFIG_SCREEN_CS_PIN, HIGH);
+    if ((board_display_spi.dmaDone() && board_display_spi.isIdle()) || expired) {
+        board_display_spi.abort();
+        screen.deselect();
         flush_active = false;
         if (expired) {
             ++display_dma_timeouts;
@@ -138,43 +117,12 @@ lv_port_disp_poll() {
 
 void
 lv_port_disp_init() {
-    /*DMA init*/
-    stc_dma_init_t stcDmaInit;
-
-    FCG_Fcg0PeriphClockCmd(DMA_CLK, ENABLE);
-    (void)DMA_StructInit(&stcDmaInit);
-    stcDmaInit.u32IntEn = DMA_INT_ENABLE;
-    stcDmaInit.u32BlockSize = 1UL;
-    stcDmaInit.u32TransCount = 65535;
-    stcDmaInit.u32DataWidth = DMA_DATAWIDTH_8BIT;
-    /* Configure TX */
-    stcDmaInit.u32SrcAddrInc = DMA_SRC_ADDR_INC;
-    stcDmaInit.u32DestAddrInc = DMA_DEST_ADDR_FIX;
-    stcDmaInit.u32SrcAddr = (uint32_t)(0);
-    stcDmaInit.u32DestAddr = (uint32_t)(&SPI_CLASS_3_SPI->DR);
-    if (LL_OK != DMA_Init(DMA_UNIT, DMA_TX_CH, &stcDmaInit)) {
+    // 保留 DMA 先于面板 GPIO/SPI 初始化的顺序；与旧 DMA_Init 失败一样停止初始化。
+    if (!board_display_spi.beginDma() || !screen.init()) {
         for (;;) {}
     }
-    AOS_SetTriggerEventSrc(DMA_TX_TRIG_CH, SPI_TX_EVT_SRC);
-
-    stc_irq_signin_config_t stcIrqSignConfig;
-    stcIrqSignConfig.enIntSrc = INT_SRC_DMA1_TC0;
-    stcIrqSignConfig.enIRQn = INT009_IRQn;
-    stcIrqSignConfig.pfnCallback = &DMA_TransCompleteCallback;
-    (void)INTC_IrqSignIn(&stcIrqSignConfig);
-    NVIC_ClearPendingIRQ(stcIrqSignConfig.enIRQn);
-    NVIC_SetPriority(stcIrqSignConfig.enIRQn, DDL_IRQ_PRIO_04);
-    NVIC_EnableIRQ(stcIrqSignConfig.enIRQn);
-
-    DMA_Cmd(DMA_UNIT, ENABLE);
-    DMA_ChCmd(DMA_UNIT, DMA_TX_CH, DISABLE);
-
-    screen.init(CONFIG_SCREEN_VER_RES, CONFIG_SCREEN_HOR_RES);
-    screen.fillScreen(ST77XX_BLACK);
-#if defined(CONFIG_SCREEN_BLK_PIN)
-    pinMode(CONFIG_SCREEN_BLK_PIN, OUTPUT);
-    digitalWrite(CONFIG_SCREEN_BLK_PIN, LOW);
-#endif
+    screen.fill(0x0000);
+    screen.enableBacklight();
     lv_disp_draw_buf_init(&draw_buf_dsc, draw_buf, NULL, SCREEN_BUFFER_SIZE);
     /*-----------------------------------
      * Register the display in LVGL
@@ -204,6 +152,8 @@ void
 lv_port_reset() {
     // 重新初始化会发送命令，必须先让在途的 DMA 帧结束。
     wait_flush_idle();
-    screen.init(CONFIG_SCREEN_VER_RES, CONFIG_SCREEN_HOR_RES);
-    screen.fillScreen(ST77XX_BLACK);
+    if (!screen.init()) {
+        for (;;) {}
+    }
+    screen.fill(0x0000);
 }
