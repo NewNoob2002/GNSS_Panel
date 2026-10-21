@@ -90,25 +90,25 @@ flowchart TD
 ## 6. 目录与变更归属
 
 ```text
-ATK_RK3506/
-├── README.md
-├── docs/                       原始资料、计划、HC32 迁移摘要、构建说明
-├── docker/                     已实现：编译镜像与环境检查
-├── application/                CMake、Linux IO、显示 port 与九页 P4 画面
-│   ├── CMakeLists.txt
-│   ├── App/                    原九页 View、PageManager、资源及直接依赖
-│   ├── demo/                   独立 benchmark 入口与 FPS/CPU 统计
-│   ├── platform/               当前 Linux SPI/GPIO 适配
-│   ├── display/                RM690A0 协议与 LVGL 显示 port
-│   └── config/                 lv_conf
-├── third_party/                已提取 LVGL 8.3.11 及来源；其他依赖按需引入
-├── board/rk3506j/              已记录接线与 P1 硬件检查
-├── refer/01_lvgl_button/       已实屏运行的参考程序源码
-├── patches/                    已保存旧 Simulator 补丁
-├── tests/                      已实现：屏协议、Linux IO 与显示回归检查
-├── .github/workflows/           主机 CMake/CTest CI
-├── out/                        本项目构建产物，不入版本库
-└── sdk/                        已有厂商多仓 SDK，当前被忽略
+<repo-root>/
+├── App/                        共享九页 View/Model/Controller、状态栏、I18n、资源与核心测试 App/tests/
+├── Frameworks/                 跨平台框架（DataCenter、DataBroker、DeviceManager、PageManager、ResourceManager）
+├── External/lvgl/              共享 LVGL 8.3.11 源码
+├── Vendor/
+│   ├── HC32/                   HC32F460xE 固件
+│   ├── Simulator/              唯一 PC SDL2 模拟器（SIM_BACKEND=Board|Demo）
+│   └── Linux/                  RK3506 Linux 端口
+│       ├── CMakeLists.txt
+│       ├── Backends/Demo/      Linux 演示业务后端（DemoStatus、SimulatedSystem）
+│       ├── board/rk3506j/      已记录接线与 P1 硬件检查
+│       ├── config/             lv_conf.h 与 POSIX tick
+│       ├── demo/               独立 benchmark 入口与 FPS/CPU 统计
+│       ├── display/            RM690A0 协议与 LVGL 显示 port
+│       ├── docker/             编译镜像与环境检查
+│       ├── docs/               原始资料、计划、HC32 迁移摘要、构建说明
+│       ├── platform/           Linux SPI/GPIO/evdev 适配与 rk3506_app 入口
+│       └── tests/              屏协议、Linux IO 与显示回归检查
+└── build/                      本仓库构建产物，不入版本库
 ```
 
 目录划分表达职责，具体文件随实现建立。保留第三方/资源来源和许可文本；不复制整套 Arduino 核心来模拟 MCU。SDK 修改写入源配置/项目包并保存补丁，不修改 output/build 生成目录。自启动方式依据 rootfs 实际 init 系统选择。

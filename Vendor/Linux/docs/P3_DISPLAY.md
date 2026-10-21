@@ -27,7 +27,7 @@
 
 ## LVGL benchmark 实屏性能（2026-09-24）
 
-使用 `cmake -S application -B out/p3/demo-host -DRK3506_LVGL_DEMO=ON` 配置并以 `cmake --build out/p3/demo-host --target lvgl_demo` 构建主机版；板端需用下文的 Buildroot ARM32 工具链构建，再运行 `lvgl_demo /dev/spidev0.0 /dev/gpiochip1 32000000 4096`。demo 使用 8 ms LVGL 刷新周期、两块各占四分之一帧的绘制缓冲，并在屏幕右下角显示实际刷新 FPS 与进程 CPU 占用率。FPS 按 LVGL 完成有像素刷新回调的次数除以经过的单调时钟时间计算；不是屏幕扫描帧率。CPU 占用率基于进程 CPU 时间，显示值随测试场景变化。
+使用 `cmake -S Vendor/Linux -B out/p3/demo-host -DRK3506_LVGL_DEMO=ON` 配置并以 `cmake --build out/p3/demo-host --target lvgl_demo` 构建主机版；板端需用下文的 Buildroot ARM32 工具链构建，再运行 `lvgl_demo /dev/spidev0.0 /dev/gpiochip1 32000000 4096`。demo 使用 8 ms LVGL 刷新周期、两块各占四分之一帧的绘制缓冲，并在屏幕右下角显示实际刷新 FPS 与进程 CPU 占用率。FPS 按 LVGL 完成有像素刷新回调的次数除以经过的单调时钟时间计算；不是屏幕扫描帧率。CPU 占用率基于进程 CPU 时间，显示值随测试场景变化。
 
 | SPI 请求频率 | 5 秒窗口实测刷新率 | 结果 |
 | --- | --- | --- |
@@ -47,13 +47,13 @@
 
 ## 代码与协议边界
 
-- `application/display/rm690a0.c`：初始化、坐标检查、0x2A/0x2B/0x2C、像素分段。参数越界在发送前拒绝；传输失败使屏状态失效，后续写入被拒绝，必须重新初始化。
-- `application/platform/linux_display.c`：SPI mode 3、8 bit、MSB first、硬件 CS；GPIO1 的 DC=22、RESET=20 以同一 line handle 申请。使用目标内核已启用的 GPIO CDEV v1，无新增 libgpiod 依赖。
-- `application/display/lv_display.c`：保留原软件旋转、rounder 及两块 9261 像素缓冲。像素已由 LVGL 按线上顺序生成，协议层不再交换字节。不分配全屏影子缓冲。
-- `application/display_test.c`：显示测试图、单调时钟、SIGINT/SIGTERM 退出；不接业务、按键或整机电源。
-- `tests/`：协议屏模型、逐处故障注入、Linux 系统调用替身。测试使用全屏数组作断言依据，生产驱动没有该数组。
+- `Vendor/Linux/display/rm690a0.c`：初始化、坐标检查、0x2A/0x2B/0x2C、像素分段。参数越界在发送前拒绝；传输失败使屏状态失效，后续写入被拒绝，必须重新初始化。
+- `Vendor/Linux/platform/linux_display.c`：SPI mode 3、8 bit、MSB first、硬件 CS；GPIO1 的 DC=22、RESET=20 以同一 line handle 申请。使用目标内核已启用的 GPIO CDEV v1，无新增 libgpiod 依赖。
+- `Vendor/Linux/display/lv_display.c`：保留原软件旋转、rounder 及两块 9261 像素缓冲。像素已由 LVGL 按线上顺序生成，协议层不再交换字节。不分配全屏影子缓冲。
+- `Vendor/Linux/display_test.c`：显示测试图、单调时钟、SIGINT/SIGTERM 退出；不接业务、按键或整机电源。
+- `Vendor/Linux/tests/`：协议屏模型、逐处故障注入、Linux 系统调用替身。测试使用全屏数组作断言依据，生产驱动没有该数组。
 
-初始化数据依据 HC32 `Libraries/Adafruit-ST7735-Library/Adafruit_ST7789.cpp` 的 `generic_RM690A0`，源提交及调用链见 [迁移摘要](HC32_MIGRATION.md)。新实现未复制 Arduino/HC32 传输代码；原工程未修改。
+初始化数据依据 HC32 `Vendor/HC32/Libraries/Adafruit-ST7735-Library/Adafruit_ST7789.cpp` 的 `generic_RM690A0`，源提交及调用链见 [迁移摘要](HC32_MIGRATION.md)。新实现未复制 Arduino/HC32 传输代码；原工程未修改。
 
 ### CS 与分段
 
@@ -72,9 +72,9 @@ SPI 短传输视为 EIO；其他 ioctl 错误保留 errno，不重试可能已�
 主机：
 
 ```sh
-cmake -S application -B out/p3/host -DCMAKE_BUILD_TYPE=Debug
-cmake --build out/p3/host -j8
-ctest --test-dir out/p3/host --output-on-failure
+cmake --preset linux-host
+cmake --build --preset linux-host -j8
+ctest --test-dir build/linux-host --output-on-failure
 ```
 
 P3 检查点主机 CTest **3/3 通过**：P2 `lvgl_baseline`、`display_protocol`、`linux_display`。检查点 `20f7f1c` 的 [GitHub Host tests](https://github.com/NewNoob2002/ATK_RK3506/actions/runs/35965777501) 同样通过 3/3。协议测试覆盖完整初始化/清黑、4/4096/32768 字节分段、74088 字节整帧、边界与非法输入、初始化和写入每一 IO 步的失败、旋转后颜色/边框与非对齐局部区域。Linux IO 测试覆盖打开失败、锁冲突、GPIO 申请失败、短传输、清理失败及 EINTR 延时；测试不访问真实设备。
@@ -85,7 +85,7 @@ ARM 沿用 P2 镜像 `rk3506-sdk:ubuntu20.04-p2`，项目挂载为 `/work`。容
 cd /work
 br_host=/work/sdk/atk_dlrk3506_linux6.1_release_v1.3.1_20260326/buildroot/output/alientek_rk3506/host
 br_target=/work/sdk/atk_dlrk3506_linux6.1_release_v1.3.1_20260326/buildroot/output/alientek_rk3506/target
-cmake -S application -B out/p3/arm \
+cmake -S Vendor/Linux -B out/p3/arm \
   -DCMAKE_TOOLCHAIN_FILE="$br_host/share/buildroot/toolchainfile.cmake" \
   -DCMAKE_BUILD_TYPE=Release
 cmake --build out/p3/arm -j8

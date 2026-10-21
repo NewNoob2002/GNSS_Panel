@@ -101,12 +101,12 @@ No new selectable hardware-failure scenarios are introduced without a backend co
 ## Phase 4 — validation
 
 ```sh
-cmake -S application -B out/ui-page-check -DCMAKE_BUILD_TYPE=Debug
-cmake --build out/ui-page-check --parallel 2
-ctest --test-dir out/ui-page-check --output-on-failure
-cmake -S application -B out/sdl -DCMAKE_BUILD_TYPE=Debug -DRK3506_SDL_PREVIEW=ON
-cmake --build out/sdl --target simulator --parallel 2
-SDL_VIDEODRIVER=dummy timeout --preserve-status --signal=TERM 2s ./out/sdl/simulator
+cmake --preset linux-host
+cmake --build --preset linux-host --parallel 2
+ctest --test-dir build/linux-host --output-on-failure
+cmake -S . -B build/sim-demo -DPLATFORM=Simulator -DSIM_BACKEND=Demo
+cmake --build build/sim-demo --parallel 2
+SDL_VIDEODRIVER=dummy timeout --preserve-status --signal=TERM 2s ./build/sim-demo/bin/main
 ```
 
 Host suite now has 9 tests. Framework tests exercise logger filtering/format/truncation/recursion, account subscription teardown and callback-driven subscriber deletion. Status tests exercise page-owned snapshots, peer pulls, lifecycle/reinitialization, calendar validation, language and simulated idempotent power requests. SystemDash host tests dispatch separate Next/Select/Back/Commit actions and check bilingual labels/image bounds and glyph coverage, native bitmap format/dimensions/1:1 zoom, enabled/disabled focus, absence of the date editor, inert Settings Commit, Select-vs-Commit safety, save cancellation, both power actions and status-bar restoration. Explicit normalized two-key sample regressions verify Function-only cyclic Language/Back and Power/Settings/Return focus, Power-single return selection, working-root coordinates/StatusBar restoration and re-entry into the fresh Power-first menu in both languages; this exercises UI logic, not physical GPIO or the SDL adapter. Pure ButtonGesture checks retain exclusivity and boundary coverage. Inactive SystemInfos cards intentionally move outside the viewport; bounds checks target each focused card.

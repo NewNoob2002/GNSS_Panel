@@ -4,7 +4,10 @@
         {
             "label": "Build Simulator",
             "type": "shell",
-            "command": "cmake -B build -G Ninja && cmake --build build",
+            "command": "cmake --preset simulator-x1pro && cmake --build --preset simulator-x1pro",
+            "options": {
+                "cwd": "${workspaceFolder}/../.."
+            },
             "group": {
                 "kind": "build",
                 "isDefault": true

@@ -5,10 +5,10 @@
             "name": "Simulator (GDB)",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/bin/main",
+            "program": "${workspaceFolder}/../../build/simulator-x1pro/bin/main",
             "args": [],
             "stopAtEntry": false,
-            "cwd": "${workspaceFolder}",
+            "cwd": "${workspaceFolder}/../..",
             "environment": [],
             "externalConsole": false,
             "MIMode": "gdb",
@@ -21,16 +21,6 @@
             ],
             "preLaunchTask": "Build Simulator",
             "miDebuggerPath": "/usr/bin/gdb"
-        },
-        {
-            "name": "Hardware (Cortex Debug)",
-            "cwd": "${workspaceFolder}",
-            "executable": "./bin/executable.elf",
-            "request": "launch",
-            "type": "cortex-debug",
-            "runToEntryPoint": "main",
-            "servertype": "jlink",
-            "device": "HC32F460xE"
         }
     ]
 }

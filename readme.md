@@ -41,31 +41,27 @@
 
 > 项目采用分层架构，确保代码的可移植性和可维护性：
 
+> ├── App               # 跨平台共享应用（核心服务、页面、Model/View、资源与核心测试 App/tests）
+
+> ├── Frameworks        # 跨平台基础框架（DataCenter、DataBroker、DeviceManager、PageManager、ResourceManager）
+
+> ├── External/lvgl     # 上游 LVGL 8.3.11 源码（不含平台 lv_conf.h 与 porting）
+
+> ├── Vendor            # 平台实现层
+
+> │   ├── HC32          # HC32F460xE 固件（Platform、Arduino、Libraries、Comm、Display、Products）
+
+> │   ├── Simulator     # 唯一 PC 端 SDL2 模拟器（支持 SIM_BACKEND=Board|Demo 与 SIM_PRODUCT=X1Pro|XBase）
+
+> │   └── Linux         # RK3506 Linux 端口、演示后端与 Linux 主机测试
+
 > ├── cmake             # 工具链文件与公共编译选项（配合根目录 CMakePresets.json）
 
-> ├── Arduino           # Arduino API 兼容层抽象实现
-
-> ├── Libraries         # 第三方与器件库（LVGL、Adafruit 显示驱动、电量计/充电芯片驱动等）
-
-> ├── Platform          # 硬件抽象层 (HAL) 与驱动定义，三产品共用
-
-> ├── Shared            # 产品共用业务
-
-> │   ├── Comm          # 与主控的 I2C 从机通信、面板帧协议核心（全部产品）
-
-> │   ├── App           # 与 RK3506 共用的框架、核心服务及 LVGL UI（同一份源码与 CMake）
-
-> │   └── Display       # 带屏产品入口、共享应用的平台层 AppPlatform/、显示协议表、显示 HAL（X1Pro、XBase）
-
-> ├── Products          # 产品配置与专属代码：X1（无屏）、X1Pro、XBase
-
-> ├── Simulator         # PC 端仿真器；链接 Shared/App 与 HC32 AppPlatform，提供模拟板级设备
-
-> └── tests             # 主机回归测试（协议、传输、电源与各产品协议表）
+> └── tests             # HC32 主机回归测试（协议、传输、电源、显示应用与各产品协议表）
 
 ## 🔨 构建
 
-每次配置只构建一个产品，`<product>` 为 `x1`、`x1pro` 或 `xbase`：
+顶层按 `PLATFORM=HC32|Simulator|Linux`（默认 `HC32`）分发到 `Vendor/<平台>`。每次配置 HC32 只构建一个产品，`<product>` 为 `x1`、`x1pro` 或 `xbase`：
 
 ```bash
 cmake --preset <product>-debug        # 或 <product>-release
@@ -75,13 +71,22 @@ cmake --build --preset <product>-debug
 产物位于 `build/<preset>/`（`.elf`、`.map`）和 `build/<preset>/generated/`（`.hex`、`.bin`）。
 
 ```bash
-# PC 模拟器（带屏产品）
-cmake -S Simulator -B build/simulator -DSIM_PRODUCT=X1Pro   # 或 XBase
-cmake --build build/simulator
-./build/simulator/bin/main         # 输出在各自构建目录的 bin/，启动时打印按键说明
+# PC 模拟器（HC32 Board 后端：X1Pro 或 XBase）
+cmake --preset simulator-x1pro        # 或 simulator-xbase
+cmake --build --preset simulator-x1pro
+./build/simulator-x1pro/bin/main      # 输出在各自构建目录的 bin/，启动时打印按键说明
 
-# 主机回归测试
-cmake -S tests -B build/host-tests && cmake --build build/host-tests && ctest --test-dir build/host-tests
+# PC 模拟器（Demo 后端，可选 --random-status [seed]）
+cmake -S . -B build/sim-demo -DPLATFORM=Simulator -DSIM_BACKEND=Demo
+cmake --build build/sim-demo
+./build/sim-demo/bin/main --random-status 42
+
+# Linux 端口主机构建与测试
+cmake --preset linux-host && cmake --build --preset linux-host && ctest --test-dir build/linux-host --output-on-failure
+
+# HC32 主机回归测试与共享核心测试
+cmake -S tests -B build/host-tests && cmake --build build/host-tests && ctest --test-dir build/host-tests --output-on-failure
+cmake -S App/tests -B build/app-core-tests && cmake --build build/app-core-tests && ctest --test-dir build/app-core-tests --output-on-failure
 ```
 
 产品差异的组织方式见 [docs/product_structure.md](docs/product_structure.md)。

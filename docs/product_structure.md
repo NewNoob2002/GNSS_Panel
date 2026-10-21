@@ -11,30 +11,34 @@
 ## 目录与依赖
 
 ```text
-Platform/          MCU 启动、驱动、Arduino 风格外设、共用 HAL（电源策略、充电/电量计、按键、LED、时基、Flash），Config/board_pins.h 为主板引脚
-Arduino/           Arduino 兼容核心
-Libraries/         第三方与器件库；LVGL/Adafruit 仅带屏产品构建，MultiButton 仅 X1
-Shared/Comm/       I2C 从机传输 + 面板帧协议核心（全部产品）
-Shared/Display/    带屏产品入口、共享应用的 HC32 平台层 AppPlatform/（入口 + Status/Power/Device 三个 Bridge + 初始化步骤）、显示协议表、显示 HAL、LVGL 内存池 operator new（X1Pro、XBase）
-Shared/App/        共享应用：独立事件框架、无 LVGL 的核心服务、LVGL 页面；ATK_RK3506 application/App 的原样副本（含共用 CMake，UPSTREAM 记录来源提交）
-Simulator/         PC 模拟器：共享应用 + AppPlatform + 固件电源时序 HAL_Power.cpp（Simulator/HAL 提供虚拟 GPIO 与时基）；LVGL 用 Libraries/lvgl，配置用自身 lv_conf.h（LV_CONF_PATH 指定）
-Products/<产品>/   product.cmake、product_config.h、产品专属源码
+App/                      共享应用：独立事件框架接入、无 LVGL 的核心服务、LVGL 页面及核心测试 App/tests/（本仓库为唯一来源）
+Frameworks/               跨平台框架：DataCenter、DataBroker、DeviceManager、PageManager、ResourceManager
+External/lvgl/            上游 LVGL 8.3.11 源码（src/、lvgl.h、demos/，不含平台 lv_conf.h 与 porting/）
+Vendor/HC32/
+  Platform/               MCU 启动、驱动、Arduino 风格外设、共用 HAL（电源策略、充电/电量计、按键、LED、时基、Flash），Config/board_pins.h 为主板引脚
+  Arduino/                Arduino 兼容核心
+  Libraries/              器件与第三方库（Bq40z50、Mp2762a、MillisTaskManager、Parser、easylogger、Adafruit*、MultiButton）；LVGL 从 External/lvgl 构建
+  Comm/                   I2C 从机传输 + 面板帧协议核心（全部产品）
+  Display/                带屏产品入口、共享应用的 HC32 平台层 AppPlatform/（入口 + Status/Power/Device 三个 Bridge + 初始化步骤）、显示协议表、显示 HAL、固件 lv_conf.h 与 lv_port*、LVGL 内存池 operator new（X1Pro、XBase）
+  Products/<产品>/        product.cmake、product_config.h、产品专属源码
+Vendor/Simulator/         唯一 PC SDL 模拟器：SIM_BACKEND=Board（默认，共享应用 + AppPlatform + 固件 HAL_Power.cpp）或 Demo（Linux 演示后端）；配置用自身 lv_conf.h
+Vendor/Linux/             RK3506 Linux 端口、Backends/Demo 演示后端与主机测试；配置用 config/lv_conf.h
 ```
 
-依赖只能自上而下：`Products` → `Shared` → `Platform`/`Libraries`/`Arduino`。`Platform/` 不包含 LVGL 或 `Shared/App` 头文件；为此做了以下解耦：
+依赖只能自上而下：`Products` → `Display`/`Comm` → `Platform`/`Libraries`/`Arduino`。`Vendor/HC32/Platform/` 不包含 LVGL 或 `App/` 头文件；为此做了以下解耦：
 
 - LVGL 使用 `LV_TICK_CUSTOM` 直接读取 `millis()`，SysTick 不再调用 `lv_tick_inc()`。
-- C++ `operator new` 平台默认走 C 堆（弱符号），带屏产品在 `Shared/Display/lvgl_new.cpp` 以强符号改用 LVGL 内存池。
+- C++ `operator new` 平台默认走 C 堆（弱符号），带屏产品在 `Vendor/HC32/Display/lvgl_new.cpp` 以强符号改用 LVGL 内存池。
 - `HAL::Power_OnCheck(idle)` 由入口传入等待开机期间的刷新函数；显示 DMA 回收 `lv_port_disp_poll()` 由带屏主循环调用。
 - `SPI.cpp` 只声明 `spi_dma_trans()`，实现在显示驱动中。
 
 ## 产品差异放在哪里
 
-共享构建与第一阶段清理见 [Shared/App/ARCHITECTURE.md](../Shared/App/ARCHITECTURE.md)：`app_framework` / `app_core` 不依赖 LVGL，`app_ui` 是 UI；固件、主机测试、模拟器复用同一个 CMake 文件。平台通过 `app_build_options` 和 `app_lvgl` 绑定编译选项与显示库，RK 演示后端不再随共享代码同步。
+共享构建与架构边界见 [App/ARCHITECTURE.md](../App/ARCHITECTURE.md)：`app_framework` / `app_core` 不依赖 LVGL，`app_ui` 是 UI；固件、主机测试、模拟器与 Linux 端口复用同一个 `App/CMakeLists.txt`。平台通过 `app_build_options` 和 `app_lvgl` 绑定编译选项与显示库。`App/` 与 `Frameworks/` 直接在本仓库修改；平台相关行为放在 `Vendor/<平台>`。
 
-1. **功能开关**：`Products/<产品>/product_config.h` 中的 `PRODUCT_*` 宏，经 `mcu_config.h` 被所有源码看到。带屏产品缺少任一开关时 `mcu_config.h` 直接报错，避免 `#if` 未定义被当作 0。
-2. **弱符号扩展点**（`Platform/HAL/HAL.h`）：`Power_ProductInit`、`Power_ProductUpdate`、`Power_AdjustPercent`、`Key_ProductInit`、`Key_ProductUpdate`。默认无动作，产品源码覆盖（X1：电量补偿、MultiButton 按键动作）。
-3. **协议表**：帧校验、ACK 编码、“完整读出后才生效”在 `Shared/Comm/panel_protocol.cpp`；产品实现 `panel_protocol_packets()`。X1 见 `Products/X1/x1_protocol.cpp`，X1Pro/XBase 共用 `Shared/Display/display_protocol.cpp`。
+1. **功能开关**：`Vendor/HC32/Products/<产品>/product_config.h` 中的 `PRODUCT_*` 宏，经 `mcu_config.h` 被所有源码看到。带屏产品缺少任一开关时 `mcu_config.h` 直接报错，避免 `#if` 未定义被当作 0。
+2. **弱符号扩展点**（`Vendor/HC32/Platform/HAL/HAL.h`）：`Power_ProductInit`、`Power_ProductUpdate`、`Power_AdjustPercent`、`Key_ProductInit`、`Key_ProductUpdate`。默认无动作，产品源码覆盖（X1：电量补偿、MultiButton 按键动作）。
+3. **协议表**：帧校验、ACK 编码、“完整读出后才生效”在 `Vendor/HC32/Comm/panel_protocol.cpp`；产品实现 `panel_protocol_packets()`。X1 见 `Vendor/HC32/Products/X1/x1_protocol.cpp`，X1Pro/XBase 共用 `Vendor/HC32/Display/display_protocol.cpp`。
    每种报文的载荷是一个 packed 结构体（通用的 `PanelInfoPayload`/`PanelStatusPayload`/`PanelSetAck`/`PanelFlagRequest` 在 `panel_protocol.h`，带屏专用的 `Display*Payload` 在 `display_protocol.h`），用 `static_assert` 固定长度与关键偏移；处理函数用 `panel_request<T>()` 读请求、`panel_write()` 写响应（按值拷贝，不做指针转换）。新增字段时改结构体并更新断言，报文长度与表项都取 `sizeof`。`tests/firmware_tests.cpp` 的 `test_wire_offsets` 按协议偏移直接检查字节，结构体改错会在这里失败。
 4. **产品专属源码**：放在产品目录并在其 `CMakeLists.txt` 中加入 `hc32_product`。
 
@@ -57,11 +61,11 @@ XBase 的差异取自其分支相对分叉点的产品级改动（无星图/过�
 
 ### 新增一个产品
 
-复制最接近的 `Products/<产品>/` 目录，修改 `product.cmake` 与 `product_config.h`，在顶层 `HC32_PRODUCTS` 和 `CMakePresets.json` 中登记；需要不同行为时优先新增开关或扩展点。
+复制最接近的 `Vendor/HC32/Products/<产品>/` 目录，修改 `product.cmake` 与 `product_config.h`，在 `Vendor/HC32/CMakeLists.txt` 的 `HC32_PRODUCTS` 和 `CMakePresets.json` 中登记；需要不同行为时优先新增开关或扩展点。
 
 ## 系统状态与所有权
 
-全部运行状态在 `systemInfo`（`Platform/Config/mcu_define.h` 定义类型，`Platform/State/SystemState.{h,cpp}` 持有存储）。`systemInfo` 对所有模块是 `const`，写入按“谁写”分域：
+全部运行状态在 `systemInfo`（`Vendor/HC32/Platform/Config/mcu_define.h` 定义类型，`Vendor/HC32/Platform/State/SystemState.{h,cpp}` 持有存储）。`systemInfo` 对所有模块是 `const`，写入按“谁写”分域：
 
 | 域 | 内容 | 写入者 | 入口 |
 |---|---|---|---|
@@ -80,18 +84,18 @@ XBase 的差异取自其分支相对分叉点的产品级改动（无星图/过�
 
 | 组件 | 位置 | 作用 |
 |---|---|---|
-| `HAL::Charger` | `Platform/HAL/Charger.{h,cpp}` | 充电控制接口；`Mp2762Charger`（V1.5 主板）与 `GpioCharger`（V1.3 主板）两个实现，`Charger_Get()` 按 I2C 扫描结果选择。温度保护 `Charger_Protect()` 与电量计读取 `Battery_Sample()` 与芯片无关 |
-| `PowerPolicy` | `Platform/HAL/PowerPolicy.h` | 关机时序与低电计时（纯逻辑） |
-| 电源时序 | `Platform/HAL/HAL_Power.cpp` | 带屏 Startup 开机请求、X1 原始按键长按判定、关机流程、驻留与原地开机、低电量关机；只依赖 GPIO、时基与 `Charger` 的待机切换，固件、主机测试与 PC 模拟器编译同一份 |
-| 电池与充电监控 | `Platform/HAL/HAL_Battery.cpp` | BQ40Z50 采样、充电保护与控制、片内温度、看门狗（仅固件与主机测试） |
-| `HoldTimer` | `Platform/HAL/HoldTimer.h` | 按住计时；Function 键 2.5 s 强制关机（`HAL_Key.cpp`，三产品共用） |
-| `BlinkLed` | `Platform/HAL/BlinkLed.h` | 固定周期闪烁的指示灯 |
-| `StatusBridge` / `PowerBridge` / `DeviceBridge` | `Shared/Display/AppPlatform/` | `systemInfo`/HAL 与共享应用之间各一个方向的转换，状态在对象内 |
+| `HAL::Charger` | `Vendor/HC32/Platform/HAL/Charger.{h,cpp}` | 充电控制接口；`Mp2762Charger`（V1.5 主板）与 `GpioCharger`（V1.3 主板）两个实现，`Charger_Get()` 按 I2C 扫描结果选择。温度保护 `Charger_Protect()` 与电量计读取 `Battery_Sample()` 与芯片无关 |
+| `PowerPolicy` | `Vendor/HC32/Platform/HAL/PowerPolicy.h` | 关机时序与低电计时（纯逻辑） |
+| 电源时序 | `Vendor/HC32/Platform/HAL/HAL_Power.cpp` | 带屏 Startup 开机请求、X1 原始按键长按判定、关机流程、驻留与原地开机、低电量关机；只依赖 GPIO、时基与 `Charger` 的待机切换，固件、主机测试与 PC 模拟器编译同一份 |
+| 电池与充电监控 | `Vendor/HC32/Platform/HAL/HAL_Battery.cpp` | BQ40Z50 采样、充电保护与控制、片内温度、看门狗（仅固件与主机测试） |
+| `HoldTimer` | `Vendor/HC32/Platform/HAL/HoldTimer.h` | 按住计时；Function 键 2.5 s 强制关机（`HAL_Key.cpp`，三产品共用） |
+| `BlinkLed` | `Vendor/HC32/Platform/HAL/BlinkLed.h` | 固定周期闪烁的指示灯 |
+| `StatusBridge` / `PowerBridge` / `DeviceBridge` | `Vendor/HC32/Display/AppPlatform/` | `systemInfo`/HAL 与共享应用之间各一个方向的转换，状态在对象内 |
 
 ### 常见扩展
 
 - **新的主板版本或充电方案**：在 `Charger.cpp` 增加一个 `HAL::Charger` 实现，并在 `Charger_Get()` 中按检测结果返回；电源与 LED 代码不需要改。
-- **新的业务数据或命令（带屏）**：共享接口先在 ATK_RK3506 增加（`DeviceSnapshot`/`DeviceRequest`），同步后在 `DeviceBridge::snapshot()/execute()` 中映射：读 `systemInfo.host` 或 `State::Effective_*()`，写经 `State::Request_*()`；主控上报的新字段加到 `HostReport_t` 并在 `display_protocol.cpp` 收发。
+- **新的业务数据或命令（带屏）**：共享接口在 `App/` 增加（`DeviceSnapshot`/`DeviceRequest`），在 `DeviceBridge::snapshot()/execute()` 中映射：读 `systemInfo.host` 或 `State::Effective_*()`，写经 `State::Request_*()`；主控上报的新字段加到 `HostReport_t` 并在 `display_protocol.cpp` 收发。
 - **产品专属按键动作**：实现 `HAL::Key_ProductInit()/Key_ProductUpdate()`；强制关机等共用行为不要复制。
 
 ## 产品行为约定
@@ -104,7 +108,7 @@ XBase 的差异取自其分支相对分叉点的产品级改动（无星图/过�
 ## X1 移植说明
 
 - X1 开机长按由共用电源监控处理（原始键电平 2 s，与 Boot 仓库 X1 契约一致；带屏产品改由 Startup 的 2 s 长按请求）；旧版因 MultiButton 10 ms 调用 5 ms 节拍，实际约 4 s。
-- 功能键按住 2.5 s 强制关机，三个产品共用 `Platform/HAL/HAL_Key.cpp`（`HoldTimer`，与旧 X1Pro ButtonEvent 500 ms + 10×200 ms 一致）；旧版 X1 计数用 `LONG_PRESS_START`，实际无法触发，已修正。
+- 功能键按住 2.5 s 强制关机，三个产品共用 `Vendor/HC32/Platform/HAL/HAL_Key.cpp`（`HoldTimer`，与旧 X1Pro ButtonEvent 500 ms + 10×200 ms 一致）；旧版 X1 计数用 `LONG_PRESS_START`，实际无法触发，已修正。
 - 电量补偿参数从旧地址 `0x7A000`（Boot V2 元数据 A）改到 App 参数扇区 `0x7E000`，只写首字，读出值不在 0..9 时视为未保存。旧设备上已保存的补偿值不会迁移；Boot 仓库的 X1 App 在该扇区使用不同的记录格式，两者交替烧录时补偿值会失效。
 - 补偿差值 ≥ 10 时不采用（旧版写入 RAM 但不保存）。
 - 擦除参数扇区时总线保持约 18 ms，期间中断暂停。

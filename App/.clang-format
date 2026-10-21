@@ -1,3 +1,3 @@
-# 本目录是 ATK_RK3506 application/App 的原样副本（见 UPSTREAM），按上游格式维护，HC32 侧不重新格式化。
+# 本目录与 Frameworks/ 以本仓库为唯一来源，保持既有格式配置。
 DisableFormat: true
 SortIncludes: Never

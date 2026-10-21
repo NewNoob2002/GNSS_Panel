@@ -1,6 +1,6 @@
 # 共享应用架构：第一阶段
 
-HC32、RK3506 与 PC 模拟器使用同一份 `App` 源码和 CMake 文件。框架与服务可独立于 LVGL 构建；平台通过 `Common/SystemBackend.h` 实现业务操作，UI 通过 Model 发送命令并接收快照。
+HC32、RK3506（`Vendor/Linux`）与 PC 模拟器（`Vendor/Simulator`）使用同一份 `App/`、`Frameworks/` 源码和 CMake 文件，本仓库为唯一来源。框架与服务可独立于 LVGL 构建；平台通过 `Common/SystemBackend.h` 实现业务操作，UI 通过 Model 发送命令并接收快照。
 
 ## 构建边界
 
@@ -11,7 +11,7 @@ HC32、RK3506 与 PC 模拟器使用同一份 `App` 源码和 CMake 文件。框
 | `app_ui` | 页面、Model、输入路由、页面管理、资源 | `app_core`、LVGL |
 | 平台目标 | 设备与业务后端、显示和输入端口、程序入口 | 共享接口及各自平台库 |
 
-父工程通过 `app_build_options` 提供编译选项，通过 `app_lvgl` 提供 UI 所需的 LVGL。没有 `app_lvgl` 时只构建框架与核心。RK 的 `Backends/Demo` 属于平台演示后端，不在共享 App 中；实屏程序当前仍选择该演示后端，真实 Linux 业务尚未接入。
+父工程通过 `app_build_options` 提供编译选项，通过 `app_lvgl` 提供 UI 所需的 LVGL。没有 `app_lvgl` 时只构建框架与核心。Linux 的 `Vendor/Linux/Backends/Demo` 属于平台演示后端，不在共享 `App/` 中；实屏程序当前仍选择该演示后端，真实 Linux 业务尚未接入。
 
 ## 执行和生命周期
 
@@ -25,12 +25,12 @@ HC32、RK3506 与 PC 模拟器使用同一份 `App` 源码和 CMake 文件。框
 独立验证（不查找或链接 LVGL）：
 
 ```sh
-cmake -S application/App/tests -B out/shared-core
-cmake --build out/shared-core
-ctest --test-dir out/shared-core --output-on-failure
+cmake -S App/tests -B build/app-core-tests
+cmake --build build/app-core-tests
+ctest --test-dir build/app-core-tests --output-on-failure
 ```
 
-HC32 对应入口为 `Shared/App/tests`。测试覆盖独立服务初始化、Account 定时事件、回绕、暂停/恢复、注册容量，以及回调销毁自己和其他定时器。
+测试入口为 `App/tests`。测试覆盖独立服务初始化、Account 定时事件、回绕、暂停/恢复、注册容量，以及回调销毁自己和其他定时器。
 
 ## 后续阶段
 

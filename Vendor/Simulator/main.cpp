@@ -293,8 +293,8 @@ main(int argc, char** argv) {
 #else
     constexpr const char* kWindowTitle = "HC32 " PRODUCT_NAME " simulator";
 #endif
-    SDL_Window* window =
-        SDL_CreateWindow(kWindowTitle, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, kWidth, kHeight, SDL_WINDOW_SHOWN);
+    SDL_Window* window = SDL_CreateWindow(kWindowTitle, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, kWidth, kHeight,
+                                          SDL_WINDOW_SHOWN);
     SDL_Renderer* renderer = window ? SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE) : nullptr;
     SDL_Texture* texture =
         renderer ? SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, kWidth, kHeight)
@@ -406,8 +406,8 @@ main(int argc, char** argv) {
                                 app->on_input(event.type == SDL_MOUSEBUTTONDOWN ? App::InputAction::Press
                                                                                 : App::InputAction::Release);
                             } else if (event.type != SDL_MOUSEMOTION && event.button.button == SDL_BUTTON_LEFT) {
-                                pointer.state =
-                                    event.type == SDL_MOUSEBUTTONDOWN ? LV_INDEV_STATE_PRESSED : LV_INDEV_STATE_RELEASED;
+                                pointer.state = event.type == SDL_MOUSEBUTTONDOWN ? LV_INDEV_STATE_PRESSED
+                                                                                  : LV_INDEV_STATE_RELEASED;
                                 lv_timer_ready(indev->driver->read_timer);
                             }
                         } else if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_FOCUS_LOST) {
@@ -425,8 +425,9 @@ main(int argc, char** argv) {
                     app->update();
                     lv_timer_handler();
                     if (now - last_status >= 200) {
-                        app->update_status(options.random_status ? DemoStatus::sample_random(now - started, options.seed)
-                                                                 : DemoStatus::sample(now - started));
+                        app->update_status(options.random_status
+                                               ? DemoStatus::sample_random(now - started, options.seed)
+                                               : DemoStatus::sample(now - started));
                         last_status = now;
                     }
 #else

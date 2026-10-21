@@ -5,29 +5,45 @@ CompileFlags:
 ---
 # X1 专属源码只出现在 X1 的编译数据库中（先执行 cmake --preset x1-debug）。
 If:
-  PathMatch: Products/X1/.*
+  PathMatch: Vendor/HC32/Products/X1/.*
 CompileFlags:
   CompilationDatabase: build/x1-debug
 ---
 If:
-  PathMatch: (Platform|Arduino|Products|Shared|Libraries)/.*\.cpp
+  PathMatch: (Vendor/HC32|App|Frameworks|External)/.*\.cpp
 CompileFlags:
   Compiler: arm-none-eabi-g++
 ---
 If:
-  PathMatch: (Platform|Arduino|Products|Shared|Libraries)/.*\.c
+  PathMatch: (Vendor/HC32|App|Frameworks|External)/.*\.c
 CompileFlags:
   Compiler: arm-none-eabi-gcc
 ---
 If:
-  PathMatch: Libraries/lvgl/src/core/lv_event\.h
+  PathMatch: External/lvgl/src/core/lv_event\.h
 CompileFlags:
   Add: [-include, lvgl.h]
 ---
 If:
-  PathMatch: Libraries/Adafruit-GFX-Library/gfxfont\.h
+  PathMatch: Vendor/HC32/Libraries/Adafruit-GFX-Library/gfxfont\.h
 CompileFlags:
   Add: [-include, stdint.h]
+---
+# 纯核心测试使用自身的编译数据库（先执行 cmake -S App/tests -B build/app-core-tests）。
+If:
+  PathMatch: ^App/tests/.*
+CompileFlags:
+  CompilationDatabase: build/app-core-tests
+---
+If:
+  PathMatch: ^App/tests/.*\.cpp
+CompileFlags:
+  Compiler: c++
+---
+If:
+  PathMatch: ^App/tests/.*\.c
+CompileFlags:
+  Compiler: cc
 ---
 # 主机测试使用自己的替身头文件与编译参数，不继承固件编译数据库。
 If:
@@ -46,16 +62,31 @@ CompileFlags:
   Compiler: cc
 ---
 If:
-  PathMatch: ^Ports/RK3506/.*
+  PathMatch: ^Vendor/Simulator/.*
 CompileFlags:
-  CompilationDatabase: build/rk3506-host
+  CompilationDatabase: build/simulator-x1pro
 ---
 If:
-  PathMatch: ^Ports/RK3506/.*\.cpp
+  PathMatch: ^Vendor/Simulator/.*\.cpp
 CompileFlags:
   Compiler: c++
 ---
 If:
-  PathMatch: ^Ports/RK3506/.*\.c
+  PathMatch: ^Vendor/Simulator/.*\.c
+CompileFlags:
+  Compiler: cc
+---
+If:
+  PathMatch: ^Vendor/Linux/.*
+CompileFlags:
+  CompilationDatabase: build/linux-host
+---
+If:
+  PathMatch: ^Vendor/Linux/.*\.cpp
+CompileFlags:
+  Compiler: c++
+---
+If:
+  PathMatch: ^Vendor/Linux/.*\.c
 CompileFlags:
   Compiler: cc

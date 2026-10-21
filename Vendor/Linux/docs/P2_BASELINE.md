@@ -99,16 +99,16 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy \
 
 源代码与配置归属：
 
-- application/CMakeLists.txt：C11/C++17、私有 lvgl8311 静态库、离线检查目标。
-- application/config/lv_conf.h：原 MCU 配置，未修改。
-- application/baseline.c：无设备 IO 的基础绘制检查；小缓冲用于触发多次 flush，不是实屏 port。
-- third_party/lvgl/：原 MCU 的 lvgl.h/src；来源和校验见 SOURCE.md。
+- `Vendor/Linux/CMakeLists.txt`：C11/C++17、私有 lvgl8311 静态库、离线检查目标。
+- `Vendor/Linux/config/lv_conf.h`：原 MCU 配置，未修改。
+- `Vendor/Linux/baseline.c`：无设备 IO 的基础绘制检查；小缓冲用于触发多次 flush，不是实屏 port。
+- `External/lvgl/`：原 MCU 的 lvgl.h/src；来源和校验见 `App/SOURCE.md`。
 
 主机端（容器内）：
 
 ~~~sh
 cd /work
-cmake -S application -B out/p2/lvgl-host -DCMAKE_BUILD_TYPE=Debug
+cmake -S Vendor/Linux -B out/p2/lvgl-host -DCMAKE_BUILD_TYPE=Debug
 cmake --build out/p2/lvgl-host -j4
 (cd out/p2/lvgl-host && ctest --output-on-failure)
 ~~~
@@ -118,7 +118,7 @@ cmake --build out/p2/lvgl-host -j4
 ~~~sh
 cd /work
 br_host=/work/sdk/atk_dlrk3506_linux6.1_release_v1.3.1_20260326/buildroot/output/alientek_rk3506/host
-cmake -S application -B out/p2/lvgl-arm \
+cmake -S Vendor/Linux -B out/p2/lvgl-arm \
   -DCMAKE_TOOLCHAIN_FILE="$br_host/share/buildroot/toolchainfile.cmake" \
   -DCMAKE_BUILD_TYPE=Release
 cmake --build out/p2/lvgl-arm -j4

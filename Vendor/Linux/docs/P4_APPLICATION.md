@@ -1,6 +1,6 @@
 # P4 页面与按键迁移
 
-2026-09-24 完成 P4 离线切片；2026-09-28 在 RK3506J 测试板完成按键、修正版九页运行及 Debug 监视器复核，P4 显示与测试板导航验收按既有记录关闭。本文历史用法核对至源码 `7b49532`；后续两键更新见下节。源代码来源及改动边界见 [SOURCE.md](../application/App/SOURCE.md)。
+2026-09-24 完成 P4 离线切片；2026-09-28 在 RK3506J 测试板完成按键、修正版九页运行及 Debug 监视器复核，P4 显示与测试板导航验收按既有记录关闭。本文历史用法核对至源码 `7b49532`；后续两键更新见下节。源代码来源及改动边界见 [SOURCE.md](../../../App/SOURCE.md)。
 
 ## 开发分支提交前复审
 
@@ -81,14 +81,14 @@ SystemLoading 按 **Logo 800ms → 五节点各 600ms → 100% 200ms → 完成�
 
 ## 本机 SDL 页面预览
 
-安装 SDL2 开发库后，在项目根目录运行：
+安装 SDL2 开发库后，在仓库根目录运行统一模拟器（`SIM_BACKEND=Demo`）：
 
 ```sh
-cmake -S application -B out/sdl -DCMAKE_BUILD_TYPE=Debug -DRK3506_SDL_PREVIEW=ON
-cmake --build out/sdl --target simulator
-out/sdl/simulator
+cmake -S . -B build/sim-demo -DPLATFORM=Simulator -DSIM_BACKEND=Demo
+cmake --build build/sim-demo
+build/sim-demo/bin/main
 # 持续随机状态验证；seed 可省略（默认 1），相同 seed 可复现。
-out/sdl/simulator --random-status 42
+build/sim-demo/bin/main --random-status 42
 ```
 
 随机模式每 3 秒生成新的 0%～100% 电量、充电状态、卫星数、Wi-Fi 与录制状态；电压按演示范围 6.80～8.40 V 随电量变化。状态每 200 ms 经 `App → StatusService/DataCenter → Model → View` 发布，沿用 SDL/LVGL 主循环线程。Startup 和 StatusBar 共用带槽框及电池正极端头的样式：充电时槽框和填充均为绿色，1.2 秒从空槽增长到满槽、停留 0.3 秒后从空槽重新开始，数字仍显示实际电量；停止充电后恢复实际电量宽度及四级颜色，数据无效时清空槽并取消动画。重复发布和充电期间实际电量变化不重置循环。Startup 空闲 10 秒后显示 StatusBar，可同时观察两处。页面导航与长按操作由用户控制，Q 退出；数据属于 DEMO，不代表电池测量或充放电模型。`app_system_dash` 回归强制检查 0/9/10/19/20/49/50/100/101% 边界，运行 seed=42 的 128 组随机状态，检查两处颜色、实际数值、从空到满的循环、无效数据及页面离开/返回；`app_status` 检查 StatusBar 在充电时销毁/重建和取消动画。

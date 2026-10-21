@@ -1,5 +1,5 @@
 CompileFlags:
-  CompilationDatabase: ../../build/rk3506-host
+  CompilationDatabase: ../../build/linux-host
 ---
 If:
   PathMatch: .*\.cpp

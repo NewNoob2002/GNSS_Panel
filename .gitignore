@@ -13,9 +13,9 @@ build/
 *.bak
 
 # Simulator build outputs
-Simulator/build/
-Simulator/bin/
+Vendor/Simulator/build/
+Vendor/Simulator/bin/
 
 # Personal IDE state
 .vscode/ipch/
-Simulator/.idea/
+Vendor/Simulator/.idea/
