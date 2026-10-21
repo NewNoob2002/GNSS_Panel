@@ -1,6 +1,6 @@
 # HC32F460xE Embedded UI Framework
 
-**基于 HC32F460xE 的高性能嵌入式系统框架，集成 Arduino 兼容层、LVGL 界面库及跨平台模拟器。**
+**基于 HC32F460xE 的高性能嵌入式系统框架，集成原生外设驱动与 HAL、LVGL 界面库及跨平台模拟器。**
 ![alt text](https://img.shields.io/badge/MCU-HC32F460-blue.svg)
 
 ![alt text](https://img.shields.io/badge/UI-LVGL_v8.3.11-orange.svg)
@@ -26,8 +26,8 @@
 
 > 🛠 完善的驱动封装：
 
-> 基于 Arduino API 风格的底层抽象。
-> 硬件驱动支持：GPIO, UART, I2C Slave (含特定通信协议), SPI, DMA, Display Control 等。
+> 基于 `Platform/Core` 原生外设类（`GpioPin`、`I2cMaster`、`SpiMaster`）与板级实例（`board_peripherals`、`board_display`）的底层抽象。
+> 硬件驱动支持：GPIO, UART, I2C Master/Slave (含特定通信协议), SPI + DMA, RM690A0 面板驱动 (`PanelRm690a0`) 等。
 
 > ⚡ 低功耗优化：主循环内置 __WFI() 指令与事件驱动逻辑，平衡性能与功耗。
 
@@ -49,7 +49,7 @@
 
 > ├── Vendor            # 平台实现层
 
-> │   ├── HC32          # HC32F460xE 固件（Platform、Arduino、Libraries、Comm、Display、Products）
+> │   ├── HC32          # HC32F460xE 固件（Platform、Libraries、Comm、Display、Products）
 
 > │   ├── Simulator     # 唯一 PC 端 SDL2 模拟器（支持 SIM_BACKEND=Board|Demo 与 SIM_PRODUCT=X1Pro|XBase）
 
@@ -95,7 +95,7 @@ cmake -S App/tests -B build/app-core-tests && cmake --build build/app-core-tests
 
 > 在本项目中，我完成了以下关键技术任务：
 
-> 硬件抽象层 (HAL) 适配：将小华官方 DDL 库封装为 Arduino 风格接口，通过 HAL::HAL_Init() 统一管理外设生命周期。
+> 硬件抽象层 (HAL) 适配：将小华官方 DDL 库封装为 `Platform/Core` 原生外设类（`GpioPin`、`I2cMaster`、`SpiMaster`）与共用 HAL 接口，通过 HAL::HAL_Init() 统一管理外设生命周期。
 
 > I2C 通信协议开发：实现了 slave_i2c 模块，用于 MCU 与主控或其他外设的可靠数据交换。
 

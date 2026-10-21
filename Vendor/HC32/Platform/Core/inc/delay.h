@@ -6,23 +6,16 @@
 extern "C" {
 #endif
 /**
- * \brief Returns the number of milliseconds since the Arduino board began running the current program.
+ * \brief 返回上电以来的毫秒数，取自 HAL_GetTick() 的 SysTick 计数。
  *
- * This number will overflow (go back to zero), after approximately 50 days.
- *
- * \return Number of milliseconds since the program started (uint32_t)
+ * 约 49.7 天回绕一次；比较时间间隔请用无符号减法（now - start）。
  */
 extern uint32_t millis(void);
 
 /**
- * \brief Returns the number of microseconds since the Arduino board began running the current program.
+ * \brief 返回上电以来的微秒数，由毫秒节拍加 SysTick 当前计数换算，可在中断中调用。
  *
- * This number will overflow (go back to zero), after approximately 70 minutes. On 16 MHz Arduino boards
- * (e.g. Duemilanove and Nano), this function has a resolution of four microseconds (i.e. the value returned is
- * always a multiple of four). On 8 MHz Arduino boards (e.g. the LilyPad), this function has a resolution
- * of eight microseconds.
- *
- * \note There are 1,000 microseconds in a millisecond and 1,000,000 microseconds in a second.
+ * 约 71.6 分钟回绕一次；比较时间间隔请用无符号减法。
  */
 extern uint32_t micros(void);
 

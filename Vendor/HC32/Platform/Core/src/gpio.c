@@ -1,6 +1,6 @@
 #include "gpio.h"
 
-// 配置语义迁自原 Arduino 数字 IO 实现（本任务 HEAD 基线）；GPIO_Init 将电平与方向一起写入 PCR。
+// 配置语义迁自原 Arduino 兼容核心的 wiring_digital.cpp（pinMode/digitalWrite 等）；GPIO_Init 将电平与方向一起写入 PCR。
 void
 gpio_set_mode(gpio_pin_t pin, gpio_mode_t mode, uint8_t initial_level) {
     ASSERT_GPIO_PIN_VALID(pin, "gpio_set_mode");

@@ -10,11 +10,10 @@ This repository follows the X-TRACK workspace layout (`App/`, `Frameworks/`, `Ex
 - `External/lvgl/` contains upstream LVGL 8.3.11 sources (`src/`, `lvgl.h`, `demos/`) without any platform-specific `lv_conf.h` or porting layer.
 - `Vendor/HC32/` contains the HC32F460xE MCU firmware:
   - `CMakeLists.txt` orchestrates the HC32 firmware build (`PRODUCT=X1|X1Pro|XBase`) and links `<prefix>_<version>.elf`.
-  - `Platform/` contains CMSIS, startup, drivers, the shared HAL (power policy, charger/gauge, LEDs, tick), `State/` and support code. It is shared by all HC32 products and must not depend on LVGL or `App/`.
-  - `Arduino/` provides the Arduino-compatible core.
-  - `Libraries/` contains HC32 device and third-party libraries (`Bq40z50`, `Mp2762a`, `MillisTaskManager`, `Parser`, `easylogger`, `Adafruit*` for display products, `MultiButton` for X1), and builds `hc32_lvgl` from `External/lvgl/`.
+  - `Platform/` contains CMSIS, startup, drivers, `Core/` native peripherals (`GpioPin`, `I2cMaster`, `SpiMaster`), board instances (`Config/board_peripherals`), the shared HAL (power policy, charger/gauge, LEDs, tick), `State/` and support code. It is shared by all HC32 products and must not depend on LVGL or `App/`.
+  - `Libraries/` contains HC32 device and third-party libraries (`Bq40z50`, `Mp2762a`, `MillisTaskManager`, `Parser`, `easylogger`, `MultiButton` for X1), and builds `hc32_lvgl` from `External/lvgl/`.
   - `Comm/` is the I2C slave transport and panel frame-protocol core used by every HC32 product.
-  - `Display/` is shared by X1Pro and XBase: display entry point, `AppPlatform/` (HC32 platform layer of the shared LVGL app: status snapshot, two-key input, power events, `system_backend`), display protocol table, display/key HAL, LVGL `lv_conf.h` and `lv_port*`, and the LVGL-backed `operator new`.
+  - `Display/` is shared by X1Pro and XBase: display entry point, `AppPlatform/` (HC32 platform layer of the shared LVGL app: status snapshot, two-key input, power events, `system_backend`), display protocol table, display/key HAL, RM690A0 panel driver (`PanelRm690a0`) and display board instances (`board_display`), LVGL `lv_conf.h` and `lv_port*`, and the LVGL-backed `operator new`.
   - `Products/<Product>/` holds `product.cmake` (version, image prefix, display flag), `product_config.h` (feature switches included through `mcu_config.h`) and product-only sources (X1: entry point, keys, SOC compensation, protocol table).
 - `Vendor/Simulator/` is the unified PC SDL2 simulator (`SIM_BACKEND=Board|Demo`, defaulting to `Board` with `SIM_PRODUCT=X1Pro|XBase`), using `Vendor/Simulator/lv_conf.h`.
 - `Vendor/Linux/` is the RK3506 Linux display port, demo backend (`Backends/Demo`) and Linux host test suite, using `Vendor/Linux/config/lv_conf.h`.

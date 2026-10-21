@@ -24,11 +24,6 @@ If:
 CompileFlags:
   Add: [-include, lvgl.h]
 ---
-If:
-  PathMatch: Vendor/HC32/Libraries/Adafruit-GFX-Library/gfxfont\.h
-CompileFlags:
-  Add: [-include, stdint.h]
----
 # 纯核心测试使用自身的编译数据库（先执行 cmake -S App/tests -B build/app-core-tests）。
 If:
   PathMatch: ^App/tests/.*
