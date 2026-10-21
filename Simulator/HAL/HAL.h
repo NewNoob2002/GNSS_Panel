@@ -21,6 +21,9 @@ bool Power_ShutdownSoftReset();
 const char* Power_GetPowerOffCause();
 void Power_ProductInit();
 
+/* I2C 器件探测（SystemLoading 自检）：按虚拟主板的器件在线状态应答 */
+bool I2C_ProbeDevice(uint8_t address);
+
 /* 模拟器输入：Power 键电平（Enter / 鼠标中键按住） */
 void Sim_SetPowerKey(bool pressed);
 } // namespace HAL

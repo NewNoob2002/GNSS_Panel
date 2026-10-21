@@ -33,6 +33,19 @@ i2c_scan_callback(void* e) {
     }
 }
 
+bool
+HAL::I2C_ProbeDevice(uint8_t address) {
+    if (!Wire.isDeviceOnline(address)) {
+        return false;
+    }
+    const bool known = (address == 0x0B && systemInfo.board.online_device.bq40z50)
+                       || (address == 0x5C && systemInfo.board.online_device.mp2762);
+    if (!known) {
+        i2c_scan_callback(&address);
+    }
+    return true;
+}
+
 int
 HAL::I2C_Scan() {
     if (!Wire.begin()) {

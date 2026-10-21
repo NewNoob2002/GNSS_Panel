@@ -73,7 +73,8 @@ enum class PowerAction { Off, Reboot };
 /** Why the system is shutting down. User is the SystemDash flow; the others come from the platform. */
 enum class PowerCause { User, Host, LowBattery, Forced };
 constexpr std::size_t kInitializationStepCount = 5;
-enum class InitializationStatus { NotRun, Ok, Failed };
+// Pending: the step is still running (only returned by system_backend::poll_initialization_step, never stored).
+enum class InitializationStatus { NotRun, Ok, Failed, Pending };
 /** Last initialization attempt, retained by System until the next attempt/app teardown. UI thread only.
  * Detail is a NUL-terminated diagnostic message (maximum 95 bytes), not a serialized payload.
  */

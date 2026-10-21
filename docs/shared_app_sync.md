@@ -21,7 +21,7 @@
 | 外部关机（主控、低电、强制关机） | 无 | HAL 置位 `LinuxPowerOff/LowBatteryPowerOff/Force_ShutDown` | `SystemState` 增加关机原因与“正在关机”；P4App 收到后推入 SaveConfig，SaveConfig 显示原因文案（HC32 现有 4 条） |
 | 关机完成后待机 | SaveConfig 计时结束后 `reset_root("Pages/Startup")` | HAL 断电延时到期、外部供电仍在时进入驻留（`ShutdownComplete`） | `SystemState.standby`；由平台通知后 `reset_root`，不由 SaveConfig 计时决定 |
 | 重启 | 模拟 | 不支持 | `SystemState.reboot_available`；为 false 时 SystemDash 隐藏 Reboot |
-| 初始化步骤 | 5 步 DEMO | 用真实器件在线状态（电量计、充电芯片、主控供电） | 步骤结果由平台后端提供，界面与日志不变 |
+| 初始化步骤 | 5 步 DEMO（模拟不同耗时） | 真实检查：版本信息、重新探测电量计与充电芯片、主控供电、等待主控通信（≤30 s） | 后端非阻塞轮询 `poll_initialization_step()`，每步耗时即实际检查时间；失败不阻止开机 |
 | 设备数据（定位、卫星、星图、工作模式、记录、Wi-Fi、电池、版本） | `SimulatedSystem` 的固定数据 | 由 `systemInfo` 组装 `DeviceSnapshot`，每 500 ms 检查、内容变化才发布 | Account “Device”（`DeviceService::update/snapshot`），页面只显示选项索引 |
 | 工作模式/电台/NTRIP | 模拟后端只改快照 | `execute_device(ApplyWork)` 经 `State::Request_Work()` 记录面板请求，面板协议上报（`radio_change_flag`）并在主控读出后确认 | `DeviceRequest`（只接受 WorkSettingsModel 发送、索引越界拒绝） |
 | 记录配置与启停 | 同上 | `execute_device(StartRecord/StopRecord)` 经 `State::Request_Record()`（协议上报 `record_op`/`record_change_flag`）；XBase 不改类型/间隔 | 同上（只接受 RecordConfigModel） |
@@ -61,10 +61,15 @@
 ## 已确认的细节
 
 - 开机由平台决定、界面跟随：Startup 长按只显示进度并发出开机请求；平台确认后发布 `powered_on`，由 P4App 切到 SystemLoading。
-- HC32 不提供重启：`reboot_available = false`，SystemDash 电源弹窗只有 Shutdown / Cancel。
-- HC32 初始化步骤使用真实器件状态，失败只显示、不阻塞：配置载入、电量计 BQ40Z50、充电控制、主控供电已开启、界面就绪。
-  主板有两个版本：V1.5 带 MP2762A，V1.3 没有（GPIO 控制充电）。版本由 `HAL::I2C_Scan` 是否找到 0x5C 推断，所以第 3 步在两种情况下都算通过，只在详情里写明 “MP2762A online” 或 “GPIO charge control”；V1.5 上 MP2762A 失效与 V1.3 无法区分。
-  主控在开机时才上电、需数十秒启动，而 SystemLoading 只有约 5 s，因此第 4 步检查“主控供电已开启”，不检查主控通信，避免每次开机都报失败。
+- HC32 不提供重启：`reboot_available = false`，SystemDash 电源弹窗只有 Shutdown；长按 Power 2 s 进度满 100% 确认，短按或提前松开关闭弹窗。运行中的 Power 长按只由界面处理（HAL 只在未开机时判定长按开机），两者不冲突。
+- HC32 初始化步骤（`InitSteps.cpp`）非阻塞轮询，失败只显示、不阻塞进入首页：
+  1. 版本信息：只检查编译期写入的产品与固件版本。
+  2. 电量计：在加载页用 `HAL::I2C_ProbeDevice(0x0B)` 重新探测 BQ40Z50。
+  3. 充电控制：重新探测 MP2762A（0x5C）。开机扫描判为 V1.5 而现在不应答判失败；V1.3 无该芯片（GPIO 控制充电）判通过。重新探测只补登记迟到上线的器件，不清除在线标志（清除电量计标志会解除充电温度保护，清除充电芯片标志会在运行中切换充电方式）。
+  4. 主控供电：`POWER_CONTROL_PIN` 为高。
+  5. 主控通信：收到第一帧有效协议帧（`host.online`）即通过，最长等 30 s，超时标红后进入首页。
+  等待期间主循环照常运行：Function 长按 2.5 s 强制关机、主控请求关机、低电量关机都由 HAL 独立处理，加载页会切到关机页。
+  主板有两个版本：V1.5 带 MP2762A，V1.3 没有（GPIO 控制充电）。版本由开机时 `HAL::I2C_Scan` 是否找到 0x5C 推断；加载页再次探测，因此开机后才失效的 MP2762A 会判失败，但开机扫描前就已失效的 V1.5 仍会被当作 V1.3。
 
 ## 与旧 HC32 界面的行为差异
 

@@ -26,6 +26,7 @@ uint32_t now = 0;
 bool power_key = false;
 int shutdown_requests = 0;
 int host_power_level = HIGH;
+bool probe_battery_gauge = true, probe_charger = true; // SystemLoading 重新探测 I2C 时的应答
 lv_color_t draw_pixels[kWidth * 20];
 uint32_t peak_used = 0;
 
@@ -118,6 +119,7 @@ reset_system_info() {
     State::Power().batteryInfo.Temp_f = 30.0f;
     State::Host().position.coordinate_status = position_fix;
     State::Host().position.satellite_number_used = 12;
+    State::Host().online = true; // 主控已在通信：加载页第 5 步立即通过
 }
 
 // HAL 判定开机：模拟 Power_OnCheck / 驻留中长按开机。
@@ -178,6 +180,11 @@ HAL::Key_PowerPressed() {
 bool
 HAL::Key_FunctionPressed() {
     return false;
+}
+
+bool
+HAL::I2C_ProbeDevice(unsigned char address) {
+    return address == 0x0B ? probe_battery_gauge : address == 0x5C && probe_charger;
 }
 
 int
@@ -378,17 +385,30 @@ main() {
         run(800);
     }
 
-    // 用户关机：SystemDash 电源弹窗（无 Reboot）→ SaveConfig 结束时向 HAL 发出一次关机请求。
+    // 用户关机：SystemDash 电源弹窗（无 Reboot），长按 Power 进度满 100% 确认，短按/提前松开关闭弹窗；
+    // SaveConfig 结束时向 HAL 发出一次关机请求。
     assert(App_Get()->show_page("Pages/SystemDash"));
     run(800);
     choose(i18n::TextId::PowerTitle);
-    App_Get()->on_input(P4App::InputAction::Confirm); // 打开电源弹窗，默认焦点 Cancel
+    App_Get()->on_input(P4App::InputAction::Confirm); // 打开电源弹窗，默认焦点 Shutdown
     run(100);
-    assert(!find_text(lv_scr_act(), i18n::text(i18n::TextId::RebootDouble)));
-    App_Get()->on_input(P4App::InputAction::NextFocus); // → Shutdown
-    App_Get()->on_input(P4App::InputAction::Commit);
+    assert(find_text(App_Get()->focused(), i18n::text(i18n::TextId::ShutdownAction)));
+    assert(!find_text(lv_scr_act(), i18n::text(i18n::TextId::RebootAction)));
+    // 按键走固件路径：App_Update() 按 HAL::Key_PowerPressed() 电平轮询，弹窗打开时页面接管按下/松开。
+    power_key = true;
+    run(1000);
+    power_key = false; // 未满 100% 松开：关闭弹窗，不准备关机，也不会被当作单击重新打开
     run(800);
+    assert(find_text(App_Get()->focused(), i18n::text(i18n::TextId::PowerTitle)));
+    assert(!SystemService::snapshot().power_pending);
+    App_Get()->on_input(P4App::InputAction::Confirm);
+    run(100);
+    power_key = true;
+    run(1500);
+    assert(on_page("Pages/SystemDash") && !SystemService::snapshot().power_pending);
+    run(800); // 满 2 s：准备关机并进入 SaveConfig
     assert(on_page("Pages/SaveConfig"));
+    power_key = false;
     run(10000);
     assert(shutdown_requests == 1);
     State::Power().ShutdownGoing = true; // HAL 电源策略进入关机
@@ -409,6 +429,7 @@ main() {
 
     // V1.3 主板没有 MP2762A（GPIO 控制充电），充电初始化步骤不算失败。
     State::Board().online_device.mp2762 = false;
+    probe_charger = false;
     std::snprintf(State::Board().hardware_version, sizeof(systemInfo.board.hardware_version), "V1.3");
     hal_power_on_and_boot();
     {
@@ -424,6 +445,61 @@ main() {
     State::Power().batteryInfo.Temp_f = 30.0f;
     run(400);
     assert(!find_text(lv_layer_top(), "66.0"));
+
+    // SystemLoading 自检非阻塞：I2C 在加载页重新探测；V1.5 主板 MP2762A 不应答判失败；主控不通信最多等 30 s；
+    // 失败都不阻止进入首页，等待期间平台关机照常进行。
+    const auto power_on_to_loading = [] {
+        State::Power().ShutdownComplete = false;
+        State::Power().ShutdownGoing = false;
+        State::Power().panel_power_on = true;
+        run(300);
+        assert(on_page("Pages/SystemLoading"));
+    };
+    hal_enter_standby();
+    State::Board().online_device.mp2762 = true; // 开机扫描判定 V1.5
+    std::snprintf(State::Board().hardware_version, sizeof(systemInfo.board.hardware_version), "V1.5");
+    probe_charger = false;
+    State::Host().online = false;
+    power_on_to_loading();
+    run(10000);
+    assert(on_page("Pages/SystemLoading")); // 仍在等主控，主循环与界面照常运行
+    assert(find_text(lv_scr_act(), i18n::text(i18n::TextId::CheckingHostLink)));
+    run(25000); // 第 5 步约在加载开始 2 s 后开始，等满 30 s，再经过完成与就绪页（约 1.5 s）
+    assert(on_page("Pages/Dialplate"));
+    {
+        const auto report = SystemService::snapshot().initialization;
+        assert(report[1].status == DataProc::InitializationStatus::Ok);
+        assert(report[2].status == DataProc::InitializationStatus::Failed);
+        assert(std::strstr(report[2].detail.data(), "MP2762A not responding (board V1.5)"));
+        assert(report[4].status == DataProc::InitializationStatus::Failed);
+        assert(std::strstr(report[4].detail.data(), "no host frame within 30 s"));
+    }
+    // 主控一通信即继续，不等满 30 s。
+    hal_enter_standby();
+    probe_charger = true;
+    State::Host().online = false;
+    power_on_to_loading();
+    run(4000);
+    assert(on_page("Pages/SystemLoading"));
+    State::Host().online = true;
+    run(2500);
+    assert(on_page("Pages/Dialplate"));
+    {
+        const auto link = SystemService::snapshot().initialization[4];
+        assert(link.status == DataProc::InitializationStatus::Ok && std::strstr(link.detail.data(), "host link up"));
+    }
+    // 等待主控期间强制关机（Function 长按，HAL 置 Force_ShutDown）：立即进入关机页，随后正常待机。
+    hal_enter_standby();
+    State::Host().online = false;
+    power_on_to_loading();
+    run(4000);
+    assert(on_page("Pages/SystemLoading"));
+    State::Power().Force_ShutDown = true;
+    run(800);
+    assert(on_page("Pages/SaveConfig"));
+    assert(find_text(lv_scr_act(), i18n::text(i18n::TextId::SaveConfigPowerOffForced)));
+    hal_enter_standby();
+    State::Host().online = true;
 
     std::printf("%s: LVGL pool peak %lu / %lu bytes (free margin %lu)\n", PRODUCT_NAME,
                 static_cast<unsigned long>(peak_used), static_cast<unsigned long>(LV_MEM_SIZE),

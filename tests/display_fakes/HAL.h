@@ -6,6 +6,7 @@ namespace HAL {
 void Power_Shutdown(bool completed);
 bool Key_PowerPressed();
 bool Key_FunctionPressed();
+bool I2C_ProbeDevice(unsigned char address);
 } // namespace HAL
 
 void HAL_NVIC_SystemReset();

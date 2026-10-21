@@ -32,7 +32,8 @@ class P4App {
      * produce a click. Call in event order; then poll_keys() with the current time.
      */
     void on_key_at(Key key, bool pressed, std::uint64_t event_ms);
-    /** Process sampled key states and Startup's Power hold with monotonic milliseconds on the UI thread.
+    /** Process sampled key states and page Power holds (Startup, power confirmation) with monotonic milliseconds on
+     * the UI thread.
      * Earlier timestamps than a previous poll are treated as that poll's time.
      */
     void poll_keys(std::uint64_t now_ms);
@@ -65,6 +66,7 @@ class P4App {
     std::unique_ptr<PageManager> manager_;
     bool power_down_ = false, function_down_ = false;
     ButtonGesture power_gesture_, function_gesture_;
+    bool power_hold_ = false; // The current page took the raw Power hold at the last poll.
     std::uint64_t last_poll_ms_ = 0;
     const char* key_page_ = nullptr;
     void cancel_keys();

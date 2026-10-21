@@ -77,8 +77,8 @@ enum class TextId : size_t {
     PowerPreviewHint,
     Unavailable,
     PowerTitle,
-    ShutdownDouble,
-    RebootDouble,
+    ShutdownAction,
+    RebootAction,
     RamPreview,
     StartingGnssService,
     Initializing,
@@ -127,6 +127,7 @@ enum class TextId : size_t {
     ReadOnly,
     InfoBrowseHint,
     Stop,
+    CheckingHostLink,
     Count
 };
 

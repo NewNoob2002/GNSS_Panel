@@ -277,9 +277,21 @@ void P4App::poll_keys(std::uint64_t now_ms) {
     }
     const auto power = power_gesture_.sample(power_down_, now_ms);
     const auto function = function_gesture_.sample(function_down_, now_ms);
-    if (const char* page = current_page(); page && std::strcmp(page, "Pages/Startup") == 0) {
-        // Startup consumes the debounced hold without cancelling it as a direct host action would.
+    auto* current = manager_->get_current_page();
+    const bool hold = current && current->wants_power_hold();
+    if (hold != power_hold_) {
+        // Switching between hold and click handling: the press that opened or closed a hold must not also
+        // complete a click (e.g. reopen the power confirmation it just dismissed).
+        power_hold_ = hold;
+        power_gesture_.cancel(power_down_);
+        return; // power/function were sampled before the cancel; start fresh on the next poll.
+    }
+    if (hold) {
+        // The page consumes the debounced hold without cancelling it as a direct host action would.
         dispatch_input(power_gesture_.pressed() ? InputAction::Press : InputAction::Release);
+        // Function still moves focus / goes back, but never while Power is held (that would cancel the hold).
+        if (function != ButtonGesture::Action::None && !power_gesture_.pressed())
+            on_input(function == ButtonGesture::Action::Single ? InputAction::NextFocus : InputAction::Back);
         return;
     }
     if (power != ButtonGesture::Action::None)

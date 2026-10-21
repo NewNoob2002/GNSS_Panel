@@ -16,6 +16,9 @@ void HAL_Update();
 void HAL_Deinit();
 /* I2C */
 int I2C_Scan();
+/* 重新探测单个 I2C 器件（SystemLoading 自检）：开机扫描时未发现、现在应答的器件按扫描流程补登记并初始化；
+ * 不清除已登记的在线标志（电量计标志清除会解除充电温度保护，充电芯片标志清除会在运行中切换充电方式）。 */
+bool I2C_ProbeDevice(uint8_t address);
 
 /* Power */
 void Power_Init();

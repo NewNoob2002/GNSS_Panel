@@ -131,6 +131,10 @@ class PageBase {
         return false;
     }
     virtual void on_commit_request() {}
+    /** True while the page takes the raw Power press/release (a hold to 100%) instead of click gestures. */
+    virtual bool wants_power_hold() const {
+        return false;
+    }
 
     /** LVGL-thread Back request: true consumes local cancel/back; false allows the router to pop. */
     virtual bool on_back_request() {

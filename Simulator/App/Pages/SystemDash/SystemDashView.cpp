@@ -50,22 +50,27 @@ void SystemDashView::create(lv_obj_t* root, bool reboot_available) {
     caption(panel, TextId::PowerTitle, 12, 6, 254);
     auto* hint = caption(panel, TextId::PowerPreviewHint, 12, 36, 254);
     lv_obj_set_style_text_color(hint, style::kMuted, 0);
-    ui.shutdown = style::box(panel, 8, 68, 82, 28, true);
-    ui.reboot = style::box(panel, 98, 68, 82, 28, true);
-    ui.cancel = style::box(panel, 188, 68, 82, 28, true);
-    const std::array<TextId, 3> actions{TextId::ShutdownDouble, TextId::RebootDouble, TextId::Cancel};
+    // Hold Power on an action until its bar fills; a short press closes the dialog (SystemDash controller).
+    ui.shutdown = style::box(panel, 8, 68, 127, 28, true);
+    ui.reboot = style::box(panel, 143, 68, 127, 28, true);
+    const std::array<TextId, 2> actions{TextId::ShutdownAction, TextId::RebootAction};
     index = 0;
-    for (auto* button : {ui.shutdown, ui.reboot, ui.cancel}) {
+    for (auto* button : {ui.shutdown, ui.reboot}) {
         style::card(button);
-        if (index < 2)
-            lv_obj_set_style_bg_color(button, style::kDanger, 0);
-        auto* text = caption(button, actions[index++], 2, 4, 78);
+        // Stay red when focused/held (card() darkens those states); the orange border still marks focus.
+        for (const lv_style_selector_t state :
+             {lv_style_selector_t{0}, lv_style_selector_t{LV_STATE_FOCUSED}, lv_style_selector_t{LV_STATE_PRESSED}})
+            lv_obj_set_style_bg_color(button, style::kDanger, state);
+        lv_obj_set_style_clip_corner(button, true, 0);
+        hold_fill_[index] = style::box(button, 0, 0, 0, 28); // Behind the caption.
+        lv_obj_set_style_bg_color(hold_fill_[index], style::kText, 0);
+        lv_obj_set_style_bg_opa(hold_fill_[index], LV_OPA_40, 0);
+        auto* text = caption(button, actions[index++], 2, 5, 123);
         lv_obj_set_style_text_align(text, LV_TEXT_ALIGN_CENTER, 0);
     }
     if (!reboot_available_) {
         lv_obj_add_flag(ui.reboot, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_set_x(ui.shutdown, 50);
-        lv_obj_set_x(ui.cancel, 146);
+        lv_obj_set_x(ui.shutdown, 75); // Centered alone.
     }
     show_power(false);
 }
@@ -98,8 +103,22 @@ void SystemDashView::update(const DataProc::SystemState& state) const {
     lv_label_set_text(wifi_value_,
                       state.wifi_pending ? "..." : i18n::text(state.wifi_on ? TextId::StatusOn : TextId::StatusOff));
 }
+void SystemDashView::set_hold(lv_obj_t* button, int32_t percent) const {
+    percent = percent < 0 ? 0 : percent > 100 ? 100 : percent;
+    for (unsigned i = 0; i < 2; ++i) {
+        const bool active = button == (i == 0 ? ui.shutdown : ui.reboot);
+        const auto width =
+            active ? static_cast<lv_coord_t>(lv_obj_get_width(lv_obj_get_parent(hold_fill_[i])) * percent / 100)
+                   : lv_coord_t{0};
+        if (lv_obj_get_width(hold_fill_[i]) != width)
+            lv_obj_set_width(hold_fill_[i], width);
+    }
+}
 void SystemDashView::show_power(bool visible) {
     power_open_ = visible;
+    set_hold(nullptr, 0);
+    for (auto* action : {ui.shutdown, ui.reboot})
+        lv_obj_clear_state(action, LV_STATE_PRESSED); // A completed hold leaves the page while still pressed.
     if (visible) {
         lv_obj_clear_flag(ui.overlay, LV_OBJ_FLAG_HIDDEN);
         style::appear(lv_obj_get_child(ui.overlay, 0));
@@ -108,9 +127,9 @@ void SystemDashView::show_power(bool visible) {
 }
 std::array<lv_obj_t*, 4> SystemDashView::controls() const {
     return power_open_
-               ? std::array<lv_obj_t*, 4>{ui.shutdown, reboot_available_ ? ui.reboot : nullptr, ui.cancel, nullptr}
+               ? std::array<lv_obj_t*, 4>{ui.shutdown, reboot_available_ ? ui.reboot : nullptr, nullptr, nullptr}
                : std::array<lv_obj_t*, 4>{ui.language, ui.wifi, ui.power, ui.back};
 }
-std::array<lv_obj_t*, 7> SystemDashView::all_controls() const {
-    return {ui.language, ui.wifi, ui.power, ui.back, ui.shutdown, ui.reboot, ui.cancel};
+std::array<lv_obj_t*, 6> SystemDashView::all_controls() const {
+    return {ui.language, ui.wifi, ui.power, ui.back, ui.shutdown, ui.reboot};
 }

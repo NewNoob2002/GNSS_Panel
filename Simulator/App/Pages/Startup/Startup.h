@@ -16,6 +16,9 @@ class Startup final : public PageBase {
     void on_view_will_disappear() override;
     void on_view_unload() override;
     void on_language_changed() override;
+    bool wants_power_hold() const override {
+        return true; // Power-on is a 2 s hold.
+    }
 
   private:
     void cancel_timer();

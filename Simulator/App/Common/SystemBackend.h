@@ -1,5 +1,6 @@
 #pragma once
 #include <cstddef>
+#include <cstdint>
 #include "DataProc/DataProc_Def.h"
 
 /** Platform implementation of system operations; exactly one per build (RK simulator:
@@ -39,8 +40,12 @@ bool execute_device(const DataProc::DeviceRequest& request);
 const char* initialization_name(unsigned step);
 /** Localized SystemLoading headline of the step (what is actually being initialized or checked). */
 i18n::TextId initialization_title(unsigned step);
-/** Run one bounded initialization step; writes a NUL-terminated detail. False marks a failure that is
+/** Advance initialization step 0..kInitializationStepCount-1 without blocking. SystemLoading polls it on the UI
+ * thread about every 50 ms; elapsed_ms counts from the step's first poll (0). Return Pending while the check is
+ * still running, otherwise Ok/Failed with a NUL-terminated detail. Each step's duration is the real check time;
+ * the platform bounds it with its own timeout (SystemLoading also stops waiting after kStepLimitMs). A failure is
  * shown and logged but never stops startup.
  */
-bool initialize_step(unsigned step, char* detail, std::size_t size);
+DataProc::InitializationStatus poll_initialization_step(unsigned step, std::uint32_t elapsed_ms, char* detail,
+                                                        std::size_t size);
 } // namespace system_backend

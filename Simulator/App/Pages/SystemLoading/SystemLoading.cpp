@@ -56,26 +56,51 @@ void SystemLoading::on_language_changed() {
     view_.apply_language();
 }
 
+void SystemLoading::begin_step(unsigned step) {
+    step_ = step;
+    step_status_ = DataProc::InitializationStatus::Pending;
+    step_started_ = lv_tick_get();
+    view_.begin_step(step);
+    poll_initialization(nullptr); // First poll (elapsed 0) at once: instant checks need no extra tick.
+}
+
+void SystemLoading::poll_initialization(lv_timer_t* timer) {
+    const uint32_t elapsed = lv_tick_elaps(step_started_);
+    if (step_status_ == DataProc::InitializationStatus::Pending) {
+        // Non-blocking: the backend reports Pending until its check (or its own timeout) is done.
+        step_status_ = model_.poll_step(step_, timer ? elapsed : 0);
+        if (step_status_ == DataProc::InitializationStatus::Pending) {
+            view_.show_waiting(elapsed);
+            return;
+        }
+        step_finished_ = lv_tick_get();
+        // A failed node is presentation/log state, never a gate for the next node.
+        view_.finish_step(step_, step_status_ == DataProc::InitializationStatus::Ok);
+    }
+    if (!timer || elapsed < kMinStepMs || lv_tick_elaps(step_finished_) < kResultMs)
+        return;
+    if (step_ + 1 < SystemLoadingView::kStepCount) {
+        begin_step(step_ + 1);
+        return;
+    }
+    phase_ = Phase::Completion;
+    lv_timer_set_period(timer, 200); // Retain the 100% window before the completion summary.
+    lv_timer_reset(timer);
+}
+
 void SystemLoading::on_timeout(lv_timer_t* timer) {
     auto* self = static_cast<SystemLoading*>(timer->user_data);
     if (self->phase_ == Phase::Logo) {
         self->phase_ = Phase::Initialization;
         self->view_.show_initialization();
         APP_LOG_I("SystemLoading", "window=Initialization%s", self->demo_tag());
-        self->view_.show_step(self->step_, self->model_.initialize_step(self->step_));
-        lv_timer_set_period(timer, SystemLoadingView::kStepMs);
+        self->begin_step(0);
+        lv_timer_set_period(timer, kPollMs);
         lv_timer_reset(timer);
         return;
     }
     if (self->phase_ == Phase::Initialization) {
-        if (++self->step_ < SystemLoadingView::kStepCount) {
-            // A failed node is presentation/log state, never a gate for the next node.
-            self->view_.show_step(self->step_, self->model_.initialize_step(self->step_));
-        } else {
-            self->phase_ = Phase::Completion;
-            lv_timer_set_period(timer, 200); // Retain the 100% window before the completion summary.
-        }
-        lv_timer_reset(timer);
+        self->poll_initialization(timer);
         return;
     }
     if (self->phase_ == Phase::Completion) {

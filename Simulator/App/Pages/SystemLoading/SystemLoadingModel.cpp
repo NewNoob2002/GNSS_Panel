@@ -38,29 +38,38 @@ bool SystemLoadingModel::begin_initialization() const {
         APP_LOG_E("SystemLoading", "initialization report reset rejected");
     return ok;
 }
-bool SystemLoadingModel::initialize_step(unsigned step) const {
+DataProc::InitializationStatus SystemLoadingModel::poll_step(unsigned step, std::uint32_t elapsed_ms) const {
     if (!account_ || step >= DataProc::kInitializationStepCount) {
         APP_LOG_E("SystemLoading", "invalid/uninitialized step %u", step);
-        return false;
+        return DataProc::InitializationStatus::Failed;
     }
     const char* name = system_backend::initialization_name(step);
     const char* tag = state_.simulated ? " [DEMO]" : "";
-    APP_LOG_I("SystemLoading", "step %u/5 %s: begin%s", step + 1, name, tag);
+    if (elapsed_ms == 0)
+        APP_LOG_I("SystemLoading", "step %u/5 %s: begin%s", step + 1, name, tag);
     DataProc::SystemRequest request{};
     request.command = DataProc::SystemCommand::RecordInitialization;
     request.initialization_step = step;
-    const bool success = system_backend::initialize_step(step, request.initialization.detail.data(),
-                                                         request.initialization.detail.size());
-    request.initialization.detail.back() = '\0';
-    request.initialization.status =
-        success ? DataProc::InitializationStatus::Ok : DataProc::InitializationStatus::Failed;
-    app_log_write(success ? APP_LOG_INFO : APP_LOG_WARN, "SystemLoading", "step %u/5 %s: %s%s (%s)", step + 1, name,
-                  success ? "OK" : "FAILED", tag, request.initialization.detail.data());
-    if (account_->Notify("System", &request, sizeof(request)) != Account::RES_OK) {
-        APP_LOG_E("SystemLoading", "step %u report rejected", step + 1);
-        return false;
+    auto& detail = request.initialization.detail;
+    auto status = system_backend::poll_initialization_step(step, elapsed_ms, detail.data(), detail.size());
+    if (status == DataProc::InitializationStatus::Pending && elapsed_ms >= kStepLimitMs) {
+        std::snprintf(detail.data(), detail.size(), "no result within %lu ms",
+                      static_cast<unsigned long>(kStepLimitMs));
+        status = DataProc::InitializationStatus::Failed;
     }
-    return success;
+    if (status == DataProc::InitializationStatus::Pending)
+        return status;
+    if (status != DataProc::InitializationStatus::Ok)
+        status = DataProc::InitializationStatus::Failed;
+    detail.back() = '\0';
+    request.initialization.status = status;
+    const bool success = status == DataProc::InitializationStatus::Ok;
+    app_log_write(success ? APP_LOG_INFO : APP_LOG_WARN, "SystemLoading", "step %u/5 %s: %s%s after %lu ms (%s)",
+                  step + 1, name, success ? "OK" : "FAILED", tag, static_cast<unsigned long>(elapsed_ms),
+                  detail.data());
+    if (account_->Notify("System", &request, sizeof(request)) != Account::RES_OK)
+        APP_LOG_E("SystemLoading", "step %u report rejected", step + 1);
+    return status;
 }
 
 int SystemLoadingModel::on_event(Account* account, Account::EventParam_t* event) {

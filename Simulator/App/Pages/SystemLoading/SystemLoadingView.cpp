@@ -1,4 +1,6 @@
 #include "SystemLoadingView.h"
+#include <cstdio>
+#include <cstring>
 #include <initializer_list>
 #include "Common/SystemBackend.h"
 #include "Utils/PageStyle.h"
@@ -35,6 +37,18 @@ void draw_check(lv_event_t* event) {
 }
 void rotate_gear(void* obj, int32_t angle) {
     lv_img_set_angle(static_cast<lv_obj_t*>(obj), static_cast<int16_t>(angle));
+}
+// Checks take a variable time, so the gear turns until Ready instead of spanning a fixed duration.
+void spin_gear(lv_obj_t* gear) {
+    lv_anim_t anim;
+    lv_anim_init(&anim);
+    lv_anim_set_var(&anim, gear);
+    lv_anim_set_values(&anim, 0, 3600);
+    lv_anim_set_time(&anim, 1600);
+    lv_anim_set_exec_cb(&anim, rotate_gear);
+    lv_anim_set_repeat_count(&anim, LV_ANIM_REPEAT_INFINITE);
+    if (!lv_anim_start(&anim))
+        LV_LOG_WARN("SystemLoading: gear animation allocation failed");
 }
 void animate(lv_obj_t* obj, lv_anim_exec_xcb_t exec, int32_t from, int32_t to, uint32_t time_ms,
              lv_anim_ready_cb_t finished = nullptr) {
@@ -145,6 +159,7 @@ void SystemLoadingView::show_logo() const {
 void SystemLoadingView::show_initialization() {
     ready_ = false;
     step_ = 1;
+    waited_s_ = 0;
     failed_steps_ = 0;
     lv_obj_clear_flag(ui_.cont, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(ui_.check, LV_OBJ_FLAG_HIDDEN);
@@ -159,24 +174,44 @@ void SystemLoadingView::show_initialization() {
     update_text();
     animate(ui_.img_logo, set_opa, LV_OPA_COVER, LV_OPA_TRANSP, kTransitionMs, hide_after_fade);
     animate(ui_.cont, set_opa, LV_OPA_TRANSP, LV_OPA_COVER, kTransitionMs);
-    animate(ui_.gear, rotate_gear, 0, 3600, kInitializationMs);
+    spin_gear(ui_.gear);
 }
 
-void SystemLoadingView::show_step(unsigned step, bool success) {
+void SystemLoadingView::begin_step(unsigned step) {
     if (step >= kStepCount) {
         LV_LOG_ERROR("SystemLoading: invalid step");
         return;
     }
     step_ = static_cast<int>(step + 1);
-    const unsigned mask = 1u << step;
-    failed_steps_ = (failed_steps_ & ~mask) | (success ? 0u : mask);
+    waited_s_ = 0;
+    failed_steps_ &= ~(1u << step);
     update_text();
-    set_accent(success ? kOrange : kRed);
+    set_accent(kOrange);
+    update_progress(progress_); // Active node and step label.
     lv_obj_fade_in(ui_.service, 160, 0);
     lv_obj_fade_in(ui_.subtitle, 160, 0);
     lv_obj_fade_in(ui_.dots[step], 160, 0);
-    // Only the controller advances the stage; progress never invents an initialization result.
-    animate(ui_.bar, set_progress, progress_, static_cast<int32_t>((step + 1) * 100 / kStepCount), kStepMs);
+}
+
+void SystemLoadingView::finish_step(unsigned step, bool success) {
+    if (step >= kStepCount) {
+        LV_LOG_ERROR("SystemLoading: invalid step");
+        return;
+    }
+    if (!success)
+        failed_steps_ |= 1u << step;
+    update_text();
+    set_accent(success ? kOrange : kRed);
+    // Only a finished check advances the bar; progress never invents an initialization result.
+    animate(ui_.bar, set_progress, progress_, static_cast<int32_t>((step + 1) * 100 / kStepCount), kProgressMs);
+}
+
+void SystemLoadingView::show_waiting(uint32_t elapsed_ms) {
+    const uint32_t seconds = elapsed_ms / 1000U;
+    if (seconds == waited_s_)
+        return;
+    waited_s_ = seconds;
+    update_progress(progress_);
 }
 
 void SystemLoadingView::show_ready() {
@@ -216,10 +251,7 @@ void SystemLoadingView::update_progress(int32_t percent) {
     lv_obj_set_width(ui_.bar, static_cast<lv_coord_t>(progress_ * kTrackWidth / 100));
     lv_arc_set_value(ui_.ring, static_cast<int16_t>(progress_));
     lv_label_set_text_fmt(ui_.percent, "%ld%%", static_cast<long>(progress_));
-    if (ready_)
-        lv_label_set_text(ui_.step, i18n::text(i18n::TextId::StartupCompleted));
-    else
-        lv_label_set_text_fmt(ui_.step, i18n::text(i18n::TextId::InitializationStep), step_);
+    update_step_label();
     for (int i = 0; i < 5; ++i) {
         const bool complete = ready_ || i < step_ - 1;
         const bool active = !ready_ && i == step_ - 1;
@@ -262,8 +294,18 @@ void SystemLoadingView::destroy() {
 }
 void SystemLoadingView::apply_language() const {
     update_text();
-    if (ready_)
+    update_step_label();
+}
+void SystemLoadingView::update_step_label() const {
+    if (ready_) {
         lv_label_set_text(ui_.step, i18n::text(i18n::TextId::StartupCompleted));
-    else
-        lv_label_set_text_fmt(ui_.step, i18n::text(i18n::TextId::InitializationStep), step_);
+        return;
+    }
+    char text[48];
+    std::snprintf(text, sizeof(text), i18n::text(i18n::TextId::InitializationStep), step_);
+    if (waited_s_ > 0) {
+        const auto length = std::strlen(text);
+        std::snprintf(text + length, sizeof(text) - length, "  %lus", static_cast<unsigned long>(waited_s_));
+    }
+    lv_label_set_text(ui_.step, text);
 }

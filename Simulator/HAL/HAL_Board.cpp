@@ -75,6 +75,13 @@ HAL::Charger_Get() {
     return charger;
 }
 
+bool
+HAL::I2C_ProbeDevice(uint8_t address) {
+    // 虚拟主板：BQ40Z50 始终在线，MP2762A 随 V 键切换的主板版本。
+    return (address == 0x0B && systemInfo.board.online_device.bq40z50)
+           || (address == 0x5C && systemInfo.board.online_device.mp2762);
+}
+
 void
 HAL::Sim_SetPowerKey(bool pressed) {
     // Power 键按下为高电平（与固件 HAL::Key_PowerPressed 一致）。

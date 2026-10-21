@@ -8,15 +8,16 @@ namespace {
 struct DemoStep {
     const char* name;
     bool success;
+    std::uint32_t duration_ms; // Simulated check time: real steps differ, so the preview does too.
     const char* detail;
 };
 // Placeholder outcomes; the network node demonstrates a non-blocking failure.
 constexpr DemoStep steps[] = {
-    {"configuration", true, "Rover, TRIMTALK, 455.05 MHz defaults loaded"},
-    {"services", true, "status and logging services prepared"},
-    {"gnss", true, "GNSS receiver placeholder prepared"},
-    {"network", false, "Wi-Fi backend reserved; continue offline"},
-    {"finalization", true, "working UI prepared"},
+    {"configuration", true, 0, "Rover, TRIMTALK, 455.05 MHz defaults loaded"},
+    {"services", true, 400, "status and logging services prepared"},
+    {"gnss", true, 1200, "GNSS receiver placeholder prepared"},
+    {"network", false, 700, "Wi-Fi backend reserved; continue offline"},
+    {"finalization", true, 200, "working UI prepared"},
 };
 static_assert(sizeof(steps) / sizeof(steps[0]) == DataProc::kInitializationStepCount);
 
@@ -118,9 +119,12 @@ bool system_backend::execute_device(const DataProc::DeviceRequest& request) {
 const char* system_backend::initialization_name(unsigned step) {
     return step < DataProc::kInitializationStepCount ? steps[step].name : "invalid";
 }
-bool system_backend::initialize_step(unsigned step, char* detail, std::size_t size) {
+DataProc::InitializationStatus system_backend::poll_initialization_step(unsigned step, std::uint32_t elapsed_ms,
+                                                                        char* detail, std::size_t size) {
     if (step >= DataProc::kInitializationStepCount || !detail || !size)
-        return false;
+        return DataProc::InitializationStatus::Failed;
+    if (elapsed_ms < steps[step].duration_ms)
+        return DataProc::InitializationStatus::Pending;
     std::snprintf(detail, size, "%s", steps[step].detail);
-    return steps[step].success;
+    return steps[step].success ? DataProc::InitializationStatus::Ok : DataProc::InitializationStatus::Failed;
 }
