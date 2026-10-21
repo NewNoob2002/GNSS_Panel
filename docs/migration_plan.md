@@ -24,9 +24,8 @@
 | 模型 | 用途 |
 |---|---|
 | `codex/gpt-6.1-sol`（high） | 外设驱动、显示端口、框架替换、内存调优等需要判断的工作（★ 任务） |
-| `codex/gpt-6-astra`（medium） | 规则明确的批量迁移：API 替换、CMake 清理、按页面迁移 |
-| `antigravity/gemini-4-argon` | 大上下文机械工作：资源格式转换、全仓清点、重命名 |
-| `antigravity/claude-sonnet-5-5` | 独立审阅 ★ 任务的 diff，不写代码 |
+| `antigravity/claude-sonnet-5-5` | 规则明确的批量迁移（按页面迁移 API）；审阅 sol 完成的 ★ 任务 diff |
+| `antigravity/gemini-4-argon` | 大上下文机械工作：上游源码替换、CMake 清理、资源格式转换、全仓清点、重命名 |
 | `antigravity/gemini-3.8-flash` | 文档同步、清点类只读任务 |
 
 ## 阶段 2：HC32 去 Arduino 化
@@ -36,9 +35,10 @@
 | # | 内容 | 负责 |
 |---|---|---|
 | 2.1 ★ | 用原生 C 接口（如 `i2c_master_*`）替换 `Platform/Core` 的 `TwoWire`，迁移 `HAL_I2C`、`Bq40z50`、`Mp2762a`；保留超时、总线恢复与扫描语义。`SPIClass` 仍被 Adafruit 使用，放到 2.3 | sol |
-| 2.2 | `Platform/HAL`、`Comm`、`Display`、`Products/X1`、`MillisTaskManager`、`easylogger` 中的 `pinMode/digitalWrite/digitalRead/millis/delay` 等改为 `gpio.h`/`delay.h` 接口；去掉 `Arduino.h` 包含 | astra |
-| 2.3 ★ | 原生 SPI 接口替换 `SPIClass`，原生 ST7789 驱动替换 `Adafruit_ST7789/GFX/BusIO`：初始化序列、MADCTL、偏移逐项照搬原库（注明出处），保留现有 DMA 刷新与旋转 | sol |
-| 2.4 | 删除 `Arduino/`、`Adafruit*` 目录与 `hc32_arduino*` 目标，更新 `AGENTS.md`、`docs/product_structure.md`、`readme.md` | astra |
+| 2.2 ★ | `Platform/HAL`、`Comm`、`Display`、`Products/X1`、`MillisTaskManager`、`easylogger` 中的 `pinMode/digitalWrite/digitalRead/millis/delay` 等改为 `gpio.h`/`delay.h` 接口；去掉 `Arduino.h` 包含；与 2.2b 合并执行 | sol |
+| 2.2b ★ | 通用外设 class 化：`I2cMaster`（替换 2.1 的 `i2c_master_*`）、`GpioPin`；驱动只含外设操作，外设号与引脚由板级配置实例化；无虚函数、无动态分配、静态构造不碰硬件 | sol |
+| 2.3 ★ | `SpiMaster` 类替换 `SPIClass`，面板驱动类替换 `Adafruit_ST7789/GFX/BusIO`（同 2.2b 原则）：初始化序列、MADCTL、偏移逐项照搬原库（注明出处），保留现有 DMA 刷新与旋转 | sol |
+| 2.4 | 删除 `Arduino/`、`Adafruit*` 目录与 `hc32_arduino*` 目标，更新 `AGENTS.md`、`docs/product_structure.md`、`readme.md` | argon |
 
 阶段 2 额外验收：`rg -n 'Arduino\.h|TwoWire|SPIClass|Adafruit|pinMode|digitalWrite' Vendor/HC32` 无结果（第三方示例除外）。
 
@@ -51,10 +51,10 @@
 | # | 内容 | 负责 |
 |---|---|---|
 | 3.0 ★ | 只读调研，产出 `docs/lvgl9_migration.md`：LVGL 8→9 API 对照（覆盖 `App/` 实际用到的符号）、图片/字体格式转换方案、内存预算、DataCenter→DataBroker 与 Bridge→DeviceManager 映射、线程与生命周期约束；同时在模拟器中抓取各页面 LVGL 8 截图作为视觉基线 | sol |
-| 3.1 | 用 v9.6.0 上游源码整体替换 `External/lvgl/`；基于 v9 模板重建三份 `lv_conf.h`，保留现有功能开关的等价配置 | astra |
+| 3.1 | 用 v9.6.0 上游源码整体替换 `External/lvgl/`；基于 v9 模板重建三份 `lv_conf.h`，保留现有功能开关的等价配置 | argon |
 | 3.2 ★ | 平台端口：HC32 `lv_port_disp`（`lv_display_create`、RGB565 字节交换、DMA 双缓冲、旋转）、输入与 tick；模拟器 SDL；Linux 显示端口 | sol |
 | 3.3 | 图片与字体转换为 v9 格式（脚本化、可重复执行，脚本入库） | argon |
-| 3.4 | `App/` 页面与组件的 API 迁移，按页面分批；`lv_ext`、`lv_anim_label` 等自定义组件由 sol 负责 | astra / sol |
+| 3.4 | `App/` 页面与组件的 API 迁移，按页面分批；`lv_ext`、`lv_anim_label` 等自定义组件由 sol 负责；sonnet 完成的批次由 sol 复核 | sonnet / sol |
 | 3.5 ★ | 切换到 `Frameworks/PageManager` + `ResourceManager`，删除 `App/Utils/PageManager`、`App/Utils/ResourceManager` | sol |
 | 3.6 ★ | DataCenter → DataBroker、Bridge → DeviceManager；移植 `App/tests` 覆盖的行为（定时器回绕、回调中销毁、注册容量、订阅者删除） | sol |
 | 3.7 ★ | HC32 内存与性能调优：`LV_MEM_SIZE`、绘制缓冲、字体/图片占用，达到体积门槛；记录帧率与 `lv_mem` 峰值 | sol |
