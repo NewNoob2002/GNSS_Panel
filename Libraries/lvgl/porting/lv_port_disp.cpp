@@ -9,6 +9,11 @@ static SCREEN_CLASS screen(&CONFIG_SCREEN_SPI, CONFIG_SCREEN_CS_PIN, CONFIG_SCRE
 #define SCREEN_BUFFER_ROWS 42U
 #define SCREEN_BUFFER_SIZE (CONFIG_SCREEN_HOR_RES * SCREEN_BUFFER_ROWS)
 static_assert(SCREEN_BUFFER_SIZE * sizeof(lv_color_t) <= UINT16_MAX, "DMA 单次传输计数不能超过 65535");
+// 画面在玻璃上的水平平移（逻辑像素，正值向右）。RM690A0 窗口起点与尺寸须按 2 像素对齐（见 my_rounder_cb），
+// 偏移为偶数才不破坏对齐；移出玻璃的列不发送，未覆盖的边缘保持初始化时填充的黑色。
+static_assert(PRODUCT_DISPLAY_X_SHIFT % 2 == 0, "PRODUCT_DISPLAY_X_SHIFT must be even");
+static_assert(PRODUCT_DISPLAY_X_SHIFT > -CONFIG_SCREEN_HOR_RES && PRODUCT_DISPLAY_X_SHIFT < CONFIG_SCREEN_HOR_RES,
+              "PRODUCT_DISPLAY_X_SHIFT out of range");
 
 static lv_disp_drv_t disp_drv; /*Descriptor of a display driver*/
 
@@ -77,6 +82,23 @@ disp_flush(lv_disp_drv_t* disp_drv, const lv_area_t* area, lv_color_t* color_p) 
     // 数据已复制到 tx_buf，立即归还绘制缓冲，LVGL 可在 DMA 期间渲染下一块。
     lv_disp_flush_ready(disp_drv);
 
+    // 旋转后 tx_buf 每行对应一个逻辑 x（第 0 行为 x2），物理行 = 屏高 - 1 - x - 偏移；只发送落在玻璃内的行。
+    const int32_t panel_rows = screen.height();
+    int32_t first_row = panel_rows - 1 - area->x2 - PRODUCT_DISPLAY_X_SHIFT;
+    int32_t rows = w;
+    int32_t skipped = 0;
+    if (first_row < 0) {
+        skipped = -first_row;
+        first_row = 0;
+        rows -= skipped;
+    }
+    if (first_row + rows > panel_rows) {
+        rows = panel_rows - first_row;
+    }
+    if (rows <= 0) {
+        return; // 整块都在玻璃外
+    }
+
     dma_done = false;
     flush_active = true;
     flush_started_ms = millis();
@@ -84,9 +106,9 @@ disp_flush(lv_disp_drv_t* disp_drv, const lv_area_t* area, lv_color_t* color_p) 
     // setAddrWindow() 不操作 CS；上一块结束时 CS 已拉高，必须先选中屏幕，
     // 否则 CASET/RASET/RAMWR 被丢弃，像素数据会写到旧窗口。
     digitalWrite(CONFIG_SCREEN_CS_PIN, LOW);
-    screen.setAddrWindow(area->y1, screen.height() - 1 - area->x2, h, w);
+    screen.setAddrWindow(area->y1, first_row, h, rows);
     digitalWrite(CONFIG_SCREEN_DC_PIN, HIGH);
-    spi_dma_trans(tx_buf, (uint32_t)w * h * sizeof(lv_color_t));
+    spi_dma_trans(tx_buf + (uint32_t)skipped * h, (uint32_t)rows * h * sizeof(lv_color_t));
 }
 
 static void

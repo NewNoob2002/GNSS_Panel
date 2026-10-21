@@ -47,6 +47,9 @@ Products/<产品>/   product.cmake、product_config.h、产品专属源码
 | `PRODUCT_PAGE_BATTERY_WARNING` | – | 1 | 0 |
 | `PRODUCT_SHUTDOWN_WIFI_BUTTON` | – | 1 | 0 |
 | `PRODUCT_RECORD_SETTINGS` | – | 1 | 0 |
+| `PRODUCT_DISPLAY_X_SHIFT`（画面右移像素，偶数） | – | 4 | 0 |
+
+`PRODUCT_DISPLAY_X_SHIFT`：X1Pro 外壳遮挡屏幕左缘，`lv_port_disp.cpp` 刷新时把画面在玻璃上整体右移 4 px，右侧移出的 4 列（各页面右侧留白）不发送，左缘保持黑色；RM690A0 窗口须 2 像素对齐，故只能取偶数。已在 X1Pro 实机确认显示正常。
 
 XBase 的差异取自其分支相对分叉点的产品级改动（无星图/过温告警页、关机页无 Wi-Fi、录制类型/间隔不可调、协议无 0x0B/0x0D）。该分支中其余页面改动为代码整理，未合入。
 

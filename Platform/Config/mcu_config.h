@@ -12,7 +12,8 @@
 #if PRODUCT_HAS_DISPLAY                                                                                                \
     && (!defined(PRODUCT_PROTOCOL_WIFI_CONTROL) || !defined(PRODUCT_PROTOCOL_SATELLITE)                                \
         || !defined(PRODUCT_PAGE_STAR_MAP) || !defined(PRODUCT_PAGE_BATTERY_WARNING)                                   \
-        || !defined(PRODUCT_SHUTDOWN_WIFI_BUTTON) || !defined(PRODUCT_RECORD_SETTINGS))
+        || !defined(PRODUCT_SHUTDOWN_WIFI_BUTTON) || !defined(PRODUCT_RECORD_SETTINGS)                                \
+        || !defined(PRODUCT_DISPLAY_X_SHIFT))
 #error "display product_config.h is missing a feature switch"
 #endif
 

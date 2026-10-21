@@ -19,5 +19,8 @@
 #define PRODUCT_SHUTDOWN_WIFI_BUTTON        0
 #define PRODUCT_RECORD_SETTINGS             0
 
+/* 画面在屏幕玻璃上的水平偏移（见 X1Pro）；XBase 外壳不遮挡。 */
+#define PRODUCT_DISPLAY_X_SHIFT             0
+
 // 2.4.5 关闭 MIDDLE_LOGO_USE
 // 2.4.6 注释外部供电变化后的复位逻辑

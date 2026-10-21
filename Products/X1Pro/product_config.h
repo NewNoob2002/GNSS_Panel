@@ -21,6 +21,10 @@
 #define PRODUCT_SHUTDOWN_WIFI_BUTTON        1
 #define PRODUCT_RECORD_SETTINGS             1
 
+/* 画面在屏幕玻璃上整体右移的像素数（偶数）：X1Pro 外壳遮挡屏幕左缘。
+ * 右侧移出玻璃的部分被裁掉；各页面右侧约 6 px 为背景留白，不裁到内容。 */
+#define PRODUCT_DISPLAY_X_SHIFT             4
+
 // 2.0 修复X1pro充电问题， 增加强制关机机制防止卡死无法关机
 // 2.0.1 增加关机充电提示和开机按键提示动画，增加设备信息页面
 // 2.1.0 使用新框架，优化响应速度和UI动画帧率
