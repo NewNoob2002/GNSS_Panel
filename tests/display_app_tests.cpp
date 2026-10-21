@@ -11,8 +11,10 @@
 #include "Common/SystemService.h"
 #include "HAL.h"
 #include "P4App.h"
+#include "Resource/ResourcePool.h"
 #include "SystemState.h"
 #include "Utils/I18n/I18n.h"
+#include "Utils/PageStyle.h"
 #include "delay.h"
 #include "mcu_config.h"
 
@@ -71,6 +73,27 @@ find_text(lv_obj_t* root, const char* text) {
         }
     }
     return nullptr;
+}
+
+lv_obj_t*
+find_image(lv_obj_t* root, const void* source) {
+    if (lv_obj_check_type(root, &lv_img_class) && lv_img_get_src(root) == source) {
+        return root;
+    }
+    for (uint32_t i = 0; i < lv_obj_get_child_cnt(root); ++i) {
+        if (auto* found = find_image(lv_obj_get_child(root, static_cast<int32_t>(i)), source)) {
+            return found;
+        }
+    }
+    return nullptr;
+}
+
+// 状态栏 SD 图标是否以录制色显示。
+bool
+status_recording() {
+    auto* sd = find_image(lv_layer_top(), resource_pool::get_image("ui_sd_card"));
+    assert(sd);
+    return lv_obj_get_style_img_recolor(sd, 0).full == page::style::kInfo.full;
 }
 
 void
@@ -289,13 +312,12 @@ main() {
     assert(App_Get()->back());
     run(800);
 
-    // RecordConfig：双击 Power（Commit）开始，单击（Confirm）停止。
+    // RecordConfig：开始与停止都是单击（Confirm）；双击（Commit）同样有效，等待期间不重复发送。
     assert(App_Get()->show_page("Pages/RecordConfig"));
     run(800);
     assert(find_text(App_Get()->focused(), i18n::text(i18n::TextId::StartupStart)));
-    App_Get()->on_input(P4App::InputAction::Confirm); // 未录制时单击不开始
     assert(!request.record_op && !request.record_settings_pending);
-    App_Get()->on_input(P4App::InputAction::Commit);
+    App_Get()->on_input(P4App::InputAction::Confirm);
     {
         const RecordInfo_t record = State::Effective_Record();
         assert(record.record_status == On_Off_Status_ON && request.record_op && request.record_settings_pending);
@@ -303,16 +325,23 @@ main() {
     }
     assert(DeviceService::snapshot().recording && DeviceService::snapshot().record_pending);
     assert(find_text(lv_scr_act(), i18n::text(i18n::TextId::RequestWaiting)));
+    run(400);
+    assert(!status_recording()); // 主控确认前状态栏仍按实际（未录制）显示
     const auto revision = State::Record_Revision();
     App_Get()->on_input(P4App::InputAction::Commit);
     assert(State::Record_Revision() == revision);
     State::Confirm_Record(State::Record_Revision(), true);
     run(600);
-    assert(!DeviceService::snapshot().record_pending);
+    assert(!DeviceService::snapshot().record_pending && status_recording());
     assert(host.record.record_status == On_Off_Status_ON && !request.record_op);
     choose(i18n::TextId::Stop);
     App_Get()->on_input(P4App::InputAction::Confirm);
     assert(State::Effective_Record().record_status == On_Off_Status_OFF && request.record_settings_pending);
+    run(400);
+    assert(status_recording()); // 停止请求确认前，状态栏仍显示录制中
+    State::Confirm_Record(State::Record_Revision(), true);
+    run(600);
+    assert(!status_recording() && host.record.record_status == On_Off_Status_OFF);
     assert(App_Get()->back());
     run(800);
     assert(on_page("Pages/Dialplate"));

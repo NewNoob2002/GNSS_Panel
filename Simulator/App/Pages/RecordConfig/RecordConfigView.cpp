@@ -1,4 +1,5 @@
 #include "RecordConfigView.h"
+#include <cstdio>
 #include "Utils/SettingsStyle.h"
 using namespace page;
 using i18n::TextId;
@@ -10,6 +11,7 @@ void RecordConfigView::create(lv_obj_t* root) {
     settings_style::icon(hero_, "ui_record_large", 28, 6);
     state_ = style::label(hero_, font, 4, 40, 80);
     space_ = style::label(hero_, font, 4, 58, 80);
+    lv_obj_set_style_text_color(space_, style::kMuted, 0);
     for (auto* label : {state_, space_})
         lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
     status_dot_ = settings_style::dot(hero_, 73, 8);
@@ -50,9 +52,10 @@ void RecordConfigView::update(const DataProc::DeviceSnapshot& device, bool confi
     settings_style::value(state_, i18n::text(!device.record_valid ? TextId::NotAvailable
                                              : device.recording   ? TextId::Recording
                                                                   : TextId::RecordIdle));
-    lv_label_set_text_fmt(space_, "%.0f MB", device.record_space_mb);
-    lv_obj_set_style_text_color(space_, style::kMuted, 0);
-    lv_obj_set_style_text_color(state_, device.recording ? style::kDanger : style::kText, 0);
+    char space[24];
+    std::snprintf(space, sizeof(space), "%.0f MB", device.record_space_mb);
+    settings_style::set_text(space_, space);
+    settings_style::set_text_color(state_, device.recording ? style::kDanger : style::kText);
     settings_style::activity(status_dot_, device.recording || device.record_pending,
                              device.record_pending ? style::kAccent
                              : device.recording    ? style::kDanger
@@ -62,16 +65,20 @@ void RecordConfigView::update(const DataProc::DeviceSnapshot& device, bool confi
     settings_style::value(type_text_, value);
     i18n::option_text(TextId::RecordIntervalOptions, interval_, value, sizeof(value));
     settings_style::value(interval_text_, value);
-    lv_label_set_text(record_text_, i18n::text(device.recording ? TextId::Stop : TextId::StartupStart));
-    lv_img_set_src(record_icon_, resource_pool::get_image(device.recording ? "ui_stop" : "ui_play"));
-    lv_label_set_text(back_text_, i18n::text(TextId::Back));
+    settings_style::set_text(record_text_, i18n::text(device.recording ? TextId::Stop : TextId::StartupStart));
+    settings_style::set_image(record_icon_, device.recording ? "ui_stop" : "ui_play");
+    settings_style::set_text(back_text_, i18n::text(TextId::Back));
     const bool locked = device.recording || device.record_pending || !device.record_valid;
     for (auto* control : {ui.type, ui.interval}) {
         if (configurable && !locked)
             lv_obj_clear_state(control, LV_STATE_DISABLED);
         else
             lv_obj_add_state(control, LV_STATE_DISABLED);
-        lv_obj_set_style_opa(control, configurable ? LV_OPA_50 : LV_OPA_COVER, LV_STATE_DISABLED);
+        lv_style_value_t opa{};
+        const lv_opa_t disabled_opa = configurable ? LV_OPA_50 : LV_OPA_COVER;
+        if (lv_obj_get_local_style_prop(control, LV_STYLE_OPA, &opa, LV_STATE_DISABLED) != LV_RES_OK
+            || opa.num != disabled_opa)
+            lv_obj_set_style_opa(control, disabled_opa, LV_STATE_DISABLED);
         if (configurable)
             lv_obj_add_flag(control, LV_OBJ_FLAG_CLICKABLE);
         else
@@ -81,12 +88,10 @@ void RecordConfigView::update(const DataProc::DeviceSnapshot& device, bool confi
         lv_obj_add_state(ui.record, LV_STATE_DISABLED);
     else
         lv_obj_clear_state(ui.record, LV_STATE_DISABLED);
-    lv_obj_set_style_border_color(ui.record, device.recording ? style::kDanger : style::kBorder, 0);
-    lv_label_set_text(feedback_, feedback == TextId::Count ? "" : i18n::text(feedback));
-    lv_obj_set_style_text_color(feedback_,
-                                feedback == TextId::RequestRejected || feedback == TextId::RequestTimeout
-                                    ? style::kDanger
-                                : feedback == TextId::RequestReceived ? style::kSuccess
-                                                                      : style::kMuted,
-                                0);
+    settings_style::set_border_color(ui.record, device.recording ? style::kDanger : style::kBorder);
+    settings_style::set_text(feedback_, feedback == TextId::Count ? "" : i18n::text(feedback));
+    settings_style::set_text_color(feedback_, feedback == TextId::RequestRejected || feedback == TextId::RequestTimeout
+                                                  ? style::kDanger
+                                              : feedback == TextId::RequestReceived ? style::kSuccess
+                                                                                    : style::kMuted);
 }

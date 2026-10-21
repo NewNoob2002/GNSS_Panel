@@ -64,38 +64,29 @@ void WorkSettingsView::update(DataProc::WorkTarget target, bool pending, TextId 
                         : target == DataProc::WorkTarget::Rover ? "ui_rover_large"
                                                                 : "ui_network_large";
     const auto color = target == DataProc::WorkTarget::Rover ? style::kSuccess : style::kInfo;
-    lv_img_set_src(mode_icon_, resource_pool::get_image(image));
-    lv_obj_set_style_img_recolor(mode_icon_, color, 0);
+    settings_style::set_image(mode_icon_, image);
+    settings_style::set_recolor(mode_icon_, color);
     settings_style::activity(status_dot_, pending, pending ? style::kAccent : color);
     char value[64];
     i18n::option_text(TextId::WorkRadioProtocolOptions, protocol_, value, sizeof(value));
     settings_style::value(protocol_text_, value);
     i18n::option_text(TextId::WorkRadioChannelOptions, channel_, value, sizeof(value));
     settings_style::value(channel_text_, value);
-    lv_label_set_text(apply_text_, i18n::text(TextId::Apply));
+    settings_style::set_text(apply_text_, i18n::text(TextId::Apply));
     const bool radio = target != DataProc::WorkTarget::Ntrip;
-    for (auto* control : {ui.protocol, ui.channel}) {
-        if (radio)
-            lv_obj_clear_flag(control, LV_OBJ_FLAG_HIDDEN);
-        else
-            lv_obj_add_flag(control, LV_OBJ_FLAG_HIDDEN);
-    }
-    if (radio)
-        lv_obj_add_flag(network_card_, LV_OBJ_FLAG_HIDDEN);
-    else
-        lv_obj_clear_flag(network_card_, LV_OBJ_FLAG_HIDDEN);
+    for (auto* control : {ui.protocol, ui.channel})
+        settings_style::set_visible(control, radio);
+    settings_style::set_visible(network_card_, !radio);
     for (auto* control : {ui.preset, ui.protocol, ui.channel, ui.apply}) {
         if (pending)
             lv_obj_add_state(control, LV_STATE_DISABLED);
         else
             lv_obj_clear_state(control, LV_STATE_DISABLED);
     }
-    lv_label_set_text(feedback_, feedback == TextId::Count ? "" : i18n::text(feedback));
-    lv_obj_set_style_text_color(feedback_,
-                                feedback == TextId::RequestRejected || feedback == TextId::RequestTimeout
-                                        || feedback == TextId::SelectChannel
-                                    ? style::kDanger
-                                : feedback == TextId::RequestReceived ? style::kSuccess
-                                                                      : style::kMuted,
-                                0);
+    settings_style::set_text(feedback_, feedback == TextId::Count ? "" : i18n::text(feedback));
+    settings_style::set_text_color(feedback_, feedback == TextId::RequestRejected || feedback == TextId::RequestTimeout
+                                                      || feedback == TextId::SelectChannel
+                                                  ? style::kDanger
+                                              : feedback == TextId::RequestReceived ? style::kSuccess
+                                                                                    : style::kMuted);
 }

@@ -30,7 +30,6 @@ static void resource_init() {
     IMPORT_FONT(rajdhaniBold_20);
     IMPORT_FONT(rajdhaniBold_40);
     /* Import Fonts */
-    IMPORT_SYMBOL(statusbar);
     IMPORT_SYMBOL(dialplate);
     // /* Import Images */
     IMPORT_IMG(battery);
@@ -59,10 +58,15 @@ static void resource_init() {
     IMPORT_IMG(ui_stop);
     IMPORT_IMG(ui_power);
     IMPORT_IMG(ui_wifi);
+    IMPORT_IMG(ui_location);
+    IMPORT_IMG(ui_sd_card);
+    IMPORT_IMG(ui_satellite);
+    IMPORT_IMG(ui_satellite_large);
+    IMPORT_IMG(ui_antenna);
+    IMPORT_IMG(ui_rover);
+    IMPORT_IMG(ui_base);
     IMPORT_IMG(start);
     IMPORT_IMG(stop);
-    IMPORT_IMG(satellite_small);
-    IMPORT_IMG(satellite_big);
     IMPORT_IMG(map_location);
     IMPORT_IMG(storage);
     IMPORT_IMG(system_info);
@@ -77,9 +81,6 @@ static void resource_init() {
     IMPORT_IMG(system_dash_power_small);
     IMPORT_IMG(system_dash_settings);
     IMPORT_IMG(system_dash_return);
-    IMPORT_IMG(rover);
-    IMPORT_IMG(base);
-    IMPORT_IMG(radio);
     IMPORT_IMG(ntrip);
 
     IMPORT_IMG(NationalFlag_EN);

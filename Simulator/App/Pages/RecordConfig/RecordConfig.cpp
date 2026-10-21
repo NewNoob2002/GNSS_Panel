@@ -70,18 +70,20 @@ void RecordConfig::on_language_changed() {
     if (priv.state != PAGE_STATE_ACTIVITY)
         view_.stop();
 }
-void RecordConfig::send(bool start) {
+// 开始与停止一致：单击即切换；双击（Commit）同样生效。等待主控确认期间不发第二个请求。
+void RecordConfig::toggle() {
     const auto& device = model_.device();
-    if (device.record_pending || !device.record_valid || start == device.recording)
+    if (device.record_pending || !device.record_valid)
         return;
+    const bool start = !device.recording;
     feedback_.begin();
     const bool accepted = start ? model_.start_record(view_.type(), view_.interval()) : model_.stop_record();
     feedback_.finish(accepted, model_.device().record_pending);
     refresh();
 }
 void RecordConfig::on_commit_request() {
-    if (lv_group_get_focused(lv_group_get_default()) == view_.ui.record && !model_.device().recording)
-        send(true);
+    if (lv_group_get_focused(lv_group_get_default()) == view_.ui.record)
+        toggle();
 }
 void RecordConfig::clicked(lv_event_t* event) {
     auto* self = static_cast<RecordConfig*>(lv_event_get_user_data(event));
@@ -94,12 +96,7 @@ void RecordConfig::clicked(lv_event_t* event) {
     if (device.record_pending || !device.record_valid)
         return;
     if (control == self->view_.ui.record) {
-        if (device.recording)
-            self->send(false);
-        else {
-            self->feedback_ = {};
-            self->refresh();
-        }
+        self->toggle();
         return;
     }
     if (!self->model_.settings().record_settings || device.recording)

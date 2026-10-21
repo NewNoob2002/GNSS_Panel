@@ -9,18 +9,6 @@
 extern "C" {
 #endif
 
-#if !defined CUSTOM_SYMBOL_WIFI
-#define CUSTOM_SYMBOL_WIFI "\xEE\x99\xA7"
-#endif
-
-#if !defined CUSTOM_SYMBOL_LOCATION
-#define CUSTOM_SYMBOL_LOCATION "\xEE\x9B\xAC"
-#endif
-
-#if !defined CUSTOM_SYMBOL_SD_CARD
-#define CUSTOM_SYMBOL_SD_CARD "\xEE\xAD\x98"
-#endif
-
 #if !defined CUSTOM_SYMBOL_SATELLITE
 #define CUSTOM_SYMBOL_SATELLITE "\xEE\x99\xBA"
 #endif

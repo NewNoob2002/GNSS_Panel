@@ -52,7 +52,7 @@ class DialplateView {
     void destroy();
 
     void appear_anim_start(bool reverse = false) const;
-    /** 启动/停止电台波形与工作模式信标手绘动效。 */
+    /** 页面出现/离开时开关电台波形与工作模式（基站播发/移动站测点）动效；实际运行与否还取决于设备状态。 */
     void anim_start();
     void anim_stop();
 
@@ -65,12 +65,21 @@ class DialplateView {
 
     static lv_obj_t* btn_create(lv_obj_t* par, const void* img_src, lv_coord_t x, lv_coord_t y,
                                 const TransformInfo_t& transform);
+    static void status_card(lv_obj_t* par, lv_coord_t x, const char* image, lv_obj_t*& card, lv_obj_t*& img,
+                            lv_obj_t*& label);
+    /** 页面可见且工作模式有效时运行动效；否则删除动画，画面保持静态。 */
+    void sync_anim();
 
     static void anim_step_exec(void* var, int32_t value);
     static void radio_draw_event_cb(lv_event_t* e);
     static void mode_draw_event_cb(lv_event_t* e);
 
+    static constexpr lv_coord_t kCardWidth = 54, kCardHeight = 44;
+    static constexpr lv_coord_t kIconX = 19, kIconY = 9; // 16 px 图标在卡片内的位置，上方留给动效。
+    static constexpr uint32_t kAnimPeriod = 1200, kAnimStep = 50;
+
     uint32_t anim_phase_ = 0;
+    bool anim_enabled_ = false;
     bool anim_running_ = false;
     lv_anim_t anim_loop_{};
     DataProc::DeviceSnapshot last_device_{};

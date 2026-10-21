@@ -57,8 +57,8 @@ StatusBridge::update(P4App& app, std::uint32_t now) {
     state.minute = (seconds / 60U) % 60U;
     state.second = seconds % 60U;
     state.clock_valid = true;
-    // 旧状态栏的 SD 图标从未按录制状态点亮（相关代码已注释），保持一致。
-    state.recording = false;
+    // SD 图标跟随主控回报的实际录制状态；面板发出启停请求后，主控确认前不改变（等待提示在记录页）。
+    state.recording = systemInfo.host.record.record_status == On_Off_Status_ON;
     state.wifi = systemInfo.host.wifi.wifi_status == On_Off_Status_ON;
     const BatteryInfo_t& battery = systemInfo.power.batteryInfo;
     state.battery_valid = battery.sample_valid;

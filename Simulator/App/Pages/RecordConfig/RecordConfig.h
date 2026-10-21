@@ -16,7 +16,7 @@ class RecordConfig final : public PageBase {
 
   private:
     void refresh();
-    void send(bool start);
+    void toggle();
     static void clicked(lv_event_t* event);
     RecordConfigView view_{};
     RecordConfigModel model_;

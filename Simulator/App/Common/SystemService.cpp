@@ -72,6 +72,7 @@ int on_event(Account* account, Account::EventParam_t* event) {
         case DataProc::SystemCommand::PreparePower:
             if (!sender_is(event, "SystemDashModel") || state.power_pending
                 || (request.action != DataProc::PowerAction::Off && request.action != DataProc::PowerAction::Reboot)
+                || (request.action == DataProc::PowerAction::Reboot && !state.reboot_available) // 平台无重启时兜底。
                 || state.power_token == std::numeric_limits<std::uint64_t>::max())
                 return Account::RES_PARAM_ERROR;
             ++state.power_token;

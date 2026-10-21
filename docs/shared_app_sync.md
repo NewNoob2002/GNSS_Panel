@@ -68,8 +68,8 @@
 
 ## 与旧 HC32 界面的行为差异
 
-- 记录：开始改为在录制按钮上双击 Power（Commit），单击（Select）停止；旧界面是长按开始。
-- 状态栏 SD 图标仍不随录制状态点亮（`recording = false`，与旧界面一致）；Dialplate 与 RecordConfig 的录制按钮按 `record_status` 显示。如需点亮，可在 `publish_status()` 改用 `record_status`。
+- 记录：开始与停止都是在录制按钮上单击 Power（Select），双击（Commit）同样有效；旧界面是长按开始。
+- 状态栏 SD 图标随主控回报的录制状态点亮（`StatusBridge` 读 `systemInfo.host.record.record_status`，主控确认前不变）；旧界面从不点亮。
 - Wi-Fi：旧界面切换后无限等待主控回报；现在 15 s 后结束等待（设定值保留，主控之后仍可应用）。
 
 ## 实施要点
