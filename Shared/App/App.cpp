@@ -1,4 +1,4 @@
-#include "P4App.h"
+#include "App.h"
 #include <cstdio>
 #include "Common/SystemService.h"
 #include "Utils/Log/Log.h"
@@ -17,7 +17,7 @@
 
 #include <cstring>
 
-bool P4App::init(const Options& options) {
+bool App::init(const Options& options) {
     resource_pool::init();
     if (!DataProc_Init(lv_tick_get))
         return false;
@@ -80,11 +80,11 @@ bool P4App::init(const Options& options) {
     return manager_->push("Pages/Startup");
 }
 
-void P4App::update() {
+void App::update() {
     (void)DataProc_RunLoop();
 }
 
-P4App::~P4App() {
+App::~App() {
     if (navigation_timer_)
         lv_timer_del(navigation_timer_);
     manager_.reset();
@@ -101,14 +101,14 @@ P4App::~P4App() {
         lv_style_reset(&root_style_);
 }
 
-int P4App::on_system_event(Account* account, Account::EventParam_t* event) {
+int App::on_system_event(Account* account, Account::EventParam_t* event) {
     if (!event || event->event != Account::EVENT_PUB_PUBLISH)
         return Account::RES_UNSUPPORTED_REQUEST;
     DataProc::SystemState state;
     const int result = DataProc::ReadPayload(event, state);
     if (result != Account::RES_OK)
         return result;
-    auto* self = static_cast<P4App*>(account->UserData);
+    auto* self = static_cast<App*>(account->UserData);
     if (state.language != self->language_) {
         self->language_ = state.language;
         self->manager_->notify_language_changed();
@@ -129,8 +129,8 @@ int P4App::on_system_event(Account* account, Account::EventParam_t* event) {
     return Account::RES_OK;
 }
 
-void P4App::on_navigation(lv_timer_t* timer) {
-    auto* self = static_cast<P4App*>(timer->user_data);
+void App::on_navigation(lv_timer_t* timer) {
+    auto* self = static_cast<App*>(timer->user_data);
     if (!self->manager_ || self->manager_->is_switching())
         return;
     const char* page = self->current_page();
@@ -164,7 +164,7 @@ void P4App::on_navigation(lv_timer_t* timer) {
         self->preload_index_ = 0; // A later boot (after standby) preloads what was unloaded again.
 }
 
-void P4App::preload_next() {
+void App::preload_next() {
     // While SystemLoading runs (often waiting for the host), build the pages entered right after it (home) and right
     // after a confirmed power-off (SaveConfig). Others are created on entry: the 96 KB LVGL pool cannot keep every
     // page resident (popped pages are unloaded), and PageManager keeps creation time out of the transition anyway.
@@ -175,7 +175,7 @@ void P4App::preload_next() {
     }
 }
 
-void P4App::update_status(const page::StatusBarState& state) {
+void App::update_status(const page::StatusBarState& state) {
     DataProc::StatusSnapshot snapshot;
     std::snprintf(snapshot.position.data(), snapshot.position.size(), "%s", state.position ? state.position : "DEMO");
     snapshot.position_color_rgb = lv_color_to32(state.position_color) & 0xffffffu;
@@ -197,14 +197,14 @@ void P4App::update_status(const page::StatusBarState& state) {
         APP_LOG_E("Application", "status publication rejected");
 }
 
-void P4App::on_input(const InputAction action) {
+void App::on_input(const InputAction action) {
     if (!group_ || !manager_ || manager_->is_switching())
         return;
     cancel_keys();
     dispatch_input(action);
 }
 
-void P4App::dispatch_input(const InputAction action) {
+void App::dispatch_input(const InputAction action) {
     auto* current = manager_->get_current_page();
     if (action == InputAction::Press && pressed_ == focused() && pressed_page_ == current_page())
         return; // Auto-repeat must not restart a hold.
@@ -259,7 +259,7 @@ void P4App::dispatch_input(const InputAction action) {
     }
 }
 
-void P4App::cancel_input() {
+void App::cancel_input() {
     power_down_ = function_down_ = false;
     cancel_keys();
     auto* pressed = pressed_;
@@ -277,23 +277,23 @@ void P4App::cancel_input() {
     }
 }
 
-void P4App::cancel_keys() {
+void App::cancel_keys() {
     power_gesture_.cancel(power_down_);
     function_gesture_.cancel(function_down_);
     key_page_ = current_page();
 }
-void P4App::on_key(Key key, bool pressed) {
+void App::on_key(Key key, bool pressed) {
     if (key == Key::Power)
         power_down_ = pressed;
     else
         function_down_ = pressed;
 }
-void P4App::on_key_at(Key key, bool pressed, std::uint64_t event_ms) {
+void App::on_key_at(Key key, bool pressed, std::uint64_t event_ms) {
     poll_keys(event_ms); // The previous level lasted until this transition.
     on_key(key, pressed);
     poll_keys(event_ms);
 }
-void P4App::poll_keys(std::uint64_t now_ms) {
+void App::poll_keys(std::uint64_t now_ms) {
     // ButtonGesture needs non-decreasing time; queued event stamps may precede the last loop poll.
     now_ms = now_ms < last_poll_ms_ ? last_poll_ms_ : now_ms;
     last_poll_ms_ = now_ms;
@@ -327,14 +327,14 @@ void P4App::poll_keys(std::uint64_t now_ms) {
         on_input(function == ButtonGesture::Action::Single ? InputAction::NextFocus : InputAction::Back);
 }
 
-const char* P4App::current_page() const {
+const char* App::current_page() const {
     if (!manager_)
         return nullptr;
     PageBase* page = manager_->get_current_page();
     return page ? page->page_name : nullptr;
 }
 
-bool P4App::show_page(const char* name) {
+bool App::show_page(const char* name) {
     if (!manager_ || !name)
         return false;
     const char* current = current_page();
@@ -342,7 +342,7 @@ bool P4App::show_page(const char* name) {
     return (current && std::strcmp(current, name) == 0) || manager_->push(name);
 }
 
-bool P4App::back() {
+bool App::back() {
     if (!manager_ || manager_->is_switching())
         return false;
     cancel_keys();
@@ -351,6 +351,6 @@ bool P4App::back() {
     return manager_->pop();
 }
 
-lv_obj_t* P4App::focused() const {
+lv_obj_t* App::focused() const {
     return group_ ? lv_group_get_focused(group_) : nullptr;
 }

@@ -30,7 +30,7 @@ Products/<产品>/   product.cmake、product_config.h、产品专属源码
 
 ## 产品差异放在哪里
 
-共享构建与第一阶段清理见 [Shared/App/ARCHITECTURE.md](../Shared/App/ARCHITECTURE.md)：`p4_data_center` / `p4_core` 不依赖 LVGL，`p4_app` 是 UI；固件、主机测试、模拟器复用同一个 CMake 文件。平台通过 `p4_build_options` 和 `p4_lvgl` 绑定编译选项与显示库，RK 演示后端不再随共享代码同步。
+共享构建与第一阶段清理见 [Shared/App/ARCHITECTURE.md](../Shared/App/ARCHITECTURE.md)：`app_framework` / `app_core` 不依赖 LVGL，`app_ui` 是 UI；固件、主机测试、模拟器复用同一个 CMake 文件。平台通过 `app_build_options` 和 `app_lvgl` 绑定编译选项与显示库，RK 演示后端不再随共享代码同步。
 
 1. **功能开关**：`Products/<产品>/product_config.h` 中的 `PRODUCT_*` 宏，经 `mcu_config.h` 被所有源码看到。带屏产品缺少任一开关时 `mcu_config.h` 直接报错，避免 `#if` 未定义被当作 0。
 2. **弱符号扩展点**（`Platform/HAL/HAL.h`）：`Power_ProductInit`、`Power_ProductUpdate`、`Power_AdjustPercent`、`Key_ProductInit`、`Key_ProductUpdate`。默认无动作，产品源码覆盖（X1：电量补偿、MultiButton 按键动作）。

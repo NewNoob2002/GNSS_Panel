@@ -74,12 +74,12 @@ void SaveConfig::on_timeout(lv_timer_t* timer) {
     lv_timer_del(timer);
     const auto request = self->model_.settings(); // Copy before navigation unloads this Model/View.
     if (!request.power_pending)
-        return; // Platform shutdown: the platform reports standby (P4App returns to Startup).
+        return; // Platform shutdown: the platform reports standby (App returns to Startup).
     if (!self->model_.finish_power()) {
         LV_LOG_ERROR("SaveConfig: power service failed");
         return;
     }
-    // Off ends with the platform's standby report (P4App resets to Startup); Reboot resumes the working root.
+    // Off ends with the platform's standby report (App resets to Startup); Reboot resumes the working root.
     if (request.power_action == DataProc::PowerAction::Reboot && !self->page_manager->back_home())
         LV_LOG_WARN("SaveConfig: return to the working root rejected");
 }

@@ -1,7 +1,7 @@
 #ifndef APP_PLATFORM_H
 #define APP_PLATFORM_H
 
-class P4App;
+class App;
 
 // HC32 平台层：把 systemInfo / HAL 接到共享应用（Shared/App，来源 ATK_RK3506）。
 // 均在主循环（LVGL）线程调用。
@@ -16,6 +16,6 @@ void App_Update();
 void App_Deinit();
 
 /** 共享应用实例；App_Init() 之前为 nullptr。PC 模拟器用它注入键盘/鼠标操作。 */
-P4App* App_Get();
+App* App_Get();
 
 #endif // APP_PLATFORM_H

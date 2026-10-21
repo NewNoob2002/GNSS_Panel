@@ -29,7 +29,7 @@ if(PRODUCT_HAS_DISPLAY)
     )
     target_link_libraries(hc32_shared_display PUBLIC
         hc32_shared_comm
-        p4_app
+        app_ui
         hc32_display_libraries
     )
 

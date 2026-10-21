@@ -2,7 +2,7 @@
 
 ## Structure
 
-This is the SDL simulator for HC32 X1Pro/XBase. It links the same `../Shared/App` CMake targets as firmware and host tests: portable `p4_core`/`p4_data_center` plus LVGL UI `p4_app`. Shared sources come from ATK_RK3506 `application/App`; the pinned commit is in `../Shared/App/UPSTREAM`.
+This is the SDL simulator for HC32 X1Pro/XBase. It links the same `../Shared/App` CMake targets as firmware and host tests: portable `app_core`/`app_framework` plus LVGL UI `app_ui`. Shared sources come from ATK_RK3506 `application/App`; the pinned commit is in `../Shared/App/UPSTREAM`.
 
 `main.cpp` owns SDL, pointer/keyboard input and simulated host data. `HAL/` provides virtual GPIO, time and a no-op charger. The firmware `../Platform/HAL/HAL_Power.cpp` runs unchanged, with `HAL/HAL.h` force-included to replace hardware declarations. Battery sampling is simulated; GPIO power sequencing and shutdown policy use the firmware implementation.
 

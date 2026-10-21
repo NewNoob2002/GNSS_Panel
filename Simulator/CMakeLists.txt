@@ -35,12 +35,12 @@ endif()
 # 与固件共用同一份 LVGL 源码（Libraries/lvgl），配置用本目录的 lv_conf.h（LV_CONF_PATH 指定）。
 set(LVGL_DIR ${CMAKE_CURRENT_LIST_DIR}/../Libraries/lvgl)
 file(GLOB_RECURSE LVGL_SOURCES CONFIGURE_DEPENDS "${LVGL_DIR}/src/*.c")
-# 共享 UI 通过 p4_lvgl 使用模拟器显示配置；核心不依赖它。
+# 共享 UI 通过 app_lvgl 使用模拟器显示配置；核心不依赖它。
 add_library(sim_lvgl STATIC ${LVGL_SOURCES})
 target_include_directories(sim_lvgl PUBLIC ${CMAKE_CURRENT_LIST_DIR}/../Libraries ${LVGL_DIR})
 target_compile_definitions(sim_lvgl PUBLIC LV_CONF_PATH=${CMAKE_CURRENT_LIST_DIR}/lv_conf.h)
-add_library(p4_lvgl INTERFACE)
-target_link_libraries(p4_lvgl INTERFACE sim_lvgl)
+add_library(app_lvgl INTERFACE)
+target_link_libraries(app_lvgl INTERFACE sim_lvgl)
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../Shared/App shared-app)
 file(GLOB HAL_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_LIST_DIR}/HAL/*.cpp)
 # 固件电源时序原样编译：强制包含模拟器 HAL.h（屏蔽固件 HAL.h 的硬件依赖），GPIO/时基由 HAL/Arduino.h 提供
@@ -73,7 +73,7 @@ target_compile_definitions(main PRIVATE
     LV_CONF_PATH=${CMAKE_CURRENT_LIST_DIR}/lv_conf.h
     LVGL_SIMULATOR
 )
-target_link_libraries(main PRIVATE p4_app)
+target_link_libraries(main PRIVATE app_ui)
 target_compile_options(main PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra>)
 if(TARGET PkgConfig::SDL2)
     target_link_libraries(sim_lvgl PUBLIC PkgConfig::SDL2)

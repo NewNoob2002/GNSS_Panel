@@ -11,7 +11,7 @@
 
 #include "AppPlatform.h"
 #include "HAL/HAL.h"
-#include "P4App.h"
+#include "App.h"
 #include "SystemState.h"
 #include "mcu_version_config.h"
 
@@ -253,7 +253,7 @@ main() {
         init_system_info();
         HAL::HAL_Init();
         App_Init();
-        P4App* app = App_Get();
+        App* app = App_Get();
         print_controls();
         result = EXIT_SUCCESS;
         bool enter_down = false;
@@ -268,18 +268,18 @@ main() {
                     if (key == SDLK_q) {
                         stop = 1;
                     } else if (key == SDLK_RIGHT || key == SDLK_DOWN) {
-                        app->on_input(P4App::InputAction::NextFocus);
+                        app->on_input(App::InputAction::NextFocus);
                     } else if (key == SDLK_LEFT || key == SDLK_UP) {
-                        app->on_input(P4App::InputAction::PreviousFocus);
+                        app->on_input(App::InputAction::PreviousFocus);
                     } else if (key == SDLK_ESCAPE) {
-                        app->on_input(P4App::InputAction::Back);
+                        app->on_input(App::InputAction::Back);
                     } else if (key == SDLK_RETURN || key == SDLK_KP_ENTER) {
                         if (event.key.keysym.mod & KMOD_CTRL) {
-                            app->on_input(P4App::InputAction::Commit);
+                            app->on_input(App::InputAction::Commit);
                         } else if (!enter_down) {
                             enter_down = true;
                             HAL::Sim_SetPowerKey(true); // 原始电平仅模拟按键，开机由 Startup 完整长按请求。
-                            app->on_input(P4App::InputAction::Press);
+                            app->on_input(App::InputAction::Press);
                         }
                     } else {
                         inject_event(key);
@@ -289,22 +289,22 @@ main() {
                     if (enter_down) {
                         enter_down = false;
                         HAL::Sim_SetPowerKey(false);
-                        app->on_input(P4App::InputAction::Release);
+                        app->on_input(App::InputAction::Release);
                     }
                 } else if (event.type == SDL_MOUSEWHEEL && event.wheel.y != 0) {
-                    app->on_input(event.wheel.y > 0 ? P4App::InputAction::PreviousFocus
-                                                    : P4App::InputAction::NextFocus);
+                    app->on_input(event.wheel.y > 0 ? App::InputAction::PreviousFocus
+                                                    : App::InputAction::NextFocus);
                 } else if (event.type == SDL_MOUSEMOTION || event.type == SDL_MOUSEBUTTONDOWN
                            || event.type == SDL_MOUSEBUTTONUP) {
                     const int x = event.type == SDL_MOUSEMOTION ? event.motion.x : event.button.x;
                     const int y = event.type == SDL_MOUSEMOTION ? event.motion.y : event.button.y;
                     pointer.point = {static_cast<lv_coord_t>(x), static_cast<lv_coord_t>(y)};
                     if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_RIGHT) {
-                        app->on_input(P4App::InputAction::Back);
+                        app->on_input(App::InputAction::Back);
                     } else if (event.type != SDL_MOUSEMOTION && event.button.button == SDL_BUTTON_MIDDLE) {
                         HAL::Sim_SetPowerKey(event.type == SDL_MOUSEBUTTONDOWN);
-                        app->on_input(event.type == SDL_MOUSEBUTTONDOWN ? P4App::InputAction::Press
-                                                                        : P4App::InputAction::Release);
+                        app->on_input(event.type == SDL_MOUSEBUTTONDOWN ? App::InputAction::Press
+                                                                        : App::InputAction::Release);
                     } else if (event.type != SDL_MOUSEMOTION && event.button.button == SDL_BUTTON_LEFT) {
                         pointer.state =
                             event.type == SDL_MOUSEBUTTONDOWN ? LV_INDEV_STATE_PRESSED : LV_INDEV_STATE_RELEASED;

@@ -11,7 +11,7 @@
 #include "Charger.h"
 #include "Common/SystemService.h"
 #include "HAL.h"
-#include "P4App.h"
+#include "App.h"
 #include "Resource/ResourcePool.h"
 #include "SystemState.h"
 #include "Utils/I18n/I18n.h"
@@ -120,7 +120,7 @@ status_recording() {
 void
 choose(i18n::TextId id) {
     for (unsigned step = 0; step < 8 && !find_text(App_Get()->focused(), i18n::text(id)); ++step) {
-        App_Get()->on_input(P4App::InputAction::NextFocus);
+        App_Get()->on_input(App::InputAction::NextFocus);
     }
     assert(find_text(App_Get()->focused(), i18n::text(id)));
 }
@@ -362,9 +362,9 @@ main() {
         if (std::strcmp(name, "Pages/SystemInfos") == 0) {
             assert(lv_obj_get_parent(App_Get()->focused()) == lv_scr_act());
             assert(lv_group_get_obj_count(lv_group_get_default()) == 7);
-            App_Get()->on_input(P4App::InputAction::NextFocus);
+            App_Get()->on_input(App::InputAction::NextFocus);
             assert(find_text(App_Get()->focused(), i18n::text(i18n::TextId::SystemWorkTitle)));
-            App_Get()->on_input(P4App::InputAction::Confirm);
+            App_Get()->on_input(App::InputAction::Confirm);
         } else {
             assert(App_Get()->back());
         }
@@ -405,10 +405,10 @@ main() {
     // 选择预设仅改草稿，点击 Apply 才下发；发出后留页等待主控读走。
     assert(App_Get()->show_page("Pages/WorkSettings"));
     run(800);
-    App_Get()->on_input(P4App::InputAction::Confirm); // Radio rover -> Radio base
+    App_Get()->on_input(App::InputAction::Confirm); // Radio rover -> Radio base
     assert(!request.work_pending);
     choose(i18n::TextId::Apply);
-    App_Get()->on_input(P4App::InputAction::Confirm);
+    App_Get()->on_input(App::InputAction::Confirm);
     run(800);
     assert(on_page("Pages/WorkSettings"));
     {
@@ -429,10 +429,10 @@ main() {
     // 网络基站不需要电台字段，选择后同样通过 Apply 下发。
     assert(App_Get()->show_page("Pages/WorkSettings"));
     run(800);
-    App_Get()->on_input(P4App::InputAction::Confirm); // Radio base -> Network base
+    App_Get()->on_input(App::InputAction::Confirm); // Radio base -> Network base
     assert(lv_group_get_obj_count(lv_group_get_default()) == 3);
     choose(i18n::TextId::Apply);
-    App_Get()->on_input(P4App::InputAction::Confirm);
+    App_Get()->on_input(App::InputAction::Confirm);
     run(800);
     {
         const WorkConfig_t work = State::Effective_Work();
@@ -448,9 +448,9 @@ main() {
     run(600);
     assert(App_Get()->show_page("Pages/WorkSettings"));
     run(800);
-    App_Get()->on_input(P4App::InputAction::Confirm); // Network -> Radio rover
+    App_Get()->on_input(App::InputAction::Confirm); // Network -> Radio rover
     choose(i18n::TextId::Apply);
-    App_Get()->on_input(P4App::InputAction::Confirm);
+    App_Get()->on_input(App::InputAction::Confirm);
     run(800);
     assert(on_page("Pages/WorkSettings") && !request.work_pending);
     assert(find_text(lv_scr_act(), i18n::text(i18n::TextId::SelectChannel)));
@@ -462,7 +462,7 @@ main() {
     run(800);
     assert(find_text(App_Get()->focused(), i18n::text(i18n::TextId::StartupStart)));
     assert(!request.record_op && !request.record_settings_pending);
-    App_Get()->on_input(P4App::InputAction::Confirm);
+    App_Get()->on_input(App::InputAction::Confirm);
     {
         const RecordInfo_t record = State::Effective_Record();
         assert(record.record_status == On_Off_Status_ON && request.record_op && request.record_settings_pending);
@@ -473,14 +473,14 @@ main() {
     run(400);
     assert(!status_recording()); // 主控确认前状态栏仍按实际（未录制）显示
     const auto revision = State::Record_Revision();
-    App_Get()->on_input(P4App::InputAction::Commit);
+    App_Get()->on_input(App::InputAction::Commit);
     assert(State::Record_Revision() == revision);
     State::Confirm_Record(State::Record_Revision(), true);
     run(600);
     assert(!DeviceService::snapshot().record_pending && status_recording());
     assert(host.record.record_status == On_Off_Status_ON && !request.record_op);
     choose(i18n::TextId::Stop);
-    App_Get()->on_input(P4App::InputAction::Confirm);
+    App_Get()->on_input(App::InputAction::Confirm);
     assert(State::Effective_Record().record_status == On_Off_Status_OFF && request.record_settings_pending);
     run(400);
     assert(status_recording()); // 停止请求确认前，状态栏仍显示录制中
@@ -504,8 +504,8 @@ main() {
         auto& wifi = host.wifi;
         assert(App_Get()->show_page("Pages/SystemDash"));
         run(800);
-        App_Get()->on_input(P4App::InputAction::NextFocus); // Language -> Wi-Fi
-        App_Get()->on_input(P4App::InputAction::Confirm);
+        App_Get()->on_input(App::InputAction::NextFocus); // Language -> Wi-Fi
+        App_Get()->on_input(App::InputAction::Confirm);
         assert(request.wifi_on == On_Off_Status_ON && request.wifi_pending);
         run(50);
         assert(SystemService::snapshot().wifi_pending && find_text(lv_scr_act(), "..."));
@@ -513,7 +513,7 @@ main() {
         run(50);
         assert(!SystemService::snapshot().wifi_pending && SystemService::snapshot().wifi_on);
         assert(!find_text(lv_scr_act(), "..."));
-        App_Get()->on_input(P4App::InputAction::Confirm);
+        App_Get()->on_input(App::InputAction::Confirm);
         assert(request.wifi_on == On_Off_Status_OFF);
         run(14000);
         assert(SystemService::snapshot().wifi_pending);
@@ -528,7 +528,7 @@ main() {
     assert(App_Get()->show_page("Pages/SystemDash"));
     run(800);
     choose(i18n::TextId::PowerTitle);
-    App_Get()->on_input(P4App::InputAction::Confirm); // 打开电源弹窗，默认焦点 Shutdown
+    App_Get()->on_input(App::InputAction::Confirm); // 打开电源弹窗，默认焦点 Shutdown
     run(100);
     assert(find_text(App_Get()->focused(), i18n::text(i18n::TextId::ShutdownAction)));
     assert(!find_text(lv_scr_act(), i18n::text(i18n::TextId::RebootAction)));
@@ -539,7 +539,7 @@ main() {
     run(800);
     assert(find_text(App_Get()->focused(), i18n::text(i18n::TextId::PowerTitle)));
     assert(!SystemService::snapshot().power_pending);
-    App_Get()->on_input(P4App::InputAction::Confirm);
+    App_Get()->on_input(App::InputAction::Confirm);
     run(100);
     power_key = true;
     run(1500);

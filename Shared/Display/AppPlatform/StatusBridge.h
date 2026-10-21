@@ -1,12 +1,12 @@
 #pragma once
 #include <cstdint>
 
-class P4App;
+class App;
 
 /** systemInfo -> 状态栏快照，固定周期发布（含首次）。 */
 class StatusBridge {
   public:
-    void update(P4App& app, std::uint32_t now);
+    void update(App& app, std::uint32_t now);
 
   private:
     static constexpr std::uint32_t kPeriodMs = 200;

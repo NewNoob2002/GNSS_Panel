@@ -7,8 +7,8 @@
 
 #include <memory>
 
-/** P4 页面组合：业务状态尚未迁入，状态栏只显示调用方传入的数据。 */
-class P4App {
+/** 应用页面组合：业务状态尚未迁入，状态栏只显示调用方传入的数据。 */
+class App {
   public:
     /** Product options; defaults match the RK3506 build. */
     struct Options {
@@ -18,7 +18,7 @@ class P4App {
         return init(Options{});
     }
     bool init(const Options& options);
-    ~P4App();
+    ~App();
     /** Run application-service timers before the LVGL handler on the same thread. */
     void update();
     void update_status(const page::StatusBarState& state);

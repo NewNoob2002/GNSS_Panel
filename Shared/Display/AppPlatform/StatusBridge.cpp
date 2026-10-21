@@ -1,6 +1,6 @@
 #include "StatusBridge.h"
 
-#include "P4App.h"
+#include "App.h"
 #include "SystemState.h"
 #include "Utils/I18n/I18n.h"
 #include "mcu_config.h"
@@ -40,7 +40,7 @@ position_text(page::StatusBarState& state) {
 } // namespace
 
 void
-StatusBridge::update(P4App& app, std::uint32_t now) {
+StatusBridge::update(App& app, std::uint32_t now) {
     if (sent_ && now - last_ms_ < kPeriodMs) {
         return;
     }

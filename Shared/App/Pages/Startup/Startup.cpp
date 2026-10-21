@@ -124,7 +124,7 @@ void Startup::on_timeout(lv_timer_t* timer) {
     auto* self = static_cast<Startup*>(timer->user_data);
     self->timer_ = nullptr;
     lv_timer_del(timer);
-    // Only a request: the platform confirms power-on (now, or after its own key timing) and P4App then
+    // Only a request: the platform confirms power-on (now, or after its own key timing) and App then
     // replaces Startup with SystemLoading.
     if (!self->model_.request_power_on())
         APP_LOG_E("Startup", "power-on request rejected");

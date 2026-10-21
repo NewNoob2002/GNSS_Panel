@@ -8,11 +8,11 @@
 
 | 目标 | 职责 | 图形依赖 |
 |---|---|---|
-| `p4_data_center` | Account 发布、通知、查询与 DataTimer | 无 |
-| `p4_core` | System/Device/Status 服务与共享数据 | 无 |
-| `p4_app` | 页面、Model、状态栏、输入路由、资源与页面管理 | LVGL |
+| `app_framework` | Account 发布、通知、查询与 DataTimer | 无 |
+| `app_core` | System/Device/Status 服务与共享数据 | 无 |
+| `app_ui` | 页面、Model、状态栏、输入路由、资源与页面管理 | LVGL |
 
-父工程通过 `p4_build_options` 提供工具链/产品编译选项，通过 `p4_lvgl` 提供显示库。核心可以单独构建，不包含 HAL、Arduino 或 Linux 设备头文件。完整职责、线程约定和后续阶段见 [共享应用架构](../Shared/App/ARCHITECTURE.md)。
+父工程通过 `app_build_options` 提供工具链/产品编译选项，通过 `app_lvgl` 提供显示库。核心可以单独构建，不包含 HAL、Arduino 或 Linux 设备头文件。完整职责、线程约定和后续阶段见 [共享应用架构](../Shared/App/ARCHITECTURE.md)。
 
 RK 的模拟业务实现位于共享目录之外的 `application/Backends/Demo`。`p4_screen` 当前仍使用这个演示业务后端；真实 Linux 电源、设备业务尚未接入，不能将实屏驱动通过视为业务后端已经完成。
 
@@ -31,7 +31,7 @@ HC32 特有代码继续放在 `Shared/Display/AppPlatform/`：
 ## 事件运行与内存
 
 - DataTimer 采用 X-TRACK 独立时钟的调度方式，保留当前 Account 的注册序号、容量、发布期间销毁订阅者和请求校验保护。
-- `DataProc_Init(clock)` 注入单调毫秒时钟；主循环通过 `P4App::update()` 执行核心循环，之后运行 `lv_timer_handler()`。
+- `DataProc_Init(clock)` 注入单调毫秒时钟；主循环通过 `App::update()` 执行核心循环，之后运行 `lv_timer_handler()`。
 - 所有状态在同一个应用线程中访问，Publish/Notify 仍同步分发；中断/后台线程不能直接进入服务，也不能保存同步回调中的临时指针作为异步消息。
 - 先销毁页面和组件，再销毁服务。框架使用标准 C++ 分配接口，HC32 的平台 `operator new` 继续使用 LVGL 池。
 - 异步有界消息入口、共享电源/初始化服务、去除具体 Model 身份依赖以及真实 Linux 后端属于下一阶段。

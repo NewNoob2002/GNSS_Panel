@@ -7,7 +7,7 @@
 #include "Common/SystemBackend.h"
 #include "DeviceBridge.h"
 #include "HAL.h"
-#include "P4App.h"
+#include "App.h"
 #include "PowerBridge.h"
 #include "StatusBridge.h"
 #include "Utils/Log/Log.h"
@@ -22,7 +22,7 @@ struct Bridges {
     DeviceBridge device;
 };
 
-P4App* app = nullptr;
+App* app = nullptr;
 Bridges bridges;
 
 uint32_t
@@ -106,7 +106,7 @@ void
 App_Init() {
     app_log_set_sink(log_sink, nullptr);
     bridges = Bridges{};
-    app = new P4App;
+    app = new App;
     if (!app->init({.battery_warning = PRODUCT_PAGE_BATTERY_WARNING != 0})) {
         app_fatal("App", "shared LVGL application initialization failed");
     }
@@ -120,8 +120,8 @@ App_Update() {
     const uint32_t now = now_ms();
 #if !defined(LVGL_SIMULATOR)
     // 两键电平按 RK3506 语义处理（Function 单击下一项/双击返回，Power 单击选择/双击提交/长按开机）。
-    app->on_key(P4App::Key::Power, HAL::Key_PowerPressed());
-    app->on_key(P4App::Key::Function, HAL::Key_FunctionPressed());
+    app->on_key(App::Key::Power, HAL::Key_PowerPressed());
+    app->on_key(App::Key::Function, HAL::Key_FunctionPressed());
     app->poll_keys(now);
 #endif
     app->update();
@@ -136,7 +136,7 @@ App_Deinit() {
     app = nullptr;
 }
 
-P4App*
+App*
 App_Get() {
     return app;
 }
