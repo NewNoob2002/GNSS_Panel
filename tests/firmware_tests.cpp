@@ -10,9 +10,9 @@
 #include "HoldTimer.h"
 #include "PowerPolicy.h"
 #include "SystemState.h"
-#include "Wire.h"
 #include "bq40z50.h"
 #include "display_protocol.h"
+#include "i2c_master.h"
 #include "mp2762a.h"
 #include "product_config.h"
 #include "slave_i2c.h"
@@ -22,6 +22,10 @@ FakeGpio fake_gpio;
 func_ptr_t fake_irqs[16] = {};
 uint32_t fake_ms, fake_primask, fake_slave_initializations, fake_master_resets;
 int fake_io_error, fake_receive_error, fake_slave_init_error;
+int fake_master_init_error;
+char fake_master_failure;
+std::string fake_master_trace;
+stc_i2c_init_t fake_master_config;
 uint8_t fake_address, fake_register;
 uint16_t fake_registers[128][256] = {};
 uint32_t fake_master_writes;
@@ -391,11 +395,97 @@ test_parser_boundaries() {
     assert(p == nullptr);
 }
 
+static int scan_callbacks, scan_online;
+
+static void
+scan_capture(const uint8_t* address) {
+    ++scan_callbacks;
+    if (address) {
+        assert(*address == scan_callbacks);
+        ++scan_online;
+    }
+}
+
+static void
+test_i2c_master() {
+    auto* bus = &g_i2c_main;
+    uint8_t bytes[2] = {0x08, 0x34};
+    i2c_master_deinit(bus);
+    fake_master_trace.clear();
+    assert(!i2c_master_init(nullptr, 100000U));
+    assert(!i2c_master_probe(bus, 0x0b));
+    assert(!i2c_master_init(bus, 0) && !i2c_master_init(bus, 400001U));
+    assert(fake_master_trace.empty());
+    fake_master_init_error = LL_ERR;
+    assert(!i2c_master_init(bus, 100000U));
+    assert(!i2c_master_probe(bus, 0x0b) && fake_master_trace.empty());
+    fake_master_init_error = LL_OK;
+    for (uint32_t hz : {1U, 100000U, 100001U, 400000U}) {
+        assert(i2c_master_init(bus, hz));
+        assert(fake_master_config.u32Baudrate == hz);
+        assert(fake_master_config.u32ClockDiv == (hz <= 100000U ? I2C_CLK_DIV8 : I2C_CLK_DIV2));
+        assert(fake_master_config.u32SclTime == (hz <= 100000U ? 3U : 5U));
+    }
+    assert(fake_master_trace == "BBBB");
+    fake_master_trace.clear();
+    assert(!i2c_master_write(bus, 0x80, bytes, 2));
+    assert(!i2c_master_write(bus, 0x0b, nullptr, 2));
+    assert(!i2c_master_write(bus, 0x0b, bytes, 0));
+    assert(!i2c_master_write_read(bus, 0x80, 0x08, bytes, 2));
+    assert(!i2c_master_write_read(bus, 0x0b, 0x08, nullptr, 2));
+    assert(!i2c_master_write_read(bus, 0x0b, 0x08, bytes, 0));
+    if (SIZE_MAX > UINT32_MAX) {
+        assert(!i2c_master_write(bus, 0x0b, bytes, static_cast<size_t>(UINT32_MAX) + 1U));
+        assert(!i2c_master_write_read(bus, 0x0b, 0x08, bytes, static_cast<size_t>(UINT32_MAX) + 1U));
+    }
+    assert(fake_master_trace.empty());
+    assert(i2c_master_write(bus, 0x5c, bytes, 2));
+    assert(fake_registers[0x5c][0x08] == 0x34 && fake_master_trace == "ERrASWDPAe");
+    fake_registers[0x0b][0x08] = 0x1234;
+    fake_master_trace.clear();
+    assert(i2c_master_write_read(bus, 0x0b, 0x08, bytes, 1));
+    assert(bytes[0] == 0x34 && fake_master_trace == "ERrASWDTNVGAe");
+    fake_master_trace.clear();
+    assert(i2c_master_write_read(bus, 0x0b, 0x08, bytes, 2));
+    assert(bytes[0] == 0x34 && bytes[1] == 0x12 && fake_master_trace == "ERrASWDTVGAe");
+    for (char step : std::string("SWDTVG")) {
+        fake_master_failure = step;
+        fake_master_trace.clear();
+        assert(!i2c_master_write_read(bus, 0x0b, 0x08, bytes, 1));
+        assert(fake_master_trace.size() >= 5 && fake_master_trace.substr(fake_master_trace.size() - 5) == "PARre");
+        fake_master_failure = 0;
+        assert(i2c_master_probe(bus, 0x0b));
+    }
+    fake_master_failure = 'D';
+    fake_master_trace.clear();
+    assert(!i2c_master_write(bus, 0x5c, bytes, 2));
+    assert(fake_master_trace == "ERrASWDPARrePARre");
+    fake_master_failure = 'P';
+    fake_master_trace.clear();
+    assert(!i2c_master_probe(bus, 0x0b));
+    assert(fake_master_trace == "ERrASWPARre");
+    fake_master_failure = 0;
+    assert(i2c_master_probe(bus, 0) && i2c_master_probe(bus, 0x7f));
+    assert(i2c_master_scan(bus, scan_capture) == 126);
+    assert(scan_callbacks == 126 && scan_online == 126);
+    scan_callbacks = scan_online = 0;
+    fake_master_failure = 'W';
+    assert(i2c_master_scan(bus, scan_capture) == 0);
+    assert(scan_callbacks == 126 && scan_online == 0);
+    fake_master_failure = 0;
+    assert(i2c_master_scan(bus, nullptr) == 126);
+    i2c_master_deinit(bus);
+    fake_master_trace.clear();
+    assert(!i2c_master_write_read(bus, 0x0b, 0x08, bytes, 2));
+    assert(!i2c_master_probe(bus, 0x0b) && fake_master_trace.empty());
+    i2c_master_deinit(nullptr);
+}
+
 static void
 test_device_failures() {
-    assert(Wire.begin());
-    assert(bq40z50Begin(&Wire));
-    assert(mp2762aBegin(&Wire));
+    assert(i2c_master_init(&g_i2c_main, 100000U));
+    assert(bq40z50Begin(&g_i2c_main));
+    assert(mp2762aBegin(&g_i2c_main));
     fake_registers[0x0b][BQ40Z50_RELATIVE_STATE_OF_CHARGE] = 50;
     fake_registers[0x0b][BQ40Z50_REMAINING_CAPACITY] = 1000;
     fake_registers[0x0b][BQ40Z50_FULL_CHARGE_CAPACITY] = 2000;
@@ -420,10 +510,9 @@ test_device_failures() {
     HAL::Battery_Sample(battery);
     assert(!battery.sample_valid && bq40z50getRelativeStateOfCharge_float() == -1.0f);
     fake_io_error = LL_ERR;
-    assert(!Wire.beginTransmission(0x0b));
-    assert(Wire.endTransmission() != 0);
+    assert(!i2c_master_probe(&g_i2c_main, 0x0b));
     fake_io_error = 0;
-    assert(Wire.beginTransmission(0x0b) && Wire.endTransmission() == 0);
+    assert(i2c_master_probe(&g_i2c_main, 0x0b));
 
     State::Board().online_device.mp2762 = false;
     battery.sample_valid = true;
@@ -784,6 +873,7 @@ main() {
     test_slave_transactions();
     test_decoder_boundary();
     test_wire_offsets();
+    test_i2c_master();
     test_device_failures();
     test_state_requests();
     test_charger_variants();

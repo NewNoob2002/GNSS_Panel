@@ -17,7 +17,7 @@ add_executable(firmware_tests firmware_tests.cpp ${STATE_SOURCES}
     ${HC32}/Comm/slave_i2c.cpp ${HC32}/Comm/panel_protocol.cpp
     ${HC32}/Display/display_protocol.cpp
     ${PARSER_SOURCES}
-    ${HC32}/Platform/Core/src/Wire.cpp ${HC32}/Platform/HAL/HAL_Power.cpp ${HC32}/Platform/HAL/HAL_Battery.cpp ${HC32}/Platform/HAL/Charger.cpp
+    ${HC32}/Platform/Core/src/i2c_master.cpp ${HC32}/Platform/HAL/HAL_Power.cpp ${HC32}/Platform/HAL/HAL_Battery.cpp ${HC32}/Platform/HAL/Charger.cpp
     ${HC32}/Libraries/Bq40z50/bq40z50.cpp ${HC32}/Libraries/Mp2762a/mp2762a.cpp)
 target_include_directories(firmware_tests PRIVATE fakes ${STATE_INCLUDE} ${HC32}/Comm ${HC32}/Display
     ${HC32}/Products/X1Pro ${HC32}/Platform/Config
@@ -44,7 +44,7 @@ foreach(product X1 XBase)
     string(TOLOWER ${product} name)
     add_executable(${name}_power_tests firmware_tests.cpp ${STATE_SOURCES}
         ${HC32}/Platform/HAL/HAL_Power.cpp ${HC32}/Platform/HAL/Charger.cpp
-        ${HC32}/Platform/HAL/HAL_Battery.cpp ${HC32}/Platform/Core/src/Wire.cpp
+        ${HC32}/Platform/HAL/HAL_Battery.cpp ${HC32}/Platform/Core/src/i2c_master.cpp
         ${HC32}/Libraries/Bq40z50/bq40z50.cpp ${HC32}/Libraries/Mp2762a/mp2762a.cpp)
     target_include_directories(${name}_power_tests PRIVATE fakes ${STATE_INCLUDE}
         ${HC32}/Products/${product} ${HC32}/Platform/Config ${HC32}/Platform/Core/inc ${HC32}/Platform/HAL

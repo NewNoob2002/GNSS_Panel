@@ -1,9 +1,9 @@
 #include "mp2762a.h"
 
-TwoWire* mp2762aI2c = nullptr;
+i2c_master_t* mp2762aI2c = nullptr;
 
 bool
-mp2762aBegin(TwoWire* i2cBus) {
+mp2762aBegin(i2c_master_t* i2cBus) {
     if (i2cBus == nullptr) {
         return false;
     }
@@ -14,8 +14,7 @@ mp2762aBegin(TwoWire* i2cBus) {
 bool
 mp2762aReadRegister8Checked(uint8_t reg, uint8_t* value) {
     uint8_t byte = 0;
-    if (!value || !mp2762aI2c || !mp2762aI2c->beginTransmission(MP2762A_DEVICE_ADDRESS)
-        || mp2762aI2c->requestFrom(MP2762A_DEVICE_ADDRESS, reg, &byte, 1) != 1U) {
+    if (!value || !mp2762aI2c || !i2c_master_write_read(mp2762aI2c, MP2762A_DEVICE_ADDRESS, reg, &byte, 1)) {
         return false;
     }
     *value = byte;
@@ -32,8 +31,7 @@ mp2762aReadRegister8(uint8_t reg) {
 bool
 mp2762aReadRegister16Checked(uint8_t reg, uint16_t* value) {
     uint8_t bytes[2] = {};
-    if (!value || !mp2762aI2c || !mp2762aI2c->beginTransmission(MP2762A_DEVICE_ADDRESS)
-        || mp2762aI2c->requestFrom(MP2762A_DEVICE_ADDRESS, reg, bytes, 2) != 2U) {
+    if (!value || !mp2762aI2c || !i2c_master_write_read(mp2762aI2c, MP2762A_DEVICE_ADDRESS, reg, bytes, 2)) {
         return false;
     }
     *value = static_cast<uint16_t>((static_cast<uint16_t>(bytes[1]) << 8) | bytes[0]);
@@ -49,13 +47,8 @@ mp2762aReadRegister16(uint8_t reg) {
 
 uint8_t
 mp2762aWriteRegister8(uint8_t reg, uint8_t data) {
-    if (!mp2762aI2c || !mp2762aI2c->beginTransmission(MP2762A_DEVICE_ADDRESS)) {
-        return 0;
-    }
     const uint8_t bytes[2] = {reg, data};
-    const bool written = mp2762aI2c->write(bytes, 2) == 2U;
-    const bool stopped = mp2762aI2c->endTransmission() == 0;
-    return written && stopped;
+    return i2c_master_write(mp2762aI2c, MP2762A_DEVICE_ADDRESS, bytes, 2);
 }
 
 // Given a bit field, and a startingBitValue

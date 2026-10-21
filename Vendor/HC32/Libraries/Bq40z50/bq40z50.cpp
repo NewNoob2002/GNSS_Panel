@@ -1,9 +1,9 @@
 #include "bq40z50.h"
 
-TwoWire* bq40z50I2c = nullptr;
+i2c_master_t* bq40z50I2c = nullptr;
 
 bool
-bq40z50Begin(TwoWire* i2cBus) {
+bq40z50Begin(i2c_master_t* i2cBus) {
     if (i2cBus == nullptr) {
         return false;
     }
@@ -15,8 +15,7 @@ uint8_t
 bq40z50ReadRegister8(uint8_t reg) {
     uint8_t data = 0;
 
-    if (bq40z50I2c && bq40z50I2c->beginTransmission(BQ40Z50_DEVICE_ADDRESS)
-        && bq40z50I2c->requestFrom(BQ40Z50_DEVICE_ADDRESS, reg, &data, 1) == 1U) {
+    if (bq40z50I2c && i2c_master_write_read(bq40z50I2c, BQ40Z50_DEVICE_ADDRESS, reg, &data, 1)) {
         return data;
     }
     return UINT8_MAX;
@@ -25,8 +24,7 @@ bq40z50ReadRegister8(uint8_t reg) {
 bool
 bq40z50ReadRegister16Checked(uint8_t reg, uint16_t* value) {
     uint8_t bytes[2] = {};
-    if (!value || !bq40z50I2c || !bq40z50I2c->beginTransmission(BQ40Z50_DEVICE_ADDRESS)
-        || bq40z50I2c->requestFrom(BQ40Z50_DEVICE_ADDRESS, reg, bytes, 2) != 2U) {
+    if (!value || !bq40z50I2c || !i2c_master_write_read(bq40z50I2c, BQ40Z50_DEVICE_ADDRESS, reg, bytes, 2)) {
         return false;
     }
     *value = static_cast<uint16_t>((static_cast<uint16_t>(bytes[1]) << 8) | bytes[0]);

@@ -1,7 +1,9 @@
 #pragma once
+#include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <string>
 
 using IRQn_Type = int;
 using en_int_src_t = int;
@@ -35,6 +37,8 @@ extern FakeGpio fake_gpio;
 #define GPIO_PORT_A                 0
 #define GPIO_PIN_03                 3
 #define GPIO_PIN_02                 2
+#define GPIO_PIN_08                 (1U << 8)
+#define GPIO_PIN_09                 (1U << 9)
 #define GPIO_FUNC_49                49
 #define GPIO_FUNC_48                48
 #define GPIO_FUNC_51                51
@@ -93,6 +97,10 @@ struct stc_irq_signin_config_t {
 extern func_ptr_t fake_irqs[16];
 extern uint32_t fake_ms, fake_primask, fake_slave_initializations, fake_master_resets;
 extern int fake_io_error, fake_receive_error, fake_slave_init_error;
+extern int fake_master_init_error;
+extern char fake_master_failure;
+extern std::string fake_master_trace;
+extern stc_i2c_init_t fake_master_config;
 extern uint8_t fake_address, fake_register;
 extern uint16_t fake_registers[128][256];
 extern uint32_t fake_master_writes;
@@ -145,7 +153,12 @@ GPIO_REG_Lock() {
 }
 
 inline void
-GPIO_SetFunc(int, int, int) {}
+GPIO_SetFunc(int port, int pin, int function) {
+    if (pin == GPIO_PIN_09 || pin == GPIO_PIN_08) {
+        assert(port == GPIO_PORT_A);
+        assert(function == (pin == GPIO_PIN_09 ? GPIO_FUNC_51 : GPIO_FUNC_50));
+    }
+}
 
 inline void
 GPIO_SetFunction(int, int) {}
@@ -190,12 +203,13 @@ I2C_StructInit(stc_i2c_init_t* config) {
 }
 
 inline int32_t
-I2C_Init(CM_I2C_TypeDef* unit, const stc_i2c_init_t*, float*) {
+I2C_Init(CM_I2C_TypeDef* unit, const stc_i2c_init_t* config, float*) {
     if (unit == CM_I2C1) {
         ++fake_slave_initializations;
         return fake_slave_init_error;
     }
-    return LL_OK;
+    fake_master_config = *config;
+    return fake_master_init_error;
 }
 
 inline void
@@ -205,16 +219,32 @@ inline void
 I2C_IntCmd(CM_I2C_TypeDef*, uint32_t, int) {}
 
 inline void
-I2C_Cmd(CM_I2C_TypeDef*, int) {}
+I2C_Cmd(CM_I2C_TypeDef* unit, int enabled) {
+    if (unit == CM_I2C2) {
+        fake_master_trace += enabled ? 'E' : 'e';
+    }
+}
 
 inline void
-I2C_BusWaitCmd(CM_I2C_TypeDef*, int) {}
+I2C_BusWaitCmd(CM_I2C_TypeDef* unit, int enabled) {
+    if (unit == CM_I2C2) {
+        assert(enabled == ENABLE);
+        fake_master_trace += 'B';
+    }
+}
 
 inline void
-I2C_AckConfig(CM_I2C_TypeDef*, int) {}
+I2C_AckConfig(CM_I2C_TypeDef* unit, int ack) {
+    if (unit == CM_I2C2) {
+        fake_master_trace += ack == I2C_ACK ? 'A' : 'N';
+    }
+}
 
 inline void
 I2C_SWResetCmd(CM_I2C_TypeDef* unit, int enabled) {
+    if (unit == CM_I2C2) {
+        fake_master_trace += enabled ? 'R' : 'r';
+    }
     if (enabled) {
         unit->SR = 0;
         ++fake_master_resets;
@@ -245,30 +275,38 @@ I2C_ReadData(CM_I2C_TypeDef* unit) {
 }
 
 inline int32_t
-I2C_Start(CM_I2C_TypeDef*, uint32_t) {
-    return fake_io_error;
+fake_master_step(char step, uint32_t timeout) {
+    assert(timeout == 0x40000UL);
+    fake_master_trace += step;
+    return fake_master_failure == step ? LL_ERR : fake_io_error;
 }
 
 inline int32_t
-I2C_Stop(CM_I2C_TypeDef*, uint32_t) {
-    return fake_io_error;
+I2C_Start(CM_I2C_TypeDef*, uint32_t timeout) {
+    return fake_master_step('S', timeout);
 }
 
 inline int32_t
-I2C_Restart(CM_I2C_TypeDef*, uint32_t) {
-    return fake_io_error;
+I2C_Stop(CM_I2C_TypeDef*, uint32_t timeout) {
+    return fake_master_step('P', timeout);
 }
 
 inline int32_t
-I2C_TransAddr(CM_I2C_TypeDef*, uint8_t address, int, uint32_t) {
+I2C_Restart(CM_I2C_TypeDef*, uint32_t timeout) {
+    return fake_master_step('T', timeout);
+}
+
+inline int32_t
+I2C_TransAddr(CM_I2C_TypeDef*, uint8_t address, int direction, uint32_t timeout) {
     fake_address = address;
-    return fake_io_error;
+    return fake_master_step(direction == I2C_DIR_TX ? 'W' : 'V', timeout);
 }
 
 inline int32_t
-I2C_TransData(CM_I2C_TypeDef*, const uint8_t* data, size_t length, uint32_t) {
-    if (fake_io_error) {
-        return fake_io_error;
+I2C_TransData(CM_I2C_TypeDef*, const uint8_t* data, size_t length, uint32_t timeout) {
+    const int32_t result = fake_master_step('D', timeout);
+    if (result != LL_OK) {
+        return result;
     }
     fake_register = data[0];
     if (length == 2U) {
@@ -279,7 +317,11 @@ I2C_TransData(CM_I2C_TypeDef*, const uint8_t* data, size_t length, uint32_t) {
 }
 
 inline int32_t
-I2C_MasterReceiveDataAndStop(CM_I2C_TypeDef*, uint8_t* data, uint8_t length, uint32_t) {
+I2C_MasterReceiveDataAndStop(CM_I2C_TypeDef*, uint8_t* data, uint32_t length, uint32_t timeout) {
+    const int32_t result = fake_master_step('G', timeout);
+    if (result != LL_OK) {
+        return result;
+    }
     const uint16_t value = fake_registers[fake_address][fake_register];
     data[0] = value & 255U;
     if (fake_receive_error) {

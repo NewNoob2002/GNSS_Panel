@@ -11,7 +11,6 @@ target_include_directories(hc32_bq40z50 PUBLIC
 )
 target_link_libraries(hc32_bq40z50 PUBLIC
     hc32_project_options
-    hc32_arduino_headers
     hc32_platform_headers
 )
 
@@ -34,7 +33,6 @@ target_include_directories(hc32_mp2762a PUBLIC
 )
 target_link_libraries(hc32_mp2762a PUBLIC
     hc32_project_options
-    hc32_arduino_headers
     hc32_platform_headers
 )
 
