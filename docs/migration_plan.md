@@ -39,6 +39,8 @@
 | 2.2b ★ | 通用外设 class 化：`I2cMaster`（替换 2.1 的 `i2c_master_*`）、`GpioPin`；驱动只含外设操作，外设号与引脚由板级配置实例化；无虚函数、无动态分配、静态构造不碰硬件 | sol |
 | 2.3 ★ | `SpiMaster` 类替换 `SPIClass`，面板驱动类替换 `Adafruit_ST7789/GFX/BusIO`（同 2.2b 原则）：初始化序列、MADCTL、偏移逐项照搬原库（注明出处），保留现有 DMA 刷新与旋转 | sol |
 | 2.4 | 删除 `Arduino/`、`Adafruit*` 目录与 `hc32_arduino*` 目标，更新 `AGENTS.md`、`docs/product_structure.md`、`readme.md` | argon |
+| 2.5 ★ | 删除未参与任何构建的文件（依据全目标全新构建的编译器依赖）与编译文件中的 Arduino 衍生死代码，修正失效路径 | sol |
+| 2.6 | `Vendor/HC32` 按职责重组：`Platform/{DDL,Peripherals,System}`（取代 `Drivers`、`Core`、`support`），SEGGER RTT 移入 `Libraries/`，`Display/{Panel,Lvgl,AppPlatform}`；只移动文件并同步 CMake/测试/文档，固件体积不变 | argon |
 
 进度（2026-10-21）：2.1 `7889f10`、2.2+2.2b `e523fa1`、2.3 `2b8a027`、2.4 `d7209d4` 已合入 `dev2`，编译与主机测试验收通过，**待实机清单确认**。release 体积（text/data/bss）：X1 25808/136/19136，X1Pro 336548/860/169268，XBase 336108/860/169268；相对阶段 1 基线，带屏产品 flash 约 −5.9 KiB、静态 RAM −80 B。
 
