@@ -2,6 +2,8 @@
   "verify_commands": [
     [
       "git",
+      "-c",
+      "core.whitespace=cr-at-eol",
       "diff",
       "--check",
       "{base}"
@@ -16,7 +18,8 @@
       "--build",
       "--preset",
       "x1-debug",
-      "-j"
+      "-j",
+      "--clean-first"
     ],
     [
       "cmake",
@@ -28,7 +31,8 @@
       "--build",
       "--preset",
       "x1pro-debug",
-      "-j"
+      "-j",
+      "--clean-first"
     ],
     [
       "cmake",
@@ -40,7 +44,8 @@
       "--build",
       "--preset",
       "xbase-debug",
-      "-j"
+      "-j",
+      "--clean-first"
     ],
     [
       "cmake",
@@ -52,7 +57,8 @@
       "--build",
       "--preset",
       "x1-release",
-      "-j"
+      "-j",
+      "--clean-first"
     ],
     [
       "cmake",
@@ -64,7 +70,8 @@
       "--build",
       "--preset",
       "x1pro-release",
-      "-j"
+      "-j",
+      "--clean-first"
     ],
     [
       "cmake",
@@ -76,7 +83,8 @@
       "--build",
       "--preset",
       "xbase-release",
-      "-j"
+      "-j",
+      "--clean-first"
     ],
     [
       "cmake",
@@ -89,7 +97,8 @@
       "cmake",
       "--build",
       "build/host-tests",
-      "-j"
+      "-j",
+      "--clean-first"
     ],
     [
       "ctest",
@@ -108,7 +117,8 @@
       "cmake",
       "--build",
       "build/app-core-tests",
-      "-j"
+      "-j",
+      "--clean-first"
     ],
     [
       "ctest",
