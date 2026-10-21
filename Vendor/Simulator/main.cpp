@@ -1,19 +1,26 @@
-// HC32 带屏产品 PC 模拟器：共享应用（Shared/App）+ HC32 平台层（Shared/Display/AppPlatform）
-// + 模拟 HAL（Simulator/HAL，运行真实的关机策略 PowerPolicy）。窗口 294×126，1:1 像素。
+// 统一 PC SDL 模拟器入口：共享应用（App/）+ 可选后端：
+// - SIM_BACKEND=Board（默认）：HC32 平台层（Vendor/HC32/Display/AppPlatform）+ 模拟 HAL（运行固件 PowerPolicy）
+// - SIM_BACKEND=Demo：Linux 演示后端（Vendor/Linux/Backends/Demo，支持 --random-status [seed]）
+// 窗口 294×126，1:1 像素。
 #define SDL_MAIN_HANDLED
 #include <SDL.h>
 #include <array>
+#include <cerrno>
 #include <csignal>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 
+#include "App.h"
+#if SIM_BACKEND_DEMO
+#include "DemoStatus.h"
+#else
 #include "AppPlatform.h"
 #include "HAL/HAL.h"
-#include "App.h"
 #include "SystemState.h"
 #include "mcu_version_config.h"
+#endif
 
 namespace {
 constexpr int kWidth = 294;
@@ -30,9 +37,50 @@ struct Pointer {
     lv_indev_state_t state = LV_INDEV_STATE_RELEASED;
 };
 
+struct CliOptions {
+    bool random_status = false;
+    std::uint32_t seed = 1;
+};
+
 void
 on_signal(int) {
     stop = 1;
+}
+
+/**
+ * @brief Parse and validate simulator command-line arguments.
+ * @param argc Argument count from main().
+ * @param argv Argument vector from main().
+ * @param options Parsed CLI options output.
+ * @return true if arguments are valid for the active backend, false otherwise.
+ */
+bool
+parse_args(int argc, char** argv, CliOptions& options) {
+#if SIM_BACKEND_DEMO
+    options.random_status = argc >= 2 && std::strcmp(argv[1], "--random-status") == 0;
+    bool valid_args = argc == 1 || (options.random_status && argc <= 3);
+    if (valid_args && argc == 3) {
+        char* end = nullptr;
+        errno = 0;
+        const auto value = std::strtoul(argv[2], &end, 10);
+        valid_args = !errno && argv[2][0] >= '0' && argv[2][0] <= '9' && !*end && value <= UINT32_MAX;
+        if (valid_args) {
+            options.seed = static_cast<std::uint32_t>(value);
+        }
+    }
+    if (!valid_args) {
+        std::fprintf(stderr, "Usage: %s [--random-status [SEED_0_TO_4294967295]]\n", argv[0]);
+        return false;
+    }
+    return true;
+#else
+    (void)options;
+    if (argc != 1) {
+        std::fprintf(stderr, "Usage: %s (note: --random-status is only supported with SIM_BACKEND=Demo)\n", argv[0]);
+        return false;
+    }
+    return true;
+#endif
 }
 
 void
@@ -54,6 +102,23 @@ pointer_read(lv_indev_drv_t* driver, lv_indev_data_t* data) {
     data->state = pointer->state;
 }
 
+#if SIM_BACKEND_DEMO
+/**
+ * @brief Print keyboard and mouse control instructions for the Demo backend.
+ * @param options Parsed CLI options describing whether random status mode is active.
+ */
+void
+print_controls(const CliOptions& options) {
+    std::puts("Host controls: arrows/wheel = focus (+1 in editor), Enter/middle click = press/release, "
+              "hold 2s to Start, Esc/right click = back/cancel, Ctrl+Enter = commit, Q = quit. "
+              "Power/time are simulated.");
+    if (options.random_status) {
+        std::printf("Random DEMO status: seed=%u, new battery/charging/Wi-Fi/recording/satellites "
+                    "every 3s; publication every 200ms.\n",
+                    options.seed);
+    }
+}
+#else
 // 主板版本：V1.5 带 MP2762A，V1.3 没有（GPIO 控制充电）；与 HAL::I2C_Scan 的推断一致。
 void
 set_board(bool v15) {
@@ -206,10 +271,15 @@ inject_event(SDL_Keycode key) {
                 static_cast<double>(battery.Temp_f), battery.Percent, battery.chargeStatus != notCharge,
                 power.LinuxPowerOff, power.LowBatteryPowerOff, power.Force_ShutDown);
 }
+#endif
 } // namespace
 
 int
-main() {
+main(int argc, char** argv) {
+    CliOptions options{};
+    if (!parse_args(argc, argv, options)) {
+        return EXIT_FAILURE;
+    }
     if (std::signal(SIGINT, on_signal) == SIG_ERR || std::signal(SIGTERM, on_signal) == SIG_ERR) {
         std::perror("signal");
         return EXIT_FAILURE;
@@ -218,8 +288,13 @@ main() {
         std::fprintf(stderr, "SDL init: %s\n", SDL_GetError());
         return EXIT_FAILURE;
     }
-    SDL_Window* window = SDL_CreateWindow("HC32 " PRODUCT_NAME " simulator", SDL_WINDOWPOS_CENTERED,
-                                          SDL_WINDOWPOS_CENTERED, kWidth, kHeight, SDL_WINDOW_SHOWN);
+#if SIM_BACKEND_DEMO
+    constexpr const char* kWindowTitle = "App preview";
+#else
+    constexpr const char* kWindowTitle = "HC32 " PRODUCT_NAME " simulator";
+#endif
+    SDL_Window* window =
+        SDL_CreateWindow(kWindowTitle, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, kWidth, kHeight, SDL_WINDOW_SHOWN);
     SDL_Renderer* renderer = window ? SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE) : nullptr;
     SDL_Texture* texture =
         renderer ? SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, kWidth, kHeight)
@@ -240,7 +315,7 @@ main() {
         driver.draw_buf = &draw;
         driver.flush_cb = flush;
         driver.user_data = &frame;
-        lv_disp_drv_register(&driver);
+        lv_disp_t* display = lv_disp_drv_register(&driver);
 
         static Pointer pointer;
         static lv_indev_drv_t pointer_driver;
@@ -248,99 +323,146 @@ main() {
         pointer_driver.type = LV_INDEV_TYPE_POINTER;
         pointer_driver.read_cb = pointer_read;
         pointer_driver.user_data = &pointer;
-        lv_indev_t* indev = lv_indev_drv_register(&pointer_driver);
+        lv_indev_t* indev = display ? lv_indev_drv_register(&pointer_driver) : nullptr;
 
-        init_system_info();
-        HAL::HAL_Init();
-        App_Init();
-        App* app = App_Get();
-        print_controls();
-        result = EXIT_SUCCESS;
-        bool enter_down = false;
-        bool cold_boot_wait = true;
-        while (!stop) {
-            SDL_Event event;
-            while (SDL_PollEvent(&event)) {
-                if (event.type == SDL_QUIT) {
-                    stop = 1;
-                } else if (event.type == SDL_KEYDOWN && !event.key.repeat) {
-                    const SDL_Keycode key = event.key.keysym.sym;
-                    if (key == SDLK_q) {
-                        stop = 1;
-                    } else if (key == SDLK_RIGHT || key == SDLK_DOWN) {
-                        app->on_input(App::InputAction::NextFocus);
-                    } else if (key == SDLK_LEFT || key == SDLK_UP) {
-                        app->on_input(App::InputAction::PreviousFocus);
-                    } else if (key == SDLK_ESCAPE) {
-                        app->on_input(App::InputAction::Back);
-                    } else if (key == SDLK_RETURN || key == SDLK_KP_ENTER) {
-                        if (event.key.keysym.mod & KMOD_CTRL) {
-                            app->on_input(App::InputAction::Commit);
-                        } else if (!enter_down) {
-                            enter_down = true;
-                            HAL::Sim_SetPowerKey(true); // 原始电平仅模拟按键，开机由 Startup 完整长按请求。
-                            app->on_input(App::InputAction::Press);
+        if (!indev) {
+            std::fprintf(stderr, "LVGL display/pointer init failed\n");
+        } else {
+#if SIM_BACKEND_DEMO
+            App demo_app;
+            App* app = demo_app.init() ? &demo_app : nullptr;
+            if (!app) {
+                std::fprintf(stderr, "App init failed\n");
+            } else {
+                print_controls(options);
+                const auto started = SDL_GetTicks64();
+                auto last_status = started;
+                app->update_status(options.random_status ? DemoStatus::sample_random(0, options.seed)
+                                                         : DemoStatus::sample(0));
+#else
+            init_system_info();
+            HAL::HAL_Init();
+            App_Init();
+            App* app = App_Get();
+            {
+                print_controls();
+                bool cold_boot_wait = true;
+#endif
+                result = EXIT_SUCCESS;
+                bool enter_down = false;
+                while (!stop) {
+                    SDL_Event event;
+                    while (SDL_PollEvent(&event)) {
+                        if (event.type == SDL_QUIT) {
+                            stop = 1;
+                        } else if (event.type == SDL_KEYDOWN && !event.key.repeat) {
+                            const SDL_Keycode key = event.key.keysym.sym;
+                            if (key == SDLK_q) {
+                                stop = 1;
+                            } else if (key == SDLK_RIGHT || key == SDLK_DOWN) {
+                                app->on_input(App::InputAction::NextFocus);
+                            } else if (key == SDLK_LEFT || key == SDLK_UP) {
+                                app->on_input(App::InputAction::PreviousFocus);
+                            } else if (key == SDLK_ESCAPE) {
+                                app->on_input(App::InputAction::Back);
+                            } else if (key == SDLK_RETURN || key == SDLK_KP_ENTER) {
+                                if (event.key.keysym.mod & KMOD_CTRL) {
+                                    app->on_input(App::InputAction::Commit);
+                                } else if (!enter_down) {
+                                    enter_down = true;
+#if !SIM_BACKEND_DEMO
+                                    HAL::Sim_SetPowerKey(true); // 原始电平仅模拟按键，开机由 Startup 完整长按请求。
+#endif
+                                    app->on_input(App::InputAction::Press);
+                                }
+                            } else {
+#if !SIM_BACKEND_DEMO
+                                inject_event(key);
+#endif
+                            }
+                        } else if (event.type == SDL_KEYUP
+                                   && (event.key.keysym.sym == SDLK_RETURN || event.key.keysym.sym == SDLK_KP_ENTER)) {
+                            if (enter_down) {
+                                enter_down = false;
+#if !SIM_BACKEND_DEMO
+                                HAL::Sim_SetPowerKey(false);
+#endif
+                                app->on_input(App::InputAction::Release);
+                            }
+                        } else if (event.type == SDL_MOUSEWHEEL && event.wheel.y != 0) {
+                            app->on_input(event.wheel.y > 0 ? App::InputAction::PreviousFocus
+                                                            : App::InputAction::NextFocus);
+                        } else if (event.type == SDL_MOUSEMOTION || event.type == SDL_MOUSEBUTTONDOWN
+                                   || event.type == SDL_MOUSEBUTTONUP) {
+                            const int x = event.type == SDL_MOUSEMOTION ? event.motion.x : event.button.x;
+                            const int y = event.type == SDL_MOUSEMOTION ? event.motion.y : event.button.y;
+                            pointer.point = {static_cast<lv_coord_t>(x), static_cast<lv_coord_t>(y)};
+                            if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_RIGHT) {
+                                app->on_input(App::InputAction::Back);
+                            } else if (event.type != SDL_MOUSEMOTION && event.button.button == SDL_BUTTON_MIDDLE) {
+#if !SIM_BACKEND_DEMO
+                                HAL::Sim_SetPowerKey(event.type == SDL_MOUSEBUTTONDOWN);
+#endif
+                                app->on_input(event.type == SDL_MOUSEBUTTONDOWN ? App::InputAction::Press
+                                                                                : App::InputAction::Release);
+                            } else if (event.type != SDL_MOUSEMOTION && event.button.button == SDL_BUTTON_LEFT) {
+                                pointer.state =
+                                    event.type == SDL_MOUSEBUTTONDOWN ? LV_INDEV_STATE_PRESSED : LV_INDEV_STATE_RELEASED;
+                                lv_timer_ready(indev->driver->read_timer);
+                            }
+                        } else if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_FOCUS_LOST) {
+                            enter_down = false;
+#if !SIM_BACKEND_DEMO
+                            HAL::Sim_SetPowerKey(false);
+#endif
+                            app->cancel_input();
+                            pointer.state = LV_INDEV_STATE_RELEASED;
+                            lv_indev_reset(indev, nullptr);
                         }
-                    } else {
-                        inject_event(key);
                     }
-                } else if (event.type == SDL_KEYUP
-                           && (event.key.keysym.sym == SDLK_RETURN || event.key.keysym.sym == SDLK_KP_ENTER)) {
-                    if (enter_down) {
-                        enter_down = false;
-                        HAL::Sim_SetPowerKey(false);
-                        app->on_input(App::InputAction::Release);
+#if SIM_BACKEND_DEMO
+                    const auto now = SDL_GetTicks64();
+                    app->update();
+                    lv_timer_handler();
+                    if (now - last_status >= 200) {
+                        app->update_status(options.random_status ? DemoStatus::sample_random(now - started, options.seed)
+                                                                 : DemoStatus::sample(now - started));
+                        last_status = now;
                     }
-                } else if (event.type == SDL_MOUSEWHEEL && event.wheel.y != 0) {
-                    app->on_input(event.wheel.y > 0 ? App::InputAction::PreviousFocus
-                                                    : App::InputAction::NextFocus);
-                } else if (event.type == SDL_MOUSEMOTION || event.type == SDL_MOUSEBUTTONDOWN
-                           || event.type == SDL_MOUSEBUTTONUP) {
-                    const int x = event.type == SDL_MOUSEMOTION ? event.motion.x : event.button.x;
-                    const int y = event.type == SDL_MOUSEMOTION ? event.motion.y : event.button.y;
-                    pointer.point = {static_cast<lv_coord_t>(x), static_cast<lv_coord_t>(y)};
-                    if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_RIGHT) {
-                        app->on_input(App::InputAction::Back);
-                    } else if (event.type != SDL_MOUSEMOTION && event.button.button == SDL_BUTTON_MIDDLE) {
-                        HAL::Sim_SetPowerKey(event.type == SDL_MOUSEBUTTONDOWN);
-                        app->on_input(event.type == SDL_MOUSEBUTTONDOWN ? App::InputAction::Press
-                                                                        : App::InputAction::Release);
-                    } else if (event.type != SDL_MOUSEMOTION && event.button.button == SDL_BUTTON_LEFT) {
-                        pointer.state =
-                            event.type == SDL_MOUSEBUTTONDOWN ? LV_INDEV_STATE_PRESSED : LV_INDEV_STATE_RELEASED;
-                        lv_timer_ready(indev->driver->read_timer);
+#else
+                    HAL::HAL_Update();
+                    simulate_host(lv_tick_get());
+                    App_Update();
+                    lv_timer_handler();
+                    if (cold_boot_wait && systemInfo.power.panel_power_on) {
+                        // SDL 事件循环维持冷启动界面；Startup 确认后再退出固件等待并拉高主控电源。
+                        HAL::Power_OnCheck();
+                        cold_boot_wait = false;
                     }
-                } else if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_FOCUS_LOST) {
-                    enter_down = false;
-                    HAL::Sim_SetPowerKey(false);
-                    app->cancel_input();
-                    pointer.state = LV_INDEV_STATE_RELEASED;
-                    lv_indev_reset(indev, nullptr);
+#endif
+                    SDL_SetWindowTitle(window, app->current_page());
+                    if (frame.dirty) {
+                        if (SDL_UpdateTexture(texture, nullptr, frame.pixels.data(), kWidth * 4) != 0
+                            || SDL_RenderClear(renderer) != 0
+                            || SDL_RenderCopy(renderer, texture, nullptr, nullptr) != 0) {
+                            std::fprintf(stderr, "SDL render: %s\n", SDL_GetError());
+                            result = EXIT_FAILURE;
+                            break;
+                        }
+                        SDL_RenderPresent(renderer);
+                        frame.dirty = false;
+                    }
+                    SDL_Delay(5);
                 }
+#if !SIM_BACKEND_DEMO
+                App_Deinit(); // 页面与 Account 在 LVGL 对象仍有效时清理
+#endif
             }
-            HAL::HAL_Update();
-            simulate_host(lv_tick_get());
-            App_Update();
-            lv_timer_handler();
-            if (cold_boot_wait && systemInfo.power.panel_power_on) {
-                // SDL 事件循环维持冷启动界面；Startup 确认后再退出固件等待并拉高主控电源。
-                HAL::Power_OnCheck();
-                cold_boot_wait = false;
-            }
-            SDL_SetWindowTitle(window, app->current_page());
-            if (frame.dirty) {
-                if (SDL_UpdateTexture(texture, nullptr, frame.pixels.data(), kWidth * 4) != 0
-                    || SDL_RenderClear(renderer) != 0 || SDL_RenderCopy(renderer, texture, nullptr, nullptr) != 0) {
-                    std::fprintf(stderr, "SDL render: %s\n", SDL_GetError());
-                    result = EXIT_FAILURE;
-                    break;
-                }
-                SDL_RenderPresent(renderer);
-                frame.dirty = false;
-            }
-            SDL_Delay(5);
+            lv_indev_delete(indev);
         }
-        App_Deinit(); // 页面与 Account 在 LVGL 对象仍有效时清理
+        if (display) {
+            lv_disp_remove(display);
+        }
     }
     if (texture) {
         SDL_DestroyTexture(texture);

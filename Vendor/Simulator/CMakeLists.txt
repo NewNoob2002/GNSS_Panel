@@ -8,21 +8,20 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 get_filename_component(REPO_ROOT "${CMAKE_CURRENT_LIST_DIR}/../.." REALPATH)
 set(HC32_DIR "${REPO_ROOT}/Vendor/HC32")
 
-# 模拟器只运行带屏产品的界面，默认 X1Pro。
+# 模拟器支持两种业务后端：Board（默认，HC32 虚拟板 + AppPlatform + 固件 HAL_Power.cpp）与 Demo（Linux 演示后端）。
+set(SIM_BACKENDS Board Demo)
+set(SIM_BACKEND "Board" CACHE STRING "Simulator backend to run: Board or Demo")
+set_property(CACHE SIM_BACKEND PROPERTY STRINGS ${SIM_BACKENDS})
+if(NOT SIM_BACKEND IN_LIST SIM_BACKENDS)
+    message(FATAL_ERROR "SIM_BACKEND must be Board or Demo")
+endif()
+
+# Board 后端可选择模拟的带屏产品，默认 X1Pro。
 set(SIM_PRODUCT "X1Pro" CACHE STRING "Display product to simulate: X1Pro or XBase")
 set_property(CACHE SIM_PRODUCT PROPERTY STRINGS X1Pro XBase)
 if(NOT SIM_PRODUCT MATCHES "^(X1Pro|XBase)$")
     message(FATAL_ERROR "SIM_PRODUCT must be X1Pro or XBase")
 endif()
-set(SIM_PRODUCT_DIR ${HC32_DIR}/Products/${SIM_PRODUCT})
-file(STRINGS "${SIM_PRODUCT_DIR}/product.cmake" PROJECT_VERSION_LINE
-    REGEX "^set\\(PRODUCT_VERSION [0-9.]+\\)")
-string(REGEX REPLACE "^set\\(PRODUCT_VERSION ([0-9.]+)\\)" "\\1" PROJECT_VERSION "${PROJECT_VERSION_LINE}")
-configure_file(
-    ${HC32_DIR}/Platform/Config/mcu_version_config.h.in
-    ${CMAKE_CURRENT_BINARY_DIR}/generated/Platform/Config/mcu_version_config.h
-    @ONLY
-)
 
 find_package(PkgConfig QUIET)
 if(PkgConfig_FOUND)
@@ -45,39 +44,75 @@ target_compile_definitions(sim_lvgl PUBLIC LV_CONF_PATH=${CMAKE_CURRENT_LIST_DIR
 add_library(app_lvgl INTERFACE)
 target_link_libraries(app_lvgl INTERFACE sim_lvgl)
 add_subdirectory(${REPO_ROOT}/App shared-app)
-file(GLOB HAL_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_LIST_DIR}/HAL/*.cpp)
-# 固件电源时序原样编译：强制包含模拟器 HAL.h（屏蔽固件 HAL.h 的硬件依赖），GPIO/时基由 HAL/Arduino.h 提供
-set(FIRMWARE_POWER_SOURCE ${HC32_DIR}/Platform/HAL/HAL_Power.cpp)
-set_source_files_properties(${FIRMWARE_POWER_SOURCE} PROPERTIES
-    COMPILE_OPTIONS "-include;${CMAKE_CURRENT_LIST_DIR}/HAL/HAL.h")
-# HC32 平台层（与固件同一份）
-file(GLOB APP_PLATFORM_SOURCES CONFIGURE_DEPENDS ${HC32_DIR}/Display/AppPlatform/*.cpp)
 
-add_executable(main
-    main.cpp
-    ${APP_PLATFORM_SOURCES}
-    ${HC32_DIR}/Platform/State/SystemState.cpp
-    ${HAL_SOURCES}
-    ${FIRMWARE_POWER_SOURCE}
-)
-target_include_directories(main PRIVATE
-    ${CMAKE_CURRENT_LIST_DIR}
-    ${CMAKE_CURRENT_LIST_DIR}/HAL
-    ${HC32_DIR}/Display
-    ${HC32_DIR}/Libraries
-    ${REPO_ROOT}/External
-    ${LVGL_DIR}
-    ${HC32_DIR}/Platform/Config
-    ${HC32_DIR}/Platform/State
-    ${CMAKE_CURRENT_BINARY_DIR}/generated/Platform/Config
-    ${SIM_PRODUCT_DIR}
-)
-target_compile_definitions(main PRIVATE
-    # 明确指定模拟器配置，避免与固件 lv_conf.h 按包含顺序混淆
-    LV_CONF_PATH=${CMAKE_CURRENT_LIST_DIR}/lv_conf.h
-    LVGL_SIMULATOR
-)
-target_link_libraries(main PRIVATE app_ui)
+if(SIM_BACKEND STREQUAL "Demo")
+    set(DEMO_BACKEND_DIR ${REPO_ROOT}/Vendor/Linux/Backends/Demo)
+    add_library(demo_backend OBJECT
+        ${DEMO_BACKEND_DIR}/DemoStatus.cpp
+        ${DEMO_BACKEND_DIR}/SimulatedSystem.cpp
+    )
+    target_include_directories(demo_backend PUBLIC ${DEMO_BACKEND_DIR})
+    target_link_libraries(demo_backend PUBLIC app_ui)
+    target_compile_options(demo_backend PRIVATE -Wall -Wextra -Werror)
+
+    add_executable(main main.cpp)
+    target_include_directories(main PRIVATE
+        ${CMAKE_CURRENT_LIST_DIR}
+        ${REPO_ROOT}/External
+        ${LVGL_DIR}
+    )
+    target_compile_definitions(main PRIVATE
+        LV_CONF_PATH=${CMAKE_CURRENT_LIST_DIR}/lv_conf.h
+        LVGL_SIMULATOR
+        SIM_BACKEND_DEMO=1
+    )
+    target_link_libraries(main PRIVATE demo_backend)
+else()
+    set(SIM_PRODUCT_DIR ${HC32_DIR}/Products/${SIM_PRODUCT})
+    file(STRINGS "${SIM_PRODUCT_DIR}/product.cmake" PROJECT_VERSION_LINE
+        REGEX "^set\\(PRODUCT_VERSION [0-9.]+\\)")
+    string(REGEX REPLACE "^set\\(PRODUCT_VERSION ([0-9.]+)\\)" "\\1" PROJECT_VERSION "${PROJECT_VERSION_LINE}")
+    configure_file(
+        ${HC32_DIR}/Platform/Config/mcu_version_config.h.in
+        ${CMAKE_CURRENT_BINARY_DIR}/generated/Platform/Config/mcu_version_config.h
+        @ONLY
+    )
+
+    file(GLOB HAL_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_LIST_DIR}/HAL/*.cpp)
+    # 固件电源时序原样编译：强制包含模拟器 HAL.h（屏蔽固件 HAL.h 的硬件依赖），GPIO/时基由 HAL/Arduino.h 提供
+    set(FIRMWARE_POWER_SOURCE ${HC32_DIR}/Platform/HAL/HAL_Power.cpp)
+    set_source_files_properties(${FIRMWARE_POWER_SOURCE} PROPERTIES
+        COMPILE_OPTIONS "-include;${CMAKE_CURRENT_LIST_DIR}/HAL/HAL.h")
+    # HC32 平台层（与固件同一份）
+    file(GLOB APP_PLATFORM_SOURCES CONFIGURE_DEPENDS ${HC32_DIR}/Display/AppPlatform/*.cpp)
+
+    add_executable(main
+        main.cpp
+        ${APP_PLATFORM_SOURCES}
+        ${HC32_DIR}/Platform/State/SystemState.cpp
+        ${HAL_SOURCES}
+        ${FIRMWARE_POWER_SOURCE}
+    )
+    target_include_directories(main PRIVATE
+        ${CMAKE_CURRENT_LIST_DIR}
+        ${CMAKE_CURRENT_LIST_DIR}/HAL
+        ${HC32_DIR}/Display
+        ${HC32_DIR}/Libraries
+        ${REPO_ROOT}/External
+        ${LVGL_DIR}
+        ${HC32_DIR}/Platform/Config
+        ${HC32_DIR}/Platform/State
+        ${CMAKE_CURRENT_BINARY_DIR}/generated/Platform/Config
+        ${SIM_PRODUCT_DIR}
+    )
+    target_compile_definitions(main PRIVATE
+        # 明确指定模拟器配置，避免与固件 lv_conf.h 按包含顺序混淆
+        LV_CONF_PATH=${CMAKE_CURRENT_LIST_DIR}/lv_conf.h
+        LVGL_SIMULATOR
+        SIM_BACKEND_DEMO=0
+    )
+    target_link_libraries(main PRIVATE app_ui)
+endif()
 target_compile_options(main PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra>)
 if(TARGET PkgConfig::SDL2)
     target_link_libraries(sim_lvgl PUBLIC PkgConfig::SDL2)

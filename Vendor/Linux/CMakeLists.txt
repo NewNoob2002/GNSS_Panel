@@ -8,7 +8,6 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(RK3506_DEBUG_MONITOR "Enable LVGL FPS/CPU and memory monitors" OFF)
 option(RK3506_LVGL_DEMO "Build standalone LVGL benchmark with on-screen FPS/CPU monitor" OFF)
-option(RK3506_SDL_PREVIEW "Build host SDL preview for RK3506 pages" OFF)
 
 # Locate repository root and shared components
 get_filename_component(REPO_ROOT "${CMAKE_CURRENT_LIST_DIR}/../.." REALPATH)
@@ -55,14 +54,6 @@ else()
         target_include_directories(button_probe PRIVATE platform)
         target_compile_definitions(button_probe PRIVATE _POSIX_C_SOURCE=200809L)
         target_compile_options(button_probe PRIVATE -Wall -Wextra -Werror)
-
-        if(RK3506_SDL_PREVIEW)
-            find_package(SDL2 REQUIRED CONFIG)
-            add_executable(simulator platform/sdl/main.cpp)
-            target_include_directories(simulator PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}" "${REPO_ROOT}")
-            target_link_libraries(simulator PRIVATE demo_backend SDL2::SDL2)
-            target_compile_options(simulator PRIVATE -Wall -Wextra -Werror)
-        endif()
     endif()
 
     # Test suite
