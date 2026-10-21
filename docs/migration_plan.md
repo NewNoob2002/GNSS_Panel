@@ -42,7 +42,7 @@
 | 2.5 ★ | 删除未参与任何构建的文件（依据全目标全新构建的编译器依赖）与编译文件中的 Arduino 衍生死代码，修正失效路径 | sol |
 | 2.6 | `Vendor/HC32` 按职责重组：`Platform/{DDL,Peripherals,System}`（取代 `Drivers`、`Core`、`support`），SEGGER RTT 移入 `Libraries/`，`Display/{Panel,Lvgl,AppPlatform}`；只移动文件并同步 CMake/测试/文档，固件体积不变 | argon |
 
-进度（2026-10-21）：2.1 `7889f10`、2.2+2.2b `e523fa1`、2.3 `2b8a027`、2.4 `d7209d4` 已合入 `dev2`，编译与主机测试验收通过，**待实机清单确认**。release 体积（text/data/bss）：X1 25808/136/19136，X1Pro 336548/860/169268，XBase 336108/860/169268；相对阶段 1 基线，带屏产品 flash 约 −5.9 KiB、静态 RAM −80 B。
+进度（2026-10-21）：2.1 `7889f10`、2.2+2.2b `e523fa1`、2.3 `2b8a027`、2.4 `d7209d4`、2.5 `978f77a`、2.6 `c369003` 已合入 `dev2`，编译与主机测试验收通过，**待实机清单确认**。release 体积（text/data/bss，2.6 后）：X1 25680/136/19136，X1Pro 336412/860/169268，XBase 335964/860/169268；相对阶段 1 基线，带屏产品 flash 约 −6.0 KiB、静态 RAM −80 B；X1Pro RAM 余量（`__RamEnd - __StackTop`）22,448 B。
 
 阶段 2 额外验收：`rg -n 'Arduino\.h|TwoWire|SPIClass|Adafruit|pinMode|digitalWrite' Vendor/HC32` 无结果（第三方示例除外）。
 
