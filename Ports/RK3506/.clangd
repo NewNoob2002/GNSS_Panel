@@ -1,0 +1,12 @@
+CompileFlags:
+  CompilationDatabase: ../../build/rk3506-host
+---
+If:
+  PathMatch: .*\.cpp
+CompileFlags:
+  Compiler: c++
+---
+If:
+  PathMatch: .*\.c
+CompileFlags:
+  Compiler: cc

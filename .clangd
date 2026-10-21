@@ -10,12 +10,12 @@ CompileFlags:
   CompilationDatabase: build/x1-debug
 ---
 If:
-  PathMatch: .*\.cpp
+  PathMatch: (Platform|Arduino|Products|Shared|Libraries)/.*\.cpp
 CompileFlags:
   Compiler: arm-none-eabi-g++
 ---
 If:
-  PathMatch: .*\.c
+  PathMatch: (Platform|Arduino|Products|Shared|Libraries)/.*\.c
 CompileFlags:
   Compiler: arm-none-eabi-gcc
 ---
@@ -31,16 +31,31 @@ CompileFlags:
 ---
 # 主机测试使用自己的替身头文件与编译参数，不继承固件编译数据库。
 If:
-  PathMatch: tests/.*
+  PathMatch: ^tests/.*
 CompileFlags:
   CompilationDatabase: build/host-tests
 ---
 If:
-  PathMatch: tests/.*\.cpp
+  PathMatch: ^tests/.*\.cpp
 CompileFlags:
   Compiler: c++
 ---
 If:
-  PathMatch: tests/.*\.c
+  PathMatch: ^tests/.*\.c
+CompileFlags:
+  Compiler: cc
+---
+If:
+  PathMatch: ^Ports/RK3506/.*
+CompileFlags:
+  CompilationDatabase: build/rk3506-host
+---
+If:
+  PathMatch: ^Ports/RK3506/.*\.cpp
+CompileFlags:
+  Compiler: c++
+---
+If:
+  PathMatch: ^Ports/RK3506/.*\.c
 CompileFlags:
   Compiler: cc
