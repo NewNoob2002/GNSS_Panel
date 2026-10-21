@@ -3,7 +3,7 @@
 // 0x01/0x02 与带屏产品同一布局（PanelInfoPayload / PanelStatusPayload），0x03~0x05 为单字节标志。
 #include <cstring>
 #include "SystemState.h"
-#include "core_debug.h"
+#include "platform_debug.h"
 #include "mcu_define.h"
 #include "panel_protocol.h"
 #include "product_config.h"

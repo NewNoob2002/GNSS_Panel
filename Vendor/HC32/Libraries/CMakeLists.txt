@@ -22,7 +22,7 @@ target_include_directories(hc32_millis_task_manager PUBLIC
 )
 target_link_libraries(hc32_millis_task_manager PUBLIC
     hc32_project_options
-    hc32_arduino_headers
+    hc32_platform_headers
 )
 
 add_library(hc32_mp2762a OBJECT
@@ -162,9 +162,7 @@ target_compile_definitions(hc32_lvgl PUBLIC
 )
 target_link_libraries(hc32_lvgl PUBLIC
     hc32_project_options
-    hc32_arduino_headers
     hc32_platform_headers
-    hc32_adafruit_st77xx
 )
 
 add_library(hc32_display_libraries INTERFACE)

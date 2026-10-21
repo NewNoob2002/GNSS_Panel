@@ -12,7 +12,6 @@ target_link_libraries(hc32_arduino_headers INTERFACE
 
 add_library(hc32_arduino OBJECT
     Core/avr/dtostrf.c
-    Core/variants/hc32f460xx/variant.cpp
     Print.cpp
     Stream.cpp
     WMath.cpp
@@ -22,4 +21,4 @@ add_library(hc32_arduino OBJECT
     yield.c
 )
 
-target_link_libraries(hc32_arduino PUBLIC hc32_arduino_headers)
+target_link_libraries(hc32_arduino PRIVATE hc32_arduino_headers)

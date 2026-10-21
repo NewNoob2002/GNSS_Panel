@@ -6,7 +6,7 @@
 #include "HAL.h"
 #include "mcu_config.h"
 
-#include <Arduino.h> // 模拟器中为 Simulator/HAL/Arduino.h 的虚拟 GPIO
+#include "gpio.h" // 模拟器使用虚拟 GPIO
 
 namespace {
 

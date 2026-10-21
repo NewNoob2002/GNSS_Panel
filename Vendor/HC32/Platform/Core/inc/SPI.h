@@ -1,7 +1,9 @@
 #ifndef __SPI_H
 #define __SPI_H
 
-#include "Arduino.h"
+#include <string.h>
+#include "gpio.h"
+#include "mcu_config.h"
 
 #ifndef LSBFIRST
 #define LSBFIRST 0

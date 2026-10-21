@@ -1,5 +1,7 @@
 #include "HAL.h"
-#include "Arduino.h"
+#include "gpio.h"
+#include "delay.h"
+#include "dwt.h"
 #include "Charger.h"
 #include "MillisTaskManager/MillisTaskManager.h"
 #include "SystemState.h"

@@ -1,5 +1,6 @@
 #include "Charger.h"
-#include "Arduino.h"
+#include "gpio.h"
+#include "delay.h"
 #include "HAL.h"
 #include "bq40z50.h"
 #include "mp2762a.h"

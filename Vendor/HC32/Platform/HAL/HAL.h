@@ -1,7 +1,7 @@
 #ifndef __HAL_H
 #define __HAL_H
 
-#include "../../../Arduino/core_debug.h"
+#include "platform_debug.h"
 #include "CommonMacro.h"
 #include "HAL_CONFIG.h"
 #include "mcu_config.h"

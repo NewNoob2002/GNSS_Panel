@@ -8,7 +8,7 @@ add_library(hc32_product_x1 OBJECT
 target_link_libraries(hc32_product_x1 PUBLIC
     hc32_shared_comm
     hc32_multi_button
-    hc32_arduino_headers
+    hc32_platform_headers
     hc32_libraries_headers
 )
 

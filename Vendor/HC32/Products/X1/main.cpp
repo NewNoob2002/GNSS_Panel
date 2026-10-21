@@ -1,4 +1,3 @@
-#include "Arduino.h"
 #include "HAL.h"
 #include "slave_i2c.h"
 

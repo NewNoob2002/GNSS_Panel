@@ -1,4 +1,5 @@
-#include "Arduino.h"
+#include "gpio.h"
+#include "delay.h"
 #include "Charger.h"
 #include "HAL.h"
 #include "SystemState.h"

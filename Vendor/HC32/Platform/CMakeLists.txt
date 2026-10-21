@@ -48,9 +48,6 @@ target_link_libraries(hc32_platform PUBLIC
 )
 # 平台层三产品共用，不依赖显示库或界面代码。
 target_include_directories(hc32_platform PRIVATE
-    ${PROJECT_SOURCE_DIR}/Arduino
-    ${PROJECT_SOURCE_DIR}/Arduino/Core/avr
-    ${PROJECT_SOURCE_DIR}/Arduino/Core/variants/hc32f460xx
     ${PROJECT_SOURCE_DIR}/Libraries
     ${PROJECT_SOURCE_DIR}/Libraries/Bq40z50
     ${PROJECT_SOURCE_DIR}/Libraries/MillisTaskManager

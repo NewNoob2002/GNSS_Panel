@@ -48,7 +48,6 @@ target_include_directories(hc32_shared_comm PUBLIC
 target_link_libraries(hc32_shared_comm PUBLIC
     hc32_project_options
     hc32_platform_headers
-    hc32_arduino_headers
     hc32_parser
 )
 

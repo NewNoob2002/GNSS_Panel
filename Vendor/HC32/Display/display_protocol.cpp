@@ -2,7 +2,7 @@
 #include <cmath>
 #include <cstring>
 #include "SystemState.h"
-#include "core_debug.h"
+#include "platform_debug.h"
 #include "mcu_define.h"
 #include "product_config.h"
 

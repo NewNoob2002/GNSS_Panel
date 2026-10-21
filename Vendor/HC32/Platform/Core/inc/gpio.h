@@ -1,8 +1,7 @@
 #pragma once
-#include "WVariant.h"
+#include "pinmap.h"
 #include "addon_gpio.h"
-#include "core_debug.h"
-#include "core_types.h"
+#include "platform_debug.h"
 
 
 #define Func_GPIO       GPIO_FUNC_0
@@ -82,9 +81,26 @@
 extern "C" {
 #endif
 
-//
+typedef enum {
+    GPIO_INPUT,
+    GPIO_INPUT_PULLUP,
+    GPIO_INPUT_ANALOG,
+    GPIO_OUTPUT,
+    GPIO_OUTPUT_OPEN_DRAIN,
+    GPIO_OUTPUT_AF_PP,
+    GPIO_OUTPUT_AF_OD
+} gpio_mode_t;
+
+enum { GPIO_LOW = 0, GPIO_HIGH = 1 };
+
+/** 有效引脚为 0..BOARD_NR_GPIO_PINS-1；初始电平随配置一次写入 PCR，保持原驱动顺序。 */
+void gpio_set_mode(gpio_pin_t pin, gpio_mode_t mode, uint8_t initial_level);
+/** 仅 GPIO_HIGH 写高，其余值写低；读取输入寄存器，返回 GPIO_LOW/GPIO_HIGH。 */
+void gpio_write(gpio_pin_t pin, uint32_t level);
+int gpio_read(gpio_pin_t pin);
+void gpio_toggle(gpio_pin_t pin);
+
 // GPIO wrappers for PORT_* functions
-//
 #define PIN_ARG(gpio_pin) PIN_MAP[gpio_pin].port, 1 << PIN_MAP[gpio_pin].bit_pos
 
 /**
