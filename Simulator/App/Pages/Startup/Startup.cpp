@@ -101,12 +101,11 @@ void Startup::hold_event(lv_event_t* event) {
         if (self->timer_)
             return;
         lv_anim_del(obj, set_progress);
-        const int32_t value = lv_arc_get_value(obj);
-        lv_anim_set_values(animation, value, 100);
-        constexpr uint32_t hold_ms = 2000; // Simulator hold; real power sequencing remains a platform reserve.
-        const uint32_t remaining_ms = hold_ms * (100 - value) / 100;
-        lv_anim_set_time(animation, remaining_ms);
-        self->timer_ = lv_timer_create(on_timeout, remaining_ms, self);
+        set_progress(obj, 0);
+        lv_anim_set_values(animation, 0, 100);
+        constexpr uint32_t hold_ms = 2000;
+        lv_anim_set_time(animation, hold_ms);
+        self->timer_ = lv_timer_create(on_timeout, hold_ms, self);
         if (self->timer_)
             lv_anim_start(animation);
         else

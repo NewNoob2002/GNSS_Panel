@@ -199,7 +199,14 @@ hal_power_on_and_boot() {
     run(1500);
     assert(power_on_requests == before && !systemInfo.power.panel_power_on);
     assert(on_page("Pages/Startup") && digitalRead(POWER_CONTROL_PIN) == LOW);
-    run(800);
+    power_key = false;
+    run(100); // 进度尚未归零时重新按下，驻留恢复也必须重新计满 2 s。
+    assert(startup_progress(lv_scr_act()) > 0);
+    power_key = true;
+    run(1995);
+    assert(power_on_requests == before && !systemInfo.power.panel_power_on);
+    assert(on_page("Pages/Startup") && digitalRead(POWER_CONTROL_PIN) == LOW);
+    run(300);
     assert(power_on_requests == before + 1 && systemInfo.power.panel_power_on);
     assert(on_page("Pages/SystemLoading") && digitalRead(POWER_CONTROL_PIN) == HIGH);
     power_key = false;
@@ -327,12 +334,15 @@ main() {
 
     run(500);
     assert(power_on_requests == 0 && digitalRead(POWER_CONTROL_PIN) == LOW);
-    power_key = false; // 约 1.5 s 松开：不得请求开机，进度回到零。
-    run(1000);
-    assert(on_page("Pages/Startup") && startup_progress(lv_scr_act()) == 0);
+    power_key = false; // 约 1.5 s 松开，再在回退动画结束前重新按下。
+    run(100);
+    assert(on_page("Pages/Startup") && startup_progress(lv_scr_act()) > 0);
     assert(power_on_requests == 0 && !systemInfo.power.panel_power_on);
     assert(!SystemService::snapshot().powered_on && digitalRead(POWER_CONTROL_PIN) == LOW);
     power_key = true;
+    run(1995);
+    assert(power_on_requests == 0 && !systemInfo.power.panel_power_on);
+    assert(on_page("Pages/Startup") && digitalRead(POWER_CONTROL_PIN) == LOW);
     HAL::Power_OnCheck(cold_boot_idle);
     assert(power_on_requests == 1 && systemInfo.power.panel_power_on);
     assert(digitalRead(POWER_CONTROL_PIN) == HIGH && charger_power_on_calls == 1 && standby_calls == 1);
