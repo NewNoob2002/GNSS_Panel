@@ -1,3 +1,0 @@
-ATK_RK3506 application/App
-commit 930cb61ca21205ab0423a92d5756c232b855bd23
-subject refactor(app): 移除 p4 命名并拆分平台入口
