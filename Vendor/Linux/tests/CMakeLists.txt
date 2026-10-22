@@ -35,6 +35,11 @@ target_link_libraries(app_status_test PRIVATE linux::demo_backend)
 target_compile_options(app_status_test PRIVATE -Wall -Wextra -Werror -UNDEBUG)
 add_test(NAME app_status COMMAND app_status_test)
 
+add_executable(hal_devices_test hal_devices_test.cpp)
+target_link_libraries(hal_devices_test PRIVATE linux::demo_backend app::hal_test_checks)
+target_compile_options(hal_devices_test PRIVATE -Wall -Wextra -Werror -UNDEBUG)
+add_test(NAME hal_devices COMMAND hal_devices_test)
+
 add_executable(app_system_dash_test app_system_dash_test.cpp)
 target_link_libraries(app_system_dash_test PRIVATE linux::demo_backend)
 target_compile_options(app_system_dash_test PRIVATE -Wall -Wextra -Werror -UNDEBUG)

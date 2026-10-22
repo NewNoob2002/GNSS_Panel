@@ -4,12 +4,7 @@
 
 namespace system_backend {
 namespace {
-/** 按值拷贝输出，避免缓冲区的对齐和严格别名假设。 */
-template<class T> int output(void* buffer, size_t size, const T& value) {
-    if (size != sizeof(T)) return ::DeviceObject::RES_PARAM_ERROR;
-    std::memcpy(buffer, &value, sizeof(value));
-    return ::DeviceObject::RES_OK;
-}
+using hal::output;
 /** 以编码字段重建命令，禁止读取联合体非活动成员。 */
 uint32_t command(::DeviceObject::IO_Cmd_t cmd) {
     return DEVICE_OBJECT_IOCMD_DEF(cmd.ch.dir, cmd.ch.size, cmd.ch.type, cmd.ch.number);
@@ -93,45 +88,45 @@ int StatusObject::onIoctl(IO_Cmd_t cmd, void* data) {
     }
 }
 /** 按值读取 Power 设备。 */
-PowerReport read_power() { return read_report<PowerReport>("Power"); }
+PowerReport read_power() { return read_report<PowerReport>(hal::names::Power); }
 /** 按值读取 Device 设备。 */
-DeviceReport read_device() { return read_report<DeviceReport>("Device"); }
+DeviceReport read_device() { return read_report<DeviceReport>(hal::names::LegacyDevice); }
 /** 按值读取 Status 设备。 */
-DataProc::StatusSnapshot read_status() { return read_report<DataProc::StatusSnapshot>("Status"); }
+DataProc::StatusSnapshot read_status() { return read_report<DataProc::StatusSnapshot>(hal::names::LegacyStatus); }
 /** 通过 Status 的精确尺寸 ioctl 获取产品能力。 */
 Capabilities capabilities() {
     Capabilities value{};
-    (void)control("Status", kCapabilities, &value, sizeof(value));
+    (void)control(hal::names::LegacyStatus, kCapabilities, &value, sizeof(value));
     return value;
 }
 /** 请求开机，RES_OK 表示平台已即时确认。 */
-bool request_power_on() { return control("Power", kRequestPowerOn, nullptr, 0) == ::DeviceObject::RES_OK; }
+bool request_power_on() { return control(hal::names::Power, kRequestPowerOn, nullptr, 0) == ::DeviceObject::RES_OK; }
 /** 通过 Power 的 write 提交按值动作。 */
 bool execute_power(DataProc::PowerAction action) {
-    auto* dev = devices().getDevice("Power");
+    auto* dev = devices().getDevice(hal::names::Power);
     return dev && dev->write(&action, sizeof(action)) == ::DeviceObject::RES_OK;
 }
 /** 通过 Device 的 ioctl 请求 Wi-Fi 开关。 */
-bool request_wifi(bool on) { return control("Device", kSetWifi, &on, sizeof(on)) == ::DeviceObject::RES_OK; }
+bool request_wifi(bool on) { return control(hal::names::LegacyDevice, kSetWifi, &on, sizeof(on)) == ::DeviceObject::RES_OK; }
 /** 初始设备快照也经过相同设备读接口。 */
 DataProc::DeviceSnapshot initial_device() { return read_device().snapshot; }
 /** 业务命令在同步回调内复制和执行。 */
 bool execute_device(const DataProc::DeviceRequest& request) {
-    auto* dev = devices().getDevice("Device");
+    auto* dev = devices().getDevice(hal::names::LegacyDevice);
     return dev && dev->write(&request, sizeof(request)) == ::DeviceObject::RES_OK;
 }
 /** 元数据查询不推进初始化步骤。 */
 const char* initialization_name(unsigned step) {
     InitializationInfo info;
     info.step = step;
-    (void)control("Status", kInitializationInfo, &info, sizeof(info));
+    (void)control(hal::names::LegacyStatus, kInitializationInfo, &info, sizeof(info));
     return info.name;
 }
 /** 读取步骤标题，不触发硬件探测。 */
 i18n::TextId initialization_title(unsigned step) {
     InitializationInfo info;
     info.step = step;
-    (void)control("Status", kInitializationInfo, &info, sizeof(info));
+    (void)control(hal::names::LegacyStatus, kInitializationInfo, &info, sizeof(info));
     return info.title;
 }
 /** 按值轮询并拷贝到调用方缓冲区，不保留指针。 */
@@ -140,7 +135,7 @@ DataProc::InitializationStatus poll_initialization_step(unsigned step, uint32_t 
     InitializationPoll poll;
     poll.step = step;
     poll.elapsed_ms = elapsed;
-    if (control("Status", kPollInitialization, &poll, sizeof(poll)) != ::DeviceObject::RES_OK)
+    if (control(hal::names::LegacyStatus, kPollInitialization, &poll, sizeof(poll)) != ::DeviceObject::RES_OK)
         return DataProc::InitializationStatus::Failed;
     std::snprintf(detail, size, "%s", poll.detail.data());
     return poll.status;

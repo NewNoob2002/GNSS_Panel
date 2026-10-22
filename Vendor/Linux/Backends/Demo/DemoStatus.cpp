@@ -95,6 +95,11 @@ DemoStatus::status_snapshot() {
     return value;
 }
 
+std::uint64_t
+DemoStatus::uptime_ms() {
+    return sample_time;
+}
+
 /** 保留现有采样入口，状态数据经过 DeviceManager 的 Status read。 */
 page::StatusBarState
 DemoStatus::sample(std::uint64_t elapsed_ms) {

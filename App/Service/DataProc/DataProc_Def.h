@@ -3,6 +3,7 @@
 #include <array>
 #include <cstdint>
 #include "I18n.h"
+#include "HAL/Def/HAL_Power.h"
 
 // Native in-process DataNode payloads, not a wire/flash format. Delivery is application-thread-only.
 namespace DataProc {
@@ -69,9 +70,9 @@ struct DeviceRequest {
 struct DateTime {
     unsigned year = 2026, month = 9, day = 30, hour = 12, minute = 30;
 };
-enum class PowerAction { Off, Reboot };
+using PowerAction = hal::PowerCommand;
 /** Why the system is shutting down. User is the SystemDash flow; the others come from the platform. */
-enum class PowerCause { User, Host, LowBattery, Forced };
+using PowerCause = hal::PowerCause;
 constexpr std::size_t kInitializationStepCount = 5;
 // Pending: the step is still running (only returned by system_backend::poll_initialization_step, never stored).
 enum class InitializationStatus { NotRun, Ok, Failed, Pending };

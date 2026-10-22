@@ -1,8 +1,9 @@
 #include <cstdio>
+#include "DemoStatus.h"
+#include "DomainDevices.h"
+#include "Log.h"
 #include "SystemBackend.h"
 #include "SystemService.h"
-#include "DemoStatus.h"
-#include "Log.h"
 
 // RK3506 host/test-board backend: every operation is simulated; no power, clock or storage syscalls.
 namespace {
@@ -91,14 +92,13 @@ class DemoBusinessDevice : public system_backend::BusinessObject {
 };
 } // namespace
 
-/** 三个静态设备不依赖 LVGL 或实际屏幕即可初始化。 */
+/** 旧设备及领域设备均使用同一组模拟状态。 */
 DeviceManager&
 system_backend::devices() {
     static DemoPowerDevice power;
     static DemoBusinessDevice device;
     static DemoStatus status;
-    static ::DeviceObject* list[] = {&power, &device, &status};
-    static DeviceManager manager(list, 3);
+    auto& manager = demo_domain_devices(power, device, status);
     static const bool initialized = (manager.init(), true);
     (void)initialized;
     return manager;

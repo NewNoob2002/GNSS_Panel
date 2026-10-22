@@ -146,13 +146,14 @@ app_add_core_test(app_core_test)
 # 7. Display app integration tests
 foreach(product X1Pro XBase)
     string(TOLOWER ${product} name)
-    add_executable(${name}_display_app_tests display_app_tests.cpp)
+    add_executable(${name}_display_app_tests display_app_tests.cpp domain_device_checks.cpp)
     target_link_libraries(${name}_display_app_tests PRIVATE
         hc32::${name}_disp_app_platform
         hc32::${name}_disp_lvgl_port
         hc32::${name}_disp_power_policy
         hc32::${name}_disp_state
         app::ui
+        app::hal_test_checks
         test_display_fakes
     )
     target_link_options(${name}_display_app_tests PRIVATE -Wl,--wrap=_ZN3HAL15Power_RequestOnEv)

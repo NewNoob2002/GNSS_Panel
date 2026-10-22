@@ -6,18 +6,19 @@
 #include <cstdlib>
 #include <cstring>
 
+#include <HAL.h>
+#include <delay.h>
+#include <gpio.h>
 #include "App.h"
 #include "AppPlatform.h"
 #include "Charger.h"
-#include "SystemService.h"
-#include <HAL.h>
-#include "UI/Resource/ResourcePool.h"
-#include "SystemState.h"
 #include "I18n.h"
+#include "SystemService.h"
+#include "SystemState.h"
 #include "UI/Common/PageStyle.h"
-#include <delay.h>
-#include <gpio.h>
+#include "UI/Resource/ResourcePool.h"
 #include "mcu_config.h"
+void check_domain_devices();
 
 namespace {
 constexpr int kWidth = 294;
@@ -324,6 +325,7 @@ main() {
     lv_display_set_buffers(display, draw_pixels, NULL, sizeof(draw_pixels), LV_DISPLAY_RENDER_MODE_PARTIAL);
     lv_display_set_flush_cb(display, flush);
 
+    check_domain_devices();
     reset_system_info();
     HAL::Power_Init();
     assert(gpio_read(POWER_CONTROL_PIN) == GPIO_LOW);

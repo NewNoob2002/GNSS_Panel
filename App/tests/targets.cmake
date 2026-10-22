@@ -1,5 +1,10 @@
 include_guard(GLOBAL)
 set(APP_CORE_TEST_DIR "${CMAKE_CURRENT_LIST_DIR}")
+# 领域契约检查由测试模块持有，供 HC32 与 Linux 等价性回归复用。
+add_library(app_hal_test_checks INTERFACE)
+add_library(app::hal_test_checks ALIAS app_hal_test_checks)
+target_include_directories(app_hal_test_checks INTERFACE "${APP_CORE_TEST_DIR}")
+target_link_libraries(app_hal_test_checks INTERFACE app::core)
 #[[Build the shared core regression from its owning module.]]
 function(app_add_core_test name)
     add_executable(${name} ${APP_CORE_TEST_DIR}/core_tests.cpp)

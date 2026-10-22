@@ -4,24 +4,18 @@
 #include "DataProc/DataProc_Def.h"
 #include "DeviceObject.h"
 #include "DeviceManager.h"
+#include "HAL_Def.h"
+#include "Def/HAL_Power.h"
+#include "Def/HAL_Board.h"
 
 /** Platform implementation of system operations; exactly one per build.
  * Called by SystemService on the application thread; must be bounded and must not
  * block on I/O. The platform reports asynchronous results through SystemService (see SystemService.h).
  */
 namespace system_backend {
-struct Capabilities {
-    bool simulated;        // Show DEMO markers; data and power actions are not real.
-    bool reboot_available; // SystemDash offers Reboot.
-    bool wifi_available;   // SystemDash may toggle Wi-Fi.
-    bool star_map;         // StarMap page, reached from the Dialplate satellite icon.
-    bool record_settings;  // RecordConfig type/interval can be changed (otherwise display only).
-};
+using Capabilities = hal::Capabilities;
 /** 电源状态按值读取；异步状态上报仍由平台主循环驱动。 */
-struct PowerReport {
-    bool powered_on = false, shutting_down = false, standby = false;
-    DataProc::PowerCause cause = DataProc::PowerCause::User;
-};
+using PowerReport = hal::PowerState;
 /** 设备业务和 Wi-Fi 使用同一时刻的值快照。 */
 struct DeviceReport {
     DataProc::DeviceSnapshot snapshot;
@@ -41,7 +35,7 @@ struct InitializationPoll {
     std::array<char, 96> detail{};
 };
 // ioctl 的方向、类型、编号和尺寸构成完整命令，必须精确匹配。
-constexpr uint32_t kRequestPowerOn = DEVICE_OBJECT_IOCMD_DEF(::DeviceObject::DIR_NONE, 0, 'P', 1);
+constexpr uint32_t kRequestPowerOn = hal::kRequestPowerOn;
 constexpr uint32_t kSetWifi = DEVICE_OBJECT_IOCMD_DEF(::DeviceObject::DIR_IN, sizeof(bool), 'D', 1);
 constexpr uint32_t kCapabilities = DEVICE_OBJECT_IOCMD_DEF(::DeviceObject::DIR_OUT, sizeof(Capabilities), 'S', 1);
 constexpr uint32_t kInitializationInfo = DEVICE_OBJECT_IOCMD_DEF(::DeviceObject::DIR_IN_OUT, sizeof(InitializationInfo), 'S', 2);
@@ -51,7 +45,7 @@ constexpr uint32_t kPollInitialization = DEVICE_OBJECT_IOCMD_DEF(::DeviceObject:
 class PowerObject : public ::DeviceObject {
 public:
     /** 注册名固定为 Power，不触碰硬件。 */
-    PowerObject() : ::DeviceObject("Power") {}
+    PowerObject() : ::DeviceObject(hal::names::Power) {}
     /** 读取平台电源状态。 */
     virtual PowerReport power_report() = 0;
     /** Startup 完成长按后请求开机；返回即时确认结果。 */
@@ -72,7 +66,7 @@ private:
 class BusinessObject : public ::DeviceObject {
 public:
     /** 注册名固定为 Device。 */
-    BusinessObject() : ::DeviceObject("Device") {}
+    BusinessObject() : ::DeviceObject(hal::names::LegacyDevice) {}
     /** 返回设备快照和 Wi-Fi 状态。 */
     virtual DeviceReport device_report() = 0;
     /** 执行服务已经校验来源及范围的业务请求。 */
@@ -93,7 +87,7 @@ private:
 class StatusObject : public ::DeviceObject {
 public:
     /** 注册名固定为 Status。 */
-    StatusObject() : ::DeviceObject("Status") {}
+    StatusObject() : ::DeviceObject(hal::names::LegacyStatus) {}
     /** 返回当前状态栏值快照。 */
     virtual DataProc::StatusSnapshot status_snapshot() = 0;
     /** 返回产品能力。 */

@@ -24,6 +24,9 @@ class DemoStatus : public system_backend::StatusObject {
      */
     static page::StatusBarState sample(std::uint64_t elapsed_ms);
 
+    /** @brief 当前模拟采样的运行时长（ms），应用线程同步读取，不推进采样。 */
+    static std::uint64_t uptime_ms();
+
     /** Host 随机预览：每 3 秒生成一组状态，相同 seed/时间可复现；由 LVGL 线程发布。 */
     static page::StatusBarState sample_random(std::uint64_t elapsed_ms, std::uint32_t seed);
 };

@@ -3,13 +3,14 @@
 
 #include <cstdio>
 
+#include <HAL.h>
 #include "App.h"
 #include "BusinessDevice.h"
-#include "SystemBackend.h"
-#include <HAL.h>
+#include "DomainDevices.h"
+#include "Log.h"
 #include "PowerDevice.h"
 #include "StatusDevice.h"
-#include "Log.h"
+#include "SystemBackend.h"
 #include "mcu_config.h"
 
 namespace {
@@ -46,11 +47,10 @@ log_sink(AppLogLevel level, const char* module, const char* message, void*) {
 
 } // namespace
 
-/** 固件和 Board 模拟器共用三个设备对象，初始化不访问硬件。 */
+/** 固件和 Board 模拟器共用旧设备及领域设备，初始化不访问硬件。 */
 DeviceManager&
 system_backend::devices() {
-    static ::DeviceObject* list[] = {&objects.power, &objects.device, &objects.status};
-    static DeviceManager manager(list, 3);
+    auto& manager = domain_devices(objects.power, objects.device, objects.status);
     // App_Init 可重建对象，因此重新标记设备可用；onInit 无硬件副作用。
     manager.init();
     return manager;
