@@ -1,5 +1,5 @@
 #pragma once
-#include "Utils/I18n/I18n.h"
+#include "I18n.h"
 #include "lvgl.h"
 
 namespace page {

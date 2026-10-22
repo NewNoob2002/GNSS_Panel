@@ -1,6 +1,6 @@
 #include "RecordConfig.h"
-#include "Utils/Log/Log.h"
-#include "PageManager/PageManager.h"
+#include "Log.h"
+#include "PageManager.h"
 #include "Utils/PageUtils.h"
 #include "Utils/PageStyle.h"
 using namespace page;

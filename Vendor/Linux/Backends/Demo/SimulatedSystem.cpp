@@ -1,8 +1,8 @@
 #include <cstdio>
-#include "Common/SystemBackend.h"
-#include "Common/SystemService.h"
+#include "SystemBackend.h"
+#include "SystemService.h"
 #include "DemoStatus.h"
-#include "Utils/Log/Log.h"
+#include "Log.h"
 
 // RK3506 host/test-board backend: every operation is simulated; no power, clock or storage syscalls.
 namespace {

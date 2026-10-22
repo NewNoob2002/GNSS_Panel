@@ -40,7 +40,7 @@ static pthread_mutex_t output_lock = PTHREAD_MUTEX_INITIALIZER;
 #else
 #include <inttypes.h>
 #include <stdio.h>
-#include "delay.h"
+#include <delay.h>
 #if defined(__CORE_DEBUG)
 #include "SEGGER_RTT.h"
 #endif

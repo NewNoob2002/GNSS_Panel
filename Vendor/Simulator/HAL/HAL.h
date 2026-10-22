@@ -4,7 +4,7 @@
 #define __HAL_H // 固件 HAL.h 的包含保护：在模拟器中不展开
 
 #include <cstdio>
-#include "../../HC32/Platform/Config/mcu_config.h"
+#include "mcu_config.h"
 
 #define CORE_DEBUG_PRINTF(fmt, ...) std::printf("[HAL] " fmt "\n", ##__VA_ARGS__)
 
@@ -27,4 +27,10 @@ bool I2C_ProbeDevice(uint8_t address);
 
 /* 模拟器输入：Power 键电平（Enter / 鼠标中键按住） */
 void Sim_SetPowerKey(bool pressed);
+
+/* 按键电平查询（供 AppPlatform 的 App_Update 使用） */
+bool Key_PowerPressed();
+bool Key_FunctionPressed();
 } // namespace HAL
+
+extern "C" void HAL_NVIC_SystemReset();

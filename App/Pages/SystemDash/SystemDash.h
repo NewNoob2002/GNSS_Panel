@@ -1,7 +1,7 @@
 #pragma once
 #include "SystemDashModel.h"
 #include "SystemDashView.h"
-#include "PageManager/PageBase.h"
+#include "PageBase.h"
 namespace page {
 class SystemDash final : public PageBase {
   public:

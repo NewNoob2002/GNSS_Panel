@@ -1,6 +1,6 @@
 #pragma once
 #include "GpioPin.h"
-#include "delay.h"
+#include <delay.h>
 
 /** 按固定周期翻转的指示灯；周期为 0 时不翻转，引脚电平由 write() 决定。 */
 class BlinkLed {

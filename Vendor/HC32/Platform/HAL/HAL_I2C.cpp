@@ -1,6 +1,6 @@
 #include <string.h>
 #include "Charger.h"
-#include "HAL.h"
+#include <HAL.h>
 #include "SystemState.h"
 #include "board_peripherals.h"
 #include "bq40z50.h"

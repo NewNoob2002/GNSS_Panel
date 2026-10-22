@@ -1,0 +1,5 @@
+add_library(demo_backend OBJECT DemoStatus.cpp SimulatedSystem.cpp)
+add_library(linux::demo_backend ALIAS demo_backend)
+target_include_directories(demo_backend PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(demo_backend PUBLIC app::ui)
+target_compile_options(demo_backend PRIVATE -Wall -Wextra -Werror)

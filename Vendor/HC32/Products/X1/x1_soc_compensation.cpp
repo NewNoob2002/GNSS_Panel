@@ -1,6 +1,6 @@
 // X1 电量补偿（源自 X1_Panel_dev）：部分电池充满时电量计停在 9x%，
 // 充电中读数持续 STABLE_TIME_MS 不变即认为已满，记录与 100% 的差值并叠加到显示/上报电量。
-#include "HAL.h"
+#include <HAL.h>
 #include "flash.h"
 
 static uint8_t comp_offset;

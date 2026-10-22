@@ -143,7 +143,7 @@ MillisTaskManager::Task_t* MillisTaskManager::Find(const TaskFunction_t func) co
 }
 
 #if (MTM_USE_CPU_USAGE == 1)
-#include "delay.h"                  // 需要使用 micros()
+#include <delay.h>                  // 需要使用 micros()
 static uint32_t UserFuncLoopUs = 0; //累计时间
 /**
   * @brief  获取CPU占用率

@@ -1,9 +1,9 @@
 #include "Charger.h"
 #include "GpioPin.h"
-#include "HAL.h"
+#include <HAL.h>
 #include "PowerPolicy.h"
 #include "SystemState.h"
-#include "delay.h"
+#include <delay.h>
 #include "product_config.h"
 
 // 电源时序：开机判定、关机流程、关机驻留与原地开机、低电量关机。只依赖 GPIO、时基与充电控制的

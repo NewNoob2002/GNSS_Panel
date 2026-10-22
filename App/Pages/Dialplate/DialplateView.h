@@ -1,7 +1,7 @@
 #ifndef DIALPLATE_VIEW_H
 #define DIALPLATE_VIEW_H
 
-#include "Common/DataProc/DataProc_Def.h"
+#include "DataProc/DataProc_Def.h"
 #include "Utils/lv_anim_label/numberFlow.h"
 #include "lvgl.h"
 

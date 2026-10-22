@@ -3,7 +3,7 @@
 #include "SystemLoadingModel.h"
 
 #include "SystemLoadingView.h"
-#include "PageManager/PageBase.h"
+#include "PageBase.h"
 
 namespace page {
 /** Loading animation and preview transition, not a hardware-check model. */

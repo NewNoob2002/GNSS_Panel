@@ -1,10 +1,10 @@
 #include "SystemLoadingModel.h"
 #include <algorithm>
 #include <cstdio>
-#include "Common/ModelUtils.h"
-#include "Common/SystemBackend.h"
-#include "Common/SystemService.h"
-#include "Utils/Log/Log.h"
+#include "ModelUtils.h"
+#include "SystemBackend.h"
+#include "SystemService.h"
+#include "Log.h"
 
 using namespace page;
 

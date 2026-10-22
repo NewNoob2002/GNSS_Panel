@@ -1,4 +1,4 @@
-#include "ots.h"
+#include <ots.h>
 
 /**
  * Specifies a clock source for OTS in this example.

@@ -2,7 +2,7 @@
 #define LVGL_SYSTEM_LOADING_VIEW_H
 
 #include "Resource/ResourcePool.h"
-#include "Utils/I18n/I18n.h"
+#include "I18n.h"
 #include "lvgl.h"
 
 namespace page {

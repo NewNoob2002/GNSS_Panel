@@ -1,7 +1,7 @@
 #include "BlinkLed.h"
-#include "HAL.h"
+#include <HAL.h>
 #include "SystemState.h"
-#include "delay.h"
+#include <delay.h>
 
 static BlinkLed powerLed(POWER_LED_PIN);
 static BlinkLed chargerLed(CHARGE_LED_PIN);

@@ -3,7 +3,7 @@
 #include "SystemInfosModel.h"
 
 #include "SystemInfosView.h"
-#include "PageManager/PageBase.h"
+#include "PageBase.h"
 
 namespace page {
 class SystemInfos final : public PageBase {

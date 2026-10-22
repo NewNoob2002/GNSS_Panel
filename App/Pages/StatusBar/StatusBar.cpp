@@ -3,7 +3,7 @@
 
 #include "Resource/ResourcePool.h"
 #include "Utils/BatteryStyle.h"
-#include "Utils/Log/Log.h"
+#include "Log.h"
 #include "Utils/SettingsStyle.h"
 
 namespace page {

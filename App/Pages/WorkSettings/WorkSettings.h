@@ -1,6 +1,6 @@
 #pragma once
-#include "Common/RequestFeedback.h"
-#include "PageManager/PageBase.h"
+#include "RequestFeedback.h"
+#include "PageBase.h"
 #include "WorkSettingsModel.h"
 #include "WorkSettingsView.h"
 namespace page {

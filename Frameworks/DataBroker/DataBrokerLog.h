@@ -22,7 +22,7 @@
  */
 #pragma once
 // 与现有应用日志共用级别、sink 和有界格式化，禁止直接 printf。
-#include "App/Utils/Log/Log.h"
+#include "Log.h"
 #define DN_LOG_INFO(...)  APP_LOG_D("DataBroker", __VA_ARGS__)
 #define DN_LOG_WARN(...)  APP_LOG_W("DataBroker", __VA_ARGS__)
 #define DN_LOG_ERROR(...) APP_LOG_E("DataBroker", __VA_ARGS__)

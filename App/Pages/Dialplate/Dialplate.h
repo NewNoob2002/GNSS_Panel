@@ -4,7 +4,7 @@
 
 #include <array>
 #include "DialplateView.h"
-#include "PageManager/PageBase.h"
+#include "PageBase.h"
 
 namespace page {
 /** Dashboard navigation and focus lifecycle; View owns visual widgets only. */

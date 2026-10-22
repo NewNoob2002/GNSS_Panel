@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 #include "board_display.h"
-#include "delay.h"
+#include <delay.h>
 #include "lv_port.h"
 #include "mcu_config.h"
 

@@ -1,5 +1,5 @@
 #pragma once
-#include "hc32_ll.h"
+#include <hc32_ll.h>
 
 #ifdef __cplusplus
 extern "C"

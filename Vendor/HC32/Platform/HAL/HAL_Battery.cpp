@@ -1,9 +1,9 @@
 #include "Charger.h"
 #include "GpioPin.h"
-#include "HAL.h"
+#include <HAL.h>
 #include "SystemState.h"
-#include "delay.h"
-#include "ots.h"
+#include <delay.h>
+#include <ots.h>
 
 static constexpr GpioPin powerLed(POWER_LED_PIN);
 static constexpr GpioPin chargerControl(CHARGER_CTRL_PIN);

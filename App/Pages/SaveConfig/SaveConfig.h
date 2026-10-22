@@ -3,7 +3,7 @@
 #include "SaveConfigModel.h"
 
 #include "SaveConfigView.h"
-#include "PageManager/PageBase.h"
+#include "PageBase.h"
 
 namespace page {
 /** Power-off progress. A user action is committed when the progress ends (cancellable before); a platform

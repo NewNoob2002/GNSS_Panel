@@ -5,7 +5,7 @@
 #include "SystemState.h"
 #include "mcu_define.h"
 #include "panel_protocol.h"
-#include "platform_debug.h"
+#include <platform_debug.h>
 #include "product_config.h"
 
 #define NM_PANNEL_INFO_ID  0x01

@@ -1,7 +1,7 @@
 #include "PowerDevice.h"
 
-#include "Common/SystemService.h"
-#include "HAL.h"
+#include "SystemService.h"
+#include <HAL.h>
 #include "mcu_config.h"
 
 namespace {

@@ -3,7 +3,7 @@
 #include "StartupModel.h"
 
 #include "StartupView.h"
-#include "PageManager/PageBase.h"
+#include "PageBase.h"
 
 namespace page {
 /** Startup hold: shows progress and requests power-on; the platform decides and App navigates. */

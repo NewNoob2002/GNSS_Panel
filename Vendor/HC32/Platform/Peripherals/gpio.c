@@ -1,4 +1,4 @@
-#include "gpio.h"
+#include <gpio.h>
 
 // 配置语义迁自原 Arduino 兼容核心的 wiring_digital.cpp（pinMode/digitalWrite 等）；GPIO_Init 将电平与方向一起写入 PCR。
 void

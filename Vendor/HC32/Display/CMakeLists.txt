@@ -1,0 +1,17 @@
+add_library(hc32_${HC32_PREFIX}display_protocol OBJECT display_protocol.cpp)
+add_library(hc32::${HC32_PREFIX}display_protocol ALIAS hc32_${HC32_PREFIX}display_protocol)
+target_include_directories(hc32_${HC32_PREFIX}display_protocol PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(hc32_${HC32_PREFIX}display_protocol PUBLIC hc32::${HC32_PREFIX}comm)
+if(PRODUCT_HAS_DISPLAY OR PORTABLE_SPI)
+    add_library(hc32_${HC32_PREFIX}display_port INTERFACE)
+    add_library(hc32::${HC32_PREFIX}display_port ALIAS hc32_${HC32_PREFIX}display_port)
+    target_link_libraries(hc32_${HC32_PREFIX}display_port INTERFACE
+        hc32::${HC32_PREFIX}lvgl_port hc32::${HC32_PREFIX}panel)
+endif()
+if(NOT HC32_PORTABLE AND PRODUCT_HAS_DISPLAY)
+    add_library(hc32_display OBJECT display_main.cpp HAL_Display.cpp)
+    add_library(hc32::display ALIAS hc32_display)
+    target_include_directories(hc32_display PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(hc32_display PUBLIC hc32::display_protocol hc32::display_port
+        hc32::app_platform hc32::hal)
+endif()

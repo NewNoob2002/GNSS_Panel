@@ -3,7 +3,7 @@
 #include "StarMapModel.h"
 
 #include "StarMapView.h"
-#include "PageManager/PageBase.h"
+#include "PageBase.h"
 
 namespace page {
 class StarMap final : public PageBase {

@@ -15,16 +15,17 @@ App/                      共享应用：独立事件框架接入、无 LVGL 的
 Frameworks/               跨平台框架：DataBroker、DeviceManager、PageManager、ResourceManager
 External/lvgl/            上游 LVGL 9.6.0 源码与原样构建文件（CMakeLists.txt、env_support/cmake/、Kconfig；不含平台 lv_conf.h 与 porting/）
 Vendor/HC32/
-  Platform/               CMSIS 启动、DDL/ 小华 LL 库、Peripherals/ 原生外设驱动（GpioPin、I2cMaster、SpiMaster、GPIO、UART、Flash、DWT、OTS）、System/ 系统与运行时胶水（中断、Syscalls、new、delay、调试宏）、Config/（board_pins.h 主板引脚、board_peripherals 板级外设实例）、共用 HAL/（电源策略、充电/电量计、按键、LED、时基）与 State/
-  Libraries/              器件与第三方库（Bq40z50、Mp2762a、MillisTaskManager、Parser、SEGGER_RTT、easylogger、MultiButton），各组件自行定义 CMake 目标；父目录仅添加子目录与汇总
-  Comm/                   I2C 从机传输 + 面板帧协议核心（全部产品）
-  Display/                带屏产品入口、显示协议表、显示 HAL，以及 AppPlatform/（共享应用的 HC32 平台层：入口 + DeviceManager 的 Power/Device/Status 三个设备对象 + 初始化步骤）、Panel/（面板驱动 PanelRm690a0 与板级显示实例 board_display）、Lvgl/（固件 lv_conf.h、lv_port*、LVGL 内存池 operator new）（X1Pro、XBase）
+  Platform/               CMSIS 启动（hc32::cmsis）、DDL/ 小华 LL 库（hc32::ddl）、Peripherals/ 原生外设驱动（hc32::peripherals）、Devices/ 板级器件驱动（hc32::devices：Bq40z50、Mp2762a）、System/ 系统与运行时胶水（hc32::system）、Config/（hc32::board：board_pins.h 主板引脚、board_peripherals 板级外设实例）、共用 HAL/（hc32::hal、hc32::power_policy）与 State/（hc32::state）
+  Libraries/              第三方库（MillisTaskManager、Parser、SEGGER_RTT、easylogger、MultiButton），各组件自行定义 CMake 目标
+  Comm/                   I2C 从机传输 + 面板帧协议核心（hc32::comm、hc32::protocol）
+  Display/                带屏产品入口（hc32::display）、显示协议表（hc32::display_protocol）、显示 HAL，以及 AppPlatform/（hc32::app_platform：DeviceManager 设备对象 + 初始化步骤）、Panel/（hc32::panel）、Lvgl/（hc32::lvgl_port）
   Products/<产品>/        product.cmake、product_config.h、产品专属源码
-Vendor/Simulator/         唯一 PC SDL 模拟器：SIM_BACKEND=Board（默认，共享应用 + AppPlatform + 固件 HAL_Power.cpp）或 Demo（Linux 演示后端）；配置用自身 lv_conf.h
+  cmake/portable.cmake    跨平台便携目标定义，供固件、模拟器与主机测试共享
+Vendor/Simulator/         唯一 PC SDL 模拟器：SIM_BACKEND=Board（默认，共享应用 + AppPlatform + 固件 HAL_Power.cpp）或 Demo（Linux 演示后端）；配置用自身 lv_conf.h，使用 portable.cmake 链接便携目标
 Vendor/Linux/             RK3506 Linux 端口、Backends/Demo 演示后端与主机测试；配置用 config/lv_conf.h
 ```
 
-构建组织遵循 [CMake 分层构建架构](build_architecture.md)。当前完成组件自管理：`Frameworks/{DataBroker,DeviceManager,PageManager,ResourceManager}/CMakeLists.txt` 分别提供 `fw::databroker`、`fw::devicemanager`、`fw::pagemanager`、`fw::resourcemanager`；前两者通过 OBJECT 目标汇入原 `app_framework` 静态归档，ResourceManager 为 INTERFACE，页面管理保留 `app_page_manager` 静态目标。HC32 `Libraries` 各组件提供 `hc32::` 别名，保持原 OBJECT 类型和依赖。完整分层、端口注入和包含路径收紧在 3.3c 实施。
+构建组织遵循 [CMake 分层构建架构](build_architecture.md)。按阶段 3.3c 实施完整分层与解耦：`Frameworks/{DataBroker,DeviceManager,PageManager,ResourceManager}/CMakeLists.txt` 分别提供 `fw::databroker`、`fw::devicemanager`、`fw::pagemanager`、`fw::resourcemanager`；App 提供 `app::core`、`app::i18n`、`app::log`、`app::dialplate`、`app::ui`；编译选项统一通过 `proj::options` 提供；HC32 平台按 4.1–4.10 子层拆分并提供 `hc32::*` 别名。主机测试与模拟器通过 `Vendor/HC32/cmake/portable.cmake` 链接便携目标与替身接口，完全消除跨模块按路径编译源文件与全局包含路径。`tests/check_layers.py` 负责自动化分层架构校验。
 
 HC32、Simulator、Linux 与 `tests/` 共用 `cmake/lvgl.cmake` 的 `project_add_lvgl(<lv_conf.h 绝对路径> [DEMOS])`，通过 `LV_BUILD_CONF_PATH` 选择平台配置并原样添加上游目录。平台只链接 `lvgl::lvgl`，Linux benchmark 额外链接 `lvgl::demos`；不再手工收集 LVGL 或 demos 源文件。示例、ThorVG、安装、测试与依赖发现/下载开关统一关闭，`DEMOS` 仅由 `RK3506_LVGL_DEMO=ON` 启用。应用和平台继续使用 `LV_DISABLE_API_MAPPING`，HC32 debug 的 LVGL 继续使用 `-Os`。
 

@@ -1,4 +1,4 @@
-#include "HAL.h"
+#include <HAL.h>
 #include "lv_port.h"
 
 #ifdef __CORE_DEBUG

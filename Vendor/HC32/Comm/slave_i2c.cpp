@@ -3,11 +3,11 @@
 #include <stdio.h>
 #include <string.h>
 #include "SystemState.h"
-#include "delay.h"
-#include "hc32_ll.h" // IWYU pragma: keep
+#include <delay.h>
+#include <hc32_ll.h> // IWYU pragma: keep
 #include "mcu_define.h"
 #include "panel_protocol.h"
-#include "platform_debug.h"
+#include <platform_debug.h>
 
 volatile SLAVE_I2C_STATE slave_state = SLAVE_RX;
 static volatile uint16_t tx_head;

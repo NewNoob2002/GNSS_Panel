@@ -1,7 +1,7 @@
 #pragma once
 #include <cstdint>
 #include <memory>
-#include "Common/DataProc/DataProc.h"
+#include "DataProc/DataProc.h"
 
 namespace page {
 /** Page-owned DataNode and received data. Init on view load, Deinit on unload, LVGL thread only. */

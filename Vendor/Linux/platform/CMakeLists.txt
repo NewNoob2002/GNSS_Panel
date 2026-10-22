@@ -1,0 +1,8 @@
+add_library(linux_display_io STATIC linux_display.c)
+add_library(linux::display_io ALIAS linux_display_io)
+target_include_directories(linux_display_io PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(linux_display_io PUBLIC linux::rm690a0 proj::options)
+add_library(linux_button STATIC linux_button.c)
+add_library(linux::button ALIAS linux_button)
+target_include_directories(linux_button PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(linux_button PUBLIC proj::options)

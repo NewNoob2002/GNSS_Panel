@@ -5,11 +5,11 @@
 
 #include "App.h"
 #include "BusinessDevice.h"
-#include "Common/SystemBackend.h"
-#include "HAL.h"
+#include "SystemBackend.h"
+#include <HAL.h>
 #include "PowerDevice.h"
 #include "StatusDevice.h"
-#include "Utils/Log/Log.h"
+#include "Log.h"
 #include "mcu_config.h"
 
 namespace {

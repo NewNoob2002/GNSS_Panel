@@ -3,7 +3,7 @@
 #include <cstring>
 #include "SystemState.h"
 #include "mcu_define.h"
-#include "platform_debug.h"
+#include <platform_debug.h>
 #include "product_config.h"
 
 // 写入范围：主控上报只写 State::Host()；面板请求经 State::Confirm_*() 确认；

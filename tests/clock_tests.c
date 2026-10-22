@@ -1,6 +1,6 @@
 #include <assert.h>
 #include <stdio.h>
-#include "time_fakes/delay.h"
+#include <delay.h>
 #include "time_fakes/dwt.h"
 #include "time_fakes/yield.h"
 uint32_t SystemCoreClock = 200000000U;
@@ -19,7 +19,10 @@ HAL_GetTickFreq(void) {
     return frequency;
 }
 
-#include "../Vendor/HC32/Platform/System/delay.c"
+void
+yield(void) {}
+
+
 
 int
 main(void) {

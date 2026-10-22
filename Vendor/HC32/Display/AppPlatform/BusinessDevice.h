@@ -1,8 +1,8 @@
 #pragma once
 #include <cstdint>
-#include "Common/SystemBackend.h"
+#include "SystemBackend.h"
 
-#include "Common/DataProc/DataProc_Def.h"
+#include "DataProc/DataProc_Def.h"
 
 /**
  * systemInfo（主控上报与面板请求）<-> 共享应用的 Device DataNode 与业务命令。

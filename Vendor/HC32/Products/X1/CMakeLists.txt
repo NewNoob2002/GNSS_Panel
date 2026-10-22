@@ -1,19 +1,14 @@
-# X1 无屏产品：自有入口、按键、电量补偿与协议表；不链接任何显示库。
-add_library(hc32_product_x1 OBJECT
-    main.cpp
-    x1_keys.cpp
-    x1_protocol.cpp
-    x1_soc_compensation.cpp
-)
-target_link_libraries(hc32_product_x1 PUBLIC
-    hc32_shared_comm
-    hc32::multibutton
-    hc32_platform_headers
-    hc32_libraries_headers
-)
-
-add_library(hc32_product INTERFACE)
-target_sources(hc32_product INTERFACE
-    $<TARGET_OBJECTS:hc32_product_x1>
-    $<TARGET_OBJECTS:hc32::multibutton>
-)
+if(HC32_CONFIG_ONLY)
+    include(${CMAKE_CURRENT_LIST_DIR}/../config.cmake)
+    return()
+endif()
+if(HC32_PROTOCOL_ONLY)
+    add_library(hc32_${HC32_PREFIX}product_x1 OBJECT x1_protocol.cpp)
+    add_library(hc32::${HC32_PREFIX}product_x1 ALIAS hc32_${HC32_PREFIX}product_x1)
+    target_link_libraries(hc32_${HC32_PREFIX}product_x1 PUBLIC hc32::${HC32_PREFIX}comm)
+    return()
+endif()
+# X1 入口与扩展点只在产品层组合。
+add_library(hc32_product_x1 OBJECT main.cpp x1_keys.cpp x1_protocol.cpp x1_soc_compensation.cpp)
+add_library(hc32::product_x1 ALIAS hc32_product_x1)
+target_link_libraries(hc32_product_x1 PUBLIC hc32::comm hc32::multibutton hc32::hal)

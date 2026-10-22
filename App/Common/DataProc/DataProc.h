@@ -3,7 +3,7 @@
 #include <cstring>
 #include <type_traits>
 #include "DataProc_Def.h"
-#include "Frameworks/DataBroker/DataBroker.h"
+#include "DataBroker.h"
 
 #define DATA_PROC_INIT_DEF(name) bool _DP_##name##_Init(DataNode* account)
 

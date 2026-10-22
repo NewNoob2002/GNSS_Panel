@@ -1,7 +1,6 @@
 #ifndef DELAY_h
 #define DELAY_h
 #include <stdint.h>
-#include "hc32_ll.h"
 #ifdef __cplusplus
 extern "C" {
 #endif

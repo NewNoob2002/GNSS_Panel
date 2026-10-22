@@ -3,13 +3,13 @@
 #include <cstdio>
 #include <cstring>
 #include <vector>
-#include "Common/DataProc/DataProc.h"
-#include "Common/SystemBackend.h"
-#include "Common/SystemService.h"
+#include "DataProc/DataProc.h"
+#include "SystemBackend.h"
+#include "SystemService.h"
 #include "App.h"
 #include "Pages/SystemLoading/SystemLoadingModel.h"
 #include "Resource/ResourcePool.h"
-#include "Utils/I18n/I18n.h"
+#include "I18n.h"
 #include "Utils/SettingsStyle.h"
 
 namespace {

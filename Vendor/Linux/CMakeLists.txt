@@ -11,6 +11,7 @@ option(RK3506_LVGL_DEMO "Build standalone LVGL benchmark with on-screen FPS/CPU 
 
 # Locate repository root and shared components
 get_filename_component(REPO_ROOT "${CMAKE_CURRENT_LIST_DIR}/../.." REALPATH)
+include(${REPO_ROOT}/cmake/options.cmake)
 set(SHARED_APP_DIR "${REPO_ROOT}/App")
 
 # Modular sub-components
@@ -33,22 +34,15 @@ if(RK3506_LVGL_DEMO)
     target_compile_options(lvgl_demos PRIVATE -Wall -Wextra -Werror)
 endif()
 add_subdirectory(display)
+add_subdirectory(platform)
 
 enable_testing()
 
 if(RK3506_LVGL_DEMO)
     add_subdirectory(demo)
 else()
-    # The shared module consumes this display contract; core/framework targets never link it.
-    add_library(app_lvgl INTERFACE)
-    target_link_libraries(app_lvgl INTERFACE lvgl::lvgl)
     add_subdirectory("${SHARED_APP_DIR}" shared_app)
-
-    add_library(demo_backend OBJECT
-        Backends/Demo/DemoStatus.cpp Backends/Demo/SimulatedSystem.cpp)
-    target_include_directories(demo_backend PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/Backends/Demo")
-    target_link_libraries(demo_backend PUBLIC app_ui)
-    target_compile_options(demo_backend PRIVATE -Wall -Wextra -Werror)
+    add_subdirectory(Backends/Demo)
 
     # Standalone utilities and application entrypoints
     add_executable(lvgl_baseline baseline.c)
@@ -56,17 +50,14 @@ else()
     add_test(NAME lvgl_baseline COMMAND lvgl_baseline)
 
     add_executable(display_test display_test.c)
-    target_link_libraries(display_test PRIVATE lv_display)
+    target_link_libraries(display_test PRIVATE linux::display linux::display_io)
     target_compile_options(display_test PRIVATE -Wall -Wextra -Werror)
 
     if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-        add_executable(rk3506_app platform/linux/main.cpp platform/linux_button.c)
-        target_include_directories(rk3506_app PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}" "${REPO_ROOT}")
-        target_link_libraries(rk3506_app PRIVATE demo_backend lv_display)
-        target_compile_options(rk3506_app PRIVATE -Wall -Wextra -Werror)
+        add_subdirectory(platform/linux)
 
-        add_executable(button_probe button_probe.c platform/linux_button.c)
-        target_include_directories(button_probe PRIVATE platform)
+        add_executable(button_probe button_probe.c)
+        target_link_libraries(button_probe PRIVATE linux::button)
         target_compile_definitions(button_probe PRIVATE _POSIX_C_SOURCE=200809L)
         target_compile_options(button_probe PRIVATE -Wall -Wextra -Werror)
     endif()

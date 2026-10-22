@@ -17,7 +17,7 @@
   ******************************************************************************
   */
 
-#include "dwt.h"
+#include <dwt.h>
 
 #ifdef DWT_BASE
 #ifdef __cplusplus

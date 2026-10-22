@@ -2,8 +2,8 @@
 #include <cstddef>
 #include <cstdint>
 #include "DataProc/DataProc_Def.h"
-#include "Frameworks/DeviceManager/DeviceObject.h"
-#include "Frameworks/DeviceManager/DeviceManager.h"
+#include "DeviceObject.h"
+#include "DeviceManager.h"
 
 /** Platform implementation of system operations; exactly one per build.
  * Called by SystemService on the application thread; must be bounded and must not

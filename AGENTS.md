@@ -10,14 +10,15 @@ This repository follows the X-TRACK workspace layout (`App/`, `Frameworks/`, `Ex
 - `External/lvgl/` contains unmodified upstream LVGL v9.6.0 sources (public headers in `include/`, plus `src/`, `lvgl.h`, `lvgl_private.h`, `lv_version.h`, and the demos used by the Linux port) without any platform-specific `lv_conf.h` or porting layer. App and platform targets compile with `LV_DISABLE_API_MAPPING`, so only v9 native API names are allowed.
 - `Vendor/HC32/` contains the HC32F460xE MCU firmware:
   - `CMakeLists.txt` orchestrates the HC32 firmware build (`PRODUCT=X1|X1Pro|XBase`) and links `<prefix>_<version>.elf`.
-  - `Platform/` contains CMSIS, startup, `DDL/` (XHSC LL drivers), `Peripherals/` native peripherals (`GpioPin`, `I2cMaster`, `SpiMaster`, GPIO, UART, Flash, DWT, OTS), `System/` runtime and system glue (interrupts, syscalls, `new`, `delay`, debug macros), board configuration and instances (`Config/board_pins.h`, `Config/board_peripherals`), the shared `HAL/` (power policy, charger/gauge, LEDs, tick), and `State/`. It is shared by all HC32 products and must not depend on LVGL or `App/`.
-  - `Libraries/` 包含 HC32 器件与第三方组件（`Bq40z50`、`Mp2762a`、`MillisTaskManager`、`Parser`、`SEGGER_RTT`、`easylogger`、X1 使用的 `MultiButton`），各组件维护自己的 `CMakeLists.txt` 与 `hc32::` 别名。LVGL 由 `cmake/lvgl.cmake` 导入上游构建，平台链接 `lvgl::lvgl`。
-  - `Comm/` is the I2C slave transport and panel frame-protocol core used by every HC32 product.
-  - `Display/` is shared by X1Pro and XBase: display entry point, display protocol table, display/key HAL, `AppPlatform/` (HC32 platform layer of the shared LVGL app: entry header, status snapshot, two-key input, `Power`/`Device`/`Status` device objects registered with DeviceManager), `Panel/` (RM690A0 panel driver `PanelRm690a0` and display board instances `board_display`), and `Lvgl/` (LVGL `lv_conf.h`, `lv_port*`, and the LVGL-backed `operator new`).
+  - `Platform/` contains CMSIS, startup, `DDL/` (XHSC LL drivers), `Peripherals/` native peripherals (`GpioPin`, `I2cMaster`, `SpiMaster`, GPIO, UART, Flash, DWT, OTS), `Devices/` on-board chip drivers (`Bq40z50`, `Mp2762a` moved from Libraries), `System/` runtime and system glue (interrupts, syscalls, `new`, `delay`, debug macros), board configuration and instances (`Config/board_pins.h`, `Config/board_peripherals`), the shared `HAL/` (power policy, charger/gauge, LEDs, tick), and `State/`. It is shared by all HC32 products and must not depend on LVGL or `App/`.
+  - `Libraries/` 包含第三方组件（`MillisTaskManager`、`Parser`、`SEGGER_RTT`、`easylogger`、X1 使用的 `MultiButton`），各组件维护自己的 `CMakeLists.txt` 与 `hc32::` 别名。LVGL 由 `cmake/lvgl.cmake` 导入上游构建，平台链接 `lvgl::lvgl`。
+  - `Comm/` is the I2C slave transport and panel frame-protocol core (`hc32::comm`, `hc32::protocol`) used by every HC32 product.
+  - `Display/` is shared by X1Pro and XBase: display entry point (`hc32::display`), display protocol table (`hc32::display_protocol`), display/key HAL, `AppPlatform/` (`hc32::app_platform`: HC32 platform layer of the shared LVGL app: entry header, status snapshot, two-key input, `Power`/`Device`/`Status` device objects registered with DeviceManager), `Panel/` (RM690A0 panel driver `PanelRm690a0` and display board instances `board_display`), and `Lvgl/` (LVGL `lv_conf.h`, `lv_port*` as `hc32::lvgl_port`, and the LVGL-backed `operator new`).
+  - `cmake/portable.cmake` defines portable host-compilable targets (`hc32::state`, `hc32::power_policy`, `hc32::app_platform`, etc.) reused by firmware, Simulator, and tests without cross-module source inclusion.
   - `Products/<Product>/` holds `product.cmake` (version, image prefix, display flag), `product_config.h` (feature switches included through `mcu_config.h`) and product-only sources (X1: entry point, keys, SOC compensation, protocol table).
 - `Vendor/Simulator/` is the unified PC SDL2 simulator (`SIM_BACKEND=Board|Demo`, defaulting to `Board` with `SIM_PRODUCT=X1Pro|XBase`), using `Vendor/Simulator/lv_conf.h`.
 - `Vendor/Linux/` is the RK3506 Linux display port, demo backend (`Backends/Demo`) and Linux host test suite, using `Vendor/Linux/config/lv_conf.h`.
-- `tests/` contains the HC32 host regression tests (protocol, transport, power, per-product tables, display app integration, state ownership).
+- `tests/` contains the HC32 host regression tests (protocol, transport, power, per-product tables, display app integration, state ownership, and layer decoupling check via `check_layers.py`).
 
 Runtime state on HC32 lives in `systemInfo`, which is `const` everywhere; each domain has one writer (board: HAL I2C scan, power: HAL power policy, host: panel protocol, request: `State::Request_*()`, diag: comm layer). Write through the `State::` entry points in `Vendor/HC32/Platform/State/SystemState.h` and keep `tests/check_state_ownership.py` in sync (see `docs/product_structure.md`).
 
@@ -48,6 +49,7 @@ Host regression tests live in `tests/` (sanitizers enabled) and `App/tests/`. Tr
 - `cmake --build --preset x1-debug`, `x1pro-debug`, `xbase-debug` (and the matching `-release` presets)
 - `ctest --test-dir build/host-tests --output-on-failure`
 - `ctest --test-dir build/app-core-tests --output-on-failure`
+- `python3 tests/check_layers.py .` (after configuring the build directories it inspects; see `docs/build_architecture.md`)
 
 Changes in `Vendor/HC32/Platform/`, `Vendor/HC32/Comm/` or `Vendor/HC32/Libraries/` affect all three HC32 products and must be built for all of them. Changes in `App/` or `Frameworks/` should also be validated with the simulator and `linux-host` tests.
 

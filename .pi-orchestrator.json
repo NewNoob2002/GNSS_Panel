@@ -180,6 +180,11 @@
       "--test-dir",
       "build/linux-host",
       "--output-on-failure"
+    ],
+    [
+      "python3",
+      "tests/check_layers.py",
+      "."
     ]
   ],
   "role_titles": {

@@ -5,9 +5,9 @@
 #include <array>
 #include <new>
 #include <cstdio>
-#include "Common/SystemBackend.h"
-#include "Common/SystemService.h"
-#include "Frameworks/DataBroker/DataTimer.h"
+#include "SystemBackend.h"
+#include "SystemService.h"
+#include "DataTimer.h"
 
 namespace {
 uint32_t tick = 0;

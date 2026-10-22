@@ -1,9 +1,9 @@
 #include "StatusDevice.h"
 #include <cstdio>
 
-#include "Common/SystemService.h"
+#include "SystemService.h"
 #include "SystemState.h"
-#include "Utils/I18n/I18n.h"
+#include "I18n.h"
 #include "lvgl.h"
 #include "mcu_config.h"
 

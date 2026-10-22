@@ -1,5 +1,5 @@
 #pragma once
-#include "hc32_ll.h"
+#include <hc32_ll.h>
 #include <stdint.h>
 
 #define STRUCT_ZERO(x)									(memset(&x, 0, sizeof(x)))

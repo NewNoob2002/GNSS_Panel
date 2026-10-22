@@ -1,9 +1,9 @@
 #ifndef SAVECONFIG_VIEW_H
 #define SAVECONFIG_VIEW_H
 
-#include "Common/DataProc/DataProc.h"
+#include "DataProc/DataProc.h"
 #include "Resource/ResourcePool.h"
-#include "Utils/I18n/I18n.h"
+#include "I18n.h"
 #include "lvgl.h"
 
 namespace page {

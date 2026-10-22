@@ -1,6 +1,6 @@
 #pragma once
 #include "pinmap.h"
-#include "platform_debug.h"
+#include <platform_debug.h>
 
 #ifdef __cplusplus
 extern "C" {

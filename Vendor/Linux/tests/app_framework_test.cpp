@@ -2,8 +2,8 @@
 #include <cstring>
 #include <memory>
 #include <string>
-#include "Frameworks/DataBroker/DataBroker.h"
-#include "Utils/Log/Log.h"
+#include "DataBroker.h"
+#include "Log.h"
 
 namespace {
 struct LogCapture {

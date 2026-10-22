@@ -1,8 +1,8 @@
 #include "Utils/lv_ext/lv_label_format.h"
 #include "BatteryWarning.h"
 #include "Resource/ResourcePool.h"
-#include "Utils/I18n/I18n.h"
-#include "Utils/Log/Log.h"
+#include "I18n.h"
+#include "Log.h"
 
 namespace page {
 namespace {

@@ -1,8 +1,8 @@
 #pragma once
-#include "Common/RequestFeedback.h"
+#include "RequestFeedback.h"
 #include "RecordConfigModel.h"
 #include "RecordConfigView.h"
-#include "PageManager/PageBase.h"
+#include "PageBase.h"
 namespace page {
 class RecordConfig final : public PageBase {
   public:

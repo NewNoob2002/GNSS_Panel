@@ -34,33 +34,26 @@ if(NOT TARGET PkgConfig::SDL2 AND NOT TARGET SDL2::SDL2)
     message(FATAL_ERROR "SDL2 development files were not found. Install libsdl2-dev on Ubuntu/Debian, or provide an SDL2 CMake package.")
 endif()
 
+include(${REPO_ROOT}/cmake/options.cmake)
+
 # 上游目标负责收集 LVGL 源文件，模拟器仅指定自己的配置。
 include(${REPO_ROOT}/cmake/lvgl.cmake)
 project_add_lvgl("${CMAKE_CURRENT_SOURCE_DIR}/lv_conf.h")
-add_library(sim_lvgl ALIAS lvgl)
-# 共享 UI 通过 app_lvgl 使用模拟器显示配置；核心不依赖它。
-add_library(app_lvgl INTERFACE)
-target_link_libraries(app_lvgl INTERFACE lvgl::lvgl)
+add_library(sim::lvgl ALIAS lvgl)
 add_subdirectory(${REPO_ROOT}/App shared-app)
 
 if(SIM_BACKEND STREQUAL "Demo")
-    set(DEMO_BACKEND_DIR ${REPO_ROOT}/Vendor/Linux/Backends/Demo)
-    add_library(demo_backend OBJECT
-        ${DEMO_BACKEND_DIR}/DemoStatus.cpp
-        ${DEMO_BACKEND_DIR}/SimulatedSystem.cpp
-    )
-    target_include_directories(demo_backend PUBLIC ${DEMO_BACKEND_DIR})
-    target_link_libraries(demo_backend PUBLIC app_ui)
-    target_compile_options(demo_backend PRIVATE -Wall -Wextra -Werror)
+    add_subdirectory(${REPO_ROOT}/Vendor/Linux/Backends/Demo demo_backend)
 
     add_executable(main main.cpp)
+    add_executable(sim::main ALIAS main)
     target_include_directories(main PRIVATE ${CMAKE_CURRENT_LIST_DIR})
     target_compile_definitions(main PRIVATE
         LV_CONF_PATH="${CMAKE_CURRENT_LIST_DIR}/lv_conf.h"
         LVGL_SIMULATOR
         SIM_BACKEND_DEMO=1
     )
-    target_link_libraries(main PRIVATE demo_backend)
+    target_link_libraries(main PRIVATE linux::demo_backend)
 else()
     set(SIM_PRODUCT_DIR ${HC32_DIR}/Products/${SIM_PRODUCT})
     file(STRINGS "${SIM_PRODUCT_DIR}/product.cmake" PROJECT_VERSION_LINE
@@ -72,40 +65,32 @@ else()
         @ONLY
     )
 
-    file(GLOB HAL_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_LIST_DIR}/HAL/*.cpp)
-    # 固件电源时序原样编译：强制包含模拟器 HAL.h（屏蔽固件 HAL.h 的硬件依赖），GPIO/时基由 HAL/gpio.h 与 HAL/delay.h 提供
-    set(FIRMWARE_POWER_SOURCE ${HC32_DIR}/Platform/HAL/HAL_Power.cpp)
-    set_source_files_properties(${FIRMWARE_POWER_SOURCE} PROPERTIES
-        COMPILE_OPTIONS "-include;${CMAKE_CURRENT_LIST_DIR}/HAL/HAL.h")
-    # HC32 平台层（与固件同一份）
-    file(GLOB APP_PLATFORM_SOURCES CONFIGURE_DEPENDS ${HC32_DIR}/Display/AppPlatform/*.cpp)
+    add_library(sim_hardware_port INTERFACE)
+    add_library(sim::hardware_port ALIAS sim_hardware_port)
+    target_compile_definitions(sim_hardware_port INTERFACE
+        SIM_BACKEND_DEMO=0
+    )
+    target_include_directories(sim_hardware_port INTERFACE
+        ${CMAKE_CURRENT_SOURCE_DIR}/HAL
+    )
+    target_link_libraries(sim_hardware_port INTERFACE proj::options)
 
-    add_executable(main
-        main.cpp
-        ${APP_PLATFORM_SOURCES}
-        ${HC32_DIR}/Platform/State/SystemState.cpp
-        ${HAL_SOURCES}
-        ${FIRMWARE_POWER_SOURCE}
-    )
-    target_include_directories(main PRIVATE
-        ${CMAKE_CURRENT_LIST_DIR}
-        ${CMAKE_CURRENT_LIST_DIR}/HAL
-        ${HC32_DIR}/Display
-        ${HC32_DIR}/Display/AppPlatform
-        ${HC32_DIR}/Libraries
-        ${HC32_DIR}/Platform/Config
-        ${HC32_DIR}/Platform/Peripherals
-        ${HC32_DIR}/Platform/State
-        ${CMAKE_CURRENT_BINARY_DIR}/generated/Platform/Config
-        ${SIM_PRODUCT_DIR}
-    )
+    include(${HC32_DIR}/cmake/portable.cmake)
+    hc32_add_portable("" ${SIM_PRODUCT} sim::hardware_port DISPLAY)
+
+    add_library(sim_hal OBJECT HAL/HAL.cpp HAL/HAL_Board.cpp)
+    add_library(sim::hal ALIAS sim_hal)
+    target_link_libraries(sim_hal PUBLIC sim::hardware_port proj::options app::ui hc32::state hc32::power_policy)
+
+    add_executable(main main.cpp)
+    add_executable(sim::main ALIAS main)
+    target_include_directories(main PRIVATE ${CMAKE_CURRENT_LIST_DIR})
     target_compile_definitions(main PRIVATE
-        # 明确指定模拟器配置，避免与固件 lv_conf.h 按包含顺序混淆
         LV_CONF_PATH="${CMAKE_CURRENT_LIST_DIR}/lv_conf.h"
         LVGL_SIMULATOR
         SIM_BACKEND_DEMO=0
     )
-    target_link_libraries(main PRIVATE app_ui)
+    target_link_libraries(main PRIVATE sim::hal hc32::app_platform hc32::power_policy hc32::state)
 endif()
 target_compile_options(main PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra>)
 if(TARGET PkgConfig::SDL2)

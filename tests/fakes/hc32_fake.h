@@ -21,6 +21,7 @@ struct FakeGpio {
 
 extern CM_I2C_TypeDef fake_i2c1, fake_i2c2;
 extern FakeGpio fake_gpio;
+
 #define CM_I2C1                     (&fake_i2c1)
 #define CM_I2C2                     (&fake_i2c2)
 #define CM_GPIO                     (&fake_gpio)

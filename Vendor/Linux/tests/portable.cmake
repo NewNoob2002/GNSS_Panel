@@ -1,0 +1,10 @@
+include_guard(GLOBAL)
+set(LINUX_TEST_DIR ${CMAKE_CURRENT_LIST_DIR})
+#[[Build the page-manager regression from its owning Linux test module.]]
+function(linux_add_page_manager_test name)
+    add_executable(${name} ${LINUX_TEST_DIR}/app_page_manager_test.cpp)
+    add_executable(linux::${name} ALIAS ${name})
+    target_link_libraries(${name} PRIVATE fw::pagemanager)
+    target_compile_options(${name} PRIVATE -Wall -Wextra -Werror -UNDEBUG)
+    add_test(NAME ${name} COMMAND ${name})
+endfunction()

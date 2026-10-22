@@ -1,5 +1,5 @@
 #pragma once
-#include "Common/SystemBackend.h"
+#include "SystemBackend.h"
 
 /**
  * HAL 电源状态 -> 共享应用。Startup 完整长按经 HAL::Power_RequestOn() 确认开机，

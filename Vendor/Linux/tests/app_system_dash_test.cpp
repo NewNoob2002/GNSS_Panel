@@ -5,11 +5,11 @@
 #include <string>
 #include <vector>
 #include "App.h"
-#include "Common/SystemService.h"
+#include "SystemService.h"
 #include "DemoStatus.h"
 #include "Pages/SaveConfig/SaveConfigView.h"
 #include "Pages/SystemLoading/SystemLoadingView.h"
-#include "Utils/Log/Log.h"
+#include "Log.h"
 #include "Utils/PageStyle.h"
 #include "Utils/SettingsStyle.h"
 #include "lvgl_private.h"

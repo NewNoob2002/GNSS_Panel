@@ -3,7 +3,7 @@
 #include "ButtonGesture.h"
 #include "Pages/BatteryWarning/BatteryWarning.h"
 #include "Pages/StatusBar/StatusBar.h"
-#include "PageManager/PageManager.h"
+#include "PageManager.h"
 
 #include <memory>
 

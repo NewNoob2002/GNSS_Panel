@@ -1,7 +1,7 @@
 #pragma once
 // 主机测试：AppPlatform 与真实 HAL_Power.cpp 使用的板级接口。
 #include <cstdint>
-#include "delay.h"
+#include <delay.h>
 using gpio_pin_t = int16_t;
 using en_flag_status_t = int;
 

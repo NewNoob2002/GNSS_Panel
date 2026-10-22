@@ -1,9 +1,9 @@
 #include <array>
 
-#include "../../HC32/Platform/HAL/Charger.h"
-#include "HAL.h"
-#include "delay.h"
-#include "gpio.h"
+#include "Charger.h"
+#include <HAL.h>
+#include <delay.h>
+#include <gpio.h>
 #include "lvgl/lvgl.h"
 
 namespace {
@@ -91,4 +91,18 @@ void
 HAL::Sim_SetPowerKey(bool pressed) {
     // Power 键按下为高电平（与固件 HAL::Key_PowerPressed 一致）。
     gpio_write(POWER_KEY_PIN, pressed);
+}
+
+bool
+HAL::Key_PowerPressed() {
+    return gpio_read(POWER_KEY_PIN) == GPIO_HIGH;
+}
+
+bool
+HAL::Key_FunctionPressed() {
+    return gpio_read(FUNCTION_KEY_PIN) == GPIO_HIGH;
+}
+
+extern "C" void
+HAL_NVIC_SystemReset() {
 }

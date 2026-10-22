@@ -1,6 +1,6 @@
 #pragma once
 #include <memory>
-#include "Common/DataProc/DataProc.h"
+#include "DataProc/DataProc.h"
 #include "lvgl.h"
 
 namespace page {

@@ -10,9 +10,5 @@ add_library(hc32_easylogger OBJECT
     port/elog_port.c
 )
 add_library(hc32::easylogger ALIAS hc32_easylogger)
-target_link_libraries(hc32_easylogger PUBLIC hc32::easylogger_headers)
-target_include_directories(hc32_easylogger PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/..
-    ${CMAKE_CURRENT_SOURCE_DIR}/../SEGGER_RTT
-)
-target_link_libraries(hc32_easylogger PUBLIC hc32_project_options hc32_platform_headers)
+target_link_libraries(hc32_easylogger PUBLIC hc32::easylogger_headers proj::options
+    PRIVATE hc32::easylogger_port)

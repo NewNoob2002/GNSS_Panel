@@ -1,7 +1,7 @@
 #include "App.h"
 #include <cstdio>
-#include "Common/SystemService.h"
-#include "Utils/Log/Log.h"
+#include "SystemService.h"
+#include "Log.h"
 
 #include "Pages/Dialplate/Dialplate.h"
 #include "Pages/RecordConfig/RecordConfig.h"

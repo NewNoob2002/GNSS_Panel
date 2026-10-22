@@ -7,7 +7,7 @@ extern "C" {
 
 #include "HAL_DEF.h"
 #if defined(HC32F460)
-#include "hc32_ll.h"
+#include <hc32_ll.h>
 #endif
 /** @defgroup CORTEX_Exported_Constants CORTEX Exported Constants
   * @{

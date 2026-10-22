@@ -1,7 +1,7 @@
-#include "Common/SystemBackend.h"
-#include "Common/SystemService.h"
+#include "SystemBackend.h"
+#include "SystemService.h"
 #include "DataProc.h"
-#include "Utils/Log/Log.h"
+#include "Log.h"
 
 namespace {
 DataProc::DeviceSnapshot latest;

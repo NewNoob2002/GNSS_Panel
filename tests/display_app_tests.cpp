@@ -9,14 +9,14 @@
 #include "App.h"
 #include "AppPlatform.h"
 #include "Charger.h"
-#include "Common/SystemService.h"
-#include "HAL.h"
+#include "SystemService.h"
+#include <HAL.h>
 #include "Resource/ResourcePool.h"
 #include "SystemState.h"
-#include "Utils/I18n/I18n.h"
+#include "I18n.h"
 #include "Utils/PageStyle.h"
-#include "delay.h"
-#include "gpio.h"
+#include <delay.h>
+#include <gpio.h>
 #include "mcu_config.h"
 
 namespace {

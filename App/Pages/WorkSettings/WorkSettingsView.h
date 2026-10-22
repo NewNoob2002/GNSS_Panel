@@ -1,6 +1,6 @@
 #pragma once
 #include <array>
-#include "Common/DataProc/DataProc_Def.h"
+#include "DataProc/DataProc_Def.h"
 #include "Resource/ResourcePool.h"
 
 namespace page {

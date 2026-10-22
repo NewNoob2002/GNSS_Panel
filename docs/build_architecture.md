@@ -48,17 +48,18 @@
    - **日志桥接（4.3）**：`Frameworks` 的日志宏通过 `app::log` 输出，这是 L2 → L3 的唯一允许例外。等日志移到更低层（例如独立的 `common::log`）后再取消。
 5. **组件自管理**：第三方组件优先使用上游 CMake（LVGL 用 `add_subdirectory`，通过 `LV_BUILD_CONF_PATH` 等选项配置）；没有 CMake 的组件在自身目录维护 `CMakeLists.txt`，父目录只做 `add_subdirectory`。
 6. **命名**：每个目标都提供 `<域>::<组件>` 形式的 ALIAS（`proj::`、`lvgl::`、`fw::`、`app::`、`hc32::`、`sim::`、`linux::`），其他目录只链接 ALIAS 名。
-7. **自动检查**：`tests/check_layers.py` 对各 preset 生成 `cmake --graphviz` 依赖图，按本文的允许表校验，并检查规则 2、3（是否引用仓库根或 `..` 包含路径，是否跨模块按路径列源文件）。检查纳入 `tests/` 的 CTest 与 `.pi-orchestrator.json` 验证策略。
+7. **可替换头文件唯一提供者**：会被模拟器或测试替身替换的头文件（`HAL.h`、`gpio.h`、`delay.h`、`dwt.h`、`hc32_ll.h`、`platform_debug.h` 等）用尖括号包含，真实版本放在各组件的 `port/` 目录并由 `*_port` 目标提供。每个编译单元对每个这类头文件只能解析到一个包含目录，替换由所链接的目标决定，不依赖包含路径顺序。
+8. **自动检查**：`tests/check_layers.py` 通过 CMake File API（codemodel-v2）读取已配置构建目录（`x1pro-debug`、`x1-debug`、`xbase-debug`、`linux-host`、`host-tests`、`simulator-x1pro`）的目标、源文件、包含目录与依赖。目标按定义目录映射到层与 HC32 子层，无法映射的目标直接报错。检查内容包括依赖方向与环、规则 2、3，以及规则 7 的包含歧义。找不到任何构建目录时判为失败。INTERFACE 目标不出现在 codemodel 中，由包含歧义检查间接约束。检查纳入 `tests/` 的 CTest 与 `.pi-orchestrator.json` 验证策略。
 
-## 5. 现状差距（2026-10-21，3.3 合入后）
+## 5. 现状差距与完成情况（2026-10-21，3.3c 实施后）
 
-| 问题 | 位置 |
-|---|---|
-| App 各目标把 `App/` 与仓库根 `..` 设为 PUBLIC 包含路径，任意头文件都能互相包含 | `App/CMakeLists.txt` |
-| App 依赖父目录预先定义的 `app_build_options`、`app_lvgl` | `App/CMakeLists.txt`、各平台 |
-| `Frameworks` 源文件由 `App/CMakeLists.txt` 按路径编译，框架没有自己的目标 | `App/CMakeLists.txt` |
-| HC32 平台只有一个 `hc32_platform_headers`（暴露全部子目录）和一个大 OBJECT 目标 | `Vendor/HC32/Platform/CMakeLists.txt` |
-| HAL 依赖 `Libraries/` 中的器件驱动，器件驱动又依赖 Platform 的外设，形成环 | `Platform/HAL/*`、`Libraries/{Bq40z50,Mp2762a,MillisTaskManager}` |
-| 模拟器按路径编译 HC32 的 `HAL_Power.cpp`、`SystemState.cpp`、`AppPlatform/*.cpp`，并把 HC32 多个目录加入包含路径 | `Vendor/Simulator/CMakeLists.txt` |
-| 主机测试按路径引用其他模块源文件约 38 处 | `tests/CMakeLists.txt` |
-| LVGL 源文件在 HC32、模拟器、Linux、tests 四处手写收集 | 3.3b 处理 |
+| 问题 | 位置 | 状态 |
+|---|---|---|
+| App 各目标把 `App/` 与仓库根 `..` 设为 PUBLIC 包含路径，任意头文件都能互相包含 | `App/CMakeLists.txt` | 已完成（3.3c）：各目标仅公开自有目录，统一按组件名包含 |
+| App 依赖父目录预先定义的 `app_build_options`、`app_lvgl` | `App/CMakeLists.txt`、各平台 | 已完成（3.3c）：上层统一链接 `proj::options` 与 `lvgl::lvgl` |
+| `Frameworks` 源文件由 `App/CMakeLists.txt` 按路径编译，框架没有自己的目标 | `App/CMakeLists.txt` | 已完成（3.3b/3.3c）：各框架组件维护自有目标与 `fw::*` 别名 |
+| HC32 平台只有一个 `hc32_platform_headers`（暴露全部子目录）和一个大 OBJECT 目标 | `Vendor/HC32/Platform/CMakeLists.txt` | 已完成（3.3c）：拆分为 4.1–4.10 子层目标 |
+| HAL 依赖 `Libraries/` 中的器件驱动，器件驱动又依赖 Platform 的外设，形成环 | `Platform/HAL/*`、`Libraries/{Bq40z50,Mp2762a,MillisTaskManager}` | 已完成（3.3c）：Bq40z50 与 Mp2762a 迁入 `Platform/Devices/`（4.5 子层），端口通过 INTERFACE 注入 |
+| 模拟器按路径编译 HC32 的 `HAL_Power.cpp`、`SystemState.cpp`、`AppPlatform/*.cpp`，并把 HC32 多个目录加入包含路径 | `Vendor/Simulator/CMakeLists.txt` | 已完成（3.3c）：通过 `portable.cmake` 链接便携目标与 `sim::hardware_port` |
+| 主机测试按路径引用其他模块源文件约 38 处 | `tests/CMakeLists.txt` | 已完成（3.3c）：主机回归全部通过 `portable.cmake` 实例化目标并链接替身接口 |
+| LVGL 源文件在 HC32、模拟器、Linux、tests 四处手写收集 | 3.3b 处理 | 已完成（3.3b）：通过上游 CMake 与 `project_add_lvgl` 统一构建 |

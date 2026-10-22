@@ -1,9 +1,9 @@
 #ifndef STARTUP_VIEW_H
 #define STARTUP_VIEW_H
 
-#include "Common/DataProc/DataProc_Def.h"
+#include "DataProc/DataProc_Def.h"
 #include "Resource/ResourcePool.h"
-#include "Utils/I18n/I18n.h"
+#include "I18n.h"
 #include "lvgl.h"
 
 namespace page {

@@ -5,9 +5,9 @@
 #include <cstdio>
 #include <cstring>
 
-#include "Common/SystemService.h"
+#include "SystemService.h"
 #include "SystemState.h"
-#include "Utils/Log/Log.h"
+#include "Log.h"
 #include "lvgl.h"
 #include "mcu_config.h"
 

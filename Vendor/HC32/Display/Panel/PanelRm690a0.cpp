@@ -26,7 +26,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 #include "PanelRm690a0.h"
-#include "delay.h"
+#include <delay.h>
 
 bool
 PanelRm690a0::init() {

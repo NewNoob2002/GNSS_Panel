@@ -2,7 +2,7 @@
 // 每步耗时即实际检查时间；I2C 探测有 WIRE_TIMEOUT 上限，等待主控有 kHostLinkTimeoutMs 上限。
 #include <cstdio>
 
-#include "HAL.h"
+#include <HAL.h>
 #include "StatusDevice.h"
 #include "mcu_config.h"
 

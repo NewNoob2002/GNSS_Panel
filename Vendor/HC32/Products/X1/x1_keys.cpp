@@ -2,9 +2,9 @@
 // 功能键按住 2.5 s 强制关机与带屏产品共用（Platform/HAL/HAL_Key.cpp）；
 // 开机长按由共用 HAL::Power_PowerOffMonitor() 处理（2 s），这里只处理已开机后的动作。
 #include "GpioPin.h"
-#include "HAL.h"
+#include <HAL.h>
 #include "SystemState.h"
-#include "delay.h"
+#include <delay.h>
 #include "multi_button.h"
 
 enum : uint8_t { POWER_KEY_ID = 1, FUNCTION_KEY_ID = 2 };

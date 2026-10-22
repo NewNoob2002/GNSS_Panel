@@ -2,7 +2,7 @@
  * Include files
  ******************************************************************************/
 #include "AppPlatform.h"
-#include "HAL/HAL.h"
+#include <HAL.h>
 #include "lv_port.h"
 #include "slave_i2c.h"
 

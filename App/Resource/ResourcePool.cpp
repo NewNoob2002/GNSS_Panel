@@ -1,5 +1,5 @@
 #include "ResourcePool.h"
-#include "Frameworks/ResourceManager/ResourceManager.h"
+#include "ResourceManager.h"
 #include <cstring>
 
 extern "C" {

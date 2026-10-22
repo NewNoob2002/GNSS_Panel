@@ -6,13 +6,17 @@ HC32、RK3506（`Vendor/Linux`）与 PC 模拟器（`Vendor/Simulator`）使用�
 
 | 目标 | 内容 | 允许的依赖 |
 |---|---|---|
-| `app_framework` | DataBroker、DataNode、DataTimer、DeviceManager、ResourceManager 静态表 | 标准 C/C++、`app_log` |
-| `app_core` | System/Device/Status 服务、共享数据定义 | 事件框架、日志、无图形依赖的 i18n |
-| `app_page_manager` | Frameworks/PageManager 的页面池、路由、生命周期与动画 | LVGL、`app_log` |
-| `app_ui` | 页面、Model、输入路由、资源 | `app_core`、`app_page_manager`、LVGL |
+| `app::log` / `app_log` | 统一日志格式化与级别定义 | `proj::options` |
+| `app::i18n` / `app_i18n` | 多语言文本支持 | `proj::options` |
+| `fw::databroker`, `fw::devicemanager` | DataBroker、DataNode、DataTimer、DeviceManager | `proj::options`、`app::log` |
+| `fw::resourcemanager` | 静态资源表模板（INTERFACE） | `proj::options` |
+| `app::core` / `app_core` | System/Device/Status 服务、共享数据定义 | 事件框架、日志、`app::i18n`、`proj::options`（不得依赖 LVGL 与 `fw::pagemanager`） |
+| `fw::pagemanager` / `app_page_manager` | Frameworks/PageManager 页面池、路由、生命周期与动画 | `lvgl::lvgl`、`app::log`、`proj::options` |
+| `app::dialplate` / `app_dialplate` | 表盘与资源支持 | `lvgl::lvgl`、`app::i18n`、`proj::options`、`fw::resourcemanager`、`app::core` |
+| `app::ui` / `app_ui` | 页面、Model、输入路由、资源 | `app::core`、`fw::pagemanager`、`app::dialplate` |
 | 平台目标 | 设备与业务后端、显示和输入端口、程序入口 | 共享接口及各自平台库 |
 
-父工程通过 `app_build_options` 提供编译选项，通过 `app_lvgl` 提供 UI 所需的 LVGL。没有 `app_lvgl` 时只构建框架与核心。Linux 的 `Vendor/Linux/Backends/Demo` 属于平台演示后端，不在共享 `App/` 中；实屏程序当前仍选择该演示后端，真实 Linux 业务尚未接入。
+父工程通过 `proj::options` 提供编译契约，通过 `lvgl::lvgl` 提供 UI 所需的 LVGL。没有 `lvgl::lvgl` 时只构建框架与核心。Linux 的 `Vendor/Linux/Backends/Demo` 属于平台演示后端，不在共享 `App/` 中；实屏程序当前仍选择该演示后端，真实 Linux 业务尚未接入。
 
 ## 执行和生命周期
 

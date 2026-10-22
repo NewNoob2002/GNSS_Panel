@@ -1,3 +1,7 @@
-# XBase 只使用共用显示业务，产品差异全部在 product_config.h。
-add_library(hc32_product INTERFACE)
-target_link_libraries(hc32_product INTERFACE hc32_display_stack)
+if(HC32_CONFIG_ONLY)
+    include(${CMAKE_CURRENT_LIST_DIR}/../config.cmake)
+    return()
+endif()
+add_library(hc32_product_xbase INTERFACE)
+add_library(hc32::product_xbase ALIAS hc32_product_xbase)
+target_link_libraries(hc32_product_xbase INTERFACE hc32::display)

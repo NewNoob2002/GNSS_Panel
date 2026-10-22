@@ -1,0 +1,10 @@
+include_guard(GLOBAL)
+set(APP_CORE_TEST_DIR "${CMAKE_CURRENT_LIST_DIR}")
+#[[Build the shared core regression from its owning module.]]
+function(app_add_core_test name)
+    add_executable(${name} ${APP_CORE_TEST_DIR}/core_tests.cpp)
+    add_executable(app::${name} ALIAS ${name})
+    target_link_libraries(${name} PRIVATE app::core)
+    target_compile_options(${name} PRIVATE -Wall -Wextra -Werror -UNDEBUG)
+    add_test(NAME ${name} COMMAND ${name})
+endfunction()

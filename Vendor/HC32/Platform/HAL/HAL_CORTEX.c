@@ -1,4 +1,4 @@
-#include "HAL.h"
+#include <HAL.h>
 
 /**
   * @brief  Sets the priority grouping field (preemption priority and subpriority)

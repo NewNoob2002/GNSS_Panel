@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Utils/Log/Log.h"
+#include "Log.h"
 #include "Utils/PageStyle.h"
 
 namespace page::battery {

@@ -1,12 +1,12 @@
 #define _POSIX_C_SOURCE 200809L
 
-#include "App/App.h"
+#include "App.h"
 #include "DemoStatus.h"
 extern "C" {
-#include "display/lv_display.h"
+#include "lv_display.h"
 #include "lv_tick_posix.h"
-#include "platform/linux_button.h"
-#include "platform/linux_display.h"
+#include "linux_button.h"
+#include "linux_display.h"
 }
 
 #include <cerrno>

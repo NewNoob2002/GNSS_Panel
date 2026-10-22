@@ -9,13 +9,8 @@ set(CPU_FLAGS
     -mfloat-abi=hard
 )
 
-add_library(hc32_project_options INTERFACE)
-target_include_directories(hc32_project_options INTERFACE
-    ${CMAKE_BINARY_DIR}/generated/Platform/Config
-    # 所选产品的 product_config.h
-    ${PRODUCT_DIR}
-)
-target_compile_definitions(hc32_project_options INTERFACE
+include(${CMAKE_CURRENT_LIST_DIR}/options.cmake)
+target_compile_definitions(project_options INTERFACE
     HC32F460
     USE_DDL_DRIVER
     ARDUINO=111
@@ -23,7 +18,7 @@ target_compile_definitions(hc32_project_options INTERFACE
     $<$<CONFIG:Debug>:__CORE_DEBUG>
     # MIDDLE_LOGO_USE
 )
-target_compile_options(hc32_project_options INTERFACE
+target_compile_options(project_options INTERFACE
     ${CPU_FLAGS}
     -ffunction-sections
     -fdata-sections

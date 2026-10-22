@@ -4,18 +4,21 @@
 #include <limits>
 #include <string>
 #include <vector>
+#include "product_config.h"
 #include "BlinkLed.h"
 #include "Charger.h"
-#include "HAL.h"
+#include <HAL.h>
 #include "HoldTimer.h"
 #include "PowerPolicy.h"
 #include "SystemState.h"
 #include "board_peripherals.h"
 #include "bq40z50.h"
-#include "display_protocol.h"
 #include "mp2762a.h"
-#include "product_config.h"
+#if !defined(POWER_TESTS_ONLY)
+#include "panel_protocol.h"
+#include "display_protocol.h"
 #include "slave_i2c.h"
+#endif
 
 CM_I2C_TypeDef fake_i2c1, fake_i2c2;
 FakeGpio fake_gpio;

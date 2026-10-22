@@ -1,8 +1,8 @@
 #include "Charger.h"
 #include "GpioPin.h"
-#include "HAL.h"
+#include <HAL.h>
 #include "bq40z50.h"
-#include "delay.h"
+#include <delay.h>
 #include "mp2762a.h"
 
 namespace {

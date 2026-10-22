@@ -1,6 +1,6 @@
 #pragma once
 #include <cstdint>
-#include "Common/SystemBackend.h"
+#include "SystemBackend.h"
 
 /** systemInfo -> 状态栏快照，固定周期发布（含首次）。 */
 class StatusDevice : public system_backend::StatusObject {

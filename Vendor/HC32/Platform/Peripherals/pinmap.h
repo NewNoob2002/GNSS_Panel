@@ -5,7 +5,7 @@
  */
 #pragma once
 #include <stdint.h>
-#include "hc32_ll.h"
+#include <hc32_ll.h>
 
 typedef int16_t gpio_pin_t;
 

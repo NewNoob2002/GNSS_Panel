@@ -2,7 +2,7 @@
 #include <algorithm>
 #include <limits>
 #include "SystemBackend.h"
-#include "Utils/Log/Log.h"
+#include "Log.h"
 
 namespace {
 DataProc::SystemState state;
