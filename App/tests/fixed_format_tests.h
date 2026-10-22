@@ -1,7 +1,7 @@
 /** @file fixed_format_tests.h 各数值页面格式的逐字节回归扫描，无 LVGL 依赖。 */
 #ifndef APP_FIXED_FORMAT_TESTS_H
 #define APP_FIXED_FORMAT_TESTS_H
-#include "../Utils/FixedFormat.h"
+#include "FixedFormat.h"
 #include <cassert>
 #include <cfloat>
 #include <initializer_list>

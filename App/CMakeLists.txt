@@ -18,7 +18,7 @@ add_library(app_core STATIC
     Common/DataProc/DP_Device.cpp
     Common/SystemService.cpp
     Common/SystemBackend.cpp
-    Utils/FixedFormat.cpp)
+    Common/FixedFormat.cpp)
 foreach(target app_log app_framework app_i18n app_core)
     target_link_libraries(${target} PUBLIC proj::options)
     target_compile_options(${target} PRIVATE -Wall -Wextra -Werror

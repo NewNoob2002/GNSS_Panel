@@ -1,5 +1,5 @@
 #include <cstdio>
-#include "Utils/FixedFormat.h"
+#include "FixedFormat.h"
 #include "StartupView.h"
 #include "Utils/BatteryStyle.h"
 #include "Utils/SettingsStyle.h"

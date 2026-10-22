@@ -1,6 +1,6 @@
 #include "RecordConfigView.h"
 #include <cstdio>
-#include "Utils/FixedFormat.h"
+#include "FixedFormat.h"
 #include "Utils/SettingsStyle.h"
 using namespace page;
 using i18n::TextId;
