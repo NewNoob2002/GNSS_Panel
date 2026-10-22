@@ -47,14 +47,26 @@ target_include_directories(hc32_shared_comm PUBLIC
 target_link_libraries(hc32_shared_comm PUBLIC
     hc32_project_options
     hc32_platform_headers
-    hc32_parser
+    hc32::parser
 )
 
 if(PRODUCT_HAS_DISPLAY)
+    include(${REPO_ROOT}/cmake/lvgl.cmake)
+    project_add_lvgl("${CMAKE_CURRENT_SOURCE_DIR}/Display/Lvgl/lv_conf.h")
+    target_link_libraries(lvgl PUBLIC hc32_project_options hc32_platform_headers)
+    # v9 在 -Og 下会超出 Flash 预算，仅 LVGL 在 debug 下保持 -Os。
+    # 先展开原选项再追加 -Os；CMake 去重后，debug 的最后一个优化选项仍为 -Os。
+    target_compile_options(lvgl PRIVATE
+        $<TARGET_PROPERTY:hc32_project_options,INTERFACE_COMPILE_OPTIONS>
+        $<$<CONFIG:Debug>:-Os>)
+    add_library(hc32_lvgl ALIAS lvgl)
+    add_library(hc32_display_libraries INTERFACE)
+    target_link_libraries(hc32_display_libraries INTERFACE hc32_libraries_headers lvgl::lvgl)
+
     add_library(app_build_options INTERFACE)
     target_link_libraries(app_build_options INTERFACE hc32_project_options)
     add_library(app_lvgl INTERFACE)
-    target_link_libraries(app_lvgl INTERFACE hc32_lvgl)
+    target_link_libraries(app_lvgl INTERFACE lvgl::lvgl)
     add_subdirectory(${REPO_ROOT}/App ${CMAKE_CURRENT_BINARY_DIR}/App)
 
     # 共享应用的 HC32 平台层：入口 + DeviceManager 的 Power/Device/Status 对象 + 初始化步骤

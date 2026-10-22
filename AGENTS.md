@@ -6,12 +6,12 @@ This repository follows the X-TRACK workspace layout (`App/`, `Frameworks/`, `Ex
 
 - `CMakeLists.txt` is the top-level platform selector: it dispatches `add_subdirectory(Vendor/${PLATFORM})` based on the `PLATFORM` cache variable (`HC32`, `Simulator` or `Linux`, defaulting to `HC32`).
 - `App/` is the shared application (`app_core`, `app_i18n`, `app_log`, `app_page_manager`, `app_dialplate`, `app_ui`) used by HC32 display firmware, Simulator and Linux. `App/tests/` contains headless core tests that do not depend on LVGL.
-- `Frameworks/` 包含跨平台框架（`DataBroker`、`DeviceManager`、`PageManager`、`ResourceManager`）。`App/CMakeLists.txt` 构建加固后的 DataBroker/DeviceManager，ResourceManager 使用静态表；页面管理由加固后的 `Frameworks/PageManager` 承担，编译为 `app_page_manager`。
+- `Frameworks/` 包含跨平台框架（`DataBroker`、`DeviceManager`、`PageManager`、`ResourceManager`），各组件在自身目录定义 CMake 目标及 `fw::` 别名；`App/CMakeLists.txt` 通过 `add_subdirectory` 汇总，ResourceManager 为 INTERFACE，页面管理保留 `app_page_manager` 目标名。
 - `External/lvgl/` contains unmodified upstream LVGL v9.6.0 sources (public headers in `include/`, plus `src/`, `lvgl.h`, `lvgl_private.h`, `lv_version.h`, and the demos used by the Linux port) without any platform-specific `lv_conf.h` or porting layer. App and platform targets compile with `LV_DISABLE_API_MAPPING`, so only v9 native API names are allowed.
 - `Vendor/HC32/` contains the HC32F460xE MCU firmware:
   - `CMakeLists.txt` orchestrates the HC32 firmware build (`PRODUCT=X1|X1Pro|XBase`) and links `<prefix>_<version>.elf`.
   - `Platform/` contains CMSIS, startup, `DDL/` (XHSC LL drivers), `Peripherals/` native peripherals (`GpioPin`, `I2cMaster`, `SpiMaster`, GPIO, UART, Flash, DWT, OTS), `System/` runtime and system glue (interrupts, syscalls, `new`, `delay`, debug macros), board configuration and instances (`Config/board_pins.h`, `Config/board_peripherals`), the shared `HAL/` (power policy, charger/gauge, LEDs, tick), and `State/`. It is shared by all HC32 products and must not depend on LVGL or `App/`.
-  - `Libraries/` contains HC32 device and third-party libraries (`Bq40z50`, `Mp2762a`, `MillisTaskManager`, `Parser`, `SEGGER_RTT`, `easylogger`, `MultiButton` for X1), and builds `hc32_lvgl` from `External/lvgl/`.
+  - `Libraries/` 包含 HC32 器件与第三方组件（`Bq40z50`、`Mp2762a`、`MillisTaskManager`、`Parser`、`SEGGER_RTT`、`easylogger`、X1 使用的 `MultiButton`），各组件维护自己的 `CMakeLists.txt` 与 `hc32::` 别名。LVGL 由 `cmake/lvgl.cmake` 导入上游构建，平台链接 `lvgl::lvgl`。
   - `Comm/` is the I2C slave transport and panel frame-protocol core used by every HC32 product.
   - `Display/` is shared by X1Pro and XBase: display entry point, display protocol table, display/key HAL, `AppPlatform/` (HC32 platform layer of the shared LVGL app: entry header, status snapshot, two-key input, `Power`/`Device`/`Status` device objects registered with DeviceManager), `Panel/` (RM690A0 panel driver `PanelRm690a0` and display board instances `board_display`), and `Lvgl/` (LVGL `lv_conf.h`, `lv_port*`, and the LVGL-backed `operator new`).
   - `Products/<Product>/` holds `product.cmake` (version, image prefix, display flag), `product_config.h` (feature switches included through `mcu_config.h`) and product-only sources (X1: entry point, keys, SOC compensation, protocol table).
@@ -36,6 +36,8 @@ Put a difference between HC32 products in `product_config.h` as a `PRODUCT_*` sw
 ## Coding Style & Naming Conventions
 
 Use C11 and C++17 in the CMake build. Keep CMake modular: add sources and include directories in the owning subdirectory target, expose headers with `PUBLIC` only when dependent modules include them, and avoid adding broad include lists at the top level.
+
+第三方组件优先使用其上游 CMake；未自带 CMake 的组件在自身目录维护 `CMakeLists.txt`，父目录通过 `add_subdirectory` 汇总。分层与目标命名遵循 [docs/build_architecture.md](docs/build_architecture.md)。
 
 Follow existing naming: lower_snake_case for C-style functions such as `slave_i2c_update`, PascalCase for many C++ classes, and `HAL_` or `HAL::` patterns for hardware abstraction code.
 

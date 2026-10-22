@@ -10,7 +10,7 @@ target_include_directories(hc32_platform_headers INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/State
     ${CMAKE_CURRENT_SOURCE_DIR}/System
 )
-target_link_libraries(hc32_platform_headers INTERFACE hc32_project_options hc32_easylogger_headers)
+target_link_libraries(hc32_platform_headers INTERFACE hc32_project_options hc32::easylogger_headers)
 
 file(GLOB PLATFORM_PERIPHERAL_SOURCES CONFIGURE_DEPENDS
     Peripherals/*.c

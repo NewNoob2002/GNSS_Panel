@@ -12,10 +12,26 @@ option(RK3506_LVGL_DEMO "Build standalone LVGL benchmark with on-screen FPS/CPU 
 # Locate repository root and shared components
 get_filename_component(REPO_ROOT "${CMAKE_CURRENT_LIST_DIR}/../.." REALPATH)
 set(SHARED_APP_DIR "${REPO_ROOT}/App")
-set(EXTERNAL_DIR "${REPO_ROOT}/External")
 
 # Modular sub-components
-include(cmake/lvgl.cmake)
+include(${REPO_ROOT}/cmake/lvgl.cmake)
+if(RK3506_LVGL_DEMO)
+    project_add_lvgl("${CMAKE_CURRENT_SOURCE_DIR}/config/lv_conf.h" DEMOS)
+else()
+    project_add_lvgl("${CMAKE_CURRENT_SOURCE_DIR}/config/lv_conf.h")
+endif()
+add_library(lvgl960 ALIAS lvgl)
+target_compile_definitions(lvgl PUBLIC $<$<BOOL:${RK3506_DEBUG_MONITOR}>:__CORE_DEBUG>)
+if(RK3506_LVGL_DEMO)
+    set(RK3506_LVGL_DEMO_REFRESH_MS 8 CACHE STRING "LVGL demo refresh period in ms")
+    set(RK3506_LVGL_DEMO_DRAW_DIVISOR 4 CACHE STRING "LVGL demo draw buffer fraction denominator")
+    target_compile_definitions(lvgl PUBLIC
+        RK3506_LVGL_DEMO=1
+        RK3506_LVGL_DEMO_REFRESH_MS=${RK3506_LVGL_DEMO_REFRESH_MS}
+        RK3506_LVGL_DEMO_DRAW_DIVISOR=${RK3506_LVGL_DEMO_DRAW_DIVISOR}
+        _POSIX_C_SOURCE=200809L)
+    target_compile_options(lvgl_demos PRIVATE -Wall -Wextra -Werror)
+endif()
 add_subdirectory(display)
 
 enable_testing()
@@ -25,8 +41,7 @@ if(RK3506_LVGL_DEMO)
 else()
     # The shared module consumes this display contract; core/framework targets never link it.
     add_library(app_lvgl INTERFACE)
-    target_link_libraries(app_lvgl INTERFACE lvgl960)
-    target_include_directories(app_lvgl INTERFACE "${EXTERNAL_DIR}")
+    target_link_libraries(app_lvgl INTERFACE lvgl::lvgl)
     add_subdirectory("${SHARED_APP_DIR}" shared_app)
 
     add_library(demo_backend OBJECT
@@ -37,7 +52,7 @@ else()
 
     # Standalone utilities and application entrypoints
     add_executable(lvgl_baseline baseline.c)
-    target_link_libraries(lvgl_baseline PRIVATE lvgl960)
+    target_link_libraries(lvgl_baseline PRIVATE lvgl::lvgl)
     add_test(NAME lvgl_baseline COMMAND lvgl_baseline)
 
     add_executable(display_test display_test.c)

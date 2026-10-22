@@ -4,12 +4,12 @@ if(NOT TARGET app_build_options)
 endif()
 
 add_library(app_log STATIC Utils/Log/Log.cpp)
-add_library(app_framework STATIC
-    ../Frameworks/DataBroker/DataNode.cpp
-    ../Frameworks/DataBroker/DataBroker.cpp
-    ../Frameworks/DataBroker/DataTimer.cpp
-    ../Frameworks/DeviceManager/DeviceManager.cpp
-    ../Frameworks/ResourceManager/ResourceManager.h)
+add_subdirectory(../Frameworks/DataBroker frameworks/databroker)
+add_subdirectory(../Frameworks/DeviceManager frameworks/devicemanager)
+add_subdirectory(../Frameworks/ResourceManager frameworks/resourcemanager)
+# 保留原静态归档及对象顺序，由各组件维护自己的源文件。
+add_library(app_framework STATIC)
+target_link_libraries(app_framework PUBLIC fw::databroker fw::devicemanager fw::resourcemanager)
 add_library(app_i18n STATIC
     Utils/I18n/I18n.cpp Utils/I18n/I18n_en.cpp Utils/I18n/I18n_ru.cpp)
 add_library(app_core STATIC
@@ -33,18 +33,7 @@ target_compile_options(app_core PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-fno-rtti>)
 if(NOT TARGET app_lvgl)
     return()
 endif()
-add_library(app_page_manager STATIC
-    ../Frameworks/PageManager/PageBase.cpp
-    ../Frameworks/PageManager/PageManager.cpp
-    ../Frameworks/PageManager/PageManagerRouter.cpp
-    ../Frameworks/PageManager/PageManagerState.cpp
-    ../Frameworks/PageManager/PageManagerAnim.cpp)
-target_include_directories(app_page_manager PUBLIC
-    "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/../Frameworks")
-target_link_libraries(app_page_manager PUBLIC app_lvgl app_build_options PRIVATE app_log)
-target_compile_options(app_page_manager PRIVATE -Wall -Wextra)
-# PageBase 与 app_ui 中的派生页面必须使用一致的 RTTI 布局及检查策略。
-target_compile_options(app_page_manager PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-fno-rtti>)
+add_subdirectory(../Frameworks/PageManager frameworks/pagemanager)
 
 file(GLOB APP_RESOURCES CONFIGURE_DEPENDS "Resource/font/*.c" "Resource/img/*.c" "Resource/symbol/*.c")
 add_library(app_dialplate STATIC
@@ -90,5 +79,5 @@ add_library(app_ui STATIC
     Pages/SaveConfig/SaveConfig.cpp
     Pages/SaveConfig/SaveConfigView.cpp)
 target_include_directories(app_ui PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
-target_link_libraries(app_ui PUBLIC app_core app_page_manager app_dialplate)
+target_link_libraries(app_ui PUBLIC app_core fw::pagemanager app_dialplate)
 target_compile_options(app_ui PRIVATE -Wall -Wextra -Werror)

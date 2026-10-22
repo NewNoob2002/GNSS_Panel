@@ -13,16 +13,20 @@
 ```text
 App/                      共享应用：独立事件框架接入、无 LVGL 的核心服务、LVGL 页面及核心测试 App/tests/（本仓库为唯一来源）
 Frameworks/               跨平台框架：DataBroker、DeviceManager、PageManager、ResourceManager
-External/lvgl/            上游 LVGL 9.6.0 源码（include/、src/、lvgl.h、demos/，不含平台 lv_conf.h 与 porting/）
+External/lvgl/            上游 LVGL 9.6.0 源码与原样构建文件（CMakeLists.txt、env_support/cmake/、Kconfig；不含平台 lv_conf.h 与 porting/）
 Vendor/HC32/
   Platform/               CMSIS 启动、DDL/ 小华 LL 库、Peripherals/ 原生外设驱动（GpioPin、I2cMaster、SpiMaster、GPIO、UART、Flash、DWT、OTS）、System/ 系统与运行时胶水（中断、Syscalls、new、delay、调试宏）、Config/（board_pins.h 主板引脚、board_peripherals 板级外设实例）、共用 HAL/（电源策略、充电/电量计、按键、LED、时基）与 State/
-  Libraries/              器件与第三方库（Bq40z50、Mp2762a、MillisTaskManager、Parser、SEGGER_RTT、easylogger、MultiButton）；LVGL 从 External/lvgl 构建
+  Libraries/              器件与第三方库（Bq40z50、Mp2762a、MillisTaskManager、Parser、SEGGER_RTT、easylogger、MultiButton），各组件自行定义 CMake 目标；父目录仅添加子目录与汇总
   Comm/                   I2C 从机传输 + 面板帧协议核心（全部产品）
   Display/                带屏产品入口、显示协议表、显示 HAL，以及 AppPlatform/（共享应用的 HC32 平台层：入口 + DeviceManager 的 Power/Device/Status 三个设备对象 + 初始化步骤）、Panel/（面板驱动 PanelRm690a0 与板级显示实例 board_display）、Lvgl/（固件 lv_conf.h、lv_port*、LVGL 内存池 operator new）（X1Pro、XBase）
   Products/<产品>/        product.cmake、product_config.h、产品专属源码
 Vendor/Simulator/         唯一 PC SDL 模拟器：SIM_BACKEND=Board（默认，共享应用 + AppPlatform + 固件 HAL_Power.cpp）或 Demo（Linux 演示后端）；配置用自身 lv_conf.h
 Vendor/Linux/             RK3506 Linux 端口、Backends/Demo 演示后端与主机测试；配置用 config/lv_conf.h
 ```
+
+构建组织遵循 [CMake 分层构建架构](build_architecture.md)。当前完成组件自管理：`Frameworks/{DataBroker,DeviceManager,PageManager,ResourceManager}/CMakeLists.txt` 分别提供 `fw::databroker`、`fw::devicemanager`、`fw::pagemanager`、`fw::resourcemanager`；前两者通过 OBJECT 目标汇入原 `app_framework` 静态归档，ResourceManager 为 INTERFACE，页面管理保留 `app_page_manager` 静态目标。HC32 `Libraries` 各组件提供 `hc32::` 别名，保持原 OBJECT 类型和依赖。完整分层、端口注入和包含路径收紧在 3.3c 实施。
+
+HC32、Simulator、Linux 与 `tests/` 共用 `cmake/lvgl.cmake` 的 `project_add_lvgl(<lv_conf.h 绝对路径> [DEMOS])`，通过 `LV_BUILD_CONF_PATH` 选择平台配置并原样添加上游目录。平台只链接 `lvgl::lvgl`，Linux benchmark 额外链接 `lvgl::demos`；不再手工收集 LVGL 或 demos 源文件。示例、ThorVG、安装、测试与依赖发现/下载开关统一关闭，`DEMOS` 仅由 `RK3506_LVGL_DEMO=ON` 启用。应用和平台继续使用 `LV_DISABLE_API_MAPPING`，HC32 debug 的 LVGL 继续使用 `-Os`。
 
 依赖只能自上而下：`Products` → `Display`/`Comm` → `Platform`/`Libraries`。`Vendor/HC32/Platform/` 不包含 LVGL 或 `App/` 头文件；为此做了以下解耦：
 
@@ -33,7 +37,7 @@ Vendor/Linux/             RK3506 Linux 端口、Backends/Demo 演示后端与主
 
 ## 产品差异放在哪里
 
-共享构建与架构边界见 [App/ARCHITECTURE.md](../App/ARCHITECTURE.md)：`app_framework` / `app_core` 不依赖 LVGL，`app_ui` 是 UI；固件、主机测试、模拟器与 Linux 端口复用同一个 `App/CMakeLists.txt`。平台通过 `app_build_options` 和 `app_lvgl` 绑定编译选项与显示库。`app_framework` 构建 DataBroker/DeviceManager，ResourceManager 使用静态数组模板；DataNode 同步分发，最多 16 个节点、32 个独立时钟定时器。资源池与页面外观不变，LVGL 为 9.6.0，页面管理由加固后的 `Frameworks/PageManager` 编译为 `app_page_manager`，统一拥有页面池、预加载和根栈重置；导航返回值显式与 `RES_TYPE::OK` 比较，页面使用 getter 与 lowerCamelCase 生命周期。`App/` 与 `Frameworks/` 直接在本仓库修改；平台相关行为放在 `Vendor/<平台>`。
+共享构建与架构边界见 [App/ARCHITECTURE.md](../App/ARCHITECTURE.md)：`app_framework` / `app_core` 不依赖 LVGL，`app_ui` 是 UI；固件、主机测试、模拟器与 Linux 端口复用同一个 `App/CMakeLists.txt`。平台通过 `app_build_options` 和 `app_lvgl` 绑定编译选项与显示库。`app_framework` 汇总组件自有目标中的 DataBroker/DeviceManager，ResourceManager 使用静态数组模板；DataNode 同步分发，最多 16 个节点、32 个独立时钟定时器。资源池与页面外观不变，LVGL 为 9.6.0，页面管理由加固后的 `Frameworks/PageManager` 编译为 `app_page_manager`，统一拥有页面池、预加载和根栈重置；导航返回值显式与 `RES_TYPE::OK` 比较，页面使用 getter 与 lowerCamelCase 生命周期。`App/` 与 `Frameworks/` 直接在本仓库修改；平台相关行为放在 `Vendor/<平台>`。
 
 1. **功能开关**：`Vendor/HC32/Products/<产品>/product_config.h` 中的 `PRODUCT_*` 宏，经 `mcu_config.h` 被所有源码看到。带屏产品缺少任一开关时 `mcu_config.h` 直接报错，避免 `#if` 未定义被当作 0。
 2. **弱符号扩展点**（`Vendor/HC32/Platform/HAL/HAL.h`）：`Power_ProductInit`、`Power_ProductUpdate`、`Power_AdjustPercent`、`Key_ProductInit`、`Key_ProductUpdate`。默认无动作，产品源码覆盖（X1：电量补偿、MultiButton 按键动作）。

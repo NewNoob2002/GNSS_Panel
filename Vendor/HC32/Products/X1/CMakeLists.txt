@@ -7,7 +7,7 @@ add_library(hc32_product_x1 OBJECT
 )
 target_link_libraries(hc32_product_x1 PUBLIC
     hc32_shared_comm
-    hc32_multi_button
+    hc32::multibutton
     hc32_platform_headers
     hc32_libraries_headers
 )
@@ -15,5 +15,5 @@ target_link_libraries(hc32_product_x1 PUBLIC
 add_library(hc32_product INTERFACE)
 target_sources(hc32_product INTERFACE
     $<TARGET_OBJECTS:hc32_product_x1>
-    $<TARGET_OBJECTS:hc32_multi_button>
+    $<TARGET_OBJECTS:hc32::multibutton>
 )

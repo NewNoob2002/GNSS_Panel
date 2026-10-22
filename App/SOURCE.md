@@ -6,6 +6,8 @@
 
 `External/lvgl` 来自上游 tag `v9.6.0`，完整提交 `80ca777e37a2b176770726a02e07a6fb79ef0b39`（MIT）。
 原样导入 `include/`、`src/`、`lvgl.h`、`lvgl_private.h`、`lv_version.h`、`LICENCE.txt`；
+构建文件同样逐字节导入 `CMakeLists.txt`、`env_support/cmake/` 全部文件（含依赖脚本、安装模板 `lvgl.pc.in` 等）及 `Kconfig`。
+`cmake/lvgl.cmake` 用 `LV_BUILD_CONF_PATH` 和上游选项配置后，通过 `add_subdirectory` 使用 `lvgl::lvgl`；仅 Linux benchmark 启用上游 `lvgl::demos`，不启用 Kconfig、安装、示例、ThorVG 或依赖下载。
 `demos/` 仅带 Linux benchmark 及其 widgets 依赖和公共入口，未加入平台 `lv_conf.h`。
 HC32、SDL 模拟器、Linux 统一使用 v9 原生 API，并关闭 API mapping。
 页面管理由加固后的 `Frameworks/PageManager` 承担（适配项见下文）；已删除应用中的旧实现。

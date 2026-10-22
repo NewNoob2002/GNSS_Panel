@@ -63,14 +63,12 @@ foreach(target gpio_tests firmware_tests x1_power_tests xbase_power_tests x1_pro
 endforeach()
 
 # 带屏产品共享 LVGL 应用 + AppPlatform（固件路径）：固件 lv_conf.h（96 KB 池），C++ new 走 LVGL 池
-file(GLOB_RECURSE LVGL_SOURCES CONFIGURE_DEPENDS ${ROOT}/External/lvgl/src/*.c)
-
-# 三端自有显示/输入端口，软件渲染不编译硬件与第三方后端。
-list(FILTER LVGL_SOURCES EXCLUDE REGEX "/draw/(dma2d|espressif|eve|nanovg|nema_gfx|nxp|opengles|renesas|sdl|sifli|vg_lite)/")
-list(FILTER LVGL_SOURCES EXCLUDE REGEX "/drivers/|/libs/")
-add_library(display_lvgl STATIC ${LVGL_SOURCES})
-target_include_directories(display_lvgl PUBLIC ${ROOT}/External/lvgl/include ${ROOT}/External/lvgl ${ROOT}/External ${HC32}/Display/Lvgl display_fakes)
-target_compile_definitions(display_lvgl PUBLIC LV_CONF_INCLUDE_SIMPLE LV_DISABLE_API_MAPPING)
+include(${ROOT}/cmake/lvgl.cmake)
+project_add_lvgl("${HC32}/Display/Lvgl/lv_conf.h")
+add_library(display_lvgl INTERFACE)
+target_link_libraries(display_lvgl INTERFACE lvgl::lvgl)
+target_include_directories(display_lvgl INTERFACE display_fakes)
+target_compile_definitions(display_lvgl INTERFACE LV_CONF_INCLUDE_SIMPLE)
 add_library(app_lvgl INTERFACE)
 target_link_libraries(app_lvgl INTERFACE display_lvgl)
 add_library(app_build_options INTERFACE)
@@ -78,7 +76,7 @@ target_compile_options(app_build_options INTERFACE -UNDEBUG -fsanitize=address,u
 target_link_options(app_build_options INTERFACE -fsanitize=address,undefined)
 add_subdirectory(${ROOT}/App shared-app)
 add_executable(page_manager_tests ${ROOT}/Vendor/Linux/tests/app_page_manager_test.cpp)
-target_link_libraries(page_manager_tests PRIVATE app_page_manager)
+target_link_libraries(page_manager_tests PRIVATE fw::pagemanager)
 target_compile_options(page_manager_tests PRIVATE -Wall -Wextra -Werror -UNDEBUG)
 add_test(NAME page_manager_tests COMMAND page_manager_tests)
 add_executable(app_core_test ${ROOT}/App/tests/core_tests.cpp)

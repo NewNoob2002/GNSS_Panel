@@ -34,24 +34,13 @@ if(NOT TARGET PkgConfig::SDL2 AND NOT TARGET SDL2::SDL2)
     message(FATAL_ERROR "SDL2 development files were not found. Install libsdl2-dev on Ubuntu/Debian, or provide an SDL2 CMake package.")
 endif()
 
-# 与固件共用同一份 LVGL 源码（External/lvgl），配置用本目录的 lv_conf.h（LV_CONF_PATH 指定）。
-set(LVGL_DIR ${REPO_ROOT}/External/lvgl)
-file(GLOB_RECURSE LVGL_SOURCES CONFIGURE_DEPENDS "${LVGL_DIR}/src/*.c")
-
-# 三端自有显示/输入端口，软件渲染不编译硬件与第三方后端。
-list(FILTER LVGL_SOURCES EXCLUDE REGEX "/draw/(dma2d|espressif|eve|nanovg|nema_gfx|nxp|opengles|renesas|sdl|sifli|vg_lite)/")
-list(FILTER LVGL_SOURCES EXCLUDE REGEX "/drivers/")
-# 桌面配置保留 PNG、JPEG、GIF 与 QR 解码所需的第三方实现。
-set(SIM_LVGL_LIB_SOURCES ${LVGL_SOURCES})
-list(FILTER SIM_LVGL_LIB_SOURCES INCLUDE REGEX "/libs/(lodepng|tjpgd|gif|qrcode)/")
-list(FILTER LVGL_SOURCES EXCLUDE REGEX "/libs/")
-list(APPEND LVGL_SOURCES ${SIM_LVGL_LIB_SOURCES})
+# 上游目标负责收集 LVGL 源文件，模拟器仅指定自己的配置。
+include(${REPO_ROOT}/cmake/lvgl.cmake)
+project_add_lvgl("${CMAKE_CURRENT_SOURCE_DIR}/lv_conf.h")
+add_library(sim_lvgl ALIAS lvgl)
 # 共享 UI 通过 app_lvgl 使用模拟器显示配置；核心不依赖它。
-add_library(sim_lvgl STATIC ${LVGL_SOURCES})
-target_include_directories(sim_lvgl PUBLIC ${REPO_ROOT}/External ${LVGL_DIR} ${LVGL_DIR}/include)
-target_compile_definitions(sim_lvgl PUBLIC LV_DISABLE_API_MAPPING LV_CONF_PATH="${CMAKE_CURRENT_LIST_DIR}/lv_conf.h")
 add_library(app_lvgl INTERFACE)
-target_link_libraries(app_lvgl INTERFACE sim_lvgl)
+target_link_libraries(app_lvgl INTERFACE lvgl::lvgl)
 add_subdirectory(${REPO_ROOT}/App shared-app)
 
 if(SIM_BACKEND STREQUAL "Demo")
@@ -65,12 +54,7 @@ if(SIM_BACKEND STREQUAL "Demo")
     target_compile_options(demo_backend PRIVATE -Wall -Wextra -Werror)
 
     add_executable(main main.cpp)
-    target_include_directories(main PRIVATE
-        ${CMAKE_CURRENT_LIST_DIR}
-        ${REPO_ROOT}/External
-        ${LVGL_DIR}
-    ${LVGL_DIR}/include
-    )
+    target_include_directories(main PRIVATE ${CMAKE_CURRENT_LIST_DIR})
     target_compile_definitions(main PRIVATE
         LV_CONF_PATH="${CMAKE_CURRENT_LIST_DIR}/lv_conf.h"
         LVGL_SIMULATOR
@@ -109,9 +93,6 @@ else()
         ${HC32_DIR}/Display
         ${HC32_DIR}/Display/AppPlatform
         ${HC32_DIR}/Libraries
-        ${REPO_ROOT}/External
-        ${LVGL_DIR}
-    ${LVGL_DIR}/include
         ${HC32_DIR}/Platform/Config
         ${HC32_DIR}/Platform/Peripherals
         ${HC32_DIR}/Platform/State
@@ -128,9 +109,9 @@ else()
 endif()
 target_compile_options(main PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra>)
 if(TARGET PkgConfig::SDL2)
-    target_link_libraries(sim_lvgl PUBLIC PkgConfig::SDL2)
+    target_link_libraries(lvgl PUBLIC PkgConfig::SDL2)
 else()
-    target_link_libraries(sim_lvgl PUBLIC SDL2::SDL2)
+    target_link_libraries(lvgl PUBLIC SDL2::SDL2)
 endif()
 
 # 输出到各自构建目录的 bin/main：X1Pro 与 XBase 可用两个构建目录并存，互不覆盖。
