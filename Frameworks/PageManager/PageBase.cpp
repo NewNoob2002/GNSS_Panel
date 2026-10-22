@@ -20,17 +20,11 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+#include <inttypes.h>
 #include "PageBase.h"
 #include "PageLog.h"
 
-PageBase::PageBase()
-    : _manager(nullptr)
-    , _name(nullptr)
-    , _id(0)
-    , _root(nullptr)
-    , _context { 0 }
-{
-}
+PageBase::PageBase() : _manager(nullptr), _name(nullptr), _id(0), _root(nullptr), _context{} {}
 
 PageBase::~PageBase()
 {
@@ -71,7 +65,7 @@ void PageBase::setBackGestureDirection(lv_dir_t dir)
 
 bool PageBase::getParam(void* ptr, uint32_t size)
 {
-    if (!_context.param.ptr) {
+    if (!ptr || !_context.param.ptr) {
         PAGE_LOG_WARN("No param found");
         return false;
     }
@@ -88,5 +82,6 @@ bool PageBase::getParam(void* ptr, uint32_t size)
     lv_memcpy(ptr, _context.param.ptr, _context.param.size);
     lv_free(_context.param.ptr);
     _context.param.ptr = nullptr;
+    _context.param.size = 0;
     return true;
 }

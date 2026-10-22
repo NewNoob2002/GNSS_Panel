@@ -1,17 +1,19 @@
 #include "WorkSettings.h"
 #include "Utils/Log/Log.h"
-#include "Utils/PageManager/PageManager.h"
-#include "Utils/PageManager/PageUtils.h"
+#include "PageManager/PageManager.h"
+#include "Utils/PageUtils.h"
 #include "Utils/PageStyle.h"
 using namespace page;
 
-void WorkSettings::on_custom_attr_config() {
-    set_custom_load_anim_type(PageManager::LOAD_ANIM_MOVE_LEFT, style::kPageTransitionMs, lv_anim_path_ease_out);
+void WorkSettings::onInstalled() {
+    setLoadAnimType(PAGE_ANIM::MOVE_LEFT);
+    setLoadAnimTime(style::kPageTransitionMs);
+    setLoadAnimPath(lv_anim_path_ease_out);
 }
-void WorkSettings::on_view_load() {
+void WorkSettings::onViewLoad() {
     if (!model_.init())
         app_fatal("WorkSettings", "Model initialization failed");
-    view_.create(root);
+    view_.create(getRoot());
     utils::attach_controls(view_.controls(), clicked, this);
 }
 void WorkSettings::refresh() {
@@ -24,7 +26,7 @@ void WorkSettings::refresh() {
     if (controls_changed)
         utils::focus_controls(view_.controls(), lv_group_get_focused(lv_group_get_default()));
 }
-void WorkSettings::on_view_will_appear() {
+void WorkSettings::onViewWillAppear() {
     model_.set_status_bar(true);
     const auto& device = model_.device();
     target_ = device.ntrip == DataProc::NtripRole::Server && !device.radio_on ? DataProc::WorkTarget::Ntrip
@@ -48,7 +50,7 @@ void WorkSettings::on_view_will_appear() {
     if (!timer_)
         app_fatal("WorkSettings", "Feedback timer allocation failed");
 }
-void WorkSettings::on_view_will_disappear() {
+void WorkSettings::onViewWillDisappear() {
     view_.stop();
     model_.set_change_callback({});
     if (timer_) {
@@ -57,7 +59,7 @@ void WorkSettings::on_view_will_disappear() {
     }
     utils::leave_focus_group();
 }
-void WorkSettings::on_view_unload() {
+void WorkSettings::onViewUnload() {
     if (timer_) {
         lv_timer_delete(timer_);
         timer_ = nullptr;
@@ -66,9 +68,9 @@ void WorkSettings::on_view_unload() {
     model_.deinit();
     view_.destroy();
 }
-void WorkSettings::on_language_changed() {
+void WorkSettings::onLanguageChanged() {
     view_.update(target_, model_.device().work_pending, feedback_.text);
-    if (priv.state != PAGE_STATE_ACTIVITY)
+    if (getState() != STATE::ACTIVITY)
         view_.stop();
 }
 void WorkSettings::apply() {
@@ -84,7 +86,7 @@ void WorkSettings::apply() {
     feedback_.finish(accepted, model_.device().work_pending);
     refresh();
 }
-void WorkSettings::on_commit_request() {
+void WorkSettings::onCommitRequest() {
     if (lv_group_get_focused(lv_group_get_default()) == view_.ui.apply)
         apply();
 }
@@ -92,7 +94,7 @@ void WorkSettings::clicked(lv_event_t* event) {
     auto* self = static_cast<WorkSettings*>(lv_event_get_user_data(event));
     auto* control = lv_event_get_current_target_obj(event);
     if (control == self->view_.ui.back) {
-        self->page_manager->pop();
+        self->getManager()->pop();
         return;
     }
     if (self->model_.device().work_pending)

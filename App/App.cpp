@@ -43,16 +43,16 @@ bool App::init(const Options& options) {
     lv_obj_set_scrollbar_mode(lv_screen_active(), LV_SCROLLBAR_MODE_OFF);
 
     manager_ = std::make_unique<PageManager>();
-    manager_->set_root_default_style(&root_style_);
+    manager_->setRootDefaultStyle(&root_style_);
     // Default forward navigation is a smooth horizontal push; pages override this for boot/modal/context changes.
-    manager_->set_global_load_anim_type(PageManager::LOAD_ANIM_MOVE_LEFT, page::style::kPageTransitionMs,
+    manager_->setGlobalLoadAnim(PAGE_ANIM::MOVE_LEFT, page::style::kPageTransitionMs,
                                         lv_anim_path_ease_out);
     auto register_page = [this](PageBase* page, const char* name) {
-        if (!manager_->register_page(page, name)) {
+        if (manager_->registerPage(page, name) != PageManager::RES_TYPE::OK) {
             delete page;
             return false;
         }
-        page->on_custom_attr_config();
+        page->onInstalled();
         return true;
     };
     if (!register_page(new page::Dialplate, "Pages/Dialplate")
@@ -77,7 +77,7 @@ bool App::init(const Options& options) {
     navigation_timer_ = lv_timer_create(on_navigation, 20, this);
     if (!navigation_timer_)
         return false;
-    return manager_->push("Pages/Startup");
+    return manager_->push("Pages/Startup") == PageManager::RES_TYPE::OK;
 }
 
 void App::update() {
@@ -111,7 +111,7 @@ int App::on_system_event(DataNode* account, DataNode::EventParam_t* event) {
     auto* self = static_cast<App*>(account->getUserData());
     if (state.language != self->language_) {
         self->language_ = state.language;
-        self->manager_->notify_language_changed();
+        self->manager_->notifyLanguageChanged();
         self->battery_warning_.apply_language();
     }
     // Record rising edges only; on_navigation applies them once page switching is idle.
@@ -131,12 +131,12 @@ int App::on_system_event(DataNode* account, DataNode::EventParam_t* event) {
 
 void App::on_navigation(lv_timer_t* timer) {
     auto* self = static_cast<App*>(lv_timer_get_user_data(timer));
-    if (!self->manager_ || self->manager_->is_switching())
+    if (!self->manager_ || self->manager_->isSwitching())
         return;
     const char* page = self->current_page();
     if (self->pending_standby_) {
         // Power-off finished while the UI runs: a fresh standby root, no working history.
-        if (self->manager_->reset_root("Pages/Startup")) {
+        if (self->manager_->resetRoot("Pages/Startup") == PageManager::RES_TYPE::OK) {
             self->pending_standby_ = false;
             self->cancel_input();
         }
@@ -145,7 +145,7 @@ void App::on_navigation(lv_timer_t* timer) {
     if (self->pending_shutdown_) {
         if (page && std::strcmp(page, "Pages/SaveConfig") == 0) {
             self->pending_shutdown_ = false;
-        } else if (self->manager_->push("Pages/SaveConfig")) {
+        } else if (self->manager_->push("Pages/SaveConfig") == PageManager::RES_TYPE::OK) {
             self->pending_shutdown_ = false;
             self->cancel_input();
         }
@@ -154,7 +154,8 @@ void App::on_navigation(lv_timer_t* timer) {
     if (self->pending_power_on_) {
         self->pending_power_on_ = false;
         // Only the standby page advances; power-on confirmed elsewhere needs no navigation.
-        if (page && std::strcmp(page, "Pages/Startup") == 0 && !self->manager_->replace("Pages/SystemLoading"))
+        if (page && std::strcmp(page, "Pages/Startup") == 0
+            && self->manager_->replace("Pages/SystemLoading") != PageManager::RES_TYPE::OK)
             self->pending_power_on_ = true;
         return;
     }
@@ -170,7 +171,7 @@ void App::preload_next() {
     // page resident (popped pages are unloaded), and PageManager keeps creation time out of the transition anyway.
     static constexpr const char* kPreload[] = {"Pages/Dialplate", "Pages/SaveConfig"};
     while (preload_index_ < sizeof(kPreload) / sizeof(kPreload[0])) {
-        if (manager_->preload(kPreload[preload_index_++]))
+        if (manager_->preload(kPreload[preload_index_++]) == PageManager::RES_TYPE::OK)
             return; // One page per tick; an already loaded one is skipped at once.
     }
 }
@@ -198,22 +199,22 @@ void App::update_status(const page::StatusBarState& state) {
 }
 
 void App::on_input(const InputAction action) {
-    if (!group_ || !manager_ || manager_->is_switching())
+    if (!group_ || !manager_ || manager_->isSwitching())
         return;
     cancel_keys();
     dispatch_input(action);
 }
 
 void App::dispatch_input(const InputAction action) {
-    auto* current = manager_->get_current_page();
+    auto* current = manager_->getCurrentPage();
     if (action == InputAction::Press && pressed_ == focused() && pressed_page_ == current_page())
         return; // Auto-repeat must not restart a hold.
-    if (action == InputAction::NextFocus && current->on_next_request())
+    if (action == InputAction::NextFocus && current->onNextRequest())
         return;
-    if (action == InputAction::Confirm && current->on_enter_request())
+    if (action == InputAction::Confirm && current->onEnterRequest())
         return;
     if (action == InputAction::Commit) {
-        current->on_commit_request();
+        current->onCommitRequest();
         return;
     }
     const char* page = current_page();
@@ -225,7 +226,7 @@ void App::dispatch_input(const InputAction action) {
         if (pressed && page && std::strcmp(page, pressed_page) == 0 && lv_obj_is_in_widget_tree(pressed)) {
             lv_obj_set_pressed(pressed, false);
             lv_obj_send_event(pressed, LV_EVENT_RELEASED, nullptr);
-            if (lv_group_get_focused(group_) == pressed && !current->on_enter_request())
+            if (lv_group_get_focused(group_) == pressed && !current->onEnterRequest())
                 lv_obj_send_event(pressed, LV_EVENT_SHORT_CLICKED, nullptr);
         }
         return;
@@ -304,14 +305,14 @@ void App::poll_keys(std::uint64_t now_ms) {
     // ButtonGesture needs non-decreasing time; queued event stamps may precede the last loop poll.
     now_ms = now_ms < last_poll_ms_ ? last_poll_ms_ : now_ms;
     last_poll_ms_ = now_ms;
-    if (!manager_ || manager_->is_switching() || key_page_ != current_page()) {
+    if (!manager_ || manager_->isSwitching() || key_page_ != current_page()) {
         cancel_keys();
         return;
     }
     const auto power = power_gesture_.sample(power_down_, now_ms);
     const auto function = function_gesture_.sample(function_down_, now_ms);
-    auto* current = manager_->get_current_page();
-    const bool hold = current && current->wants_power_hold();
+    auto* current = manager_->getCurrentPage();
+    const bool hold = current && current->wantsPowerHold();
     if (hold != power_hold_) {
         // Switching between hold and click handling: the press that opened or closed a hold must not also
         // complete a click (e.g. reopen the power confirmation it just dismissed).
@@ -337,8 +338,8 @@ void App::poll_keys(std::uint64_t now_ms) {
 const char* App::current_page() const {
     if (!manager_)
         return nullptr;
-    PageBase* page = manager_->get_current_page();
-    return page ? page->page_name : nullptr;
+    PageBase* page = manager_->getCurrentPage();
+    return page ? page->getName() : nullptr;
 }
 
 bool App::show_page(const char* name) {
@@ -346,16 +347,16 @@ bool App::show_page(const char* name) {
         return false;
     const char* current = current_page();
     cancel_keys();
-    return (current && std::strcmp(current, name) == 0) || manager_->push(name);
+    return (current && std::strcmp(current, name) == 0) || manager_->push(name) == PageManager::RES_TYPE::OK;
 }
 
 bool App::back() {
-    if (!manager_ || manager_->is_switching())
+    if (!manager_ || manager_->isSwitching())
         return false;
     cancel_keys();
-    if (auto* current = manager_->get_current_page(); current && current->on_back_request())
+    if (auto* current = manager_->getCurrentPage(); current && current->onBackRequest())
         return true;
-    return manager_->pop();
+    return manager_->pop() == PageManager::RES_TYPE::OK;
 }
 
 lv_obj_t* App::focused() const {

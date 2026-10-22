@@ -3,7 +3,7 @@
 #include "SaveConfigModel.h"
 
 #include "SaveConfigView.h"
-#include "Utils/PageManager/PageBase.h"
+#include "PageManager/PageBase.h"
 
 namespace page {
 /** Power-off progress. A user action is committed when the progress ends (cancellable before); a platform
@@ -11,14 +11,14 @@ namespace page {
  */
 class SaveConfig final : public PageBase {
   public:
-    void on_custom_attr_config() override;
-    void on_view_load() override;
-    void on_view_will_appear() override;
-    void on_view_did_appear() override;
-    void on_view_will_disappear() override;
-    void on_view_unload() override;
-    void on_language_changed() override;
-    bool on_back_request() override;
+    void onInstalled() override;
+    void onViewLoad() override;
+    void onViewWillAppear() override;
+    void onViewDidAppear() override;
+    void onViewWillDisappear() override;
+    void onViewUnload() override;
+    void onLanguageChanged() override;
+    bool onBackRequest() override;
 
   private:
     void apply_text();

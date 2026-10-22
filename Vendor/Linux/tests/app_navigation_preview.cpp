@@ -5,13 +5,13 @@
 #include <cstdlib>
 #include <cstring>
 
+#include "App.h"
 #include "ButtonGesture.h"
 #include "Common/SystemService.h"
-#include "App.h"
-#include "Resource/ResourcePool.h"
 #include "DemoStatus.h"
+#include "PageManager/PageManager.h"
+#include "Resource/ResourcePool.h"
 #include "Utils/I18n/I18n.h"
-#include "Utils/PageManager/PageManager.h"
 
 /** @brief 通过公开 API 读取对象的屏幕绝对坐标供布局断言使用。 */
 static lv_area_t
@@ -56,10 +56,12 @@ static lv_obj_t* find_image(lv_obj_t* root, const void* source) {
 }
 
 namespace {
-// Building this page takes 200 ms (the tick advances inside on_view_load), like a heavy page on the MCU.
+// 建页期间推进 200 ms，模拟 MCU 上耗时较长的页面创建。
 class SlowPage final : public PageBase {
   public:
-    void on_view_load() override {
+    /** @brief Simulate a slow load without spending real time. */
+    void
+    onViewLoad() override {
         lv_tick_inc(200);
     }
 };
@@ -133,9 +135,10 @@ int main(int argc, char** argv) {
     {
         // Building a page is not elapsed transition time: the first frame starts at the beginning of the slide.
         PageManager manager;
-        assert(manager.register_page(new RootPage, "Test/Root") && manager.register_page(new SlowPage, "Test/Slow"));
-        manager.set_global_load_anim_type(PageManager::LOAD_ANIM_MOVE_LEFT, 260, lv_anim_path_linear);
-        assert(manager.push("Test/Root"));
+        assert(manager.registerPage(new RootPage, "Test/Root") == PageManager::RES_TYPE::OK);
+        assert(manager.registerPage(new SlowPage, "Test/Slow") == PageManager::RES_TYPE::OK);
+        manager.setGlobalLoadAnim(PAGE_ANIM::MOVE_LEFT, 260, lv_anim_path_linear);
+        assert(manager.push("Test/Root") == PageManager::RES_TYPE::OK);
         // The UI always has some animation running (status icons, dashboard cards); with an empty list LVGL would
         // reset its clock on the next start and hide the problem.
         lv_anim_t background;
@@ -147,10 +150,10 @@ int main(int argc, char** argv) {
         lv_anim_set_repeat_count(&background, LV_ANIM_REPEAT_INFINITE);
         assert(lv_anim_start(&background));
         advance(400);
-        assert(manager.push("Test/Slow"));
+        assert(manager.push("Test/Slow") == PageManager::RES_TYPE::OK);
         lv_tick_inc(10);
         lv_timer_handler();
-        auto* slow_root = manager.get_current_page()->root;
+        auto* slow_root = manager.getCurrentPage()->getRoot();
         assert(lv_obj_get_style_x(slow_root, LV_PART_MAIN) > width_px * 3 / 4); // Not 210 of 260 ms already gone.
         advance(400);
         assert(lv_obj_get_style_x(slow_root, LV_PART_MAIN) == 0);
@@ -310,21 +313,21 @@ int main(int argc, char** argv) {
                 // Pages slide (no page-level opacity layer): info pages vertically, the save page over the top.
                 const auto expected_anim =
                     std::strcmp(page.name, "Pages/StarMap") == 0 || std::strcmp(page.name, "Pages/SystemInfos") == 0
-                        ? PageManager::LOAD_ANIM_MOVE_TOP
-                    : std::strcmp(page.name, "Pages/SaveConfig") == 0   ? PageManager::LOAD_ANIM_OVER_TOP
-                    : std::strcmp(page.name, "Pages/RecordConfig") == 0 ? PageManager::LOAD_ANIM_OVER_TOP
-                    : std::strcmp(page.name, "Pages/SystemDash") == 0   ? PageManager::LOAD_ANIM_OVER_BOTTOM
-                                                                        : PageManager::LOAD_ANIM_MOVE_LEFT;
+                        ? PAGE_ANIM::MOVE_TOP
+                    : std::strcmp(page.name, "Pages/SaveConfig") == 0   ? PAGE_ANIM::OVER_TOP
+                    : std::strcmp(page.name, "Pages/RecordConfig") == 0 ? PAGE_ANIM::OVER_TOP
+                    : std::strcmp(page.name, "Pages/SystemDash") == 0   ? PAGE_ANIM::OVER_BOTTOM
+                                                                        : PAGE_ANIM::MOVE_LEFT;
                 const auto* controller = static_cast<PageBase*>(lv_obj_get_user_data(page_root));
-                assert(controller && controller->priv.anim.attr.type == expected_anim);
-                assert(controller->priv.anim.attr.type != PageManager::LOAD_ANIM_FADE_ON);
+                assert(controller && controller->getLoadAnimType() == expected_anim);
+                assert(controller->getLoadAnimType() != PAGE_ANIM::FADE_ON);
                 advance(120);
-                if (expected_anim == PageManager::LOAD_ANIM_FADE_ON) {
+                if (expected_anim == PAGE_ANIM::FADE_ON) {
                     const auto opa = lv_obj_get_style_opa(page_root, LV_PART_MAIN);
                     assert(opa > LV_OPA_TRANSP && opa < LV_OPA_COVER);
-                } else if (expected_anim == PageManager::LOAD_ANIM_MOVE_LEFT) {
+                } else if (expected_anim == PAGE_ANIM::MOVE_LEFT) {
                     assert(lv_obj_get_x(page_root) > 0 && lv_obj_get_x(page_root) < width_px);
-                } else if (expected_anim == PageManager::LOAD_ANIM_OVER_BOTTOM) {
+                } else if (expected_anim == PAGE_ANIM::OVER_BOTTOM) {
                     assert(lv_obj_get_y(page_root) < 0 && lv_obj_get_y(page_root) > -height_px);
                 } else {
                     assert(lv_obj_get_y(page_root) > 0 && lv_obj_get_y(page_root) < height_px);
@@ -400,20 +403,21 @@ int main(int argc, char** argv) {
                 } else {
                     assert(app.back());
                 }
-                if (expected_anim == PageManager::LOAD_ANIM_MOVE_TOP)
+                if (expected_anim == PAGE_ANIM::MOVE_TOP) {
                     assert(lv_obj_get_style_y(page_root, LV_PART_MAIN) == 0); // No bottom-alignment jump at pop start.
+                }
                 lv_tick_inc(50);
                 lv_timer_handler();
                 assert(std::strcmp(app.current_page(), "Pages/Dialplate") == 0);
                 lv_obj_update_layout(
                     page_root); // Animation setters dirty layout; getters otherwise see the last frame.
-                if (expected_anim == PageManager::LOAD_ANIM_FADE_ON)
+                if (expected_anim == PAGE_ANIM::FADE_ON) {
                     assert(lv_obj_get_style_opa(page_root, LV_PART_MAIN) < LV_OPA_COVER);
-                else if (expected_anim == PageManager::LOAD_ANIM_MOVE_LEFT)
+                } else if (expected_anim == PAGE_ANIM::MOVE_LEFT) {
                     assert(lv_obj_get_x(page_root) > 0); // Back reverses the direction, not another left wipe.
-                else if (expected_anim == PageManager::LOAD_ANIM_OVER_BOTTOM)
+                } else if (expected_anim == PAGE_ANIM::OVER_BOTTOM) {
                     assert(lv_obj_get_style_y(page_root, LV_PART_MAIN) < 0);
-                else
+                } else
                     assert(lv_obj_get_style_y(page_root, LV_PART_MAIN) > 0);
                 assert(app.focused());
                 assert(lv_group_get_focus_cb(lv_group_get_default()) == nullptr);

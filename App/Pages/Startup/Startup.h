@@ -3,20 +3,20 @@
 #include "StartupModel.h"
 
 #include "StartupView.h"
-#include "Utils/PageManager/PageBase.h"
+#include "PageManager/PageBase.h"
 
 namespace page {
 /** Startup hold: shows progress and requests power-on; the platform decides and App navigates. */
 class Startup final : public PageBase {
   public:
-    void on_custom_attr_config() override;
-    void on_view_load() override;
-    void on_view_will_appear() override;
-    void on_view_did_appear() override;
-    void on_view_will_disappear() override;
-    void on_view_unload() override;
-    void on_language_changed() override;
-    bool wants_power_hold() const override {
+    void onInstalled() override;
+    void onViewLoad() override;
+    void onViewWillAppear() override;
+    void onViewDidAppear() override;
+    void onViewWillDisappear() override;
+    void onViewUnload() override;
+    void onLanguageChanged() override;
+    bool wantsPowerHold() const override {
         return true; // Power-on is a 2 s hold.
     }
 

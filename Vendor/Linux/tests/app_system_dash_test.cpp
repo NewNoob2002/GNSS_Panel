@@ -15,6 +15,19 @@
 #include "lvgl_private.h"
 
 namespace {
+/** @brief Reject SaveConfig navigation after power preparation to exercise rollback. */
+PageManager::RES_TYPE
+reject_save_navigation(PageManager::EVENT* event) {
+    if (event->type == PageManager::EVENT_TYPE::PAGE_PUSH && event->param
+        && std::strcmp(static_cast<const char*>(event->param), "Pages/SaveConfig") == 0) {
+        auto* attempts = static_cast<unsigned*>(event->userData);
+        ++*attempts;
+        assert(SystemService::snapshot().power_pending);
+        return PageManager::RES_TYPE::STOP_PROCESS;
+    }
+    return PageManager::RES_TYPE::OK;
+}
+
 /** @brief 通过公开 API 读取对象的屏幕绝对坐标供布局断言使用。 */
 static lv_area_t
 object_coords(const lv_obj_t* object) {
@@ -952,9 +965,27 @@ int main(int argc, char** argv) {
             assert(std::strcmp(app.current_page(), "Pages/SystemDash") == 0);
         }
         choose(i18n::TextId::PowerTitle);
+        auto* dash_root = app.focused();
+        while (lv_obj_get_parent(dash_root) != lv_screen_active()) {
+            dash_root = lv_obj_get_parent(dash_root);
+        }
+        auto* dash = static_cast<PageBase*>(lv_obj_get_user_data(dash_root));
+        assert(dash && dash->getState() == PageBase::STATE::ACTIVITY);
+        auto* manager = dash->getManager();
+        unsigned rejected = 0;
+        manager->setEventCallback(reject_save_navigation, &rejected);
+        product_click(App::Key::Power);
+        product_hold(App::Key::Power, 2300);
+        assert(rejected == 1);
+        assert(std::strcmp(app.current_page(), "Pages/SystemDash") == 0);
+        assert(!manager->isSwitching());
+        assert(!SystemService::snapshot().power_pending && SystemService::snapshot().power_calls == 0);
+        focused(i18n::TextId::PowerTitle);
+        manager->setEventCallback(nullptr, nullptr);
         product_click(App::Key::Power);
         product_hold(App::Key::Power, 2300);
         assert(std::strcmp(app.current_page(), "Pages/SaveConfig") == 0);
+        assert(SystemService::snapshot().power_pending && SystemService::snapshot().power_calls == 0);
         product_click(App::Key::Function, true); // Cancel before the simulated service runs.
         assert(!SystemService::snapshot().power_pending && SystemService::snapshot().power_calls == 0);
         focused(i18n::TextId::PowerTitle); // Leaving for SaveConfig closed the dialog.
@@ -983,7 +1014,8 @@ int main(int argc, char** argv) {
             open();
             product_hold(App::Key::Power, 2300);
             assert(std::strcmp(app.current_page(), "Pages/SaveConfig") == 0
-                   && SystemService::snapshot().power_calls == calls);
+                   && SystemService::snapshot().power_calls == calls && SystemService::snapshot().power_pending
+                   && SystemService::snapshot().power_action == action);
             product_click(App::Key::Power, true); // Duplicate commit cannot create another request.
             advance(12000);
             assert(SystemService::snapshot().power_calls == calls + 1

@@ -1,27 +1,29 @@
 #include "Startup.h"
 #include "Utils/Log/Log.h"
-#include "Utils/PageManager/PageManager.h"
-#include "Utils/PageManager/PageUtils.h"
+#include "PageManager/PageManager.h"
+#include "Utils/PageUtils.h"
 #include "Utils/PageStyle.h"
 
 using namespace page;
 
-void Startup::on_custom_attr_config() {
-    set_custom_load_anim_type(PageManager::LOAD_ANIM_OVER_BOTTOM, style::kPageTransitionMs, lv_anim_path_ease_out);
+void Startup::onInstalled() {
+    setLoadAnimType(PAGE_ANIM::OVER_BOTTOM);
+    setLoadAnimTime(style::kPageTransitionMs);
+    setLoadAnimPath(lv_anim_path_ease_out);
 }
 
-void Startup::on_view_load() {
+void Startup::onViewLoad() {
     if (!model_.init())
         app_fatal("Startup", "Model initialization failed");
-    view_.create(root);
-    style::show_demo(root, model_.settings().simulated);
+    view_.create(getRoot());
+    style::show_demo(getRoot(), model_.settings().simulated);
     lv_obj_set_clickable(view_.ui.btn_press, true);
     lv_obj_add_event_cb(view_.ui.btn_press, hold_event, LV_EVENT_ALL, this);
     lv_obj_set_user_data(view_.ui.arc, this);
     lv_anim_set_exec_cb(&view_.ui.arc_anim, set_progress);
 }
 
-void Startup::on_view_will_appear() {
+void Startup::onViewWillAppear() {
     model_.set_change_callback([this] {
         view_.update(model_.status());
         view_.update_device(model_.device());
@@ -34,7 +36,7 @@ void Startup::on_view_will_appear() {
     utils::focus_controls(std::array{view_.ui.btn_press}, view_.ui.btn_press);
 }
 
-void Startup::on_view_did_appear() {
+void Startup::onViewDidAppear() {
     status_timer_ = lv_timer_create(on_status_timeout, 10000, this);
     if (!status_timer_)
         LV_LOG_ERROR("Startup: status delay timer allocation failed");
@@ -51,7 +53,7 @@ void Startup::on_status_timeout(lv_timer_t* timer) {
     auto* self = static_cast<Startup*>(lv_timer_get_user_data(timer));
     self->status_timer_ = nullptr;
     lv_timer_delete(timer);
-    if (self->page_manager->get_current_page() == self)
+    if (self->getManager()->getCurrentPage() == self)
         self->model_.set_status_bar(true);
 }
 
@@ -62,7 +64,7 @@ void Startup::cancel_timer() {
     }
 }
 
-void Startup::on_view_will_disappear() {
+void Startup::onViewWillDisappear() {
     model_.set_change_callback({});
     cancel_status_timer();
     cancel_timer();
@@ -71,7 +73,7 @@ void Startup::on_view_will_disappear() {
     utils::leave_focus_group();
 }
 
-void Startup::on_view_unload() {
+void Startup::onViewUnload() {
     cancel_status_timer();
     model_.deinit();
     cancel_timer();
@@ -79,7 +81,7 @@ void Startup::on_view_unload() {
     view_.destroy();
 }
 
-void Startup::on_language_changed() {
+void Startup::onLanguageChanged() {
     view_.apply_language();
 }
 

@@ -1,30 +1,32 @@
 #include "SaveConfig.h"
 #include "Utils/Log/Log.h"
-#include "Utils/PageManager/PageManager.h"
-#include "Utils/PageManager/PageUtils.h"
+#include "PageManager/PageManager.h"
+#include "Utils/PageUtils.h"
 #include "Utils/PageStyle.h"
 
 using namespace page;
 
-void SaveConfig::on_custom_attr_config() {
-    set_custom_load_anim_type(PageManager::LOAD_ANIM_OVER_TOP, style::kPageTransitionMs, lv_anim_path_ease_out);
+void SaveConfig::onInstalled() {
+    setLoadAnimType(PAGE_ANIM::OVER_TOP);
+    setLoadAnimTime(style::kPageTransitionMs);
+    setLoadAnimPath(lv_anim_path_ease_out);
 }
 
-void SaveConfig::on_view_load() {
+void SaveConfig::onViewLoad() {
     if (!model_.init())
         app_fatal("SaveConfig", "Model initialization failed");
-    view_.create(root);
+    view_.create(getRoot());
 }
 
 void SaveConfig::apply_text() {
     view_.update(model_.settings());
 }
 
-bool SaveConfig::on_back_request() {
+bool SaveConfig::onBackRequest() {
     return model_.settings().shutting_down; // A platform shutdown cannot be left or cancelled.
 }
 
-void SaveConfig::on_view_will_appear() {
+void SaveConfig::onViewWillAppear() {
     model_.set_status_bar(true);
     model_.set_change_callback([this] {
         apply_text();
@@ -33,7 +35,7 @@ void SaveConfig::on_view_will_appear() {
     apply_text();
 }
 
-void SaveConfig::on_view_did_appear() {
+void SaveConfig::onViewDidAppear() {
     // A long host frame cannot execute power completion while navigation is still busy.
     if (!model_.settings().shutting_down)
         lv_anim_start(view_.progress_animation());
@@ -49,7 +51,7 @@ void SaveConfig::cancel_timer() {
     }
 }
 
-void SaveConfig::on_view_will_disappear() {
+void SaveConfig::onViewWillDisappear() {
     model_.set_change_callback({});
     view_.stop();
     cancel_timer();
@@ -58,13 +60,13 @@ void SaveConfig::on_view_will_disappear() {
     utils::leave_focus_group();
 }
 
-void SaveConfig::on_view_unload() {
+void SaveConfig::onViewUnload() {
     model_.deinit();
     cancel_timer();
     view_.stop();
 }
 
-void SaveConfig::on_language_changed() {
+void SaveConfig::onLanguageChanged() {
     apply_text();
 }
 
@@ -80,6 +82,7 @@ void SaveConfig::on_timeout(lv_timer_t* timer) {
         return;
     }
     // Off ends with the platform's standby report (App resets to Startup); Reboot resumes the working root.
-    if (request.power_action == DataProc::PowerAction::Reboot && !self->page_manager->back_home())
+    if (request.power_action == DataProc::PowerAction::Reboot
+        && self->getManager()->backHome() != PageManager::RES_TYPE::OK)
         LV_LOG_WARN("SaveConfig: return to the working root rejected");
 }

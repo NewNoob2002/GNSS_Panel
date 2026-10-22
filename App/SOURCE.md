@@ -1,6 +1,6 @@
 # P4 原应用源码来源
 
-当前构建与平台边界见 [共享应用架构](ARCHITECTURE.md)。`App/` 与 `Frameworks/` 以本仓库为唯一来源，不再从外部仓库同步。事件框架位于 `Frameworks/DataBroker`，使用独立时钟调度；DataNode 的注册、发布销毁保护与请求校验保留。调度设计参考 X-TRACK `dev_lvgl_v9` 的 `Frameworks/DataBroker/DataTimer`（提交 `28b0e90898eb6fcb474c7a354459242c781d780a`）；没有整体引入其 LVGL 9 页面或 HAL。
+当前构建与平台边界见 [共享应用架构](ARCHITECTURE.md)。`App/` 与 `Frameworks/` 以本仓库为唯一来源，不再从外部仓库同步。事件框架位于 `Frameworks/DataBroker`，使用独立时钟调度；DataNode 的注册、发布销毁保护与请求校验保留。调度设计参考 X-TRACK `dev_lvgl_v9` 的 `Frameworks/DataBroker/DataTimer`（提交 `28b0e90898eb6fcb474c7a354459242c781d780a`）；没有引入 X-TRACK HAL；页面管理的后续适配见下文。
 
 ## LVGL v9.6.0
 
@@ -8,17 +8,17 @@
 原样导入 `include/`、`src/`、`lvgl.h`、`lvgl_private.h`、`lv_version.h`、`LICENCE.txt`；
 `demos/` 仅带 Linux benchmark 及其 widgets 依赖和公共入口，未加入平台 `lv_conf.h`。
 HC32、SDL 模拟器、Linux 统一使用 v9 原生 API，并关闭 API mapping。
-页面管理继续使用 `App/Utils/PageManager`，仅适配编译与运行所需接口；不接入 `Frameworks/PageManager`。
+页面管理由加固后的 `Frameworks/PageManager` 承担（适配项见下文）；已删除应用中的旧实现。
 正式图片位于 `Resource/img`（56 个文件、57 张图），转换及回读工具默认检查这个目录；`img_v9` 暂存目录已移除。
 Oswald 字体只增加俄语 ё 对已有同形 ë 字形的 cmap 映射；v8 的范围上界错误此前掩盖了缺字，位图未重新生成。
 
 ## 当前页面结构
 
 - 首页四个入口为工作配置、记录管理、设备信息、系统，使用原创同规格 16x16 白色 alpha 图标，不显示焦点文字；卫星区保持纯数值。图标源路径和生成检查位于 `Vendor/Linux/tools/generate_ui_icons.py`。
-- `SystemDash` 已合并原 `SystemSettings`：语言、Wi-Fi、电源和返回同屏。移除原设置页及路由，系统命令仍由所属 Model 发起。电源确认窗聚焦 Shutdown（有重启能力时 Function 可切到 Reboot），长按 Power 2 s 进度满 100% 才准备电源动作；进度满前松开或短按即关闭窗口，双击不再确认。长按期间页面经 `PageBase::wants_power_hold()` 接收原始按下/松开，切换模式时清除 Power 手势，关闭窗口的那次短按不会再触发单击。
+- `SystemDash` 已合并原 `SystemSettings`：语言、Wi-Fi、电源和返回同屏。移除原设置页及路由，系统命令仍由所属 Model 发起。电源确认窗聚焦 Shutdown（有重启能力时 Function 可切到 Reboot），长按 Power 2 s 进度满 100% 才准备电源动作；进度满前松开或短按即关闭窗口，双击不再确认。长按期间页面经 `PageBase::wantsPowerHold()` 接收原始按下/松开，切换模式时清除 Power 手势，关闭窗口的那次短按不会再触发单击。
 - `SaveConfig` 保留 26px 状态栏：左侧主卡显示 32px 电源图标与关机/重启动作，右侧圆角卡显示实时原因、取消或保留供电提示、8px 橙色进度条及百分比；仅位移入场，进度仍为 8 秒。
 - 工作页提供电台移动站、电台基站、网络基站三种预设；选择预设/协议/信道只改草稿，点击 Apply 才发送，CUSTOM 拒绝时留页提示。网络预设隐藏电台字段。
-- 页面切换全部为滑动（`style::kPageTransitionMs` 260 ms、缓出），不用整页淡入：整页透明度图层在 MCU 上最慢，且 LVGL 8.3 对含全屏子对象的页面在该图层中绘制错位（SaveConfig 花屏）。`PageManager::switch_to()` 先创建页面再 `lv_anim_refr_now()`，创建耗时不计入切换动画；SystemLoading 期间 App 预加载 Dialplate 与 SaveConfig（`PageManager::preload()`）。缓存/预加载页面在 `on_view_will_appear()` 前已取消隐藏，页面可以聚焦自身根对象。屏幕对象关闭滚动条。冷启动时 Power 键在 UI 开始轮询前已按下，长按模式按去抖电平 `ButtonGesture::held()` 计时（单击判定仍被取消），待机页开机进度从这次按压开始。
+- 页面切换全部为滑动（`style::kPageTransitionMs` 260 ms、缓出），不用整页淡入：整页透明度图层在 MCU 上最慢，且 LVGL 8.3 对含全屏子对象的页面在该图层中绘制错位（SaveConfig 花屏）。`PageManager::switchTo()` 先创建页面再 `lv_anim_refr_now()`，创建耗时不计入切换动画；SystemLoading 期间 App 预加载 Dialplate 与 SaveConfig（`PageManager::preload()`）。缓存/预加载页面在 `onViewWillAppear()` 前已取消隐藏，页面可以聚焦自身根对象。屏幕对象关闭滚动条。冷启动时 Power 键在 UI 开始轮询前已按下，长按模式按去抖电平 `ButtonGesture::held()` 计时（单击判定仍被取消），待机页开机进度从这次按压开始。
 - SystemLoading 按实际检查推进：控制器每 50 ms 轮询 `system_backend::poll_initialization_step()`（返回 Pending/Ok/Failed，平台自带超时，页面另有 `kStepLimitMs` 兜底），每步至少显示 300 ms、结果再停留 150 ms；进度条只在步骤完成时前进，齿轮持续旋转，单步超过 1 s 显示已等待秒数。失败只标红、不阻止进入 Dialplate。
 - 记录页默认聚焦启停，开始与停止都是单击（双击同样有效），等待主控确认期间不重复发送。状态栏 SD 图标跟随平台上报的录制状态：变化时先滑出状态栏、换色后滑回，录制中蓝色闪烁，未录制为静止白色。固定参数产品显示只读参数，参数在记录或等待期间锁定。
 - `DeviceSnapshot` 的 `work_pending/record_pending` 表达主控接收等待，通用反馈区分等待、收到、拒绝与 15 秒超时；超时不取消平台请求，返回不隐式撤销请求。已接收不代表物理操作完成。
@@ -39,14 +39,14 @@ Oswald 字体只增加俄语 ё 对已有同形 ë 字形的 cmap 映射；v8 �
 - Startup 最新主机样式为 GNSS RTK 标题/DEMO 徽章、FW/HW 两卡、电池图标/电量槽/实际百分比及电压，以及完整 106×94 Start 长按卡。Startup 与 StatusBar 复用 BatteryStyle：非充电按实际电量显示四级颜色，充电以绿色从空到满循环（1.2 秒增长、0.3 秒停留），数字保留实际电量；数据无效时取消动画；Startup 离页停止自身电池动画，StatusBar 在销毁时清理动画。SDL `--random-status [seed]` 每 3 秒生成可复现状态，经现有 UI 线程发布。电源图标、进度环与居中百分比、英俄 Start/Запуск 和 Hold 2s/Удерж. 2 с 形成明确启动入口；复用 PageStyle 与现有字体/图像，保留 26px 延迟状态栏区域和 2 秒长按行为。主机 CTest 9/9、双语字体/文字宽度/布局、SDL 提示文字处指针按下/提前释放检查通过；截图 out/host-startup-style/preview.png，未部署板端。
 - 主机 SystemInfos 按最新要求移除初始化标题与五条结果行，仅保留六张原有信息卡，固定 294×126 视口纵向滚动；显式控件数组按 Work/GPS/Wi-Fi/Battery/Storage/System 注册焦点，Next/Down/Function 正向、Previous/Up 反向，两端循环。System 卡保留初始化失败节点数，System 服务仍保存最近一次报告，Loading 日志和非阻塞初始化行为不变。发现实际运行的 out/host-init-info/application/simulator 是导航修复前的旧二进制，本轮原路径重建并重启。主机 CTest 9/9，生产 SDL 事件循环的队列注入检查确认 Down: Work→GPS、Up: GPS→Work 和完整六卡循环；记录及临时 fixture 位于 out/host-info-clean/。本轮未部署板端，旧初始化卡/紧凑行截图为历史。
 - 状态由 DemoStatus/StatusService 提供明确标为 DEMO 的自有快照；所有 LVGL、DataNode、输入、计时器在主线程执行，未来异步生产者需主循环投递。`Utils/Log` 提供运行时级别、可替换 sink、stderr 默认输出与有界格式化；PageManager/DataBroker 使用同一 API，普通投递日志为 DEBUG。
-- 本分支按情境切页：Startup/SystemLoading/Dialplate 与 SystemInfos 淡入，设置/菜单水平推进，StarMap/SaveConfig 从下向上进入；Back 反向退出，时长 280–360ms。PageManager 在缓存页重入时复位未动画轴/透明度，坐标 getter 读取与 setter 一致的对齐偏移，避免跨轴返回残留偏移或底对齐 StarMap 跳动；Oswald 支持英俄，Rajdhani 仅用于数字。Startup 在主机 Enter/中键/左键或测试板 V+（Power）长按 2 秒后进入 SystemLoading；短按、指针移出和窗口失焦取消。重复按下不重启计时，跨页松开不触发下一页。产品电源时序保留为未来平台接入点；归一化 Power 的去抖长按仅启动演示 UI，不将单击伪装为开机。两个开机阶段均用现有 PageManager::replace() 替换前页，Dialplate 为工作根页，Back 不再进入 Startup/SystemLoading；模拟 SaveConfig 完成按动作区分：Off 在未切断系统电源时调用 PageManager::reset_root("Pages/Startup")，清空旧历史并重建待机根页；Reboot 回到工作根页 Dialplate。进度和完成计时在 did_appear 后启动，避免主机长帧撞上未结束的切页。
+- 本分支按情境切页：Startup/SystemLoading/Dialplate 与 SystemInfos 淡入，设置/菜单水平推进，StarMap/SaveConfig 从下向上进入；Back 反向退出，时长 280–360ms。PageManager 在缓存页重入时复位未动画轴/透明度，坐标 getter 读取与 setter 一致的对齐偏移，避免跨轴返回残留偏移或底对齐 StarMap 跳动；Oswald 支持英俄，Rajdhani 仅用于数字。Startup 在主机 Enter/中键/左键或测试板 V+（Power）长按 2 秒后进入 SystemLoading；短按、指针移出和窗口失焦取消。重复按下不重启计时，跨页松开不触发下一页。产品电源时序保留为未来平台接入点；归一化 Power 的去抖长按仅启动演示 UI，不将单击伪装为开机。两个开机阶段均用现有 PageManager::replace() 替换前页，Dialplate 为工作根页，Back 不再进入 Startup/SystemLoading；模拟 SaveConfig 完成按动作区分：Off 在未切断系统电源时调用 PageManager::resetRoot("Pages/Startup")，清空旧历史并重建待机根页；Reboot 回到工作根页 Dialplate。进度和完成计时在 did_appear 后启动，避免主机长帧撞上未结束的切页。
 - Startup 默认隐藏 StatusBar，did_appear 后未完成启动长按则 10 秒滑入；短按取消不重置该延迟，离页删除定时器。SystemLoading 一律上滑隐藏状态栏，先展示 Logo 800ms，220ms 淡入带旋转齿轮/圆环的 System Initialization；控制器（当时每 600ms，现改为按实际结果轮询，见上方当前结构）推进配置/服务/GNSS/网络/收尾五阶段，单步记录 begin 与 OK/FAILED 的 DEMO 日志，窗口切换也保留日志。默认网络预留节点演示失败：标题/当前进度红色，失败圆点和连接线持续红色，后续节点照常执行；全部成功时 Ready 绿色，有失败时橙色 Started with warnings / ServicesLimited，100% 保留 200ms、Ready 保持 1 秒再淡入 Dialplate。默认使用 img_src_SystemLoading_XYZ.c（仍导出 img_src_startupLogo）；既有 RGK_LOGO_USE/MIDDLE_LOGO_USE 分别选 RGK/Neutral 文件。界面包含阶段标题、辅助文案、8px 进度条、百分比、Step N of 5、五个连接圆点与 GNSS RTK Receiver 页脚；文字/激活点淡入，Ready 颜色和齿轮→勾选过渡 220ms。英俄用 Oswald（Rajdhani 没有 % 字形）。全程标 DEMO，不代表真实硬件初始化或测量；平台接入须有界且保留失败不阻断规则。离页清理计时器/动画，重入清除失败标记。最新拼图见 out/deploy-loading/initialization.png；旧 out/ui-pages/Boot 拼图/GIF 为历史成功演示。
 - 主机测试扩为 9 项，含框架日志/生命周期、页面 Model 数据、直接逻辑操作与双语布局；除直接主机操作外，新增归一化 GPIO 逻辑样本回归，检查两键 Settings 循环焦点和 Back、SystemDash 三项循环及 Return 返回/重新进入，保持电源操作未执行，并检查 StarMap 无外框；不访问真实 GPIO、不改变 SDL 输入适配。SDL 构建及 dummy-video 退出已验证；详细命令与截图路径见 [UI 计划](../Vendor/Linux/docs/UI_PAGES_OPTIMIZATION_PLAN.md)。本分支两键版本已 ARM 构建并部署，主机 9/9 通过；RK3506 上通过临时 FIFO 定时 evdev 事件验证启动长按、取消、模拟 Off/Reboot，随后恢复真实 /dev/input/event0。实际两键手感和最新画面仍需操作者复核，真实 GPIO/电源仍未验收。详见 [P4 板端记录](../Vendor/Linux/docs/P4_APPLICATION.md)。
 - 平台边界（供 HC32 共用本 App）：系统操作经 `Common/SystemBackend.h` 由平台实现，本仓库的模拟实现与 `DemoStatus` 一起位于 `Vendor/Linux/Backends/Demo/`，编译为 OBJECT 库 `demo_backend`，`Vendor/Simulator`（`SIM_BACKEND=Demo`）/`rk3506_app`/既有测试链接它；其他平台注册自己的 DeviceObject。`SystemState` 增加 `powered_on`/`shutting_down`/`standby`/`reboot_available`/`power_cause`：Startup 长按结束只发 `RequestPowerOn`，由后端立即确认（模拟）或由平台稍后调用 `SystemService::set_powered_on(true)`；平台关机经 `begin_shutdown(cause)` 推入不可返回的 SaveConfig 并显示原因；`enter_standby()` 回到 Startup。上述导航由 App 的 20 ms 定时器在 DataNode 回调之外执行。用户 Off 在 SaveConfig 结束时提交，之后等待平台的待机报告（模拟后端立即报告，行为不变）；`reboot_available=false` 时电源弹窗只有 Shutdown/Cancel。`SystemState.simulated=false` 时隐藏标记为 DEMO 的徽章。页面 Model 初始化失败调用可由平台覆盖的弱符号 `app_fatal()`（默认 abort）。`App::init({.battery_warning = true})` 启用顶层电池过温横幅（65 °C 出现、低于 60 °C 消失，温度来自状态快照）。`app_platform_test` 用测试后端覆盖平台确认开机、无重启、平台关机/待机与过温横幅；主机 CTest 10/10。
 
 ## X-TRACK 框架适配（LVGL 8）
 
-保留 `Frameworks/DataBroker`、`DeviceManager`、`ResourceManager` 各源码文件的 X-TRACK MIT 许可和版权。此处只切换无图形依赖的三个框架；LVGL 仍为 8.3.11，`App/Utils/PageManager` 保持不变。
+保留 `Frameworks/DataBroker`、`DeviceManager`、`ResourceManager` 各源码文件的 X-TRACK MIT 许可和版权。本节记录 LVGL 8 阶段三个无图形依赖框架的适配；当前 LVGL 与页面管理状态见上文及下节。
 
 - DataTimer 移植本仓库原调度器的 32 项定长表、递增序号与回调快照，避免回调中删除自己/其他定时器后访问已释放对象；当前 tick 初始化起始时刻，无时钟安全返回，支持回绕、暂停/重置/恢复，不追赶遗漏周期。逐个回调前重新取时钟，避免前一回调推进时间并重置后续定时器后误触发。保留 DataBroker 的方法命名，新增注册结果查询；零周期暂停或删除节点定时器。
 - DataBroker 的节点池和订阅关系使用定长值成员，外部节点上限 16；主节点也改为值成员，不再使用异常分配。重复/空名称注册失败，通过 DataNode::isRegistered() 查询；重复订阅返回 nullptr。DataNode 定时器使用 nothrow 分配并检查失败。
@@ -54,3 +54,16 @@ Oswald 字体只增加俄语 ё 对已有同形 ë 字形的 cmap 映射；v8 �
 - DataBroker 日志宏接到现有 `App/Utils/Log`，例行分发使用 DEBUG；主节点默认接收成功，无业务订阅者时发布仍成功。应用服务保留各自值快照，原 Commit+Publish 改为 publish(data, size)，接收方继续按值拷贝。
 - DeviceObject 的默认虚函数省略未使用形参，消除 -Wextra/-Werror 告警；ioctl 按整数位域值解码，移除严格别名强转，并校验精确尺寸及非零尺寸空指针。SystemBackend 公共设备解码层统一按值拷贝，三端通过 DeviceManager 注册 Power/Device/Status；HC32 保留原 HAL 时序、协议索引映射与单写者约束。
 - ResourcePool 改用 ResourceManager.h 静态数组模板，保留公开接口、默认字体及缺失图片行为，不再动态注册资源；移除未使用的 ResourceManagerStatic 实现、本仓库旧消息缓冲框架和旧资源管理器。
+
+## X-TRACK PageManager 适配（LVGL 9.6）
+
+源码来自本仓库原有的 FASTSHIFT/X-TRACK `Frameworks/PageManager`（文件版权 2021–2024 _VIFEXTech，MIT），保留各文件许可；按本仓库需要修改，设计依据为 `docs/lvgl9_migration.md` 5.1 节。
+
+- 析构卸载并释放完整页面池，包含预加载与从未进入的页面；卸载停止根动画，清空子对象及外部样式，取消 root 的页面指针后保留 LVGL 异步删除。修复安装失败的实例释放和重复状态推进，入口校验空指针。
+- 先取消根对象 HIDDEN 再调用 `onViewWillAppear`，确保 StarMap 与缓存页根焦点有效；补充 `getState` 和只读动画类型查询，应用不再访问内部状态。
+- 合入旧实现的非动画轴/透明度复位、style x/y getter 与建页后 `lv_anim_refr_now`，避免跨轴残留、底对齐跳动和建页耗时造成首帧跳跃；默认与各页动画均保持实际使用的 260 ms 缓出。
+- 补齐 `preload/resetRoot/getCurrentPage/isSwitching/notifyLanguageChanged`。语言与双键输入扩展使用 `onLanguageChanged/onNextRequest/onEnterRequest/onCommitRequest/wantsPowerHold/onBackRequest`，直接置于 PageBase，供管理器与 App 统一分发，避免只作转发的应用基类。
+- 路由返回 `RES_TYPE`（`OK == 0`）；App 的 bool 接口和 SystemDash 准备/回滚路径显式比较 OK。参数在改栈前校验并复制，尺寸变化时分配新缓冲、成功后释放旧缓冲，失败保留原值及导航历史；读取参数后清零指针与长度。
+- 残留兼容 API 换成 v9.6 原生接口与专用 flag setter，坐标使用 int32_t；清理头文件未用形参和聚合初始化告警。PageLog 宏统一接入 `App/Utils/Log`，例行状态日志为 DEBUG；删除独立 printf 日志实现。
+- CMake 只编译框架实现，删除旧页面管理目录；应用焦点/控件辅助函数移至 `Utils/PageUtils.h`。不移植指针拖拽跟随返回；双键导航保持不变，模拟器使用 Esc、右键或返回控件，可选手势入口仍为 `setBackGestureDirection`。
+- Linux/主机的页面管理回归验证完整析构、异步删除、忙状态拒绝、预加载焦点、多语言通知、参数扩缩容及 resetRoot/backHome；SystemDash 回归注入 SaveConfig 导航拒绝，验证准备后回滚，并断言成功切页后事务仍待处理。原有动画、焦点、双键和电源完成断言保留。

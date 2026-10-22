@@ -1,23 +1,25 @@
 #include "SystemLoading.h"
 #include "Utils/Log/Log.h"
-#include "Utils/PageManager/PageManager.h"
-#include "Utils/PageManager/PageUtils.h"
+#include "PageManager/PageManager.h"
+#include "Utils/PageUtils.h"
 #include "Utils/PageStyle.h"
 
 using namespace page;
 
-void SystemLoading::on_custom_attr_config() {
-    set_custom_load_anim_type(PageManager::LOAD_ANIM_OVER_TOP, style::kPageTransitionMs, lv_anim_path_ease_out);
+void SystemLoading::onInstalled() {
+    setLoadAnimType(PAGE_ANIM::OVER_TOP);
+    setLoadAnimTime(style::kPageTransitionMs);
+    setLoadAnimPath(lv_anim_path_ease_out);
 }
 
-void SystemLoading::on_view_load() {
+void SystemLoading::onViewLoad() {
     if (!model_.init())
         app_fatal("SystemLoading", "Model initialization failed");
-    view_.create(root);
-    style::show_demo(root, model_.settings().simulated);
+    view_.create(getRoot());
+    style::show_demo(getRoot(), model_.settings().simulated);
 }
 
-void SystemLoading::on_view_will_appear() {
+void SystemLoading::onViewWillAppear() {
     model_.set_status_bar(false);
     phase_ = Phase::Logo;
     step_ = 0;
@@ -26,7 +28,7 @@ void SystemLoading::on_view_will_appear() {
     APP_LOG_I("SystemLoading", "window=Logo%s", demo_tag());
 }
 
-void SystemLoading::on_view_did_appear() {
+void SystemLoading::onViewDidAppear() {
     // Start completion timing after the page transition, including a stalled host frame.
     timer_ = lv_timer_create(on_timeout, 800, this); // Full-screen logo before simulated progress.
     if (!timer_)
@@ -40,19 +42,19 @@ void SystemLoading::cancel_timer() {
     }
 }
 
-void SystemLoading::on_view_will_disappear() {
+void SystemLoading::onViewWillDisappear() {
     cancel_timer();
     view_.destroy(); // Stop child animations even when this page remains cached.
     utils::leave_focus_group();
 }
 
-void SystemLoading::on_view_unload() {
+void SystemLoading::onViewUnload() {
     model_.deinit();
     cancel_timer();
     view_.destroy();
 }
 
-void SystemLoading::on_language_changed() {
+void SystemLoading::onLanguageChanged() {
     view_.apply_language();
 }
 
@@ -115,6 +117,6 @@ void SystemLoading::on_timeout(lv_timer_t* timer) {
     self->timer_ = nullptr;
     lv_timer_delete(timer);
     APP_LOG_I("SystemLoading", "window=Dialplate%s", self->demo_tag());
-    if (!self->page_manager->replace("Pages/Dialplate"))
+    if (self->getManager()->replace("Pages/Dialplate") != PageManager::RES_TYPE::OK)
         LV_LOG_WARN("SystemLoading: preview transition rejected");
 }

@@ -1,22 +1,24 @@
 #include "SystemDash.h"
 #include "Utils/Log/Log.h"
-#include "Utils/PageManager/PageManager.h"
-#include "Utils/PageManager/PageUtils.h"
+#include "PageManager/PageManager.h"
+#include "Utils/PageUtils.h"
 #include "Utils/PageStyle.h"
 using namespace page;
 
-void SystemDash::on_custom_attr_config() {
-    set_custom_load_anim_type(PageManager::LOAD_ANIM_OVER_BOTTOM, style::kPageTransitionMs, lv_anim_path_ease_out);
+void SystemDash::onInstalled() {
+    setLoadAnimType(PAGE_ANIM::OVER_BOTTOM);
+    setLoadAnimTime(style::kPageTransitionMs);
+    setLoadAnimPath(lv_anim_path_ease_out);
 }
-void SystemDash::on_view_load() {
+void SystemDash::onViewLoad() {
     if (!model_.init())
         app_fatal("SystemDash", "Model initialization failed");
-    view_.create(root, model_.settings().reboot_available);
+    view_.create(getRoot(), model_.settings().reboot_available);
     utils::attach_controls(view_.all_controls(), clicked, this);
     for (auto* action : {view_.ui.shutdown, view_.ui.reboot})
         lv_obj_add_event_cb(action, hold_event, LV_EVENT_ALL, this);
 }
-void SystemDash::on_view_will_appear() {
+void SystemDash::onViewWillAppear() {
     model_.set_status_bar(false);
     view_.apply_language();
     view_.update(model_.settings());
@@ -26,7 +28,7 @@ void SystemDash::on_view_will_appear() {
     utils::focus_controls(view_.controls(), last_focus_);
     view_.appear();
 }
-void SystemDash::on_view_will_disappear() {
+void SystemDash::onViewWillDisappear() {
     view_.stop();
     model_.set_change_callback({});
     // Stop the hold but keep the dialog and its full bar on screen while the next page slides over this one;
@@ -38,7 +40,7 @@ void SystemDash::on_view_will_disappear() {
     lv_anim_delete(this, set_hold_progress);
     last_focus_ = utils::leave_focus_group();
 }
-void SystemDash::on_view_did_disappear() {
+void SystemDash::onViewDidDisappear() {
     cancel_hold();
     if (view_.power_open()) {
         // Leaving (SaveConfig or a platform shutdown) ends the confirmation; return lands on the Power row.
@@ -46,16 +48,16 @@ void SystemDash::on_view_did_disappear() {
         last_focus_ = view_.ui.power;
     }
 }
-void SystemDash::on_view_unload() {
+void SystemDash::onViewUnload() {
     cancel_hold();
     model_.deinit();
     view_.destroy();
     last_focus_ = nullptr;
 }
-void SystemDash::on_language_changed() {
+void SystemDash::onLanguageChanged() {
     view_.apply_language();
     view_.update(model_.settings());
-    if (priv.state != PAGE_STATE_ACTIVITY)
+    if (getState() != STATE::ACTIVITY)
         view_.stop();
 }
 void SystemDash::show_power(bool visible) {
@@ -64,7 +66,7 @@ void SystemDash::show_power(bool visible) {
     view_.show_power(visible);
     utils::focus_controls(view_.controls(), visible ? view_.ui.shutdown : view_.ui.power);
 }
-bool SystemDash::on_back_request() {
+bool SystemDash::onBackRequest() {
     if (!view_.power_open())
         return false;
     show_power(false);
@@ -90,7 +92,7 @@ void SystemDash::hold_event(lv_event_t* event) {
     auto* self = static_cast<SystemDash*>(lv_event_get_user_data(event));
     auto* target = lv_event_get_current_target_obj(event);
     const auto code = lv_event_get_code(event);
-    if (!self->view_.power_open() || self->page_manager->is_switching())
+    if (!self->view_.power_open() || self->getManager()->isSwitching())
         return;
     if (code == LV_EVENT_PRESSED) {
         if (self->holding_)
@@ -128,7 +130,7 @@ void SystemDash::on_hold_complete(lv_timer_t* timer) {
         self->show_power(false);
         return;
     }
-    if (!self->page_manager->push("Pages/SaveConfig")) {
+    if (self->getManager()->push("Pages/SaveConfig") != PageManager::RES_TYPE::OK) {
         if (!self->model_.cancel_power())
             APP_LOG_E("SystemDash", "power rollback failed");
         self->show_power(false);
@@ -136,7 +138,7 @@ void SystemDash::on_hold_complete(lv_timer_t* timer) {
 }
 void SystemDash::clicked(lv_event_t* event) {
     auto* self = static_cast<SystemDash*>(lv_event_get_user_data(event));
-    if (self->page_manager->is_switching())
+    if (self->getManager()->isSwitching())
         return;
     auto* target = lv_event_get_current_target_obj(event);
     if (self->view_.power_open()) {
@@ -152,6 +154,6 @@ void SystemDash::clicked(lv_event_t* event) {
         const auto state = self->model_.settings();
         if (state.wifi_available && !state.wifi_pending && !self->model_.set_wifi(!state.wifi_on))
             APP_LOG_E("SystemDash", "Wi-Fi request rejected");
-    } else if (target == self->view_.ui.back && !self->page_manager->pop())
+    } else if (target == self->view_.ui.back && self->getManager()->pop() != PageManager::RES_TYPE::OK)
         APP_LOG_E("SystemDash", "Return navigation rejected");
 }

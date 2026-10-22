@@ -28,27 +28,29 @@
 #define PM_EMPTY_PAGE_NAME "EMPTY_PAGE"
 
 PageManager::PageManager(PageFactory* factory)
-    : _factory(factory)
-    , _pageCnt(0)
-    , _pagePrev(nullptr)
-    , _pageCurrent(nullptr)
-    , _animState { 0 }
-    , _rootParent(nullptr)
-    , _rootDefaultStyle(nullptr)
-    , _layerTop(nullptr)
-    , _eventCallback(nullptr)
-    , _eventUserData(nullptr)
-{
+    : _factory(factory), _pageCnt(0), _pagePrev(nullptr), _pageCurrent(nullptr), _animState{}, _rootParent(nullptr),
+      _rootDefaultStyle(nullptr), _layerTop(nullptr), _eventCallback(nullptr), _eventUserData(nullptr) {
     setGlobalLoadAnim(PAGE_ANIM::OVER_LEFT);
 }
 
 PageManager::~PageManager()
 {
     clearStack();
+    for (PageBase* base : _pagePool) {
+        if (base->_root) {
+            forceUnload(base);
+        }
+        delete base;
+    }
+    _pagePool.clear();
+    _pageCurrent = _pagePrev = nullptr;
 }
 
 PageBase* PageManager::findPageInPool(const char* name)
 {
+    if (!name) {
+        return nullptr;
+    }
     for (auto iter : _pagePool) {
         if (strcmp(name, iter->_name) == 0) {
             return iter;
@@ -59,6 +61,9 @@ PageBase* PageManager::findPageInPool(const char* name)
 
 PageBase* PageManager::findPageInStack(const char* name)
 {
+    if (!name) {
+        return nullptr;
+    }
     decltype(_pageStack) stk = _pageStack;
     while (!stk.empty()) {
         PageBase* base = stk.top();
@@ -75,6 +80,9 @@ PageBase* PageManager::findPageInStack(const char* name)
 
 PageManager::RES_TYPE PageManager::install(const char* className, const char* appName)
 {
+    if (!className) {
+        return RES_TYPE::ERR_PARAM;
+    }
     if (!_factory) {
         PAGE_LOG_ERROR("Factory was not registered, can't install page");
         return RES_TYPE::ERR_NOT_FOUND;
@@ -102,6 +110,8 @@ PageManager::RES_TYPE PageManager::install(const char* className, const char* ap
     auto res = registerPage(base, appName);
     if (res == RES_TYPE::OK) {
         base->onInstalled();
+    } else {
+        delete base;
     }
 
     return res;
@@ -109,6 +119,9 @@ PageManager::RES_TYPE PageManager::install(const char* className, const char* ap
 
 PageManager::RES_TYPE PageManager::uninstall(const char* appName)
 {
+    if (isSwitching()) {
+        return RES_TYPE::ERR_BUSY;
+    }
     PAGE_LOG_INFO("Page(%s) uninstall...", appName);
 
     PageBase* base = findPageInPool(appName);
@@ -123,17 +136,7 @@ PageManager::RES_TYPE PageManager::uninstall(const char* appName)
         return res;
     }
 
-    if (base->_context.isCached) {
-        PAGE_LOG_WARN("Page(%s) has cached, unloading...", appName);
-        base->_context.state = PageBase::STATE::UNLOAD;
-        stateNext(base);
-        stateNext(base);
-        stateNext(base);
-        stateNext(base);
-        stateNext(base);
-    } else {
-        PAGE_LOG_INFO("Page(%s) has not cache", appName);
-    }
+    forceUnload(base);
 
     delete base;
     PAGE_LOG_INFO("Uninstall OK");
@@ -142,6 +145,9 @@ PageManager::RES_TYPE PageManager::uninstall(const char* appName)
 
 PageManager::RES_TYPE PageManager::registerPage(PageBase* base, const char* name)
 {
+    if (!base || !name || base->_manager) {
+        return RES_TYPE::ERR_PARAM;
+    }
     if (findPageInPool(name) != nullptr) {
         PAGE_LOG_ERROR("Page(%s) was multi registered", name);
         return RES_TYPE::ERR_DUPLICATE;
@@ -229,11 +235,21 @@ void PageManager::clearStack(bool keepBottom)
             }
         }
 
-        fourceUnload(top);
+        forceUnload(top);
 
         _pageStack.pop();
     }
     PAGE_LOG_INFO("Stack clear done");
+}
+
+/** @brief Refresh language on every loaded page on the application thread. */
+void
+PageManager::notifyLanguageChanged() const {
+    for (PageBase* base : _pagePool) {
+        if (base->_root) {
+            base->onLanguageChanged();
+        }
+    }
 }
 
 const char* PageManager::getPagePrevName()

@@ -34,13 +34,13 @@ if(NOT TARGET app_lvgl)
     return()
 endif()
 add_library(app_page_manager STATIC
-    Utils/PageManager/PageBase.cpp
-    Utils/PageManager/PageManager_Base.cpp
-    Utils/PageManager/PageManager_Router.cpp
-    Utils/PageManager/PageManager_State.cpp
-    Utils/PageManager/PageManager_Anim.cpp
-    Utils/PageManager/PageManager_Drag.cpp)
-target_include_directories(app_page_manager PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+    ../Frameworks/PageManager/PageBase.cpp
+    ../Frameworks/PageManager/PageManager.cpp
+    ../Frameworks/PageManager/PageManagerRouter.cpp
+    ../Frameworks/PageManager/PageManagerState.cpp
+    ../Frameworks/PageManager/PageManagerAnim.cpp)
+target_include_directories(app_page_manager PUBLIC
+    "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/../Frameworks")
 target_link_libraries(app_page_manager PUBLIC app_lvgl app_build_options PRIVATE app_log)
 target_compile_options(app_page_manager PRIVATE -Wall -Wextra)
 # PageBase 与 app_ui 中的派生页面必须使用一致的 RTTI 布局及检查策略。

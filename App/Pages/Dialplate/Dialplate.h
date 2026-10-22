@@ -4,17 +4,17 @@
 
 #include <array>
 #include "DialplateView.h"
-#include "Utils/PageManager/PageBase.h"
+#include "PageManager/PageBase.h"
 
 namespace page {
 /** Dashboard navigation and focus lifecycle; View owns visual widgets only. */
 class Dialplate final : public PageBase {
   public:
-    void on_custom_attr_config() override;
-    void on_view_load() override;
-    void on_view_will_appear() override;
-    void on_view_will_disappear() override;
-    void on_view_unload() override;
+    void onInstalled() override;
+    void onViewLoad() override;
+    void onViewWillAppear() override;
+    void onViewWillDisappear() override;
+    void onViewUnload() override;
 
   private:
     std::array<lv_obj_t*, 5> controls() const;

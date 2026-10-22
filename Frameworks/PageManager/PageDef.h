@@ -23,7 +23,7 @@
 #ifndef __PAGE_DEF_H
 #define __PAGE_DEF_H
 
-#define PAGE_ANIM_TIME_DEFAULT 300 //[ms]
+#define PAGE_ANIM_TIME_DEFAULT 260 //[ms]
 
 #define PAGE_ANIM_PATH_DEFAULT lv_anim_path_ease_out
 

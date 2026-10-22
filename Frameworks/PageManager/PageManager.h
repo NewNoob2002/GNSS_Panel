@@ -68,13 +68,14 @@ public:
 
 public:
     PageManager(PageFactory* factory = nullptr);
+    /** @brief Use asynchronous root deletion only after page-owned callbacks stop. */
     ~PageManager();
 
     /**
      * @brief  Install the page, and register the page to the page pool
      * @param  className: The class name of the page
      * @param  appName: Page application name, no duplicates allowed
-     * @retval Return true if successful
+     * @retval OK on success, otherwise a specific error.
      */
     RES_TYPE install(const char* className, const char* appName);
 
@@ -86,9 +87,10 @@ public:
     RES_TYPE uninstall(const char* appName);
 
     /**
-     * @brief  Register the page to the page pool
-     * @param  name: Page application name, duplicate registration is not allowed
-     * @retval Return true if the registration is successful
+     * @brief Register a page; the manager takes ownership on success.
+     * @param base Page instance, not already owned by another manager.
+     * @param name Unique route string that outlives the manager.
+     * @retval OK on success; ownership remains with the caller on failure.
      */
     RES_TYPE registerPage(PageBase* base, const char* name);
 
@@ -103,7 +105,7 @@ public:
      * @brief  Enter a new page, replace the old page
      * @param  name: The name of the page to enter
      * @param  param: Parameters passed to the new page
-     * @retval Return true if successful
+     * @retval OK on success, otherwise a navigation error or hook rejection.
      */
     RES_TYPE replace(const char* name, const PageBase::PARAM* param = nullptr);
 
@@ -111,23 +113,44 @@ public:
      * @brief  Enter a new page, the old page is pushed onto the stack
      * @param  name: The name of the page to enter
      * @param  param: Parameters passed to the new page
-     * @retval Return true if successful
+     * @retval OK on success, otherwise a navigation error or hook rejection.
      */
     RES_TYPE push(const char* name, const PageBase::PARAM* param = nullptr);
 
     /**
      * @brief  Pop the current page
      * @param  None
-     * @retval Return true if successful
+     * @retval OK on success, otherwise a navigation error or hook rejection.
      */
     RES_TYPE pop();
 
     /**
      * @brief  Back to the main page (the page at the bottom of the stack)
      * @param  None
-     * @retval Return true if successful
+     * @retval OK on success, otherwise a navigation error or hook rejection.
      */
     RES_TYPE backHome();
+
+    /** @brief Preload a cacheable page; return OK only when newly loaded. */
+    RES_TYPE preload(const char* name);
+
+    /** @brief Unload stack history and enter an installed root page while idle. */
+    RES_TYPE resetRoot(const char* name);
+
+    /** @brief Return the current page, or nullptr before the first push. */
+    PageBase*
+    getCurrentPage() const {
+        return _pageCurrent;
+    }
+
+    /** @brief Return whether navigation is waiting for transition completion. */
+    bool
+    isSwitching() const {
+        return _animState.isSwitchReq || _animState.isBusy;
+    }
+
+    /** @brief Notify all loaded pages, including hidden preloaded pages. */
+    void notifyLanguageChanged() const;
 
     /**
      * @brief  Get the name of the previous page
@@ -160,7 +183,7 @@ public:
 
     /**
      * @brief  Set the root parent of the page
-     * @param  par: The parent of the root, if it is nullptr, the parent is lv_scr_act()
+     * @param  par: The parent of the root, if it is nullptr, the parent is lv_screen_active()
      * @retval None
      */
     void setRootParent(lv_obj_t* par)
@@ -175,7 +198,7 @@ public:
      */
     lv_obj_t* getRootParent()
     {
-        return (_rootParent ? _rootParent : lv_scr_act());
+        return (_rootParent ? _rootParent : lv_screen_active());
     }
 
     /**
@@ -220,11 +243,9 @@ private:
     /* Animation switching param  */
     struct ANIM_PARAM {
         ANIM_PARAM()
-            : enter { 0 }
-            , exit { 0 }
+            : enter{}, exit{}
 
-        {
-        }
+        {}
         /* As the entered party */
         struct
         {
@@ -330,12 +351,8 @@ private:
      */
     void clearStack(bool keepBottom = false);
 
-    /**
-     * @brief  Force the end of the life cycle of the page without animation
-     * @param  base: Pointer to the page being executed
-     * @retval Return true if successful
-     */
-    RES_TYPE fourceUnload(PageBase* base);
+    /** @brief Force a page lifecycle to finish without a transition. */
+    RES_TYPE forceUnload(PageBase* base);
 
     /**
      * @brief  Get page loading animation properties
@@ -372,14 +389,16 @@ private:
         return _animState.current.type;
     }
 
+    /** @brief Validate and copy parameters before changing navigation history. */
+    RES_TYPE prepareParam(PageBase* base, const PageBase::PARAM* param);
+
     /**
-     * @brief  Page switching
-     * @param  newNode: Pointer to new page
-     * @param  isEnterAct: Whether it is a ENTER action
-     * @param  param: Parameters passed to the new page
-     * @retval Return true if successful
+     * @brief Switch to a page whose parameters were prepared before stack mutation.
+     * @param base Target page in this manager's pool.
+     * @param isEnterAct True for forward navigation, false for back navigation.
+     * @retval OK on success, otherwise a navigation error.
      */
-    RES_TYPE switchTo(PageBase* base, bool isEnterAct, const PageBase::PARAM* param = nullptr);
+    RES_TYPE switchTo(PageBase* base, bool isEnterAct);
 
     /**
      * @brief  PPage switching animation execution end callback

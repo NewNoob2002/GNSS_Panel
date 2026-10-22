@@ -22,6 +22,11 @@ target_link_libraries(app_framework_test PRIVATE app_framework app_log)
 target_compile_options(app_framework_test PRIVATE -Wall -Wextra -Werror -UNDEBUG)
 add_test(NAME app_framework COMMAND app_framework_test)
 
+add_executable(app_page_manager_test app_page_manager_test.cpp)
+target_link_libraries(app_page_manager_test PRIVATE app_page_manager)
+target_compile_options(app_page_manager_test PRIVATE -Wall -Wextra -Werror -UNDEBUG)
+add_test(NAME app_page_manager COMMAND app_page_manager_test)
+
 add_executable(app_navigation_preview app_navigation_preview.cpp)
 target_link_libraries(app_navigation_preview PRIVATE demo_backend)
 target_compile_options(app_navigation_preview PRIVATE -Wall -Wextra -Werror -UNDEBUG)

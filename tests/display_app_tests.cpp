@@ -549,6 +549,9 @@ main() {
     assert(on_page("Pages/SystemDash") && !SystemService::snapshot().power_pending);
     run(800); // 满 2 s：准备关机并进入 SaveConfig
     assert(on_page("Pages/SaveConfig"));
+    assert(SystemService::snapshot().power_pending);
+    assert(SystemService::snapshot().power_action == DataProc::PowerAction::Off);
+    assert(SystemService::snapshot().power_calls == 0);
     power_key = false;
     run(10000);
     assert(SystemService::snapshot().power_calls == 1);

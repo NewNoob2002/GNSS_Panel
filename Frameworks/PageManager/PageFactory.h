@@ -35,8 +35,8 @@ public:
      * @param name Page name
      * @return Pointer to the page
      */
-    virtual PageBase* create(const char* name)
-    {
+    virtual PageBase*
+    create(const char*) {
         return nullptr;
     };
 };

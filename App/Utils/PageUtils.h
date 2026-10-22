@@ -33,6 +33,7 @@ template <size_t N> void focus_controls(const std::array<lv_obj_t*, N>& controls
         lv_group_focus_obj(focus);
 }
 
+/** @brief Release focus controls before the owning page root is unloaded. */
 inline lv_obj_t* leave_focus_group() {
     auto* group = lv_group_get_default();
     auto* focused = lv_group_get_focused(group);

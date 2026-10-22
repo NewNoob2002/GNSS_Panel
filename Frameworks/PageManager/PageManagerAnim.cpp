@@ -27,8 +27,8 @@ PageManager::RES_TYPE PageManager::getLoadAnimAttr(PAGE_ANIM anim, LOAD_ANIM_ATT
 {
     lv_obj_t* rootParent = getRootParent();
     lv_obj_update_layout(rootParent);
-    lv_coord_t hor = lv_obj_get_width(rootParent);
-    lv_coord_t ver = lv_obj_get_height(rootParent);
+    int32_t hor = lv_obj_get_width(rootParent);
+    int32_t ver = lv_obj_get_height(rootParent);
 
     switch (anim) {
     case PAGE_ANIM::OVER_LEFT:
@@ -143,9 +143,7 @@ PageManager::RES_TYPE PageManager::getLoadAnimAttr(PAGE_ANIM anim, LOAD_ANIM_ATT
         /* Use default NONE */
         break;
 
-    default:
-        PAGE_LOG_ERROR("Load anim type error: %d", anim);
-        return RES_TYPE::ERR_PARAM;
+    default: PAGE_LOG_ERROR("Load anim type error: %d", static_cast<int>(anim)); return RES_TYPE::ERR_PARAM;
     }
 
     /* Determine the setter and getter of the animation */
@@ -157,9 +155,7 @@ PageManager::RES_TYPE PageManager::getLoadAnimAttr(PAGE_ANIM anim, LOAD_ANIM_ATT
         attr->setter = [](void* obj, int32_t v) {
             lv_obj_set_x((lv_obj_t*)obj, v);
         };
-        attr->getter = [](void* obj) {
-            return (int32_t)lv_obj_get_x((lv_obj_t*)obj);
-        };
+        attr->getter = [](void* obj) { return (int32_t)lv_obj_get_style_x((lv_obj_t*)obj, LV_PART_MAIN); };
         break;
 
     case PAGE_ANIM::OVER_TOP:
@@ -169,9 +165,7 @@ PageManager::RES_TYPE PageManager::getLoadAnimAttr(PAGE_ANIM anim, LOAD_ANIM_ATT
         attr->setter = [](void* obj, int32_t v) {
             lv_obj_set_y((lv_obj_t*)obj, v);
         };
-        attr->getter = [](void* obj) {
-            return (int32_t)lv_obj_get_y((lv_obj_t*)obj);
-        };
+        attr->getter = [](void* obj) { return (int32_t)lv_obj_get_style_y((lv_obj_t*)obj, LV_PART_MAIN); };
         break;
 
     case PAGE_ANIM::FADE_ON:

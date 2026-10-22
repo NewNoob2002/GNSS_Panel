@@ -1,13 +1,15 @@
 #include "Dialplate.h"
 #include "Utils/Log/Log.h"
-#include "Utils/PageManager/PageManager.h"
-#include "Utils/PageManager/PageUtils.h"
+#include "PageManager/PageManager.h"
+#include "Utils/PageUtils.h"
 #include "Utils/PageStyle.h"
 
 using namespace page;
 
-void Dialplate::on_custom_attr_config() {
-    set_custom_load_anim_type(PageManager::LOAD_ANIM_OVER_TOP, style::kPageTransitionMs, lv_anim_path_ease_out);
+void Dialplate::onInstalled() {
+    setLoadAnimType(PAGE_ANIM::OVER_TOP);
+    setLoadAnimTime(style::kPageTransitionMs);
+    setLoadAnimPath(lv_anim_path_ease_out);
 }
 
 std::array<lv_obj_t*, 5> Dialplate::controls() const {
@@ -16,15 +18,15 @@ std::array<lv_obj_t*, 5> Dialplate::controls() const {
             view_.ui.btn_cont.btn_shutdown, model_.settings().star_map ? view_.ui.top_info.icon_satellite : nullptr};
 }
 
-void Dialplate::on_view_load() {
+void Dialplate::onViewLoad() {
     if (!model_.init())
         app_fatal("Dialplate", "Model initialization failed");
-    view_.create(root);
+    view_.create(getRoot());
     utils::attach_controls(controls(), clicked, this);
     entrance_pending_ = true;
 }
 
-void Dialplate::on_view_will_appear() {
+void Dialplate::onViewWillAppear() {
     model_.set_status_bar(true);
     view_.update(model_.device());
     model_.set_change_callback([this] {
@@ -39,13 +41,13 @@ void Dialplate::on_view_will_appear() {
     view_.anim_start();
 }
 
-void Dialplate::on_view_will_disappear() {
+void Dialplate::onViewWillDisappear() {
     view_.anim_stop();
     model_.set_change_callback({});
     last_focus_ = utils::leave_focus_group();
 }
 
-void Dialplate::on_view_unload() {
+void Dialplate::onViewUnload() {
     model_.deinit();
     view_.destroy();
     last_focus_ = nullptr;
@@ -66,5 +68,5 @@ void Dialplate::clicked(lv_event_t* event) {
     else if (button == self->view_.ui.top_info.icon_satellite)
         destination = "Pages/StarMap";
     if (destination)
-        self->page_manager->push(destination);
+        self->getManager()->push(destination);
 }

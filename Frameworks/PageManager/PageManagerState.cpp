@@ -72,7 +72,7 @@ void PageManager::stateNext(PageBase* base)
         break;
 
     default:
-        PAGE_LOG_ERROR("Page(%s) state[%d] was NOT FOUND!", base->_name, base->_context.state);
+        PAGE_LOG_ERROR("Page(%s) state[%d] was NOT FOUND!", base->_name, static_cast<int>(base->_context.state));
         break;
     }
 }
@@ -88,11 +88,11 @@ PageBase::STATE PageManager::stateLoad(PageBase* base)
     lv_obj_t* parent = base->_manager->getRootParent();
     lv_obj_t* root_obj = lv_obj_create(parent);
 
-    lv_obj_clear_flag(root_obj, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollable(root_obj, false);
     lv_obj_set_user_data(root_obj, base);
 
     if (base->_context.backGestureDir != LV_DIR_NONE) {
-        lv_obj_remove_flag(root_obj, LV_OBJ_FLAG_GESTURE_BUBBLE);
+        lv_obj_set_gesture_bubble(root_obj, false);
         lv_obj_add_event_cb(
             root_obj,
             [](lv_event_t* e) {
@@ -129,8 +129,9 @@ PageBase::STATE PageManager::stateLoad(PageBase* base)
 PageBase::STATE PageManager::stateWillAppear(PageBase* base)
 {
     PAGE_LOG_INFO("Page(%s) state will appear", base->_name);
+    // 缓存页必须先可见，willAppear 中对根对象的聚焦才会生效。
+    lv_obj_set_hidden(base->_root, false);
     base->onViewWillAppear();
-    lv_obj_clear_flag(base->_root, LV_OBJ_FLAG_HIDDEN);
     return PageBase::STATE::DID_APPEAR;
 }
 
@@ -151,7 +152,7 @@ PageBase::STATE PageManager::stateWillDisappear(PageBase* base)
 PageBase::STATE PageManager::stateDidDisappear(PageBase* base)
 {
     PAGE_LOG_INFO("Page(%s) state did disappear", base->_name);
-    lv_obj_add_flag(base->_root, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_set_hidden(base->_root, true);
     base->onViewDidDisappear();
     if (base->_context.isCached) {
         PAGE_LOG_INFO("Page(%s) has cached", base->_name);
@@ -169,9 +170,12 @@ PageBase::STATE PageManager::stateUnload(PageBase* base)
         return PageBase::STATE::IDLE;
     }
 
+    lv_anim_delete(base->_root, nullptr);
+    base->_context.anim.isBusy = false;
     base->onViewUnload();
-    if (base->_context.param.ptr != nullptr && base->_context.param.size != 0) {
-        PAGE_LOG_INFO("Page(%s) free param(%p)[%d]", base->_name, base->_context.param.ptr, base->_context.param.size);
+    if (base->_context.param.ptr != nullptr) {
+        PAGE_LOG_INFO("Page(%s) free param(%p)[%lu]", base->_name, base->_context.param.ptr,
+                      static_cast<unsigned long>(base->_context.param.size));
         lv_free(base->_context.param.ptr);
         base->_context.param.ptr = nullptr;
         base->_context.param.size = 0;
@@ -182,7 +186,11 @@ PageBase::STATE PageManager::stateUnload(PageBase* base)
     lv_obj_remove_style_all(base->_root);
 
     /* Delete after the end of the root animation life cycle */
-    lv_obj_del_async(base->_root);
+    // 根对象延迟删除，先解除指向页面实例的事件；保留 App 的删除时置空通知。
+    lv_obj_remove_event_cb_with_user_data(base->_root, nullptr, base);
+    lv_obj_set_clickable(base->_root, false);
+    lv_obj_set_user_data(base->_root, nullptr);
+    lv_obj_delete_async(base->_root);
     base->_root = nullptr;
     base->_context.isCached = false;
     base->onViewDidUnload();

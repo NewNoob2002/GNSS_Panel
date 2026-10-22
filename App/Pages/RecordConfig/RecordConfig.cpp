@@ -1,17 +1,19 @@
 #include "RecordConfig.h"
 #include "Utils/Log/Log.h"
-#include "Utils/PageManager/PageManager.h"
-#include "Utils/PageManager/PageUtils.h"
+#include "PageManager/PageManager.h"
+#include "Utils/PageUtils.h"
 #include "Utils/PageStyle.h"
 using namespace page;
 
-void RecordConfig::on_custom_attr_config() {
-    set_custom_load_anim_type(PageManager::LOAD_ANIM_OVER_TOP, style::kPageTransitionMs, lv_anim_path_ease_out);
+void RecordConfig::onInstalled() {
+    setLoadAnimType(PAGE_ANIM::OVER_TOP);
+    setLoadAnimTime(style::kPageTransitionMs);
+    setLoadAnimPath(lv_anim_path_ease_out);
 }
-void RecordConfig::on_view_load() {
+void RecordConfig::onViewLoad() {
     if (!model_.init())
         app_fatal("RecordConfig", "Model initialization failed");
-    view_.create(root);
+    view_.create(getRoot());
     utils::attach_controls(view_.controls(), clicked, this);
 }
 void RecordConfig::refresh() {
@@ -28,7 +30,7 @@ void RecordConfig::refresh() {
     if (changed)
         utils::focus_controls(view_.controls(), lv_group_get_focused(lv_group_get_default()));
 }
-void RecordConfig::on_view_will_appear() {
+void RecordConfig::onViewWillAppear() {
     model_.set_status_bar(true);
     view_.set_selection(model_.device().record_type, model_.device().record_interval);
     feedback_ = {};
@@ -48,7 +50,7 @@ void RecordConfig::on_view_will_appear() {
     if (!timer_)
         app_fatal("RecordConfig", "Feedback timer allocation failed");
 }
-void RecordConfig::on_view_will_disappear() {
+void RecordConfig::onViewWillDisappear() {
     view_.stop();
     model_.set_change_callback({});
     if (timer_) {
@@ -57,7 +59,7 @@ void RecordConfig::on_view_will_disappear() {
     }
     utils::leave_focus_group();
 }
-void RecordConfig::on_view_unload() {
+void RecordConfig::onViewUnload() {
     if (timer_) {
         lv_timer_delete(timer_);
         timer_ = nullptr;
@@ -66,9 +68,9 @@ void RecordConfig::on_view_unload() {
     model_.deinit();
     view_.destroy();
 }
-void RecordConfig::on_language_changed() {
+void RecordConfig::onLanguageChanged() {
     view_.update(model_.device(), model_.settings().record_settings, feedback_.text);
-    if (priv.state != PAGE_STATE_ACTIVITY)
+    if (getState() != STATE::ACTIVITY)
         view_.stop();
 }
 // 开始与停止一致：单击即切换；双击（Commit）同样生效。等待主控确认期间不发第二个请求。
@@ -82,7 +84,7 @@ void RecordConfig::toggle() {
     feedback_.finish(accepted, model_.device().record_pending);
     refresh();
 }
-void RecordConfig::on_commit_request() {
+void RecordConfig::onCommitRequest() {
     if (lv_group_get_focused(lv_group_get_default()) == view_.ui.record)
         toggle();
 }
@@ -90,7 +92,7 @@ void RecordConfig::clicked(lv_event_t* event) {
     auto* self = static_cast<RecordConfig*>(lv_event_get_user_data(event));
     auto* control = lv_event_get_current_target_obj(event);
     if (control == self->view_.ui.back) {
-        self->page_manager->pop();
+        self->getManager()->pop();
         return;
     }
     const auto& device = self->model_.device();

@@ -102,6 +102,50 @@ public:
      */
     virtual void onViewDidUnload() { }
 
+    /** @brief Refresh text for a language change on a loaded page. */
+    virtual void
+    onLanguageChanged() {}
+
+    /** @brief Consume a next-focus request; return true when handled. */
+    virtual bool
+    onNextRequest() {
+        return false;
+    }
+
+    /** @brief Consume an enter request; return true when handled. */
+    virtual bool
+    onEnterRequest() {
+        return false;
+    }
+
+    /** @brief Handle a commit request from the application input router. */
+    virtual void
+    onCommitRequest() {}
+
+    /** @brief Request raw Power hold events instead of click recognition. */
+    virtual bool
+    wantsPowerHold() const {
+        return false;
+    }
+
+    /** @brief Consume a back request; return true to suppress navigation. */
+    virtual bool
+    onBackRequest() {
+        return false;
+    }
+
+    /** @brief Return the current lifecycle state without exposing mutable context. */
+    STATE
+    getState() const {
+        return _context.state;
+    }
+
+    /** @brief Return the configured animation type for navigation diagnostics. */
+    PAGE_ANIM
+    getLoadAnimType() const {
+        return _context.anim.attr.type;
+    }
+
     /**
      * @brief  Set page cache enable
      * @param  en: Cache enable
@@ -180,7 +224,7 @@ public:
      */
     lv_obj_t* getRoot() { return _root; }
 
-protected:
+  public:
     /* Page parameter */
     struct PARAM {
         void* ptr;

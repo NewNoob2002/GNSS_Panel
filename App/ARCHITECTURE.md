@@ -1,6 +1,6 @@
 # 共享应用架构
 
-HC32、RK3506（`Vendor/Linux`）与 PC 模拟器（`Vendor/Simulator`）使用同一份 `App/`、`Frameworks/` 源码和 CMake 文件，本仓库为唯一来源。框架与服务可独立于 LVGL 构建；平台通过 `Common/SystemBackend.h` 的 DeviceManager 设备契约实现业务操作，UI 通过 Model 发送命令并接收快照。
+HC32、RK3506（`Vendor/Linux`）与 PC 模拟器（`Vendor/Simulator`）使用同一份 `App/`、`Frameworks/` 源码和 CMake 文件，本仓库为唯一来源。事件/设备框架与服务可独立于 LVGL 构建；平台通过 `Common/SystemBackend.h` 的 DeviceManager 设备契约实现业务操作，UI 通过 Model 发送命令并接收快照。
 
 ## 构建边界
 
@@ -8,7 +8,8 @@ HC32、RK3506（`Vendor/Linux`）与 PC 模拟器（`Vendor/Simulator`）使用�
 |---|---|---|
 | `app_framework` | DataBroker、DataNode、DataTimer、DeviceManager、ResourceManager 静态表 | 标准 C/C++、`app_log` |
 | `app_core` | System/Device/Status 服务、共享数据定义 | 事件框架、日志、无图形依赖的 i18n |
-| `app_ui` | 页面、Model、输入路由、页面管理、资源 | `app_core`、LVGL |
+| `app_page_manager` | Frameworks/PageManager 的页面池、路由、生命周期与动画 | LVGL、`app_log` |
+| `app_ui` | 页面、Model、输入路由、资源 | `app_core`、`app_page_manager`、LVGL |
 | 平台目标 | 设备与业务后端、显示和输入端口、程序入口 | 共享接口及各自平台库 |
 
 父工程通过 `app_build_options` 提供编译选项，通过 `app_lvgl` 提供 UI 所需的 LVGL。没有 `app_lvgl` 时只构建框架与核心。Linux 的 `Vendor/Linux/Backends/Demo` 属于平台演示后端，不在共享 `App/` 中；实屏程序当前仍选择该演示后端，真实 Linux 业务尚未接入。
@@ -44,7 +45,11 @@ ctest --test-dir build/app-core-tests --output-on-failure
 
 ioctl 编码包含方向、类型（P/D/S）、编号与 `sizeof(载荷)`；未知命令、错误尺寸、非零尺寸的空指针均拒绝。初始化元数据查询不触发探测，轮询结果的详情数组由调用方拥有，名称仅引用平台静态字符串。HC32 的 I2C 探测与主控等待仍在 StatusDevice/InitSteps 中；PowerDevice 保留原 HAL 开关机时序；BusinessDevice 内完成索引与协议码转换，只经 `State::Request_*` 和 `State::Effective_*` 处理请求，revision 采样与确认仍由显示协议拥有。Board 模拟器复用这些对象；DemoStatus 是 Demo 的 Status 设备，确定性/随机采样和初始化耗时保持不变。
 
-`ResourcePool.cpp` 使用 `Frameworks/ResourceManager/ResourceManager.h` 的字体、图片静态表，无堆分配；未知字体返回 LV_FONT_DEFAULT，未知图片返回空指针。`ResourcePool.h` 接口保持不变。LVGL 已升级为 9.6.0；页面管理继续使用 `App/Utils/PageManager`，未切换到 Frameworks 中的页面管理器。
+`ResourcePool.cpp` 使用 `Frameworks/ResourceManager/ResourceManager.h` 的字体、图片静态表，无堆分配；未知字体返回 LV_FONT_DEFAULT，未知图片返回空指针。`ResourcePool.h` 接口保持不变。LVGL 已升级为 9.6.0；`app_page_manager` 统一编译加固后的 `Frameworks/PageManager`。
+
+页面管理器拥有注册成功的 PageBase 实例；析构时卸载全部页面并释放页面池。根对象异步删除前停止页面动画、清理子对象和外部样式引用，不再引用页面实例。`preload` 只创建可缓存页面；`resetRoot` 清空导航历史后进入指定根页。路由返回 `RES_TYPE`，调用方必须显式比较 `RES_TYPE::OK`（值为 0）；App 对外的导航接口仍返回 bool。生命周期和语言/输入回调统一用 lowerCamelCase，根对象、管理器和状态通过 getter 访问；语言/输入扩展直接放在 PageBase，使管理器与输入路由可以统一分发，无需应用转发基类。
+
+页面切换保持各页 260 ms 缓出滑动；先建页再刷新动画时基，缓存页出现前先取消隐藏，进入时复位未动画轴与透明度。双键设备不启用返回手势，也不保留旧指针拖拽跟随动画；模拟器使用 Esc、右键或页面返回控件，框架仍提供可选 `setBackGestureDirection`。
 
 ## 后续阶段
 
@@ -55,4 +60,4 @@ ioctl 编码包含方向、类型（P/D/S）、编号与 `sizeof(载荷)`；未�
 3. 将初始化推进和业务超时移出页面/平台设备，并移除服务对具体 Model 名称和选项下标的依赖。
 4. 提供真实 Linux 业务适配，统一三端事件回放测试。
 
-页面动画、导航和多语言呈现继续属于 UI。X-TRACK LVGL 9 的 PageManager/设备实现不在本阶段整体替换，保留当前 App/Utils/PageManager 与已验证的板级时序。
+页面动画、导航和多语言呈现继续属于 UI；页面管理使用 Frameworks/PageManager，已验证的板级时序保持不变。
