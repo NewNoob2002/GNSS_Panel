@@ -20,6 +20,15 @@
 #include "HAL/HAL.h"
 #include "SystemState.h"
 #include "mcu_version_config.h"
+
+namespace {
+constexpr bool
+same_text(const char* a, const char* b) {
+    return *a == *b && (*a == '\0' || same_text(a + 1, b + 1));
+}
+} // namespace
+// mcu_config.h 找不到生成的版本头时会回退到 V0.0.0；模拟器必须显示产品真实版本。
+static_assert(!same_text(SOFTWARE_VERSION, "V0.0.0"), "模拟器未取到生成的 mcu_version_config.h");
 #endif
 
 namespace {

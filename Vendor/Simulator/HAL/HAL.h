@@ -27,10 +27,4 @@ bool I2C_ProbeDevice(uint8_t address);
 
 /* 模拟器输入：Power 键电平（Enter / 鼠标中键按住） */
 void Sim_SetPowerKey(bool pressed);
-
-/* 按键电平查询（供 AppPlatform 的 App_Update 使用） */
-bool Key_PowerPressed();
-bool Key_FunctionPressed();
 } // namespace HAL
-
-extern "C" void HAL_NVIC_SystemReset();

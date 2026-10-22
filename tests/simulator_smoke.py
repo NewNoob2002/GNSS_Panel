@@ -24,6 +24,9 @@ def main() -> None:
             output = log.read()
             if "Pages/Startup" not in output or "Stack clear done" not in output:
                 raise RuntimeError("未观察到启动页面和页面栈清理")
+            # 应用日志应走模拟器 sink；出现 HAL 前缀说明共享平台目标没拿到 LVGL_SIMULATOR。
+            if "[HAL] [" in output:
+                raise RuntimeError("应用日志被 HAL 调试宏重复加前缀")
         except BaseException:
             log.seek(0)
             print(log.read(), file=sys.stderr)

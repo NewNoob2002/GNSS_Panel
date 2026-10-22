@@ -59,15 +59,18 @@ else()
     file(STRINGS "${SIM_PRODUCT_DIR}/product.cmake" PROJECT_VERSION_LINE
         REGEX "^set\\(PRODUCT_VERSION [0-9.]+\\)")
     string(REGEX REPLACE "^set\\(PRODUCT_VERSION ([0-9.]+)\\)" "\\1" PROJECT_VERSION "${PROJECT_VERSION_LINE}")
+    # 与固件相同的生成位置：产品配置目标（Products/config.cmake）只公开该目录。
     configure_file(
         ${HC32_DIR}/Platform/Config/mcu_version_config.h.in
-        ${CMAKE_CURRENT_BINARY_DIR}/generated/Platform/Config/mcu_version_config.h
+        ${CMAKE_BINARY_DIR}/generated/Platform/Config/mcu_version_config.h
         @ONLY
     )
 
     add_library(sim_hardware_port INTERFACE)
     add_library(sim::hardware_port ALIAS sim_hardware_port)
+    # LVGL_SIMULATOR 经端口传给 hc32::app_platform 等共享目标，使其走模拟器日志与 SDL 输入分支。
     target_compile_definitions(sim_hardware_port INTERFACE
+        LVGL_SIMULATOR
         SIM_BACKEND_DEMO=0
     )
     target_include_directories(sim_hardware_port INTERFACE
