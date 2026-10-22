@@ -41,12 +41,12 @@ void PageManager::on_root_drag_event(lv_event_t* event) {
         return;
     }
 
-    const lv_indev_t* indev = lv_indev_get_act();
+    const lv_indev_t* indev = lv_indev_active();
     if (indev == nullptr || lv_indev_get_type(indev) != LV_INDEV_TYPE_POINTER) {
         return;
     }
 
-    auto* root = lv_event_get_current_target(event);
+    auto* root = lv_event_get_current_target_obj(event);
     auto* base = static_cast<PageBase*>(lv_event_get_user_data(event));
 
     if (base == nullptr) {
@@ -69,7 +69,7 @@ void PageManager::on_root_drag_event(lv_event_t* event) {
 
         if (manager->anim_state_.is_busy) {
             PM_LOG_INFO("Root drag anim interrupted");
-            lv_anim_del(root, anim_attr.setter);
+            lv_anim_delete(root, anim_attr.setter);
             manager->anim_state_.is_busy = false;
         }
 
@@ -79,20 +79,20 @@ void PageManager::on_root_drag_event(lv_event_t* event) {
             return;
         }
 
-        lv_obj_clear_flag(bottom_page->root, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_set_hidden(bottom_page->root, false);
         manager->anim_state_.is_dragging = true;
     } else if (event_code == LV_EVENT_PRESSING) {
         if (!manager->anim_state_.is_dragging) {
             return;
         }
 
-        lv_coord_t cur = anim_attr.getter(root);
+        int32_t cur = anim_attr.getter(root);
 
-        const lv_coord_t max = std::max(anim_attr.pop.exit.start, anim_attr.pop.exit.end);
-        const lv_coord_t min = std::min(anim_attr.pop.exit.start, anim_attr.pop.exit.end);
+        const int32_t max = std::max(anim_attr.pop.exit.start, anim_attr.pop.exit.end);
+        const int32_t min = std::min(anim_attr.pop.exit.start, anim_attr.pop.exit.end);
 
         lv_point_t offset;
-        lv_indev_get_vect(lv_indev_get_act(), &offset);
+        lv_indev_get_vect(lv_indev_active(), &offset);
 
         if (anim_attr.drag_dir == ROOT_DRAG_DIR_HOR) {
             cur += offset.x;
@@ -107,21 +107,21 @@ void PageManager::on_root_drag_event(lv_event_t* event) {
         }
         manager->anim_state_.is_dragging = false;
 
-        const lv_coord_t offset_sum = anim_attr.push.enter.end - anim_attr.push.enter.start;
+        const int32_t offset_sum = anim_attr.push.enter.end - anim_attr.push.enter.start;
 
-        lv_coord_t x_predict = 0;
-        lv_coord_t y_predict = 0;
+        int32_t x_predict = 0;
+        int32_t y_predict = 0;
         root_get_drag_predict(&x_predict, &y_predict);
 
-        const lv_coord_t start = anim_attr.getter(root);
-        lv_coord_t end = start;
+        const int32_t start = anim_attr.getter(root);
+        int32_t end = start;
 
         if (anim_attr.drag_dir == ROOT_DRAG_DIR_HOR) {
             end += x_predict;
-            PM_LOG_INFO("Root drag x_predict = %d", end);
+            PM_LOG_INFO("Root drag x_predict = %ld", static_cast<long>(end));
         } else if (anim_attr.drag_dir == ROOT_DRAG_DIR_VER) {
             end += y_predict;
-            PM_LOG_INFO("Root drag y_predict = %d", end);
+            PM_LOG_INFO("Root drag y_predict = %ld", static_cast<long>(end));
         }
 
         if (std::abs(end) > std::abs((int)offset_sum) / 2) {
@@ -135,7 +135,7 @@ void PageManager::on_root_drag_event(lv_event_t* event) {
             lv_anim_set_var(&a, root);
             lv_anim_set_values(&a, start, anim_attr.push.enter.end);
             lv_anim_set_exec_cb(&a, anim_attr.setter);
-            lv_anim_set_ready_cb(&a, on_root_drag_anim_finish);
+            lv_anim_set_completed_cb(&a, on_root_drag_anim_finish);
             lv_anim_start(&a);
             PM_LOG_INFO("Root drag anim start");
         }
@@ -154,7 +154,7 @@ void PageManager::on_root_drag_anim_finish(lv_anim_t* a) {
 
     /* Hide the bottom page */
     if (const PageBase* bottom_page = manager->get_stack_top_after(); bottom_page) {
-        lv_obj_add_flag(bottom_page->root, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_set_hidden(bottom_page->root, true);
     }
 }
 
@@ -177,7 +177,7 @@ void PageManager::root_enable_drag(lv_obj_t* root) {
 void PageManager::on_root_async_leave(void* data) {
     auto* base = static_cast<PageBase*>(data);
     PM_LOG_INFO("Page(%s) send event: LV_EVENT_LEAVE, need to handle...", base->page_name);
-    lv_event_send(base->root, LV_EVENT_LEAVE, base);
+    lv_obj_send_event(base->root, LV_EVENT_LEAVE, base);
 }
 
 /**
@@ -186,13 +186,13 @@ void PageManager::on_root_async_leave(void* data) {
   * @param  y: y stop point
   * @retval None
   */
-void PageManager::root_get_drag_predict(lv_coord_t* x, lv_coord_t* y) {
-    const lv_indev_t* indev = lv_indev_get_act();
+void PageManager::root_get_drag_predict(int32_t* x, int32_t* y) {
+    const lv_indev_t* indev = lv_indev_active();
     lv_point_t vect;
     lv_indev_get_vect(indev, &vect);
 
-    lv_coord_t y_predict = 0;
-    lv_coord_t x_predict = 0;
+    int32_t y_predict = 0;
+    int32_t x_predict = 0;
 
     while (vect.y != 0) {
         y_predict += vect.y;

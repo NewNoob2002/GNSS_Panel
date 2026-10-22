@@ -10,6 +10,7 @@
 #include "demo_perf.h"
 #include "linux_display.h"
 #include "lv_display.h"
+#include "lv_tick_posix.h"
 
 static volatile sig_atomic_t stop;
 static void on_signal(int signal_number) {
@@ -32,8 +33,8 @@ static uint64_t milliseconds(void) {
 }
 
 static int benchmark_summary(void) {
-    lv_obj_t* root = lv_scr_act();
-    for (uint32_t i = 0; i < lv_obj_get_child_cnt(root); ++i) {
+    lv_obj_t* root = lv_screen_active();
+    for (uint32_t i = 0; i < lv_obj_get_child_count(root); ++i) {
         lv_obj_t* child = lv_obj_get_child(root, i);
         if (!lv_obj_check_type(child, &lv_label_class))
             continue;
@@ -66,7 +67,7 @@ int main(int argc, char** argv) {
         return EXIT_FAILURE;
     }
     int result = EXIT_FAILURE;
-    static struct lv_display port;
+    static struct panel_display port;
     if (rm_init(&screen) < 0) {
         perror("RM690A0 init");
         goto done;
@@ -74,6 +75,7 @@ int main(int argc, char** argv) {
     if (stop)
         goto done;
     lv_init();
+    lv_tick_set_cb(lv_tick_posix_ms);
     if (lv_display_register(&port, &screen) < 0) {
         perror("LVGL display");
         goto done;
@@ -128,7 +130,7 @@ int main(int argc, char** argv) {
     } else if (stop || finished) {
         result = EXIT_SUCCESS;
     }
-    lv_disp_remove(port.display);
+    lv_display_delete(port.display);
 done:
     if (linux_display_close(&io) < 0) {
         perror("display close");

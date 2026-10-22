@@ -17,8 +17,8 @@ void WorkSettings::on_view_load() {
 void WorkSettings::refresh() {
     const bool pending = model_.device().work_pending;
     const bool controls_changed =
-        lv_obj_has_state(view_.ui.apply, LV_STATE_DISABLED) != pending
-        || lv_obj_has_flag(view_.ui.protocol, LV_OBJ_FLAG_HIDDEN) != (target_ == DataProc::WorkTarget::Ntrip);
+        lv_obj_is_disabled(view_.ui.apply) != pending
+        || lv_obj_is_hidden(view_.ui.protocol) != (target_ == DataProc::WorkTarget::Ntrip);
     feedback_.poll(pending);
     view_.update(target_, pending, feedback_.text);
     if (controls_changed)
@@ -42,7 +42,7 @@ void WorkSettings::on_view_will_appear() {
     view_.appear();
     timer_ = lv_timer_create(
         [](lv_timer_t* timer) {
-            static_cast<WorkSettings*>(timer->user_data)->refresh();
+            static_cast<WorkSettings*>(lv_timer_get_user_data(timer))->refresh();
         },
         200, this);
     if (!timer_)
@@ -52,14 +52,14 @@ void WorkSettings::on_view_will_disappear() {
     view_.stop();
     model_.set_change_callback({});
     if (timer_) {
-        lv_timer_del(timer_);
+        lv_timer_delete(timer_);
         timer_ = nullptr;
     }
     utils::leave_focus_group();
 }
 void WorkSettings::on_view_unload() {
     if (timer_) {
-        lv_timer_del(timer_);
+        lv_timer_delete(timer_);
         timer_ = nullptr;
     }
     model_.set_change_callback({});
@@ -90,7 +90,7 @@ void WorkSettings::on_commit_request() {
 }
 void WorkSettings::clicked(lv_event_t* event) {
     auto* self = static_cast<WorkSettings*>(lv_event_get_user_data(event));
-    auto* control = lv_event_get_current_target(event);
+    auto* control = lv_event_get_current_target_obj(event);
     if (control == self->view_.ui.back) {
         self->page_manager->pop();
         return;

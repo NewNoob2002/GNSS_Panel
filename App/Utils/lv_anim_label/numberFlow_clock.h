@@ -15,7 +15,7 @@ class NumberFlowClock {
 
     void create(lv_obj_t* parent);
 
-    void set_pos(lv_align_t align, lv_coord_t x, lv_coord_t y) const;
+    void set_pos(lv_align_t align, int32_t x, int32_t y) const;
 
     void set_time(uint32_t hour_val, uint32_t minute_val, uint32_t second_val) const;
 

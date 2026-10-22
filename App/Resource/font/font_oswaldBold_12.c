@@ -1555,6 +1555,11 @@ static const lv_font_fmt_txt_cmap_t cmaps[] =
         .range_start = 1024, .range_length = 81, .glyph_id_start = 194,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     },
+    /* v9 严格检查 cmap 上界；为俄语 ё 复用同形的拉丁 ë 字形，不重新生成位图。 */
+    {
+        .range_start = 1105, .range_length = 1, .glyph_id_start = 170,
+        .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
+    },
     {
         .range_start = 8226, .range_length = 257, .glyph_id_start = 275,
         .unicode_list = unicode_list_5, .glyph_id_ofs_list = NULL, .list_length = 3, .type = LV_FONT_FMT_TXT_CMAP_SPARSE_TINY
@@ -2713,7 +2718,7 @@ static lv_font_fmt_txt_dsc_t font_dsc = {
     .cmaps = cmaps,
     .kern_dsc = &kern_classes,
     .kern_scale = 16,
-    .cmap_num = 6,
+    .cmap_num = 7,
     .bpp = 2,
     .kern_classes = 1,
     .bitmap_format = 0,

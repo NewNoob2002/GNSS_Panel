@@ -182,11 +182,12 @@ int main(void) {
     assert(rm_init(&s) == 0);
     lv_init();
     m.aligned = 1;
-    static struct lv_display port;
+    static struct panel_display port;
     assert(lv_display_register(&port, &s) == 0);
-    assert(lv_disp_get_hor_res(port.display) == 294 && lv_disp_get_ver_res(port.display) == 126);
+    assert(lv_display_get_horizontal_resolution(port.display) == 294
+           && lv_display_get_vertical_resolution(port.display) == 126);
     lv_area_t area = {1, 3, 292, 124};
-    port.driver.rounder_cb(&port.driver, &area);
+    lv_display_send_event(port.display, LV_EVENT_INVALIDATE_AREA, &area);
     assert(area.x1 == 0 && area.y1 == 2 && area.x2 == 293 && area.y2 == 125);
     lv_display_pattern();
     lv_refr_now(port.display);
@@ -201,7 +202,7 @@ int main(void) {
     assert(pixel(&m, 60, 83) == 0xffff);
     assert(pixel(&m, 60, 23) == 0x0000);
     memcpy(frame, m.frame, sizeof(frame));
-    lv_obj_t* partial = lv_obj_create(lv_scr_act());
+    lv_obj_t* partial = lv_obj_create(lv_screen_active());
     lv_obj_remove_style_all(partial);
     lv_obj_set_pos(partial, 101, 51);
     lv_obj_set_size(partial, 6, 4);
@@ -218,11 +219,11 @@ int main(void) {
     }
     /* Flush error must release LVGL ownership instead of deadlocking the renderer. */
     m.fail_at = m.calls + 1;
-    lv_obj_invalidate(lv_scr_act());
+    lv_obj_invalidate(lv_screen_active());
     lv_refr_now(port.display);
-    assert(port.error == ETIMEDOUT && !port.draw.flushing && !m.selected);
-    lv_disp_remove(port.display);
-    assert(lv_mem_test() == LV_RES_OK);
+    assert(port.error == ETIMEDOUT && !m.selected);
+    lv_display_delete(port.display);
+    assert(lv_mem_test() == LV_RESULT_OK);
     puts("P3 protocol, segmentation, fault injection and LVGL rotation checks passed");
     return 0;
 }

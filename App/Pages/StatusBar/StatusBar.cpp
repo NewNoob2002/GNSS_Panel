@@ -9,25 +9,25 @@
 namespace page {
 
 namespace {
-constexpr lv_coord_t kHeight = 26, kMargin = 6, kGap = 3;
+constexpr int32_t kHeight = 26, kMargin = 6, kGap = 3;
 // SD 图标上移 22 px 即完全离开 26 px 高的分组（分组裁剪子对象），在栏外完成换色。
-constexpr lv_coord_t kSdTravel = 22;
+constexpr int32_t kSdTravel = 22;
 constexpr uint32_t kSdOutMs = 160, kSdInMs = 220, kSdBlinkMs = 500;
 
 // 8-bit alpha 图标由 recolor 着色；图片对象便于后续做透明度/缩放/换图动画。
 lv_obj_t* icon(lv_obj_t* parent, const char* name, lv_color_t color = style::kText) {
-    lv_obj_t* image = lv_img_create(parent);
-    lv_img_set_src(image, resource_pool::get_image(name));
-    lv_obj_set_style_img_recolor(image, color, 0);
-    lv_obj_set_style_img_recolor_opa(image, LV_OPA_COVER, 0);
+    lv_obj_t* image = lv_image_create(parent);
+    lv_image_set_src(image, resource_pool::get_image(name));
+    lv_obj_set_style_image_recolor(image, color, 0);
+    lv_obj_set_style_image_recolor_opa(image, LV_OPA_COVER, 0);
     return image;
 }
 
 // 左右两组按实际内容宽度紧凑排列并垂直居中；隐藏的子对象不占位，数值位数变化时不留空隙。
-lv_obj_t* group(lv_obj_t* parent, lv_align_t align, lv_coord_t x) {
+lv_obj_t* group(lv_obj_t* parent, lv_align_t align, int32_t x) {
     lv_obj_t* row = lv_obj_create(parent);
     lv_obj_remove_style_all(row);
-    lv_obj_clear_flag(row, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollable(row, false);
     lv_obj_set_size(row, LV_SIZE_CONTENT, kHeight);
     lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(row, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
@@ -68,7 +68,7 @@ bool StatusBar::create(lv_obj_t* parent) {
     visible_ = false;
     lv_obj_set_style_bg_color(root_, style::kBackground, 0);
     lv_obj_set_style_bg_opa(root_, LV_OPA_COVER, 0);
-    lv_obj_clear_flag(root_, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollable(root_, false);
 
     const lv_font_t* small = resource_pool::get_font("oswaldBold_12");
     const lv_font_t* large = resource_pool::get_font("oswaldBold_18");
@@ -108,7 +108,7 @@ bool StatusBar::create(lv_obj_t* parent) {
 }
 
 void StatusBar::set_y(void* obj, int32_t y) {
-    lv_obj_set_y(static_cast<lv_obj_t*>(obj), static_cast<lv_coord_t>(y));
+    lv_obj_set_y(static_cast<lv_obj_t*>(obj), static_cast<int32_t>(y));
 }
 
 bool StatusBar::on_presentation(void* owner, const DataProc::StatusBarPresentation& request) {
@@ -129,13 +129,13 @@ bool StatusBar::on_presentation(void* owner, const DataProc::StatusBarPresentati
     if (self->visible_ == request.visible)
         return true;
     self->visible_ = request.visible;
-    lv_anim_del(self->root_, set_y);
+    lv_anim_delete(self->root_, set_y);
     lv_anim_t animation;
     lv_anim_init(&animation);
     lv_anim_set_var(&animation, self->root_);
     lv_anim_set_exec_cb(&animation, set_y);
     lv_anim_set_values(&animation, lv_obj_get_y(self->root_), request.visible ? 0 : -26);
-    lv_anim_set_time(&animation, 500);
+    lv_anim_set_duration(&animation, 500);
     lv_anim_set_path_cb(&animation, request.visible ? lv_anim_path_ease_out : lv_anim_path_overshoot);
     if (!lv_anim_start(&animation)) {
         set_y(self->root_, request.visible ? 0 : -26);
@@ -200,7 +200,7 @@ void StatusBar::update(const StatusBarState& state) {
 }
 
 void StatusBar::sd_slide(void* obj, int32_t y) {
-    lv_obj_set_style_translate_y(static_cast<lv_obj_t*>(obj), static_cast<lv_coord_t>(y), 0);
+    lv_obj_set_style_translate_y(static_cast<lv_obj_t*>(obj), static_cast<int32_t>(y), 0);
 }
 
 void StatusBar::sd_blink(void* obj, int32_t opa) {
@@ -211,17 +211,17 @@ void StatusBar::sd_show(bool recording) {
     if (recording == sd_recording_)
         return;
     sd_recording_ = recording;
-    lv_anim_del(sd_icon_, sd_blink);
+    lv_anim_delete(sd_icon_, sd_blink);
     sd_blink(sd_icon_, LV_OPA_COVER);
-    lv_anim_del(sd_icon_, sd_slide); // 打断进行中的滑入/滑出，从当前位置继续滑出。
+    lv_anim_delete(sd_icon_, sd_slide); // 打断进行中的滑入/滑出，从当前位置继续滑出。
     lv_anim_t out;
     lv_anim_init(&out);
     lv_anim_set_var(&out, sd_icon_);
     lv_anim_set_exec_cb(&out, sd_slide);
-    lv_anim_set_values(&out, lv_obj_get_style_translate_y(sd_icon_, 0), -kSdTravel);
-    lv_anim_set_time(&out, kSdOutMs);
+    lv_anim_set_values(&out, lv_obj_get_style_translate_y(sd_icon_, LV_PART_MAIN), -kSdTravel);
+    lv_anim_set_duration(&out, kSdOutMs);
     lv_anim_set_path_cb(&out, lv_anim_path_ease_in);
-    lv_anim_set_ready_cb(&out, sd_hidden);
+    lv_anim_set_completed_cb(&out, sd_hidden);
     if (!lv_anim_start(&out)) {
         sd_slide(sd_icon_, -kSdTravel);
         sd_hidden(&out); // 动画分配失败：直接换色并归位。
@@ -231,15 +231,15 @@ void StatusBar::sd_show(bool recording) {
 void StatusBar::sd_hidden(lv_anim_t* animation) {
     auto* obj = static_cast<lv_obj_t*>(animation->var);
     auto* self = static_cast<StatusBar*>(lv_obj_get_user_data(obj));
-    lv_obj_set_style_img_recolor(obj, self->sd_recording_ ? style::kInfo : style::kText, 0);
+    lv_obj_set_style_image_recolor(obj, self->sd_recording_ ? style::kInfo : style::kText, 0);
     lv_anim_t in;
     lv_anim_init(&in);
     lv_anim_set_var(&in, obj);
     lv_anim_set_exec_cb(&in, sd_slide);
     lv_anim_set_values(&in, -kSdTravel, 0);
-    lv_anim_set_time(&in, kSdInMs);
+    lv_anim_set_duration(&in, kSdInMs);
     lv_anim_set_path_cb(&in, lv_anim_path_overshoot);
-    lv_anim_set_ready_cb(&in, sd_entered);
+    lv_anim_set_completed_cb(&in, sd_entered);
     if (!lv_anim_start(&in)) {
         sd_slide(obj, 0);
         sd_entered(&in);
@@ -256,8 +256,8 @@ void StatusBar::sd_entered(lv_anim_t* animation) {
     lv_anim_set_var(&blink, obj);
     lv_anim_set_exec_cb(&blink, sd_blink);
     lv_anim_set_values(&blink, LV_OPA_COVER, LV_OPA_30);
-    lv_anim_set_time(&blink, kSdBlinkMs);
-    lv_anim_set_playback_time(&blink, kSdBlinkMs);
+    lv_anim_set_duration(&blink, kSdBlinkMs);
+    lv_anim_set_reverse_duration(&blink, kSdBlinkMs);
     lv_anim_set_path_cb(&blink, lv_anim_path_ease_in_out);
     lv_anim_set_repeat_count(&blink, LV_ANIM_REPEAT_INFINITE);
     if (!lv_anim_start(&blink))
@@ -269,7 +269,7 @@ void StatusBar::destroy() {
     battery::stop(battery_fill_);
     battery_fill_ = nullptr;
     if (root_)
-        lv_anim_del(root_, set_y);
+        lv_anim_delete(root_, set_y);
     visible_ = false;
     delete satellites_;
     delete battery_percent_;
@@ -278,7 +278,7 @@ void StatusBar::destroy() {
     battery_percent_ = nullptr;
     clock_ = nullptr;
     if (root_) {
-        lv_obj_del(root_);
+        lv_obj_delete(root_);
         root_ = nullptr;
     }
 }

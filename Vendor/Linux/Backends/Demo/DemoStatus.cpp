@@ -77,7 +77,7 @@ DemoStatus::status_snapshot() {
     const auto state = random_sample ? generate_random(sample_time, sample_seed) : generate(sample_time);
     DataProc::StatusSnapshot value;
     std::snprintf(value.position.data(), value.position.size(), "%s", state.position);
-    value.position_color_rgb = lv_color_to32(state.position_color) & 0xffffffu;
+    value.position_color_rgb = lv_color_to_u32(state.position_color) & 0xffffffu;
     value.satellites = state.satellites;
     value.satellites_valid = state.satellites_valid;
     value.battery_percent = state.battery_percent;

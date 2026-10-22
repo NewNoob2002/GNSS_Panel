@@ -22,7 +22,10 @@ inline lv_obj_t* create_slot(lv_obj_t* parent, int x, int y, int width, int heig
     lv_obj_set_style_border_width(slot, 1, 0);
     lv_obj_set_style_bg_color(slot, style::kBorder, 0);
     lv_obj_set_style_bg_opa(slot, LV_OPA_COVER, 0);
-    lv_obj_add_flag(slot, LV_OBJ_FLAG_OVERFLOW_VISIBLE);
+    lv_obj_set_overflow_visible(slot, true);
+    // v9 需显式扩展绘制区域，电池正极超出槽框右缘 2 px。
+    lv_obj_set_ext_draw_size(slot, 2);
+    lv_obj_refresh_ext_draw_size(slot);
     auto* fill = style::box(slot, 1, 1, 0, height);
     lv_obj_set_style_radius(fill, 1, 0);
     lv_obj_set_style_bg_opa(fill, LV_OPA_COVER, 0);
@@ -33,13 +36,13 @@ inline lv_obj_t* create_slot(lv_obj_t* parent, int x, int y, int width, int heig
 }
 
 inline void set_width(void* fill, int32_t width) {
-    lv_obj_set_width(static_cast<lv_obj_t*>(fill), static_cast<lv_coord_t>(width));
+    lv_obj_set_width(static_cast<lv_obj_t*>(fill), static_cast<int32_t>(width));
 }
 
 /** 在删除槽或离开页面前停止其动画；fill 可为空。 */
 inline void stop(lv_obj_t* fill) {
     if (fill)
-        lv_anim_del(fill, set_width);
+        lv_anim_delete(fill, set_width);
 }
 
 /** 在 LVGL 线程更新：充电时 1.2s 从空到满、停留 0.3s 后循环；重复更新不重置动画。
@@ -51,7 +54,7 @@ inline void update_fill(lv_obj_t* fill, unsigned percent, bool charging, bool va
     lv_obj_set_style_bg_color(fill, tint, 0);
     lv_obj_set_style_border_color(slot, tint, 0);
     lv_obj_set_style_bg_color(lv_obj_get_child(slot, 1), tint, 0);
-    const auto width = lv_obj_get_style_width(slot, 0) - 4;
+    const auto width = lv_obj_get_style_width(slot, LV_PART_MAIN) - 4;
     if (!valid || !charging) {
         stop(fill);
         set_width(fill, valid ? width * percent / 100 : 0);
@@ -64,7 +67,7 @@ inline void update_fill(lv_obj_t* fill, unsigned percent, bool charging, bool va
     lv_anim_set_var(&animation, fill);
     lv_anim_set_exec_cb(&animation, set_width);
     lv_anim_set_values(&animation, 0, width);
-    lv_anim_set_time(&animation, 1200);
+    lv_anim_set_duration(&animation, 1200);
     lv_anim_set_repeat_delay(&animation, 300);
     lv_anim_set_repeat_count(&animation, LV_ANIM_REPEAT_INFINITE);
     lv_anim_set_path_cb(&animation, lv_anim_path_linear);

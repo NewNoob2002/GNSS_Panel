@@ -64,9 +64,13 @@ endforeach()
 
 # 带屏产品共享 LVGL 应用 + AppPlatform（固件路径）：固件 lv_conf.h（96 KB 池），C++ new 走 LVGL 池
 file(GLOB_RECURSE LVGL_SOURCES CONFIGURE_DEPENDS ${ROOT}/External/lvgl/src/*.c)
+
+# 三端自有显示/输入端口，软件渲染不编译硬件与第三方后端。
+list(FILTER LVGL_SOURCES EXCLUDE REGEX "/draw/(dma2d|espressif|eve|nanovg|nema_gfx|nxp|opengles|renesas|sdl|sifli|vg_lite)/")
+list(FILTER LVGL_SOURCES EXCLUDE REGEX "/drivers/|/libs/")
 add_library(display_lvgl STATIC ${LVGL_SOURCES})
-target_include_directories(display_lvgl PUBLIC ${ROOT}/External/lvgl ${ROOT}/External ${HC32}/Display/Lvgl display_fakes)
-target_compile_definitions(display_lvgl PUBLIC LV_CONF_INCLUDE_SIMPLE)
+target_include_directories(display_lvgl PUBLIC ${ROOT}/External/lvgl/include ${ROOT}/External/lvgl ${ROOT}/External ${HC32}/Display/Lvgl display_fakes)
+target_compile_definitions(display_lvgl PUBLIC LV_CONF_INCLUDE_SIMPLE LV_DISABLE_API_MAPPING)
 add_library(app_lvgl INTERFACE)
 target_link_libraries(app_lvgl INTERFACE display_lvgl)
 add_library(app_build_options INTERFACE)
@@ -108,7 +112,8 @@ foreach(product X1Pro XBase)
     target_link_libraries(${name}_spi_panel_tests PRIVATE display_lvgl)
     target_compile_options(${name}_spi_panel_tests PRIVATE -Wall -Wextra -UNDEBUG
         -fsanitize=address,undefined -fno-omit-frame-pointer)
-    target_link_options(${name}_spi_panel_tests PRIVATE -fsanitize=address,undefined)
+    target_link_options(${name}_spi_panel_tests PRIVATE -fsanitize=address,undefined
+        -Wl,--wrap=_ZN9SpiMaster13startDmaWriteEPKvm)
     add_test(NAME ${name}_spi_panel_tests COMMAND ${name}_spi_panel_tests)
 endforeach()
 

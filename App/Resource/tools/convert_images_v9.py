@@ -3,21 +3,20 @@
 
 用途
 ----
-读取 ``App/Resource/img/*.c``（LVGL 8 的 ``lv_img_dsc_t`` C 数组），解码为 RGBA 像素，
-再按源格式和透明度编码为 v9 格式，写入暂存目录 ``App/Resource/img_v9/``。
-设计依据为 ``docs/lvgl9_migration.md`` 第 1、3 节；其历史名称/尺寸表已过时，以实际资源为准。
-暂存目录不接入任何 CMake 目标，由 3.3（LVGL 9 切换）接入。文件名与符号名（``img_src_*``）与原文件一致。
+读取 ``App/Resource/img/*.c`` 正式 v9 资源，独立解码回读并校验头字段、像素和生成文本。
+也支持显式 ``--src`` 传入历史 v8 C 数组并转换到独立 ``--dst`` 目录。
+设计依据为 ``docs/lvgl9_migration.md`` 第 1、3 节。文件名与符号名（``img_src_*``）保持不变。
 
 用法（在仓库根目录执行）::
 
-    python3 App/Resource/tools/convert_images_v9.py              # 转换并写入 img_v9/，随后从磁盘回读校验
+    python3 App/Resource/tools/convert_images_v9.py              # 规范化正式 v9 资源并回读校验
     python3 App/Resource/tools/convert_images_v9.py --check      # 只校验，不写任何文件
     python3 App/Resource/tools/convert_images_v9.py --format SystemLoading_Neutral=A8
     python3 App/Resource/tools/convert_images_v9.py --self-test  # 解码器/编码器/预处理器的内置自检
 
 选项
 ----
-``--src DIR`` / ``--dst DIR``  源目录（默认 ``App/Resource/img``）/ 输出目录（默认 ``App/Resource/img_v9``）。
+``--src DIR`` / ``--dst DIR``  源目录和输出目录默认均为 ``App/Resource/img``；历史 v8 输入须指定独立输出目录。
 ``--format NAME=FMT``         覆盖单张图片的目标格式，可重复。FMT 为 ``RGB565`` / ``RGB565A8`` / ``A8``。
                               NAME 可写符号名（``img_src_startupLogo``、``startupLogo``）或文件名
                               （``img_src_SystemLoading_XYZ``、``SystemLoading_XYZ``）。
@@ -41,7 +40,7 @@
 * 色键图按本仓库三端 lv_conf.h 的 ``LV_COLOR_CHROMA_KEY = 0x00ff00`` 解码；
   仅 ``TRUE_COLOR_CHROMA_KEYED`` 应用色键，普通 ``TRUE_COLOR`` 不应用。
 * 源目录按实际文件发现，不假设图片数量、尺寸或符号等于设计文档中的历史清单。
-* v9 暂存文件保持已有行尾；新文件使用 LF。源目录与输出目录不得重叠。
+* v9 文件保持已有行尾；新文件使用 LF。历史 v8 输入与输出目录不得重叠。
 
 v9 输出格式
 ----------
@@ -77,7 +76,7 @@ from typing import Dict, List, Optional, Sequence, Tuple
 
 HERE = Path(__file__).resolve().parent
 DEFAULT_SRC = HERE.parent / "img"
-DEFAULT_DST = HERE.parent / "img_v9"
+DEFAULT_DST = HERE.parent / "img"
 
 # v9.6 include/lvgl/draw/lv_image_dsc.h: LV_IMAGE_HEADER_MAGIC；include/lvgl/draw/lv_color.h: 颜色格式枚举值。
 LV_IMAGE_HEADER_MAGIC = 0x19
@@ -696,6 +695,35 @@ def choose_format(img: Image8, overrides: Dict[str, str]) -> str:
     raise ConvertError(f"{img.symbol}: 不支持的源格式 {img.cf}")
 
 
+def parse_source_file(path: Path) -> List[Image8]:
+    """Parse v8 or deployed v9 resources. 兼容历史输入，并对正式 v9 资源独立回读为 RGBA。"""
+    text = path.read_bytes().decode("utf-8")
+    if "const lv_image_dsc_t" not in text:
+        return parse_v8_file(path)
+    result = []
+    formats = {"A8": "LV_IMG_CF_ALPHA_8BIT", "RGB565": "LV_IMG_CF_TRUE_COLOR",
+               "RGB565A8": "LV_IMG_CF_TRUE_COLOR_ALPHA"}
+    for image in parse_v9_text(text):
+        if image.cf not in formats:
+            raise ConvertError(f"{path.name}: 不支持的 v9 格式 {image.cf}")
+        size = v9_expected_size(image.cf, image.w, image.h, image.stride)
+        if len(image.data) != size or image.data_size != size:
+            raise ConvertError(f"{image.symbol}: v9 数据长度与头字段不符")
+        rgba = bytearray()
+        for index in range(image.w * image.h):
+            color = (255, 255, 255) if image.cf == "A8" else rgb565_to_rgb888(
+                image.data[index * 2] | image.data[index * 2 + 1] << 8)
+            alpha = image.data[index] if image.cf == "A8" else (
+                image.data[image.w * image.h * 2 + index] if image.cf == "RGB565A8" else 255)
+            rgba.extend((*color, alpha))
+        source = Image8(path, image.symbol, formats[image.cf], image.w, image.h, size, bytes(rgba))
+        errors = verify_pair(source, image)
+        if errors:
+            raise ConvertError("; ".join(errors))
+        result.append(source)
+    return result
+
+
 def run(src_dir: Path, dst_dir: Path, overrides: Dict[str, str], check_only: bool) -> int:
     """Convert or check all images. 转换并磁盘回读，或只读校验现有输出；失败返回非零。
 
@@ -703,15 +731,19 @@ def run(src_dir: Path, dst_dir: Path, overrides: Dict[str, str], check_only: boo
     """
     errors: List[str] = []
     src_dir, dst_dir = src_dir.resolve(), dst_dir.resolve()
-    if src_dir == dst_dir or src_dir in dst_dir.parents or dst_dir in src_dir.parents:
-        raise ConvertError("源目录与暂存目录必须互不包含，防止覆盖原资源")
+    if src_dir != dst_dir and (src_dir in dst_dir.parents or dst_dir in src_dir.parents):
+        raise ConvertError("源目录与输出目录不得互相包含")
+    if src_dir == dst_dir and any("const lv_image_dsc_t" not in path.read_text()
+                                  for path in src_dir.glob("*.c")):
+        raise ConvertError("v8 输入必须使用独立输出目录，禁止覆盖历史原图")
     paths = sorted(src_dir.glob("*.c"))
     if not paths:
         raise ConvertError(f"{src_dir}: 没有图片 C 文件")
+    source_is_v9 = all("const lv_image_dsc_t" in path.read_text() for path in paths)
     files: List[Tuple[Path, List[Image8]]] = []
     for path in paths:
         try:
-            files.append((path, parse_v8_file(path)))
+            files.append((path, parse_source_file(path)))
         except ConvertError as exc:
             errors.append(f"{path.name}: 解析失败: {exc}")
     symbols = [img.symbol for _, imgs in files for img in imgs]
@@ -770,17 +802,22 @@ def run(src_dir: Path, dst_dir: Path, overrides: Dict[str, str], check_only: boo
             if extra.name not in expected_names:
                 errors.append(f"{extra}: 源目录中没有对应文件")
 
-    print(f"{'symbol':34}{'size':>9}  {'v8 format':>26} -> {'v9':9}{'v8 B':>8}{'v9 B':>8}{'C file B':>10}  readback")
+    print(f"{'symbol':34}{'size':>9}  {'source format':>26} -> {'v9':9}{'source B':>8}{'v9 B':>8}{'C file B':>10}  readback")
     total_old = total_new = 0
     for img, new, ok, c_size in rows:
         total_old += img.data_bytes
         total_new += len(new.data)
-        print(f"{img.symbol:34}{f'{img.w}x{img.h}':>9}  {img.cf[len('LV_IMG_CF_'):]:>26} -> {new.fmt:9}"
+        source_format = new.fmt if source_is_v9 else img.cf[len('LV_IMG_CF_'):]
+        print(f"{img.symbol:34}{f'{img.w}x{img.h}':>9}  {source_format:>26} -> {new.fmt:9}"
               f"{img.data_bytes:8}{len(new.data):8}{c_size:10}  {'OK' if ok else 'FAIL'}")
-    desc_delta = (V9_DESC_BYTES - V8_DESC_BYTES) * len(rows)
-    print(f"\n{len(files)} 个 C 文件，{len(rows)} 张图片；像素数据 v8 {total_old} B -> v9 {total_new} B（{total_new - total_old:+d} B），"
-          f"描述符 {V8_DESC_BYTES} -> {V9_DESC_BYTES} B/张（{desc_delta:+d} B），合计 {total_new - total_old + desc_delta:+d} B"
-          "（全量参考，未计链接裁剪及对齐；暂存资源尚未接入构建）")
+    if source_is_v9:
+        print(f"\n{len(files)} 个 C 文件，{len(rows)} 张 v9 图片；像素数据 {total_new} B，描述符 {V9_DESC_BYTES} B/张"
+              "（32 位目标估算，未计链接裁剪及对齐）")
+    else:
+        desc_delta = (V9_DESC_BYTES - V8_DESC_BYTES) * len(rows)
+        print(f"\n{len(files)} 个 C 文件，{len(rows)} 张图片；像素数据 v8 {total_old} B -> v9 {total_new} B（{total_new - total_old:+d} B），"
+              f"描述符 {V8_DESC_BYTES} -> {V9_DESC_BYTES} B/张（{desc_delta:+d} B），合计 {total_new - total_old + desc_delta:+d} B"
+              "（全量参考，未计链接裁剪及对齐）")
     for message in errors:
         print(f"ERROR: {message}", file=sys.stderr)
     mode = "校验" if check_only else "转换并回读校验"
@@ -875,8 +912,9 @@ def self_test() -> int:
 def main(argv: Optional[Sequence[str]] = None) -> int:
     """Run the CLI. 解析参数并返回进程退出码；用法见模块文档字符串。"""
     parser = argparse.ArgumentParser(description="LVGL 8 图片 C 数组 -> LVGL 9.6 lv_image_dsc_t（详见脚本文档字符串）")
-    parser.add_argument("--src", type=Path, default=DEFAULT_SRC, help="v8 源目录（默认 App/Resource/img）")
-    parser.add_argument("--dst", type=Path, default=DEFAULT_DST, help="v9 输出目录（默认 App/Resource/img_v9）")
+    parser.add_argument("--src", type=Path, default=DEFAULT_SRC,
+                        help="源目录（默认 App/Resource/img，支持 v8/v9）")
+    parser.add_argument("--dst", type=Path, default=DEFAULT_DST, help="v9 输出目录（默认 App/Resource/img）")
     parser.add_argument("--check", action="store_true", help="只校验 --dst 中已有文件，不写任何文件")
     parser.add_argument("--format", action="append", default=[], metavar="NAME=FMT",
                         help="覆盖某张图片的目标格式（RGB565/RGB565A8/A8），可重复")

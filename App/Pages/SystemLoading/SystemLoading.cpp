@@ -35,7 +35,7 @@ void SystemLoading::on_view_did_appear() {
 
 void SystemLoading::cancel_timer() {
     if (timer_) {
-        lv_timer_del(timer_);
+        lv_timer_delete(timer_);
         timer_ = nullptr;
     }
 }
@@ -89,7 +89,7 @@ void SystemLoading::poll_initialization(lv_timer_t* timer) {
 }
 
 void SystemLoading::on_timeout(lv_timer_t* timer) {
-    auto* self = static_cast<SystemLoading*>(timer->user_data);
+    auto* self = static_cast<SystemLoading*>(lv_timer_get_user_data(timer));
     if (self->phase_ == Phase::Logo) {
         self->phase_ = Phase::Initialization;
         self->view_.show_initialization();
@@ -113,7 +113,7 @@ void SystemLoading::on_timeout(lv_timer_t* timer) {
         return;
     }
     self->timer_ = nullptr;
-    lv_timer_del(timer);
+    lv_timer_delete(timer);
     APP_LOG_I("SystemLoading", "window=Dialplate%s", self->demo_tag());
     if (!self->page_manager->replace("Pages/Dialplate"))
         LV_LOG_WARN("SystemLoading: preview transition rejected");

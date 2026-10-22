@@ -25,7 +25,7 @@ if(RK3506_LVGL_DEMO)
 else()
     # The shared module consumes this display contract; core/framework targets never link it.
     add_library(app_lvgl INTERFACE)
-    target_link_libraries(app_lvgl INTERFACE lvgl8311)
+    target_link_libraries(app_lvgl INTERFACE lvgl960)
     target_include_directories(app_lvgl INTERFACE "${EXTERNAL_DIR}")
     add_subdirectory("${SHARED_APP_DIR}" shared_app)
 
@@ -37,7 +37,7 @@ else()
 
     # Standalone utilities and application entrypoints
     add_executable(lvgl_baseline baseline.c)
-    target_link_libraries(lvgl_baseline PRIVATE lvgl8311)
+    target_link_libraries(lvgl_baseline PRIVATE lvgl960)
     add_test(NAME lvgl_baseline COMMAND lvgl_baseline)
 
     add_executable(display_test display_test.c)

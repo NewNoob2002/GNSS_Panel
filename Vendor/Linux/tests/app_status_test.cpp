@@ -9,6 +9,14 @@
 #include "DemoStatus.h"
 #include "Utils/PageStyle.h"
 
+/** @brief 通过公开 API 读取对象的屏幕绝对坐标供布局断言使用。 */
+static lv_area_t
+object_coords(const lv_obj_t* object) {
+    lv_area_t area;
+    lv_obj_get_coords(object, &area);
+    return area;
+}
+
 static void advance(unsigned ms) {
     for (unsigned i = 0; i < ms; i += 10) {
         lv_tick_inc(10);
@@ -18,16 +26,18 @@ static void advance(unsigned ms) {
 }
 
 static lv_obj_t* find_image(lv_obj_t* root, const void* source) {
-    if (lv_obj_check_type(root, &lv_img_class) && lv_img_get_src(root) == source)
+    if (lv_obj_check_type(root, &lv_image_class) && lv_image_get_src(root) == source) {
         return root;
-    for (uint32_t i = 0; i < lv_obj_get_child_cnt(root); ++i)
+    }
+    for (uint32_t i = 0; i < lv_obj_get_child_count(root); ++i) {
         if (auto* found = find_image(lv_obj_get_child(root, static_cast<int32_t>(i)), source))
             return found;
+    }
     return nullptr;
 }
 
 static bool tinted(lv_obj_t* obj, lv_color_t color) {
-    return lv_obj_get_style_img_recolor(obj, 0).full == color.full;
+    return lv_color_to_u32(lv_obj_get_style_image_recolor(obj, LV_PART_MAIN)) == lv_color_to_u32(color);
 }
 
 int main() {
@@ -40,18 +50,12 @@ int main() {
     assert(long_running.hour < 24 && long_running.minute < 60 && long_running.second < 60);
     lv_init();
     resource_pool::init();
-    lv_color_t pixels[294];
-    lv_disp_draw_buf_t draw;
-    lv_disp_draw_buf_init(&draw, pixels, nullptr, 294);
-    lv_disp_drv_t driver;
-    lv_disp_drv_init(&driver);
-    driver.hor_res = 294;
-    driver.ver_res = 126;
-    driver.draw_buf = &draw;
-    driver.flush_cb = [](lv_disp_drv_t* d, const lv_area_t*, lv_color_t*) {
-        lv_disp_flush_ready(d);
-    };
-    auto* display = lv_disp_drv_register(&driver);
+    uint16_t pixels[294];
+    lv_display_t* display = lv_display_create(294, 126);
+    assert(display);
+    lv_display_set_color_format(display, LV_COLOR_FORMAT_RGB565);
+    lv_display_set_buffers(display, pixels, nullptr, sizeof(pixels), LV_DISPLAY_RENDER_MODE_PARTIAL);
+    lv_display_set_flush_cb(display, [](lv_display_t* d, const lv_area_t*, uint8_t*) { lv_display_flush_ready(d); });
     assert(display && DataProc_Init(lv_tick_get));
     assert(!DataProc_Init(lv_tick_get)); // No reset beneath live DataNodes.
     {
@@ -60,7 +64,7 @@ int main() {
         page::SystemInfosModel info;
         assert(info.init() && info.init());
         assert(DataProc::Broker()->search("SystemInfosModel"));
-        assert(lv_obj_get_y(bar.root()) == -26 && !lv_obj_has_flag(bar.root(), LV_OBJ_FLAG_HIDDEN));
+        assert(lv_obj_get_y(bar.root()) == -26 && !lv_obj_is_hidden(bar.root()));
         assert(info.set_status_bar(true));
         advance(600);
         assert(lv_obj_get_y(bar.root()) == 0);
@@ -68,7 +72,7 @@ int main() {
         advance(150);
         const auto hiding_y = lv_obj_get_y(bar.root());
         assert(hiding_y < 0 && hiding_y > -26);
-        assert(!lv_obj_has_flag(bar.root(), LV_OBJ_FLAG_HIDDEN));
+        assert(!lv_obj_is_hidden(bar.root()));
         assert(lv_obj_get_style_bg_opa(bar.root(), LV_PART_MAIN) == LV_OPA_TRANSP);
         DataProc::StatusSnapshot data;
         std::strcpy(data.position.data(), "UPDATED");
@@ -82,7 +86,7 @@ int main() {
         assert(info.set_status_bar(false, DataProc::StatusBarStyle::Transparent));
         assert(lv_obj_get_y(bar.root()) == hiding_y); // Identical requests do not restart the animation.
         advance(400);
-        assert(lv_obj_get_y(bar.root()) == -26 && bar.root()->coords.y2 < 0);
+        assert(lv_obj_get_y(bar.root()) == -26 && object_coords(bar.root()).y2 < 0);
         DataNode peer("Peer", DataProc::Broker());
         assert(peer.subscribe("SystemInfosModel"));
         DataProc::StatusSnapshot pulled;
@@ -100,8 +104,8 @@ int main() {
         assert(info.set_status_bar(true));
         assert(lv_obj_get_y(bar.root()) == reversing_y);
         advance(600);
-        assert(lv_obj_get_y(bar.root()) == 0 && bar.root()->coords.y1 == 0);
-        assert(!lv_obj_has_flag(bar.root(), LV_OBJ_FLAG_HIDDEN));
+        assert(lv_obj_get_y(bar.root()) == 0 && object_coords(bar.root()).y1 == 0);
+        assert(!lv_obj_is_hidden(bar.root()));
         assert(lv_obj_get_style_bg_opa(bar.root(), LV_PART_MAIN) == LV_OPA_COVER);
         // SD 图标：录制状态变化时先滑出，在栏外换色后滑回；录制中持续闪烁，停止后为静止白色。
         auto* sd = find_image(bar.root(), resource_pool::get_image("ui_sd_card"));
@@ -111,29 +115,29 @@ int main() {
         data.recording = true;
         assert(StatusService::update(data));
         advance(100);
-        assert(lv_obj_get_style_translate_y(sd, 0) < 0 && tinted(sd, page::style::kText)); // 滑出期间不换色
+        assert(lv_obj_get_style_translate_y(sd, LV_PART_MAIN) < 0 && tinted(sd, page::style::kText)); // 滑出期间不换色
         advance(400);
-        assert(lv_obj_get_style_translate_y(sd, 0) == 0 && tinted(sd, page::style::kInfo));
+        assert(lv_obj_get_style_translate_y(sd, LV_PART_MAIN) == 0 && tinted(sd, page::style::kInfo));
         advance(300);
-        assert(lv_obj_get_style_opa(sd, 0) < LV_OPA_COVER); // 闪烁
+        assert(lv_obj_get_style_opa(sd, LV_PART_MAIN) < LV_OPA_COVER); // 闪烁
         data.recording = false;
         assert(StatusService::update(data));
-        assert(lv_obj_get_style_opa(sd, 0) == LV_OPA_COVER); // 停止闪烁后再滑出
+        assert(lv_obj_get_style_opa(sd, LV_PART_MAIN) == LV_OPA_COVER); // 停止闪烁后再滑出
         advance(500);
-        assert(lv_obj_get_style_translate_y(sd, 0) == 0 && tinted(sd, page::style::kText));
+        assert(lv_obj_get_style_translate_y(sd, LV_PART_MAIN) == 0 && tinted(sd, page::style::kText));
         advance(1200);
-        assert(lv_obj_get_style_opa(sd, 0) == LV_OPA_COVER); // 未录制不闪烁
+        assert(lv_obj_get_style_opa(sd, LV_PART_MAIN) == LV_OPA_COVER); // 未录制不闪烁
         for (const bool recording : {true, false, true}) {   // 快速往返以最后一次上报为准
             data.recording = recording;
             assert(StatusService::update(data));
             advance(60);
         }
         advance(600);
-        assert(lv_obj_get_style_translate_y(sd, 0) == 0 && tinted(sd, page::style::kInfo));
+        assert(lv_obj_get_style_translate_y(sd, LV_PART_MAIN) == 0 && tinted(sd, page::style::kInfo));
         data.recording = false;
         assert(StatusService::update(data));
         advance(600);
-        assert(tinted(sd, page::style::kText) && lv_obj_get_style_opa(sd, 0) == LV_OPA_COVER);
+        assert(tinted(sd, page::style::kText) && lv_obj_get_style_opa(sd, LV_PART_MAIN) == LV_OPA_COVER);
         page::SystemDashModel settings;
         assert(settings.init());
         assert(!settings.settings().wifi_available && settings.settings().simulated);
@@ -227,7 +231,7 @@ int main() {
         assert(StatusService::update(data) && lv_anim_get(battery_fill, nullptr));
         bar.destroy(); // No pending slide or charging animation may reference destroyed widgets.
         assert(!lv_anim_get(battery_fill, nullptr));
-        assert(!lv_obj_is_valid(bar_root));
+        assert(!lv_obj_is_in_widget_tree(bar_root));
         advance(600);
         assert(bar.create(lv_layer_top()) && lv_obj_get_y(bar.root()) == -26);
         battery_fill = lv_obj_get_child(lv_obj_get_child(lv_obj_get_child(bar.root(), -1), -2), 0);
@@ -242,5 +246,5 @@ int main() {
     }
     assert(DataProc_Deinit() && DataProc::Broker()->getNodeNumber() == 0);
     assert(DataProc_Init(lv_tick_get) && DataProc_Deinit()); // Reinitialization after full cleanup.
-    lv_disp_remove(display);
+    lv_display_delete(display);
 }

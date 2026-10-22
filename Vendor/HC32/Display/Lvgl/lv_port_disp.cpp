@@ -8,28 +8,28 @@ static PanelRm690a0& screen = board_display_panel;
 // 逻辑横屏宽度为 CONFIG_SCREEN_HOR_RES；42 行使 126 行高的整屏正好分 3 块刷新。
 #define SCREEN_BUFFER_ROWS 42U
 #define SCREEN_BUFFER_SIZE (CONFIG_SCREEN_HOR_RES * SCREEN_BUFFER_ROWS)
-static_assert(SCREEN_BUFFER_SIZE * sizeof(lv_color_t) <= UINT16_MAX, "DMA 单次传输计数不能超过 65535");
+static_assert(SCREEN_BUFFER_SIZE * sizeof(uint16_t) <= UINT16_MAX, "DMA 单次传输计数不能超过 65535");
 // 画面在玻璃上的水平平移（逻辑像素，正值向右）。RM690A0 窗口起点与尺寸须按 2 像素对齐（见 my_rounder_cb），
 // 偏移为偶数才不破坏对齐；移出玻璃的列不发送，未覆盖的边缘保持初始化时填充的黑色。
 static_assert(PRODUCT_DISPLAY_X_SHIFT % 2 == 0, "PRODUCT_DISPLAY_X_SHIFT must be even");
 static_assert(PRODUCT_DISPLAY_X_SHIFT > -CONFIG_SCREEN_HOR_RES && PRODUCT_DISPLAY_X_SHIFT < CONFIG_SCREEN_HOR_RES,
               "PRODUCT_DISPLAY_X_SHIFT out of range");
 
-static lv_disp_drv_t disp_drv; /*Descriptor of a display driver*/
+static lv_display_t* display;
 
 /* LVGL 单缓冲渲染，旋转后的数据放入独立的 DMA 发送缓冲。
  * LVGL 自带 sw_rotate 会强制“渲染→旋转→发送”串行执行，这里自行旋转，
  * 让下一块的渲染与上一块的 DMA 发送并行。 */
-static lv_disp_draw_buf_t draw_buf_dsc;
-static lv_color_t draw_buf[SCREEN_BUFFER_SIZE] __attribute__((aligned(4)));
-static lv_color_t tx_buf[SCREEN_BUFFER_SIZE] __attribute__((aligned(4)));
+static uint16_t draw_buf[SCREEN_BUFFER_SIZE] __attribute__((aligned(4)));
+static uint16_t tx_buf[SCREEN_BUFFER_SIZE] __attribute__((aligned(4)));
 static bool flush_active;
 static uint32_t flush_started_ms;
 volatile uint32_t display_dma_timeouts;
 
-void
-my_rounder_cb(lv_disp_drv_t* disp_drv, lv_area_t* area) {
-    (void)disp_drv;
+/** @brief 将失效区域扩展到面板要求的双像素边界。 */
+static void
+my_rounder_cb(lv_event_t* event) {
+    auto* area = static_cast<lv_area_t*>(lv_event_get_param(event));
     area->x1 = area->x1 & ~1;
     area->x2 = area->x2 | 1;
     area->y1 = area->y1 & ~1;
@@ -43,28 +43,31 @@ wait_flush_idle() {
     }
 }
 
-// 与 LVGL 8.3 sw_rotate 的 LV_DISP_ROT_90 映射一致：逻辑 (x, y) -> 物理 (y, H - 1 - x)。
+// 与 LVGL 8.3 sw_rotate 的 LV_DISPLAY_ROTATION_90 映射一致：逻辑 (x, y) -> 物理 (y, H - 1 - x)。
 static void
-rotate_90(const lv_color_t* src, lv_coord_t w, lv_coord_t h, lv_color_t* dst) {
-    for (lv_coord_t y = 0; y < h; ++y) {
-        lv_color_t* out = dst + (uint32_t)(w - 1) * h + y;
-        for (lv_coord_t x = 0; x < w; ++x) {
-            *out = *src++;
+rotate_90(const uint16_t* src, int32_t w, int32_t h, uint16_t* dst) {
+    for (int32_t y = 0; y < h; ++y) {
+        uint16_t* out = dst + (uint32_t)(w - 1) * h + y;
+        for (int32_t x = 0; x < w; ++x) {
+            const uint16_t pixel = *src++;
+            // RM690A0 高字节在前；交换只发生在发送缓冲，绘制缓冲保持原生 RGB565。
+            *out = static_cast<uint16_t>((pixel << 8) | (pixel >> 8));
             out -= h;
         }
     }
 }
 
 static void
-disp_flush(lv_disp_drv_t* disp_drv, const lv_area_t* area, lv_color_t* color_p) {
+disp_flush(lv_display_t* disp, const lv_area_t* area, uint8_t* px_map) {
+    const auto* color_p = reinterpret_cast<const uint16_t*>(px_map);
     // tx_buf 仍可能被上一块 DMA 读取，必须等发送结束后才能覆写。
     wait_flush_idle();
 
-    const lv_coord_t w = lv_area_get_width(area);
-    const lv_coord_t h = lv_area_get_height(area);
+    const int32_t w = lv_area_get_width(area);
+    const int32_t h = lv_area_get_height(area);
     rotate_90(color_p, w, h, tx_buf);
     // 数据已复制到 tx_buf，立即归还绘制缓冲，LVGL 可在 DMA 期间渲染下一块。
-    lv_disp_flush_ready(disp_drv);
+    lv_display_flush_ready(disp);
 
     // 旋转后 tx_buf 每行对应一个逻辑 x（第 0 行为 x2），物理行 = 屏高 - 1 - x - 偏移；只发送落在玻璃内的行。
     const int32_t panel_rows = screen.height();
@@ -90,7 +93,7 @@ disp_flush(lv_disp_drv_t* disp_drv, const lv_area_t* area, lv_color_t* color_p) 
     screen.select();
     screen.setWindow(area->y1, first_row, area->y1 + h - 1, first_row + rows - 1);
     screen.dataMode();
-    if (!board_display_spi.startDmaWrite(tx_buf + (uint32_t)skipped * h, (uint32_t)rows * h * sizeof(lv_color_t))) {
+    if (!board_display_spi.startDmaWrite(tx_buf + (uint32_t)skipped * h, (uint32_t)rows * h * sizeof(uint16_t))) {
         // 静态缓冲和长度已受编译期约束；初始化异常时也必须释放片选，避免卡住下一帧。
         board_display_spi.abort();
         screen.deselect();
@@ -123,29 +126,15 @@ lv_port_disp_init() {
     }
     screen.fill(0x0000);
     screen.enableBacklight();
-    lv_disp_draw_buf_init(&draw_buf_dsc, draw_buf, NULL, SCREEN_BUFFER_SIZE);
-    /*-----------------------------------
-     * Register the display in LVGL
-     *----------------------------------*/
-
-    lv_disp_drv_init(&disp_drv); /*Basic initialization*/
-
-    /*Set up the functions to access to your display*/
-
-    /*面板物理竖屏，LVGL 使用横屏逻辑坐标，旋转在 disp_flush() 中完成。*/
-    disp_drv.hor_res = screen.height();
-    disp_drv.ver_res = screen.width();
-
-    /*Used to copy the buffer's content to the display*/
-    disp_drv.flush_cb = disp_flush;
-
-    disp_drv.rounder_cb = my_rounder_cb;
-
-    /*Set a display buffer*/
-    disp_drv.draw_buf = &draw_buf_dsc;
-
-    /*Finally register the driver*/
-    lv_disp_drv_register(&disp_drv);
+    // 面板物理竖屏，逻辑横屏旋转在 disp_flush 中完成。
+    display = lv_display_create(screen.height(), screen.width());
+    if (!display) {
+        for (;;) {}
+    }
+    lv_display_set_color_format(display, LV_COLOR_FORMAT_RGB565);
+    lv_display_set_buffers(display, draw_buf, nullptr, sizeof(draw_buf), LV_DISPLAY_RENDER_MODE_PARTIAL);
+    lv_display_set_flush_cb(display, disp_flush);
+    lv_display_add_event_cb(display, my_rounder_cb, LV_EVENT_INVALIDATE_AREA, nullptr);
 }
 
 void

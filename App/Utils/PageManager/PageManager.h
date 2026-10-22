@@ -173,7 +173,7 @@ class PageManager {
     static void on_root_drag_anim_finish(lv_anim_t* a);
     static void on_root_async_leave(void* base);
     static void root_enable_drag(lv_obj_t* root);
-    static void root_get_drag_predict(lv_coord_t* x, lv_coord_t* y);
+    static void root_get_drag_predict(int32_t* x, int32_t* y);
 
     /* Switch */
     bool switch_to(PageBase* new_node, bool is_enter_act, const PageBase::Stash_t* stash = nullptr);

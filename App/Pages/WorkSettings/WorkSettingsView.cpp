@@ -79,9 +79,9 @@ void WorkSettingsView::update(DataProc::WorkTarget target, bool pending, TextId 
     settings_style::set_visible(network_card_, !radio);
     for (auto* control : {ui.preset, ui.protocol, ui.channel, ui.apply}) {
         if (pending)
-            lv_obj_add_state(control, LV_STATE_DISABLED);
+            lv_obj_set_disabled(control, true);
         else
-            lv_obj_clear_state(control, LV_STATE_DISABLED);
+            lv_obj_set_disabled(control, false);
     }
     settings_style::set_text(feedback_, feedback == TextId::Count ? "" : i18n::text(feedback));
     settings_style::set_text_color(feedback_, feedback == TextId::RequestRejected || feedback == TextId::RequestTimeout

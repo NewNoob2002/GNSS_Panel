@@ -107,33 +107,26 @@ if(PRODUCT_HAS_DISPLAY)
 
 set(EXTERNAL_DIR ${REPO_ROOT}/External)
 set(LVGL_DIR ${EXTERNAL_DIR}/lvgl)
-file(GLOB_RECURSE LVGL_SOURCES CONFIGURE_DEPENDS
-    ${LVGL_DIR}/src/core/*.c
-    ${LVGL_DIR}/src/draw/*.c
-    ${LVGL_DIR}/src/extra/*.c
-    ${LVGL_DIR}/src/extra/layouts/*.c
-    ${LVGL_DIR}/src/extra/themes/*.c
-    ${LVGL_DIR}/src/extra/widgets/*.c
-    ${LVGL_DIR}/src/font/*.c
-    ${LVGL_DIR}/src/hal/*.c
-    ${LVGL_DIR}/src/misc/*.c
-    ${LVGL_DIR}/src/widgets/*.c
-)
+file(GLOB_RECURSE LVGL_SOURCES CONFIGURE_DEPENDS "${LVGL_DIR}/src/*.c")
 
-foreach(pattern "/draw/arm2d/" "/draw/nxp/" "/draw/renesas/" "/draw/sdl/" "/draw/stm32_dma2d/" "/draw/swm341_dma2d/" "/extra/libs/" "/extra/others/")
-    list(FILTER LVGL_SOURCES EXCLUDE REGEX "${pattern}")
-endforeach()
+# 三端自有显示/输入端口，软件渲染不编译硬件与第三方后端。
+list(FILTER LVGL_SOURCES EXCLUDE REGEX "/draw/(dma2d|espressif|eve|nanovg|nema_gfx|nxp|opengles|renesas|sdl|sifli|vg_lite)/")
+list(FILTER LVGL_SOURCES EXCLUDE REGEX "/drivers/|/libs/")
 
+# v9 渲染器在 -Og 下加上正式资源和浮点显示会超出 456 KiB；仅第三方库按体积优化，保留调试符号。
+set_property(SOURCE ${LVGL_SOURCES} APPEND PROPERTY COMPILE_OPTIONS $<$<CONFIG:Debug>:-Os>)
 add_library(hc32_lvgl STATIC
     ${LVGL_SOURCES}
 )
 target_include_directories(hc32_lvgl PUBLIC
     ${EXTERNAL_DIR}
     ${LVGL_DIR}
+    ${LVGL_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../Display/Lvgl
 )
 target_compile_definitions(hc32_lvgl PUBLIC
-    LV_CONF_PATH=${CMAKE_CURRENT_SOURCE_DIR}/../Display/Lvgl/lv_conf.h
+    LV_DISABLE_API_MAPPING
+    LV_CONF_PATH="${CMAKE_CURRENT_SOURCE_DIR}/../Display/Lvgl/lv_conf.h"
 )
 target_link_libraries(hc32_lvgl PUBLIC
     hc32_project_options

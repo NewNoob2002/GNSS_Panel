@@ -9,5 +9,5 @@ target_include_directories(rm690a0 PUBLIC
 target_compile_options(rm690a0 PRIVATE -Wall -Wextra -Werror)
 
 add_library(lv_display STATIC lv_display.c)
-target_link_libraries(lv_display PUBLIC rm690a0 lvgl8311)
+target_link_libraries(lv_display PUBLIC rm690a0 lvgl960)
 target_compile_options(lv_display PRIVATE -Wall -Wextra -Werror)

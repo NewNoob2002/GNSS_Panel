@@ -8,7 +8,7 @@ using namespace page;
 
 // 入场动画只改 translate：不触发重新布局（原先改 y/高度，按钮每帧重排），也不改透明度（不需要混合图层）。
 static void animate_translate_y(void* object, int32_t value) {
-    lv_obj_set_style_translate_y(static_cast<lv_obj_t*>(object), static_cast<lv_coord_t>(value), 0);
+    lv_obj_set_style_translate_y(static_cast<lv_obj_t*>(object), static_cast<int32_t>(value), 0);
 }
 
 void DialplateView::create(lv_obj_t* root) {
@@ -20,8 +20,8 @@ void DialplateView::create(lv_obj_t* root) {
 
     // 与页面切换同向（开机时首页从下方推入）：面板和按钮稍晚于页面从下方升起，像跟着页面落定，
     // 不与页面运动方向相反。按钮行裁剪子对象，按钮起点在行外不可见。
-    constexpr lv_coord_t top_from = 24;
-    constexpr lv_coord_t btn_from = 40;
+    constexpr int32_t top_from = 24;
+    constexpr int32_t btn_from = 40;
 
     const lv_anim_timeline_wrapper_t wrapper[] = {
         {0, ui.top_info.cont, animate_translate_y, top_from, 0, 260, lv_anim_path_ease_out, true},
@@ -36,7 +36,7 @@ void DialplateView::create(lv_obj_t* root) {
 void DialplateView::destroy() {
     anim_stop();
     if (ui.anim_timeline) {
-        lv_anim_timeline_del(ui.anim_timeline);
+        lv_anim_timeline_delete(ui.anim_timeline);
         ui.anim_timeline = nullptr;
     }
     delete ui.top_info.satellite_used;
@@ -61,7 +61,7 @@ void DialplateView::sync_anim() {
         return;
     anim_running_ = needed;
     if (!needed) {
-        lv_anim_del(this, anim_step_exec);
+        lv_anim_delete(this, anim_step_exec);
         anim_phase_ = 0;
         return;
     }
@@ -69,7 +69,7 @@ void DialplateView::sync_anim() {
     lv_anim_set_var(&anim_loop_, this);
     lv_anim_set_exec_cb(&anim_loop_, anim_step_exec);
     lv_anim_set_values(&anim_loop_, 0, kAnimPeriod - 1);
-    lv_anim_set_time(&anim_loop_, kAnimPeriod);
+    lv_anim_set_duration(&anim_loop_, kAnimPeriod);
     lv_anim_set_repeat_count(&anim_loop_, LV_ANIM_REPEAT_INFINITE);
     if (!lv_anim_start(&anim_loop_))
         anim_running_ = false; // 动画分配失败时保持静态画面，下一次 update 再尝试。
@@ -90,7 +90,7 @@ void DialplateView::anim_step_exec(void* var, int32_t value) {
 void DialplateView::top_info_create(lv_obj_t* par) {
     lv_obj_t* cont = lv_obj_create(par);
     lv_obj_remove_style_all(cont);
-    lv_obj_clear_flag(cont, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollable(cont, false);
     lv_obj_set_size(cont, 282, 54);
     lv_obj_set_pos(cont, 6, 28);
     lv_obj_set_style_bg_opa(cont, LV_OPA_COVER, 0);
@@ -103,8 +103,8 @@ void DialplateView::top_info_create(lv_obj_t* par) {
     // 卫星按钮（可聚焦并支持产品 StarMap 配置）
     TransformInfo_t sat_tf = {36, 34, 36, 32};
     lv_obj_t* icon_satellite = btn_create(cont, resource_pool::get_image("ui_satellite_large"), 6, 10, sat_tf);
-    lv_obj_set_style_bg_img_recolor(icon_satellite, style::kInfo, 0);
-    lv_obj_set_style_bg_img_recolor_opa(icon_satellite, LV_OPA_COVER, 0);
+    lv_obj_set_style_bg_image_recolor(icon_satellite, style::kInfo, 0);
+    lv_obj_set_style_bg_image_recolor_opa(icon_satellite, LV_OPA_COVER, 0);
     ui.top_info.icon_satellite = icon_satellite;
 
     const lv_font_t* font_large = resource_pool::get_font("rajdhaniBold_40");
@@ -113,7 +113,7 @@ void DialplateView::top_info_create(lv_obj_t* par) {
 
     // 整组按实际位数居中，斜杠与两组数字保持同一基线。
     auto* counts = style::box(cont, 44, 12, 108, font_large->line_height);
-    lv_obj_add_flag(counts, LV_OBJ_FLAG_OVERFLOW_VISIBLE);
+    lv_obj_set_overflow_visible(counts, true);
     lv_obj_set_flex_flow(counts, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(counts, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_column(counts, 2, 0);
@@ -160,11 +160,11 @@ void DialplateView::top_info_create(lv_obj_t* par) {
     ui.top_info.icon_mode = ui.top_info.mode_card;
 }
 
-void DialplateView::status_card(lv_obj_t* par, lv_coord_t x, const char* image, lv_obj_t*& card, lv_obj_t*& img,
+void DialplateView::status_card(lv_obj_t* par, int32_t x, const char* image, lv_obj_t*& card, lv_obj_t*& img,
                                 lv_obj_t*& label) {
     card = lv_obj_create(par);
     lv_obj_remove_style_all(card);
-    lv_obj_clear_flag(card, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollable(card, false);
     lv_obj_set_size(card, kCardWidth, kCardHeight);
     lv_obj_set_pos(card, x, 5);
     lv_obj_set_style_bg_color(card, style::kCard, 0);
@@ -173,11 +173,11 @@ void DialplateView::status_card(lv_obj_t* par, lv_coord_t x, const char* image, 
     lv_obj_set_style_border_width(card, 1, 0);
     lv_obj_set_style_radius(card, 8, 0);
 
-    img = lv_img_create(card);
-    lv_img_set_src(img, resource_pool::get_image(image));
+    img = lv_image_create(card);
+    lv_image_set_src(img, resource_pool::get_image(image));
     lv_obj_set_pos(img, kIconX, kIconY);
-    lv_obj_set_style_img_recolor(img, style::kMuted, 0);
-    lv_obj_set_style_img_recolor_opa(img, LV_OPA_COVER, 0);
+    lv_obj_set_style_image_recolor(img, style::kMuted, 0);
+    lv_obj_set_style_image_recolor_opa(img, LV_OPA_COVER, 0);
 
     label = lv_label_create(card);
     lv_obj_remove_style_all(label);
@@ -190,7 +190,7 @@ void DialplateView::status_card(lv_obj_t* par, lv_coord_t x, const char* image, 
 void DialplateView::btn_cont_create(lv_obj_t* par) {
     lv_obj_t* cont = lv_obj_create(par);
     lv_obj_remove_style_all(cont);
-    lv_obj_clear_flag(cont, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollable(cont, false);
     lv_obj_set_size(cont, LV_HOR_RES, 40);
     lv_obj_align_to(cont, ui.top_info.cont, LV_ALIGN_OUT_BOTTOM_MID, 0, 4);
     ui.btn_cont.cont = cont;
@@ -202,17 +202,17 @@ void DialplateView::btn_cont_create(lv_obj_t* par) {
     ui.btn_cont.btn_menu = btn_create(cont, resource_pool::get_image("ui_info"), 35, 0, transform);
     ui.btn_cont.btn_shutdown = btn_create(cont, resource_pool::get_image("ui_settings"), 105, 0, transform);
     for (auto* control : {ui.btn_cont.btn_map, ui.btn_cont.btn_rec, ui.btn_cont.btn_menu, ui.btn_cont.btn_shutdown}) {
-        lv_obj_set_style_bg_img_recolor(control, lv_color_white(), 0);
-        lv_obj_set_style_bg_img_recolor_opa(control, LV_OPA_COVER, 0);
+        lv_obj_set_style_bg_image_recolor(control, lv_color_white(), 0);
+        lv_obj_set_style_bg_image_recolor_opa(control, LV_OPA_COVER, 0);
     }
 }
 
-lv_obj_t* DialplateView::btn_create(lv_obj_t* par, const void* img_src, const lv_coord_t x, const lv_coord_t y,
+lv_obj_t* DialplateView::btn_create(lv_obj_t* par, const void* img_src, const int32_t x, const int32_t y,
                                     const TransformInfo_t& transform) {
     lv_obj_t* obj = lv_obj_create(par);
     lv_obj_remove_style_all(obj);
-    lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_add_flag(obj, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_scrollable(obj, false);
+    lv_obj_set_clickable(obj, true);
 
     lv_obj_set_size(obj, transform.width_default, transform.height_default);
     // y == 0 表示按钮行内按中心水平偏移排列，否则为父对象内绝对位置。
@@ -220,7 +220,7 @@ lv_obj_t* DialplateView::btn_create(lv_obj_t* par, const void* img_src, const lv
         lv_obj_align(obj, LV_ALIGN_CENTER, x, 0);
     else
         lv_obj_set_pos(obj, x, y);
-    lv_obj_set_style_bg_img_src(obj, img_src, 0);
+    lv_obj_set_style_bg_image_src(obj, img_src, 0);
 
     page::style::control(obj);
 
@@ -287,14 +287,22 @@ void DialplateView::update(const DataProc::DeviceSnapshot& device) {
 }
 
 namespace {
-// LVGL 角度 0° 指向右侧并顺时针增加；跨 0° 的弧拆成两段绘制。
-void draw_arc(lv_draw_ctx_t* ctx, const lv_draw_arc_dsc_t* dsc, const lv_point_t* center, uint16_t radius, int start,
-              int end) {
+/** @brief 按 LVGL 顺时针角度绘制短弧，跨零度时拆分以保持原有外观。 */
+void draw_arc(lv_layer_t* layer, const lv_draw_arc_dsc_t* dsc, const lv_point_t* center, uint16_t radius,
+              int start, int end) {
+    lv_draw_arc_dsc_t arc = *dsc;
+    arc.center = {static_cast<lv_value_precise_t>(center->x), static_cast<lv_value_precise_t>(center->y)};
+    arc.radius = radius;
+    arc.end_angle = end;
     if (start < 0) {
-        lv_draw_arc(ctx, dsc, center, radius, static_cast<uint16_t>(start + 360), 360);
+        arc.start_angle = start + 360;
+        arc.end_angle = 360;
+        lv_draw_arc(layer, &arc);
         start = 0;
     }
-    lv_draw_arc(ctx, dsc, center, radius, static_cast<uint16_t>(start), static_cast<uint16_t>(end));
+    arc.start_angle = start;
+    arc.end_angle = end;
+    lv_draw_arc(layer, &arc);
 }
 
 // 三角脉冲：phase 距 peak 越近越亮，窗口外保持底亮度。
@@ -314,10 +322,10 @@ void DialplateView::radio_draw_event_cb(lv_event_t* e) {
         return;
 
     lv_area_t coords;
-    lv_obj_get_coords(lv_event_get_target(e), &coords);
+    lv_obj_get_coords(lv_event_get_target_obj(e), &coords);
     // 波形以天线顶端为圆心，仅画左右两侧 ±22° 的短弧；最内弧半径大于天线顶端宽度，不压到图标。
-    const lv_point_t tip = {static_cast<lv_coord_t>(coords.x1 + kIconX + 8),
-                            static_cast<lv_coord_t>(coords.y1 + kIconY + 4)};
+    const lv_point_t tip = {static_cast<int32_t>(coords.x1 + kIconX + 8),
+                            static_cast<int32_t>(coords.y1 + kIconY + 4)};
     const bool rover = device.work_mode == DataProc::WorkMode::Rover;
     constexpr uint16_t radii[] = {9, 13, 17};
 
@@ -330,8 +338,8 @@ void DialplateView::radio_draw_event_cb(lv_event_t* e) {
         // TX（基站）由内向外扩散；RX（移动站）由外向内收拢。
         const uint32_t order = rover ? 2 - i : i;
         arc.opa = pulse(self->anim_phase_, order * kAnimPeriod / 4, kAnimPeriod, kAnimPeriod / 4, LV_OPA_20);
-        draw_arc(lv_event_get_draw_ctx(e), &arc, &tip, radii[i], 180 - 22, 180 + 22);
-        draw_arc(lv_event_get_draw_ctx(e), &arc, &tip, radii[i], -22, 22);
+        draw_arc(lv_event_get_layer(e), &arc, &tip, radii[i], 180 - 22, 180 + 22);
+        draw_arc(lv_event_get_layer(e), &arc, &tip, radii[i], -22, 22);
     }
 }
 
@@ -342,12 +350,12 @@ void DialplateView::mode_draw_event_cb(lv_event_t* e) {
         return;
 
     lv_area_t coords;
-    lv_obj_get_coords(lv_event_get_target(e), &coords);
-    lv_draw_ctx_t* ctx = lv_event_get_draw_ctx(e);
+    lv_obj_get_coords(lv_event_get_target_obj(e), &coords);
+    lv_layer_t* ctx = lv_event_get_layer(e);
     const uint32_t phase = self->anim_phase_;
     // 图标坐标：接收机天线罩底边在图标 y=5，对中杆尖在 y=15，水平中心 x=8。
-    const lv_coord_t cx = coords.x1 + kIconX + 8;
-    const lv_coord_t dome_base = coords.y1 + kIconY + 5, pole_tip = coords.y1 + kIconY + 15;
+    const int32_t cx = coords.x1 + kIconX + 8;
+    const int32_t dome_base = coords.y1 + kIconY + 5, pole_tip = coords.y1 + kIconY + 15;
 
     if (device.work_mode != DataProc::WorkMode::Rover) {
         // 基准站：天线罩上方三道弧由内向外依次亮起，表示持续播发差分改正数。
@@ -374,8 +382,8 @@ void DialplateView::mode_draw_event_cb(lv_event_t* e) {
         dot.bg_color = style::kSuccess;
         dot.bg_opa = static_cast<lv_opa_t>(LV_OPA_40 + (LV_OPA_COVER - LV_OPA_40) * phase / kFall);
         dot.radius = LV_RADIUS_CIRCLE;
-        const auto y = static_cast<lv_coord_t>(coords.y1 + 1 + (dome_base - 6 - coords.y1 - 1) * phase / kFall);
-        const lv_area_t area = {static_cast<lv_coord_t>(cx - 1), y, cx, static_cast<lv_coord_t>(y + 1)};
+        const auto y = static_cast<int32_t>(coords.y1 + 1 + (dome_base - 6 - coords.y1 - 1) * phase / kFall);
+        const lv_area_t area = {static_cast<int32_t>(cx - 1), y, cx, static_cast<int32_t>(y + 1)};
         lv_draw_rect(ctx, &dot, &area);
     }
     lv_draw_rect_dsc_t ring;
@@ -388,11 +396,11 @@ void DialplateView::mode_draw_event_cb(lv_event_t* e) {
         if (phase < start || phase >= start + kRipple)
             continue;
         const uint32_t age = phase - start;
-        const auto rx = static_cast<lv_coord_t>(2 + 10 * age / kRipple),
-                   ry = static_cast<lv_coord_t>(1 + 2 * age / kRipple); // 1→2 px，不压文字
+        const auto rx = static_cast<int32_t>(2 + 10 * age / kRipple),
+                   ry = static_cast<int32_t>(1 + 2 * age / kRipple); // 1→2 px，不压文字
         ring.border_opa = static_cast<lv_opa_t>(LV_OPA_COVER - LV_OPA_COVER * age / kRipple);
-        const lv_area_t area = {static_cast<lv_coord_t>(cx - rx), static_cast<lv_coord_t>(pole_tip - ry),
-                                static_cast<lv_coord_t>(cx + rx - 1), static_cast<lv_coord_t>(pole_tip + ry)};
+        const lv_area_t area = {static_cast<int32_t>(cx - rx), static_cast<int32_t>(pole_tip - ry),
+                                static_cast<int32_t>(cx + rx - 1), static_cast<int32_t>(pole_tip + ry)};
         lv_draw_rect(ctx, &ring, &area);
     }
 }

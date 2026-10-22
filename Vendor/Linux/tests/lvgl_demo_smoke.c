@@ -3,27 +3,24 @@
 #include "benchmark/lv_demo_benchmark.h"
 #include "demo_perf.h"
 
-static lv_color_t pixels[294 * 20];
+static uint16_t pixels[294 * 20];
 static unsigned flushes;
 
-static void flush(lv_disp_drv_t* driver, const lv_area_t* area, lv_color_t* color) {
+static void
+flush(lv_display_t* driver, const lv_area_t* area, uint8_t* color) {
     (void)area;
     (void)color;
     ++flushes;
-    lv_disp_flush_ready(driver);
+    lv_display_flush_ready(driver);
 }
 
 int main(void) {
     lv_init();
-    lv_disp_draw_buf_t draw;
-    lv_disp_draw_buf_init(&draw, pixels, NULL, 294 * 20);
-    lv_disp_drv_t driver;
-    lv_disp_drv_init(&driver);
-    driver.hor_res = 294;
-    driver.ver_res = 126;
-    driver.draw_buf = &draw;
-    driver.flush_cb = flush;
-    lv_disp_t* display = lv_disp_drv_register(&driver);
+    lv_display_t* display = lv_display_create(294, 126);
+    assert(display);
+    lv_display_set_color_format(display, LV_COLOR_FORMAT_RGB565);
+    lv_display_set_buffers(display, pixels, NULL, sizeof(pixels), LV_DISPLAY_RENDER_MODE_PARTIAL);
+    lv_display_set_flush_cb(display, flush);
     assert(display);
 
     lv_demo_benchmark();
@@ -38,6 +35,6 @@ int main(void) {
     assert(strstr(text, "FPS") && strstr(text, "CPU"));
     assert(!strstr(text, "0.0 FPS"));
     demo_perf_finish(&perf, 5000);
-    lv_disp_remove(display);
+    lv_display_delete(display);
     return 0;
 }

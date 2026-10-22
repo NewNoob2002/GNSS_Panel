@@ -11,7 +11,7 @@ void attach_controls(const std::array<lv_obj_t*, N>& controls, lv_event_cb_t cal
     for (auto* obj : controls) {
         if (!obj)
             continue;
-        lv_obj_add_flag(obj, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_set_clickable(obj, true);
         lv_obj_add_event_cb(obj, callback, LV_EVENT_SHORT_CLICKED, context);
     }
 }
@@ -23,7 +23,7 @@ template <size_t N> void focus_controls(const std::array<lv_obj_t*, N>& controls
     lv_group_set_wrap(group, true);
     lv_obj_t* focus = nullptr;
     for (auto* obj : controls) {
-        if (!obj || lv_obj_has_flag(obj, LV_OBJ_FLAG_HIDDEN) || lv_obj_has_state(obj, LV_STATE_DISABLED))
+        if (!obj || lv_obj_is_hidden(obj) || lv_obj_is_disabled(obj))
             continue;
         lv_group_add_obj(group, obj);
         if (!focus || obj == preferred)

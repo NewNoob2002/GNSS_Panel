@@ -44,7 +44,7 @@ ctest --test-dir build/app-core-tests --output-on-failure
 
 ioctl 编码包含方向、类型（P/D/S）、编号与 `sizeof(载荷)`；未知命令、错误尺寸、非零尺寸的空指针均拒绝。初始化元数据查询不触发探测，轮询结果的详情数组由调用方拥有，名称仅引用平台静态字符串。HC32 的 I2C 探测与主控等待仍在 StatusDevice/InitSteps 中；PowerDevice 保留原 HAL 开关机时序；BusinessDevice 内完成索引与协议码转换，只经 `State::Request_*` 和 `State::Effective_*` 处理请求，revision 采样与确认仍由显示协议拥有。Board 模拟器复用这些对象；DemoStatus 是 Demo 的 Status 设备，确定性/随机采样和初始化耗时保持不变。
 
-`ResourcePool.cpp` 使用 `Frameworks/ResourceManager/ResourceManager.h` 的字体、图片静态表，无堆分配；未知字体返回 LV_FONT_DEFAULT，未知图片返回空指针。`ResourcePool.h` 接口保持不变。LVGL 仍为 8.3.11；页面管理继续使用 `App/Utils/PageManager`，未切换到 Frameworks 中的页面管理器。
+`ResourcePool.cpp` 使用 `Frameworks/ResourceManager/ResourceManager.h` 的字体、图片静态表，无堆分配；未知字体返回 LV_FONT_DEFAULT，未知图片返回空指针。`ResourcePool.h` 接口保持不变。LVGL 已升级为 9.6.0；页面管理继续使用 `App/Utils/PageManager`，未切换到 Frameworks 中的页面管理器。
 
 ## 后续阶段
 
@@ -55,4 +55,4 @@ ioctl 编码包含方向、类型（P/D/S）、编号与 `sizeof(载荷)`；未�
 3. 将初始化推进和业务超时移出页面/平台设备，并移除服务对具体 Model 名称和选项下标的依赖。
 4. 提供真实 Linux 业务适配，统一三端事件回放测试。
 
-页面动画、导航和多语言呈现继续属于 UI。X-TRACK LVGL 9 的 PageManager/设备实现不在本阶段整体替换，保留当前 LVGL 8 与已验证的板级时序。
+页面动画、导航和多语言呈现继续属于 UI。X-TRACK LVGL 9 的 PageManager/设备实现不在本阶段整体替换，保留当前 App/Utils/PageManager 与已验证的板级时序。

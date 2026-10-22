@@ -44,7 +44,7 @@ void SaveConfig::on_view_did_appear() {
 
 void SaveConfig::cancel_timer() {
     if (timer_) {
-        lv_timer_del(timer_);
+        lv_timer_delete(timer_);
         timer_ = nullptr;
     }
 }
@@ -69,9 +69,9 @@ void SaveConfig::on_language_changed() {
 }
 
 void SaveConfig::on_timeout(lv_timer_t* timer) {
-    auto* self = static_cast<SaveConfig*>(timer->user_data);
+    auto* self = static_cast<SaveConfig*>(lv_timer_get_user_data(timer));
     self->timer_ = nullptr;
-    lv_timer_del(timer);
+    lv_timer_delete(timer);
     const auto request = self->model_.settings(); // Copy before navigation unloads this Model/View.
     if (!request.power_pending)
         return; // Platform shutdown: the platform reports standby (App returns to Startup).

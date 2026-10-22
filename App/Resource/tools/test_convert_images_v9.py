@@ -182,5 +182,26 @@ class ConversionTests(unittest.TestCase):
                 converter.run(dst, base / "empty", {}, False)
 
 
+    def test_deployed_v9_check(self):
+        """Check deployed v9 resources in place. 正式资源支持同目录只读校验，拒绝错误头字段。"""
+        root = converter.HERE.parents[2] / "build"
+        root.mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(prefix="deployed-v9-test-", dir=root) as directory:
+            base = Path(directory)
+            for fmt in ("A8", "RGB565", "RGB565A8"):
+                rgba = bytes((255, 0, 0, 255 if fmt == "RGB565" else 128)) * 2
+                image = converter.encode_v9("img_src_t", 2, 1, rgba, fmt)
+                path = base / "img_src_t.c"
+                path.write_bytes(converter.render_c_file([image]).replace("\n", "\r\n").encode())
+                original = path.read_bytes()
+                with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                    self.assertEqual(converter.run(base, base, {}, True), 0)
+                    self.assertEqual(path.read_bytes(), original)
+                    path.write_bytes(original.replace(b".magic = LV_IMAGE_HEADER_MAGIC", b".magic = 0"))
+                    self.assertEqual(converter.run(base, base, {}, True), 1)
+                    self.assertEqual(path.read_bytes(), original.replace(b".magic = LV_IMAGE_HEADER_MAGIC",
+                                                                         b".magic = 0"))
+
+
 if __name__ == "__main__":
     unittest.main()

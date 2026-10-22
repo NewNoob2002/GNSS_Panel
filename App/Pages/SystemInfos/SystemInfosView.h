@@ -45,7 +45,7 @@ class SystemInfosView {
         item_t system;
     } ui;
 
-    static void set_scroll_to_y(lv_obj_t* obj, lv_coord_t y, lv_anim_enable_t en);
+    static void set_scroll_to_y(lv_obj_t* obj, int32_t y, lv_anim_enable_t en);
 
     static void on_focus(lv_group_t* e);
 

@@ -3,7 +3,7 @@
 
 #ifdef __CORE_DEBUG
 static void
-lv_log_print(const char* buf) {
+lv_log_print(lv_log_level_t, const char* buf) {
     CORE_DEBUG_PRINTF("%s", buf);
 }
 #endif

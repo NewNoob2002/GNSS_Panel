@@ -28,17 +28,17 @@ NumberFlowClock::~NumberFlowClock() {
         second_ = nullptr;
     }
     // 删除容器会自动删除所有子对象（包括分隔符）
-    if (cont_ && lv_obj_is_valid(cont_)) {
-        lv_obj_del(cont_);
+    if (cont_ && lv_obj_is_in_widget_tree(cont_)) {
+        lv_obj_delete(cont_);
         cont_ = nullptr;
     }
 }
 
 void NumberFlowClock::create(lv_obj_t* parent) {
-    if (parent == nullptr || !lv_obj_is_valid(parent))
+    if (parent == nullptr || !lv_obj_is_in_widget_tree(parent))
         return;
     if (cont_ != nullptr) {
-        if (lv_obj_is_valid(cont_))
+        if (lv_obj_is_in_widget_tree(cont_))
             return;
         cont_ = nullptr;
         separator1_ = nullptr;
@@ -46,16 +46,16 @@ void NumberFlowClock::create(lv_obj_t* parent) {
     }
 
     const uint16_t font_width = lv_font_get_glyph_width(font_, '0', '\0');
-    const lv_coord_t font_height = font_->line_height;
+    const int32_t font_height = font_->line_height;
     const uint16_t colon_width = lv_font_get_glyph_width(font_, ':', '\0');
 
     // 创建主容器
     cont_ = lv_obj_create(parent);
     lv_obj_remove_style_all(cont_);
-    lv_obj_clear_flag(cont_, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollable(cont_, false);
 
     // 计算总宽度：2位数字 + 冒号 + 2位数字 + 冒号 + 2位数字
-    const lv_coord_t total_width = font_width * 2 + colon_width + font_width * 2 + colon_width + font_width * 2;
+    const int32_t total_width = font_width * 2 + colon_width + font_width * 2 + colon_width + font_width * 2;
     lv_obj_set_size(cont_, total_width, font_height);
 
     // 创建小时数字流
@@ -95,14 +95,14 @@ void NumberFlowClock::create(lv_obj_t* parent) {
     lv_obj_set_pos(second_cont, font_width * 2 + colon_width + font_width * 2 + colon_width, 0);
 }
 
-void NumberFlowClock::set_pos(const lv_align_t align, const lv_coord_t x, const lv_coord_t y) const {
-    if (cont_ == nullptr || !lv_obj_is_valid(cont_))
+void NumberFlowClock::set_pos(const lv_align_t align, const int32_t x, const int32_t y) const {
+    if (cont_ == nullptr || !lv_obj_is_in_widget_tree(cont_))
         return;
     lv_obj_align(cont_, align, x, y);
 }
 
 void NumberFlowClock::set_time(const uint32_t hour_val, const uint32_t minute_val, const uint32_t second_val) const {
-    if (cont_ == nullptr || !lv_obj_is_valid(cont_))
+    if (cont_ == nullptr || !lv_obj_is_in_widget_tree(cont_))
         return;
     if (hour_) {
         hour_->set_value(hour_val);

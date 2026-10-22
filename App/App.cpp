@@ -39,8 +39,8 @@ bool App::init(const Options& options) {
 
     // Sliding page roots overflow the screen during transitions; the screen itself never scrolls, so it must not draw
     // a scrollbar over every transition frame.
-    lv_obj_clear_flag(lv_scr_act(), LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_scrollbar_mode(lv_scr_act(), LV_SCROLLBAR_MODE_OFF);
+    lv_obj_set_scrollable(lv_screen_active(), false);
+    lv_obj_set_scrollbar_mode(lv_screen_active(), LV_SCROLLBAR_MODE_OFF);
 
     manager_ = std::make_unique<PageManager>();
     manager_->set_root_default_style(&root_style_);
@@ -86,7 +86,7 @@ void App::update() {
 
 App::~App() {
     if (navigation_timer_)
-        lv_timer_del(navigation_timer_);
+        lv_timer_delete(navigation_timer_);
     manager_.reset();
     account_.reset();
     battery_warning_.destroy();
@@ -95,7 +95,7 @@ App::~App() {
         APP_LOG_E("Application", "provider cleanup failed");
     if (group_) {
         lv_group_set_default(nullptr);
-        lv_group_del(group_);
+        lv_group_delete(group_);
     }
     if (style_ready_)
         lv_style_reset(&root_style_);
@@ -130,7 +130,7 @@ int App::on_system_event(DataNode* account, DataNode::EventParam_t* event) {
 }
 
 void App::on_navigation(lv_timer_t* timer) {
-    auto* self = static_cast<App*>(timer->user_data);
+    auto* self = static_cast<App*>(lv_timer_get_user_data(timer));
     if (!self->manager_ || self->manager_->is_switching())
         return;
     const char* page = self->current_page();
@@ -178,7 +178,7 @@ void App::preload_next() {
 void App::update_status(const page::StatusBarState& state) {
     DataProc::StatusSnapshot snapshot;
     std::snprintf(snapshot.position.data(), snapshot.position.size(), "%s", state.position ? state.position : "DEMO");
-    snapshot.position_color_rgb = lv_color_to32(state.position_color) & 0xffffffu;
+    snapshot.position_color_rgb = lv_color_to_u32(state.position_color) & 0xffffffu;
     snapshot.satellites = state.satellites;
     snapshot.satellites_valid = state.satellites_valid;
     snapshot.battery_percent = state.battery_percent;
@@ -222,18 +222,18 @@ void App::dispatch_input(const InputAction action) {
         const char* pressed_page = pressed_page_;
         pressed_ = nullptr;
         pressed_page_ = nullptr;
-        if (pressed && page && std::strcmp(page, pressed_page) == 0 && lv_obj_is_valid(pressed)) {
-            lv_obj_clear_state(pressed, LV_STATE_PRESSED);
-            lv_event_send(pressed, LV_EVENT_RELEASED, nullptr);
+        if (pressed && page && std::strcmp(page, pressed_page) == 0 && lv_obj_is_in_widget_tree(pressed)) {
+            lv_obj_set_pressed(pressed, false);
+            lv_obj_send_event(pressed, LV_EVENT_RELEASED, nullptr);
             if (lv_group_get_focused(group_) == pressed && !current->on_enter_request())
-                lv_event_send(pressed, LV_EVENT_SHORT_CLICKED, nullptr);
+                lv_obj_send_event(pressed, LV_EVENT_SHORT_CLICKED, nullptr);
         }
         return;
     }
     if (pressed_ && action != InputAction::None) {
-        if (page && std::strcmp(page, pressed_page_) == 0 && lv_obj_is_valid(pressed_)) {
-            lv_obj_clear_state(pressed_, LV_STATE_PRESSED);
-            lv_event_send(pressed_, LV_EVENT_PRESS_LOST, nullptr);
+        if (page && std::strcmp(page, pressed_page_) == 0 && lv_obj_is_in_widget_tree(pressed_)) {
+            lv_obj_set_pressed(pressed_, false);
+            lv_obj_send_event(pressed_, LV_EVENT_PRESS_LOST, nullptr);
         }
         pressed_ = nullptr;
         pressed_page_ = nullptr;
@@ -247,11 +247,18 @@ void App::dispatch_input(const InputAction action) {
             // Uniform input dispatch; each page decides whether Press is a hold or a normal click.
             if (action == InputAction::Press && page) {
                 pressed_ = focused;
+                // 删除通知指向 App 成员；相同控件只保留一份通知，避免反复按下积累事件。
+                for (uint32_t i = lv_obj_get_event_count(focused); i > 0; --i) {
+                    auto* event = lv_obj_get_event_dsc(focused, i - 1);
+                    if (lv_event_dsc_get_user_data(event) == &pressed_)
+                        lv_obj_remove_event(focused, i - 1);
+                }
+                lv_obj_null_on_delete(&pressed_);
                 pressed_page_ = page;
-                lv_obj_add_state(focused, LV_STATE_PRESSED);
-                lv_event_send(focused, LV_EVENT_PRESSED, nullptr);
+                lv_obj_set_pressed(focused, true);
+                lv_obj_send_event(focused, LV_EVENT_PRESSED, nullptr);
             } else {
-                lv_event_send(focused, LV_EVENT_SHORT_CLICKED, nullptr);
+                lv_obj_send_event(focused, LV_EVENT_SHORT_CLICKED, nullptr);
             }
         }
     } else if (action == InputAction::Back) {
@@ -265,15 +272,15 @@ void App::cancel_input() {
     auto* pressed = pressed_;
     const auto* page = pressed_page_;
     // Pointer presses are owned by LVGL, not pressed_; reset alone does not emit PRESS_LOST.
-    if (auto* focus = focused(); focus && lv_obj_has_state(focus, LV_STATE_PRESSED)) {
+    if (auto* focus = focused(); focus && lv_obj_is_pressed(focus)) {
         pressed = focus;
         page = current_page();
     }
     pressed_ = nullptr;
     pressed_page_ = nullptr;
-    if (pressed && page && current_page() && std::strcmp(page, current_page()) == 0 && lv_obj_is_valid(pressed)) {
-        lv_obj_clear_state(pressed, LV_STATE_PRESSED);
-        lv_event_send(pressed, LV_EVENT_PRESS_LOST, nullptr);
+    if (pressed && page && current_page() && std::strcmp(page, current_page()) == 0 && lv_obj_is_in_widget_tree(pressed)) {
+        lv_obj_set_pressed(pressed, false);
+        lv_obj_send_event(pressed, LV_EVENT_PRESS_LOST, nullptr);
     }
 }
 

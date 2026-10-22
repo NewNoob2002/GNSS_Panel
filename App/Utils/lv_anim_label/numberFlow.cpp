@@ -6,10 +6,10 @@ static void lv_anim_label_set_y(void* obj, const int32_t y) {
 }
 
 void NumberFlow::create(lv_obj_t* parent) {
-    if (parent == nullptr || !lv_obj_is_valid(parent))
+    if (parent == nullptr || !lv_obj_is_in_widget_tree(parent))
         return;
     if (cont_ != nullptr) {
-        if (lv_obj_is_valid(cont_))
+        if (lv_obj_is_in_widget_tree(cont_))
             return;
         cont_ = nullptr;
         digit_labels_.clear();
@@ -18,15 +18,15 @@ void NumberFlow::create(lv_obj_t* parent) {
     }
 
     const uint16_t font_width = lv_font_get_glyph_width(font_, '0', '\0');
-    const lv_coord_t font_height = font_->line_height;
+    const int32_t font_height = font_->line_height;
 
     // 创建容器并保存到成员变量
     cont_ = lv_obj_create(parent);
     lv_obj_remove_style_all(cont_);
     lv_obj_center(cont_);
     lv_obj_set_size(cont_, font_width * number_size_, font_height);
-    lv_obj_clear_flag(cont_, LV_OBJ_FLAG_SCROLLABLE);       // 禁用滚动
-    lv_obj_clear_flag(cont_, LV_OBJ_FLAG_OVERFLOW_VISIBLE); // 确保裁剪子对象
+    lv_obj_set_scrollable(cont_, false);       // 禁用滚动
+    lv_obj_set_overflow_visible(cont_, false); // 确保裁剪子对象
 
     for (int i = 0; i < number_size_; i++) {
         // 为每个数字位创建容器
@@ -34,13 +34,13 @@ void NumberFlow::create(lv_obj_t* parent) {
         lv_obj_remove_style_all(digit_cont);
         lv_obj_set_size(digit_cont, font_width, font_height);
         lv_obj_set_pos(digit_cont, i * font_width, 0);
-        lv_obj_clear_flag(digit_cont, LV_OBJ_FLAG_SCROLLABLE);
-        lv_obj_clear_flag(digit_cont, LV_OBJ_FLAG_OVERFLOW_VISIBLE);
+        lv_obj_set_scrollable(digit_cont, false);
+        lv_obj_set_overflow_visible(digit_cont, false);
 
         // 创建包含所有数字的长条 label
         lv_obj_t* label = lv_label_create(digit_cont);
         lv_label_set_text(label, "0\n1\n2\n3\n4\n5\n6\n7\n8\n9");
-        lv_label_set_long_mode(label, LV_LABEL_LONG_CLIP); // 设置长文本模式为裁剪
+        lv_label_set_long_mode(label, LV_LABEL_LONG_MODE_CLIP); // 设置长文本模式为裁剪
         lv_obj_set_style_text_font(label, font_, 0);
         lv_obj_set_style_text_color(label, lv_color_hex(0xffffff), 0);
         lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
@@ -58,15 +58,15 @@ void NumberFlow::create(lv_obj_t* parent) {
     }
 }
 
-void NumberFlow::set_pos(const lv_align_t align, const lv_coord_t x, const lv_coord_t y) const {
-    if (cont_ == nullptr || !lv_obj_is_valid(cont_))
+void NumberFlow::set_pos(const lv_align_t align, const int32_t x, const int32_t y) const {
+    if (cont_ == nullptr || !lv_obj_is_in_widget_tree(cont_))
         return;
     lv_obj_align(cont_, align, x, y);
 }
 
-void NumberFlow::set_align_to(const lv_obj_t* base, const lv_align_t align, const lv_coord_t x,
-                              const lv_coord_t y) const {
-    if (cont_ == nullptr || !lv_obj_is_valid(cont_) || base == nullptr || !lv_obj_is_valid(base))
+void NumberFlow::set_align_to(const lv_obj_t* base, const lv_align_t align, const int32_t x,
+                              const int32_t y) const {
+    if (cont_ == nullptr || !lv_obj_is_in_widget_tree(cont_) || base == nullptr || !lv_obj_is_in_widget_tree(base))
         return;
     lv_obj_align_to(cont_, base, align, x, y);
 }
@@ -75,18 +75,18 @@ void NumberFlow::set_align_to(const lv_obj_t* base, const lv_align_t align, cons
 void NumberFlow::animate_digit(const uint32_t digit_index, const uint32_t target_val) const {
     if (digit_index >= digit_labels_.size())
         return;
-    if (digit_labels_[digit_index] == nullptr || !lv_obj_is_valid(digit_labels_[digit_index]))
+    if (digit_labels_[digit_index] == nullptr || !lv_obj_is_in_widget_tree(digit_labels_[digit_index]))
         return;
 
     lv_obj_t* label = digit_labels_[digit_index];
-    const lv_coord_t font_height = font_->line_height;
+    const int32_t font_height = font_->line_height;
 
     // 先删除该 label 上可能存在的旧动画，避免冲突
-    lv_anim_del(label, lv_anim_label_set_y);
+    lv_anim_delete(label, lv_anim_label_set_y);
 
     // 删除动画后，获取当前实际位置
-    const lv_coord_t current_y = lv_obj_get_y(label);
-    const lv_coord_t target_y = -(target_val * font_height);
+    const int32_t current_y = lv_obj_get_y(label);
+    const int32_t target_y = -(target_val * font_height);
 
     // 如果已经在目标位置，直接返回
     if (current_y == target_y)
@@ -96,7 +96,7 @@ void NumberFlow::animate_digit(const uint32_t digit_index, const uint32_t target
     lv_anim_init(&a);
     lv_anim_set_var(&a, label);
     lv_anim_set_values(&a, current_y, target_y);
-    lv_anim_set_time(&a, 300);                      // 缩短动画时间到300ms，避免卡顿
+    lv_anim_set_duration(&a, 300);                      // 缩短动画时间到300ms，避免卡顿
     lv_anim_set_path_cb(&a, lv_anim_path_ease_out); // 缓动效果
     lv_anim_set_exec_cb(&a, lv_anim_label_set_y);
     lv_anim_start(&a);
@@ -106,23 +106,23 @@ void NumberFlow::animate_digit(const uint32_t digit_index, const uint32_t target
 void NumberFlow::set_digit_visibility(const uint32_t digit_index, const bool visible) const {
     if (digit_index >= digit_labels_.size())
         return;
-    if (digit_labels_[digit_index] == nullptr || !lv_obj_is_valid(digit_labels_[digit_index]))
+    if (digit_labels_[digit_index] == nullptr || !lv_obj_is_in_widget_tree(digit_labels_[digit_index]))
         return;
 
     // 获取数字位的容器（label 的父对象）
     lv_obj_t* digit_cont = lv_obj_get_parent(digit_labels_[digit_index]);
-    if (digit_cont == nullptr || !lv_obj_is_valid(digit_cont))
+    if (digit_cont == nullptr || !lv_obj_is_in_widget_tree(digit_cont))
         return;
 
     if (visible) {
-        lv_obj_clear_flag(digit_cont, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_set_hidden(digit_cont, false);
     } else {
-        lv_obj_add_flag(digit_cont, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_set_hidden(digit_cont, true);
     }
 }
 
 void NumberFlow::set_value(const uint32_t target_value) const {
-    if (cont_ == nullptr || !lv_obj_is_valid(cont_) || digit_labels_.empty())
+    if (cont_ == nullptr || !lv_obj_is_in_widget_tree(cont_) || digit_labels_.empty())
         return;
 
     // 如果值没有改变，直接返回，避免频繁启动动画

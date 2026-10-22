@@ -13,32 +13,45 @@
 #include "Utils/I18n/I18n.h"
 #include "Utils/PageManager/PageManager.h"
 
+/** @brief 通过公开 API 读取对象的屏幕绝对坐标供布局断言使用。 */
+static lv_area_t
+object_coords(const lv_obj_t* object) {
+    lv_area_t area;
+    lv_obj_get_coords(object, &area);
+    return area;
+}
+
 constexpr int width_px = 294;
 constexpr int height_px = 126;
-static lv_color_t frame[width_px * height_px];
-static lv_color_t dialplate_frame[width_px * height_px];
-static lv_color_t draw_pixels[width_px * 20];
+static uint16_t frame[width_px * height_px];
+static uint16_t dialplate_frame[width_px * height_px];
+static uint16_t draw_pixels[width_px * 20];
 static unsigned flushes;
 
 static lv_obj_t* find_label(lv_obj_t* root, const char* text) {
-    if (lv_obj_has_flag(root, LV_OBJ_FLAG_HIDDEN))
+    if (lv_obj_is_hidden(root)) {
         return nullptr;
+    }
     if (lv_obj_check_type(root, &lv_label_class) && std::strstr(lv_label_get_text(root), text))
         return root;
-    for (uint32_t i = 0; i < lv_obj_get_child_cnt(root); ++i)
+    for (uint32_t i = 0; i < lv_obj_get_child_count(root); ++i) {
         if (auto* found = find_label(lv_obj_get_child(root, static_cast<int32_t>(i)), text))
             return found;
+    }
     return nullptr;
 }
 
 static lv_obj_t* find_image(lv_obj_t* root, const void* source) {
-    if (lv_obj_has_flag(root, LV_OBJ_FLAG_HIDDEN))
+    if (lv_obj_is_hidden(root)) {
         return nullptr;
-    if (lv_obj_check_type(root, &lv_img_class) && lv_img_get_src(root) == source)
+    }
+    if (lv_obj_check_type(root, &lv_image_class) && lv_image_get_src(root) == source) {
         return root;
-    for (uint32_t i = 0; i < lv_obj_get_child_cnt(root); ++i)
+    }
+    for (uint32_t i = 0; i < lv_obj_get_child_count(root); ++i) {
         if (auto* found = find_image(lv_obj_get_child(root, static_cast<int32_t>(i)), source))
             return found;
+    }
     return nullptr;
 }
 
@@ -61,15 +74,17 @@ static void advance(unsigned ms) {
     }
 }
 
-static void flush(lv_disp_drv_t* driver, const lv_area_t* area, lv_color_t* pixels) {
+static void
+flush(lv_display_t* driver, const lv_area_t* area, uint8_t* px_map) {
+    uint16_t* pixels = (uint16_t*)px_map;
     assert(area->x1 >= 0 && area->y1 >= 0 && area->x2 < width_px && area->y2 < height_px);
     const int width = area->x2 - area->x1 + 1;
     for (int y = area->y1; y <= area->y2; ++y)
         std::memcpy(&frame[y * width_px + area->x1],
                     &pixels[static_cast<std::size_t>(y - area->y1) * static_cast<std::size_t>(width)],
-                    width * sizeof(lv_color_t));
+                    width * sizeof(uint16_t));
     ++flushes;
-    lv_disp_flush_ready(driver);
+    lv_display_flush_ready(driver);
 }
 
 int main(int argc, char** argv) {
@@ -109,15 +124,11 @@ int main(int argc, char** argv) {
     assert(boundary.sample(false, 2200) == Action::None); // A cancelled held key is not a click.
 
     lv_init();
-    lv_disp_draw_buf_t draw;
-    lv_disp_draw_buf_init(&draw, draw_pixels, nullptr, width_px * 20);
-    lv_disp_drv_t driver;
-    lv_disp_drv_init(&driver);
-    driver.hor_res = width_px;
-    driver.ver_res = height_px;
-    driver.draw_buf = &draw;
-    driver.flush_cb = flush;
-    lv_disp_t* display = lv_disp_drv_register(&driver);
+    lv_display_t* display = lv_display_create(width_px, height_px);
+    assert(display);
+    lv_display_set_color_format(display, LV_COLOR_FORMAT_RGB565);
+    lv_display_set_buffers(display, draw_pixels, NULL, sizeof(draw_pixels), LV_DISPLAY_RENDER_MODE_PARTIAL);
+    lv_display_set_flush_cb(display, flush);
     assert(display);
     {
         // Building a page is not elapsed transition time: the first frame starts at the beginning of the slide.
@@ -132,7 +143,7 @@ int main(int argc, char** argv) {
         lv_anim_set_var(&background, &background);
         lv_anim_set_exec_cb(&background, [](void*, int32_t) {});
         lv_anim_set_values(&background, 0, 100);
-        lv_anim_set_time(&background, 1000);
+        lv_anim_set_duration(&background, 1000);
         lv_anim_set_repeat_count(&background, LV_ANIM_REPEAT_INFINITE);
         assert(lv_anim_start(&background));
         advance(400);
@@ -140,10 +151,10 @@ int main(int argc, char** argv) {
         lv_tick_inc(10);
         lv_timer_handler();
         auto* slow_root = manager.get_current_page()->root;
-        assert(lv_obj_get_style_x(slow_root, 0) > width_px * 3 / 4); // Not 210 of 260 ms already gone.
+        assert(lv_obj_get_style_x(slow_root, LV_PART_MAIN) > width_px * 3 / 4); // Not 210 of 260 ms already gone.
         advance(400);
-        assert(lv_obj_get_style_x(slow_root, 0) == 0);
-        lv_anim_del(&background, nullptr);
+        assert(lv_obj_get_style_x(slow_root, LV_PART_MAIN) == 0);
+        lv_anim_delete(&background, nullptr);
     }
     {
         App app;
@@ -162,37 +173,37 @@ int main(int argc, char** argv) {
             assert(app.focused());
             advance(400); // Finish initial transition before testing actual input.
             auto* startup_status = find_label(lv_layer_top(), "DEMO");
-            assert(startup_status && startup_status->coords.y2 < 0);
+            assert(startup_status && object_coords(startup_status).y2 < 0);
             app.on_input(Input::Confirm);
             advance(300);
             assert(std::strcmp(app.current_page(), "Pages/Startup") == 0);
             app.on_input(Input::Press);
             advance(500);
-            assert(!find_label(lv_scr_act(), "0%"));
+            assert(!find_label(lv_screen_active(), "0%"));
             app.on_input(Input::Release); // A short press must not start.
             advance(400);
             assert(std::strcmp(app.current_page(), "Pages/Startup") == 0);
-            assert(find_label(lv_scr_act(), "0%"));
+            assert(find_label(lv_screen_active(), "0%"));
             app.on_input(Input::Press);
             advance(500);
             app.cancel_input(); // SDL focus loss cancels rather than confirming the held control.
             app.on_input(Input::Release);
             advance(2500);
             assert(std::strcmp(app.current_page(), "Pages/Startup") == 0);
-            assert(find_label(lv_scr_act(), "0%"));
+            assert(find_label(lv_screen_active(), "0%"));
             // LVGL pointer presses bypass App::pressed_; window loss must still cancel their hold.
-            lv_obj_add_state(app.focused(), LV_STATE_PRESSED);
-            lv_event_send(app.focused(), LV_EVENT_PRESSED, nullptr);
+            lv_obj_set_pressed(app.focused(), true);
+            lv_obj_send_event(app.focused(), LV_EVENT_PRESSED, nullptr);
             advance(500);
             app.cancel_input();
-            assert(!lv_obj_has_state(app.focused(), LV_STATE_PRESSED));
+            assert(!lv_obj_is_pressed(app.focused()));
             advance(2500);
             assert(std::strcmp(app.current_page(), "Pages/Startup") == 0);
-            assert(find_label(lv_scr_act(), "0%"));
+            assert(find_label(lv_screen_active(), "0%"));
             advance(2000);
-            assert(startup_status->coords.y2 < 0); // Still below the ten-second Startup idle deadline.
+            assert(object_coords(startup_status).y2 < 0); // Still below the ten-second Startup idle deadline.
             advance(1500);
-            assert(startup_status->coords.y1 >= 0); // Delay expired; slide-in completed.
+            assert(object_coords(startup_status).y1 >= 0); // Delay expired; slide-in completed.
             app.on_input(Input::Press);
             advance(1000);
             app.on_input(Input::Press); // Repeated keydown cannot restart the timer.
@@ -205,28 +216,28 @@ int main(int argc, char** argv) {
 #else
             const auto* loading_logo = resource_pool::get_image("startupLogo");
 #endif
-            assert(loading_logo && find_image(lv_scr_act(), loading_logo));
-            assert(!find_label(lv_scr_act(), i18n::text(i18n::TextId::SystemLoadingTitle)));
+            assert(loading_logo && find_image(lv_screen_active(), loading_logo));
+            assert(!find_label(lv_screen_active(), i18n::text(i18n::TextId::SystemLoadingTitle)));
             lv_tick_inc(5000); // A stalled host frame must not lose the loading completion request.
             lv_timer_handler();
             assert(std::strcmp(app.current_page(), "Pages/SystemLoading") == 0);
             advance(300);
-            assert(startup_status->coords.y2 < 0); // SystemLoading slides a previously shown bar off-screen.
+            assert(object_coords(startup_status).y2 < 0); // SystemLoading slides a previously shown bar off-screen.
             assert(!app.back());                   // Loading replaced Startup, rather than retaining it underneath.
             app.on_input(Input::Release);          // Cross-page release must not activate the next page.
             advance(800);
-            assert(!find_image(lv_scr_act(), loading_logo));
-            assert(find_label(lv_scr_act(), i18n::text(i18n::TextId::SystemLoadingTitle)));
+            assert(!find_image(lv_screen_active(), loading_logo));
+            assert(find_label(lv_screen_active(), i18n::text(i18n::TextId::SystemLoadingTitle)));
             // Steps take their simulated check time (0/400/1200/700/200 ms, each shown at least 300 ms).
-            assert(find_label(lv_scr_act(), i18n::text(i18n::TextId::LoadingConfiguration))
-                   || find_label(lv_scr_act(), i18n::text(i18n::TextId::PreparingServices)));
-            assert(find_label(lv_scr_act(), i18n::text(i18n::TextId::PreparingModules)));
+            assert(find_label(lv_screen_active(), i18n::text(i18n::TextId::LoadingConfiguration))
+                   || find_label(lv_screen_active(), i18n::text(i18n::TextId::PreparingServices)));
+            assert(find_label(lv_screen_active(), i18n::text(i18n::TextId::PreparingModules)));
             advance(1600);
-            auto* progress = find_label(lv_scr_act(), "%");
+            auto* progress = find_label(lv_screen_active(), "%");
             assert(progress && std::atoi(lv_label_get_text(progress)) >= 40);
             assert(std::strcmp(app.current_page(), "Pages/SystemLoading") == 0);
             advance(2400);
-            assert(find_label(lv_scr_act(), i18n::text(i18n::TextId::ReadyWithWarnings)));
+            assert(find_label(lv_screen_active(), i18n::text(i18n::TextId::ReadyWithWarnings)));
             advance(1400);
             assert(std::strcmp(app.current_page(), "Pages/Dialplate") == 0);
             assert(!DataProc::Broker()->search("StartupModel"));
@@ -256,7 +267,7 @@ int main(int argc, char** argv) {
         assert(flushes);
         unsigned lit = 0;
         for (const auto& pixel : frame)
-            lit += LV_COLOR_GET_R(pixel) || LV_COLOR_GET_G(pixel) || LV_COLOR_GET_B(pixel);
+            lit += ((pixel >> 11) & 31) || ((pixel >> 5) & 63) || (pixel & 31);
         assert(lit > 100);
         if (argc != 3)
             std::memcpy(dialplate_frame, frame, sizeof(frame));
@@ -264,10 +275,10 @@ int main(int argc, char** argv) {
             FILE* image = std::fopen(argv[argc - 1], "wb");
             assert(image);
             assert(std::fprintf(image, "P6\n%d %d\n255\n", width_px, height_px) > 0);
-            for (const lv_color_t pixel : frame) {
-                const std::uint8_t rgb[] = {(std::uint8_t)(LV_COLOR_GET_R(pixel) * 255 / 31),
-                                            (std::uint8_t)(LV_COLOR_GET_G(pixel) * 255 / 63),
-                                            (std::uint8_t)(LV_COLOR_GET_B(pixel) * 255 / 31)};
+            for (const uint16_t pixel : frame) {
+                const std::uint8_t rgb[] = {(std::uint8_t)(((pixel >> 11) & 31) * 255 / 31),
+                                            (std::uint8_t)(((pixel >> 5) & 63) * 255 / 63),
+                                            (std::uint8_t)((pixel & 31) * 255 / 31)};
                 assert(std::fwrite(rgb, 1, sizeof(rgb), image) == sizeof(rgb));
             }
             assert(std::fclose(image) == 0);
@@ -287,13 +298,14 @@ int main(int argc, char** argv) {
                 app.update_status(DemoStatus::sample(16000));
                 assert(app.show_page(page.name));
                 assert(std::strcmp(app.current_page(), page.name) == 0);
-                auto* page_root = find_label(lv_scr_act(), page.label);
+                auto* page_root = find_label(lv_screen_active(), page.label);
                 assert(page_root);
-                while (lv_obj_get_parent(page_root) != lv_scr_act())
+                while (lv_obj_get_parent(page_root) != lv_screen_active()) {
                     page_root = lv_obj_get_parent(page_root);
+                }
                 if (std::strcmp(page.name, "Pages/SaveConfig") == 0) {
                     auto* seconds = find_label(page_root, "8");
-                    assert(seconds && lv_obj_get_style_opa(seconds, 0) == LV_OPA_COVER);
+                    assert(seconds && lv_obj_get_style_opa(seconds, LV_PART_MAIN) == LV_OPA_COVER);
                 }
                 // Pages slide (no page-level opacity layer): info pages vertically, the save page over the top.
                 const auto expected_anim =
@@ -308,7 +320,7 @@ int main(int argc, char** argv) {
                 assert(controller->priv.anim.attr.type != PageManager::LOAD_ANIM_FADE_ON);
                 advance(120);
                 if (expected_anim == PageManager::LOAD_ANIM_FADE_ON) {
-                    const auto opa = lv_obj_get_style_opa(page_root, 0);
+                    const auto opa = lv_obj_get_style_opa(page_root, LV_PART_MAIN);
                     assert(opa > LV_OPA_TRANSP && opa < LV_OPA_COVER);
                 } else if (expected_anim == PageManager::LOAD_ANIM_MOVE_LEFT) {
                     assert(lv_obj_get_x(page_root) > 0 && lv_obj_get_x(page_root) < width_px);
@@ -318,23 +330,24 @@ int main(int argc, char** argv) {
                     assert(lv_obj_get_y(page_root) > 0 && lv_obj_get_y(page_root) < height_px);
                 }
                 advance(480); // Page and StatusBar animations both need frame delivery.
-                assert(lv_obj_get_style_x(page_root, 0) == 0 && lv_obj_get_style_y(page_root, 0) == 0);
+                assert(lv_obj_get_style_x(page_root, LV_PART_MAIN) == 0
+                       && lv_obj_get_style_y(page_root, LV_PART_MAIN) == 0);
                 assert(lv_obj_get_y(page_root) == (std::strcmp(page.name, "Pages/StarMap") == 0 ? 26 : 0));
-                assert(lv_obj_get_style_opa(page_root, 0) == LV_OPA_COVER);
+                assert(lv_obj_get_style_opa(page_root, LV_PART_MAIN) == LV_OPA_COVER);
                 const bool work = std::strcmp(page.name, "Pages/WorkSettings") == 0;
                 const bool record = std::strcmp(page.name, "Pages/RecordConfig") == 0;
                 const bool infos = std::strcmp(page.name, "Pages/SystemInfos") == 0;
                 const bool system_dash = std::strcmp(page.name, "Pages/SystemDash") == 0;
                 const bool star_map = std::strcmp(page.name, "Pages/StarMap") == 0;
                 auto* position = find_label(lv_layer_top(), "DEMO");
-                assert(position && (position->coords.y2 >= 0) == !(infos || system_dash));
+                assert(position && (object_coords(position).y2 >= 0) == !(infos || system_dash));
                 if (work || record || infos || system_dash || star_map) {
                     lv_obj_t* first = app.focused();
                     assert(first);
                     if (star_map) {
-                        assert(lv_obj_has_state(page_root, LV_STATE_FOCUSED));
-                        assert(lv_obj_get_style_outline_width(page_root, 0) == 0);
-                        assert(lv_obj_get_style_border_width(page_root, 0) == 0);
+                        assert(lv_obj_is_focused(page_root));
+                        assert(lv_obj_get_style_outline_width(page_root, LV_PART_MAIN) == 0);
+                        assert(lv_obj_get_style_border_width(page_root, LV_PART_MAIN) == 0);
                     }
                     app.on_input(Input::NextFocus);
                     if (!star_map)
@@ -345,7 +358,7 @@ int main(int argc, char** argv) {
                         // 开始与停止一致：单击即切换，双击（Commit）同样有效。
                         app.on_input(Input::Confirm);
                         assert(DeviceService::snapshot().recording);
-                        assert(find_label(lv_scr_act(), i18n::text(i18n::TextId::RequestReceived)));
+                        assert(find_label(lv_screen_active(), i18n::text(i18n::TextId::RequestReceived)));
                         assert(lv_group_get_obj_count(lv_group_get_default()) == 2);
                         app.on_input(Input::Confirm);
                         assert(!DeviceService::snapshot().recording);
@@ -358,7 +371,7 @@ int main(int argc, char** argv) {
                     if (work) {
                         assert(find_label(app.focused(), "TRIMTALK"));
                         app.on_input(Input::Press);
-                        assert(lv_obj_has_state(app.focused(), LV_STATE_PRESSED));
+                        assert(lv_obj_is_pressed(app.focused()));
                         assert(find_label(app.focused(), "TRIMTALK"));
                         app.on_input(Input::Release);
                         assert(find_label(app.focused(), "TRIMMK3"));
@@ -372,12 +385,12 @@ int main(int argc, char** argv) {
                     assert(badge);
                     auto* scroller = lv_obj_get_parent(lv_obj_get_parent(badge));
                     lv_obj_get_scrollbar_area(scroller, &hor_bar, &ver_bar);
-                    assert(ver_bar.x1 < ver_bar.x2 && badge->coords.x2 < ver_bar.x1);
+                    assert(ver_bar.x1 < ver_bar.x2 && object_coords(badge).x2 < ver_bar.x1);
                     assert(!find_label(page_root, i18n::text(i18n::TextId::InfoBrowseHint)));
                 }
                 if (std::strcmp(page.name, "Pages/SaveConfig") == 0) {
                     auto* action = find_label(page_root, i18n::text(i18n::TextId::SaveConfigPoweringOff));
-                    assert(action && lv_obj_get_parent(action)->coords.y1 >= 26);
+                    assert(action && object_coords(lv_obj_get_parent(action)).y1 >= 26);
                     assert(find_label(page_root, i18n::text(i18n::TextId::SaveConfigWarning)));
                 }
                 lv_refr_now(display);
@@ -388,20 +401,20 @@ int main(int argc, char** argv) {
                     assert(app.back());
                 }
                 if (expected_anim == PageManager::LOAD_ANIM_MOVE_TOP)
-                    assert(lv_obj_get_style_y(page_root, 0) == 0); // No bottom-alignment jump at pop start.
+                    assert(lv_obj_get_style_y(page_root, LV_PART_MAIN) == 0); // No bottom-alignment jump at pop start.
                 lv_tick_inc(50);
                 lv_timer_handler();
                 assert(std::strcmp(app.current_page(), "Pages/Dialplate") == 0);
                 lv_obj_update_layout(
                     page_root); // Animation setters dirty layout; getters otherwise see the last frame.
                 if (expected_anim == PageManager::LOAD_ANIM_FADE_ON)
-                    assert(lv_obj_get_style_opa(page_root, 0) < LV_OPA_COVER);
+                    assert(lv_obj_get_style_opa(page_root, LV_PART_MAIN) < LV_OPA_COVER);
                 else if (expected_anim == PageManager::LOAD_ANIM_MOVE_LEFT)
                     assert(lv_obj_get_x(page_root) > 0); // Back reverses the direction, not another left wipe.
                 else if (expected_anim == PageManager::LOAD_ANIM_OVER_BOTTOM)
-                    assert(lv_obj_get_style_y(page_root, 0) < 0);
+                    assert(lv_obj_get_style_y(page_root, LV_PART_MAIN) < 0);
                 else
-                    assert(lv_obj_get_style_y(page_root, 0) > 0);
+                    assert(lv_obj_get_style_y(page_root, LV_PART_MAIN) > 0);
                 assert(app.focused());
                 assert(lv_group_get_focus_cb(lv_group_get_default()) == nullptr);
             }
@@ -416,9 +429,9 @@ int main(int argc, char** argv) {
                 advance(400);
                 assert(std::strcmp(app.current_page(), "Pages/SystemLoading") == 0);
                 advance(900); // Logo (800 ms after the return), then step 1 fades in (160 ms) for its minimum 300 ms.
-                auto* restarted = find_label(lv_scr_act(), i18n::text(i18n::TextId::LoadingConfiguration));
-                assert(restarted && lv_obj_get_style_opa(restarted, 0) == LV_OPA_COVER);
-                assert(!find_label(lv_scr_act(), i18n::text(i18n::TextId::ReadyWithWarnings)));
+                auto* restarted = find_label(lv_screen_active(), i18n::text(i18n::TextId::LoadingConfiguration));
+                assert(restarted && lv_obj_get_style_opa(restarted, LV_PART_MAIN) == LV_OPA_COVER);
+                assert(!find_label(lv_screen_active(), i18n::text(i18n::TextId::ReadyWithWarnings)));
                 assert(app.back());
                 advance(4000);
                 assert(std::strcmp(app.current_page(), "Pages/Dialplate") == 0);
@@ -447,9 +460,9 @@ int main(int argc, char** argv) {
                 lv_timer_handler();
             }
             assert(std::strcmp(app.current_page(), "Pages/Startup") == 0);
-            assert(app.focused() && find_label(lv_scr_act(), "0%"));
+            assert(app.focused() && find_label(lv_screen_active(), "0%"));
             assert(!app.back()); // Off resets the root; no previous working/boot history remains.
         }
     }
-    lv_disp_remove(display);
+    lv_display_delete(display);
 }

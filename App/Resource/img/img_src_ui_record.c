@@ -1,7 +1,31 @@
-/* 由 tools/generate_ui_icons.py 生成的原创图标；8-bit alpha，主题提供颜色。 */
-#include "lvgl.h"
+/* LVGL 9 图片资源，由 App/Resource/tools/convert_images_v9.py 的编码器生成，请勿手改。 */
+#ifdef __has_include
+    #if __has_include("lvgl.h")
+        #if !defined(LV_LVGL_H_INCLUDE_SIMPLE) && !defined(LV_LVGL_H_INCLUDE_SYSTEM) && !defined(LV_BUILD_TEST)
+            #define LV_LVGL_H_INCLUDE_SIMPLE
+        #endif
+    #endif
+#endif
 
-static const LV_ATTRIBUTE_MEM_ALIGN uint8_t ui_record_alpha[] = {
+#if defined(LV_LVGL_H_INCLUDE_SIMPLE)
+#include "lvgl.h"
+#elif defined(LV_LVGL_H_INCLUDE_SYSTEM)
+#include <lvgl.h>
+#elif defined(LV_BUILD_TEST)
+#include "../lvgl.h"
+#else
+#include "lvgl/lvgl.h"
+#endif
+
+#ifndef LV_ATTRIBUTE_MEM_ALIGN
+#define LV_ATTRIBUTE_MEM_ALIGN
+#endif
+
+#ifndef LV_ATTRIBUTE_IMG_SRC_UI_RECORD
+#define LV_ATTRIBUTE_IMG_SRC_UI_RECORD
+#endif
+
+static const LV_ATTRIBUTE_MEM_ALIGN LV_ATTRIBUTE_LARGE_CONST LV_ATTRIBUTE_IMG_SRC_UI_RECORD uint8_t img_src_ui_record_map[] = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00,
     0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00,
@@ -20,8 +44,18 @@ static const LV_ATTRIBUTE_MEM_ALIGN uint8_t ui_record_alpha[] = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 };
 
-const lv_img_dsc_t img_src_ui_record = {
-    .header = {.cf = LV_IMG_CF_ALPHA_8BIT, .w = 16, .h = 16},
-    .data_size = sizeof(ui_record_alpha),
-    .data = ui_record_alpha,
+const lv_image_dsc_t img_src_ui_record = {
+  .header = {
+    .magic = LV_IMAGE_HEADER_MAGIC,
+    .cf = LV_COLOR_FORMAT_A8,
+    .flags = 0,
+    .w = 16,
+    .h = 16,
+    .stride = 16,
+    .reserved_2 = 0,
+  },
+  .data_size = sizeof(img_src_ui_record_map),
+  .data = img_src_ui_record_map,
+  .reserved = NULL,
+  .reserved_2 = NULL,
 };

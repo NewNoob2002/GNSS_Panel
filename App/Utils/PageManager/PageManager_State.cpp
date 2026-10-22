@@ -91,9 +91,9 @@ PageBase::State_t PageManager::state_load_execute(PageBase* base) {
         PM_LOG_ERROR("Page(%s) root must be nullptr", base->page_name);
     }
 
-    lv_obj_t* root_obj = lv_obj_create(lv_scr_act());
+    lv_obj_t* root_obj = lv_obj_create(lv_screen_active());
 
-    lv_obj_clear_flag(root_obj, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollable(root_obj, false);
     lv_obj_set_user_data(root_obj, base);
 
     if (root_default_style_) {
@@ -137,7 +137,7 @@ PageBase::State_t PageManager::state_will_appear_execute(PageBase* base) const {
     PM_LOG_INFO("Page(%s) state will appear", base->page_name);
     // Show the root before the page sets up focus: a cached or preloaded root is still hidden here, and a page
     // that focuses its root (StarMap) would otherwise skip it. Nothing renders until this timer cycle ends.
-    lv_obj_clear_flag(base->root, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_set_hidden(base->root, false);
     base->on_view_will_appear();
     switch_anim_create(base);
     return PageBase::PAGE_STATE_DID_APPEAR;
@@ -173,7 +173,7 @@ PageBase::State_t PageManager::state_will_disappear_execute(PageBase* base) cons
   */
 PageBase::State_t PageManager::state_did_disappear_execute(PageBase* base) {
     PM_LOG_INFO("Page(%s) state did disappear", base->page_name);
-    lv_obj_add_flag(base->root, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_set_hidden(base->root, true);
     base->on_view_did_disappear();
     if (base->priv.is_cached) {
         PM_LOG_INFO("Page(%s) has cached", base->page_name);
@@ -199,14 +199,14 @@ PageBase::State_t PageManager::state_unload_execute(PageBase* base) {
     if (base->priv.stash.ptr != nullptr && base->priv.stash.size != 0) {
         PM_LOG_INFO("Page(%s) free stash(0x%p)[%lu]", base->page_name, base->priv.stash.ptr,
                     static_cast<unsigned long>(base->priv.stash.size));
-        lv_mem_free(base->priv.stash.ptr);
+        lv_free(base->priv.stash.ptr);
         base->priv.stash.ptr = nullptr;
         base->priv.stash.size = 0;
     }
 
     /* state_unload_execute runs after the switch animation has finished. Delete
        synchronously so callbacks cannot outlive the owning PageBase instance. */
-    lv_obj_del(base->root);
+    lv_obj_delete(base->root);
     base->root = nullptr;
     base->priv.is_cached = false;
     base->on_view_did_unload();

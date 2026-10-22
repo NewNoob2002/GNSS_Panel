@@ -8,7 +8,7 @@ allocate(size_t size) {
     if (!lv_is_initialized()) {
         lv_init();
     }
-    return lv_mem_alloc(size == 0U ? 1U : size);
+    return lv_malloc(size == 0U ? 1U : size);
 }
 
 void*
@@ -38,30 +38,30 @@ operator new[](size_t size, const std::nothrow_t&) noexcept {
 
 void
 operator delete(void* ptr) noexcept {
-    lv_mem_free(ptr);
+    lv_free(ptr);
 }
 
 void
 operator delete[](void* ptr) noexcept {
-    lv_mem_free(ptr);
+    lv_free(ptr);
 }
 
 void
 operator delete(void* ptr, size_t) noexcept {
-    lv_mem_free(ptr);
+    lv_free(ptr);
 }
 
 void
 operator delete[](void* ptr, size_t) noexcept {
-    lv_mem_free(ptr);
+    lv_free(ptr);
 }
 
 void
 operator delete(void* ptr, const std::nothrow_t&) noexcept {
-    lv_mem_free(ptr);
+    lv_free(ptr);
 }
 
 void
 operator delete[](void* ptr, const std::nothrow_t&) noexcept {
-    lv_mem_free(ptr);
+    lv_free(ptr);
 }

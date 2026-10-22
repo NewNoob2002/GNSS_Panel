@@ -117,6 +117,11 @@ target_link_options(${TARGET_NAME} PRIVATE
     --specs=nosys.specs
 )
 
+if(PRODUCT_HAS_DISPLAY)
+    # LV_USE_FLOAT=0 禁用内置浮点格式化；应用使用 newlib 显示电压、温度和坐标。
+    target_link_options(${TARGET_NAME} PRIVATE -u _printf_float)
+endif()
+
 add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
     COMMAND ${CMAKE_OBJCOPY} -O ihex $<TARGET_FILE:${TARGET_NAME}> ${CMAKE_BINARY_DIR}/generated/${TARGET_NAME}.hex
     COMMAND ${CMAKE_OBJCOPY} -O binary $<TARGET_FILE:${TARGET_NAME}> ${CMAKE_BINARY_DIR}/generated/${TARGET_NAME}.bin

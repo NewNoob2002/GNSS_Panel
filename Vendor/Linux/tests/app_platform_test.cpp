@@ -14,7 +14,7 @@
 
 namespace {
 constexpr int width = 294, height = 126;
-lv_color_t pixels[width * 20];
+uint16_t pixels[width * 20];
 unsigned power_on_requests = 0, off_calls = 0, reboot_calls = 0;
 unsigned wifi_requests = 0;
 bool requested_wifi = false;
@@ -23,8 +23,9 @@ bool stall_last_step = false; // The last initialization step never finishes (a 
 std::vector<DataProc::DeviceRequest> device_requests;
 App* active = nullptr;
 
-void flush(lv_disp_drv_t* driver, const lv_area_t*, lv_color_t*) {
-    lv_disp_flush_ready(driver);
+void
+flush(lv_display_t* driver, const lv_area_t*, uint8_t*) {
+    lv_display_flush_ready(driver);
 }
 void advance(unsigned ms) {
     for (unsigned i = 0; i < ms; i += 10) {
@@ -40,21 +41,24 @@ void sample_keys(unsigned ms) {
     }
 }
 lv_obj_t* find_text(lv_obj_t* root, const char* text) {
-    if (lv_obj_has_flag(root, LV_OBJ_FLAG_HIDDEN))
+    if (lv_obj_is_hidden(root)) {
         return nullptr;
+    }
     if (lv_obj_check_type(root, &lv_label_class) && std::strstr(lv_label_get_text(root), text))
         return root;
-    for (unsigned i = 0; i < lv_obj_get_child_cnt(root); ++i)
+    for (unsigned i = 0; i < lv_obj_get_child_count(root); ++i) {
         if (auto* found = find_text(lv_obj_get_child(root, static_cast<int32_t>(i)), text))
             return found;
+    }
     return nullptr;
 }
 lv_obj_t* activity(lv_obj_t* obj) {
     if (lv_anim_get(obj, page::settings_style::pulse))
         return obj;
-    for (unsigned i = 0; i < lv_obj_get_child_cnt(obj); ++i)
+    for (unsigned i = 0; i < lv_obj_get_child_count(obj); ++i) {
         if (auto* found = activity(lv_obj_get_child(obj, static_cast<int32_t>(i))))
             return found;
+    }
     return nullptr;
 }
 bool on_page(const char* name) {
@@ -256,15 +260,11 @@ BackendStatus::poll_initialization_step(unsigned step, std::uint32_t elapsed_ms,
 
 int main() {
     lv_init();
-    lv_disp_draw_buf_t draw;
-    lv_disp_draw_buf_init(&draw, pixels, nullptr, width * 20);
-    lv_disp_drv_t driver;
-    lv_disp_drv_init(&driver);
-    driver.hor_res = width;
-    driver.ver_res = height;
-    driver.draw_buf = &draw;
-    driver.flush_cb = flush;
-    auto* display = lv_disp_drv_register(&driver);
+    lv_display_t* display = lv_display_create(width, height);
+    assert(display);
+    lv_display_set_color_format(display, LV_COLOR_FORMAT_RGB565);
+    lv_display_set_buffers(display, pixels, NULL, sizeof(pixels), LV_DISPLAY_RENDER_MODE_PARTIAL);
+    lv_display_set_flush_cb(display, flush);
     assert(display);
     {
         App app;
@@ -273,7 +273,7 @@ int main() {
         publish_status();
         advance(400);
         assert(on_page("Pages/Startup"));
-        assert(!SystemService::snapshot().simulated && !find_text(lv_scr_act(), "DEMO"));
+        assert(!SystemService::snapshot().simulated && !find_text(lv_screen_active(), "DEMO"));
 
         // Cold boot: the Power key that powered the board is already held when the UI starts polling. Startup's
         // hold must still count from it (gesture cancellation only stops it from becoming a click).
@@ -290,7 +290,7 @@ int main() {
         assert(power_on_requests == 2 && on_page("Pages/Startup"));
         app.on_key(App::Key::Power, false);
         sample_keys(600);
-        assert(on_page("Pages/Startup") && find_text(lv_scr_act(), "0%"));
+        assert(on_page("Pages/Startup") && find_text(lv_screen_active(), "0%"));
 
         // A quick re-press during the reset animation must still require a fresh 2 s hold.
         const unsigned before_repress = power_on_requests;
@@ -312,19 +312,21 @@ int main() {
             for (unsigned step = 0; step < DataProc::kInitializationStepCount; ++step) {
                 const char* title = i18n::text(system_backend::initialization_title(step));
                 const auto* font = resource_pool::get_font("oswaldBold_18");
-                assert(lv_txt_get_width(title, std::strlen(title), font, 0, LV_TEXT_FLAG_NONE) <= 246);
+                lv_point_t text_size;
+                lv_text_get_size(&text_size, title, font, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
+                assert(text_size.x <= 246);
             }
         }
         assert(i18n::set_language(i18n::Language::English));
 
         boot_to_dialplate();
-        assert(!find_text(lv_scr_act(), "DEMO"));
+        assert(!find_text(lv_screen_active(), "DEMO"));
         // SystemLoading built the power-off page ahead (home is the current page); other pages load on entry.
         assert(DataProc::Broker()->search("SaveConfigModel"));
         assert(!DataProc::Broker()->search("WorkSettingsModel"));
 
         // Before the platform publishes, device fields show N/A; afterwards pages show the real data.
-        assert(find_text(lv_scr_act(), "N/A") || on_page("Pages/Dialplate"));
+        assert(find_text(lv_screen_active(), "N/A") || on_page("Pages/Dialplate"));
         auto device = real_device();
         assert(DeviceService::update(device));
         advance(100);
@@ -332,11 +334,11 @@ int main() {
         // SystemInfos cards from device data (formats as on the former HC32 pages).
         assert(app.show_page("Pages/SystemInfos"));
         advance(500);
-        assert(find_text(lv_scr_act(), "22.543096\n114.057865\n8.25 m"));
-        assert(find_text(lv_scr_act(), "AP-X1PRO-TEST\nOFF\n10.0.0.7"));
-        assert(find_text(lv_scr_act(), "64.5%\n7.71 V\n31.0 C"));
-        assert(find_text(lv_scr_act(), "V2.4.4\n01:02:05\n0\n2026-10-19"));
-        assert(find_text(lv_scr_act(), i18n::text(i18n::TextId::WorkModeBase)));
+        assert(find_text(lv_screen_active(), "22.543096\n114.057865\n8.25 m"));
+        assert(find_text(lv_screen_active(), "AP-X1PRO-TEST\nOFF\n10.0.0.7"));
+        assert(find_text(lv_screen_active(), "64.5%\n7.71 V\n31.0 C"));
+        assert(find_text(lv_screen_active(), "V2.4.4\n01:02:05\n0\n2026-10-19"));
+        assert(find_text(lv_screen_active(), i18n::text(i18n::TextId::WorkModeBase)));
         assert(app.back());
         advance(500);
 
@@ -346,26 +348,26 @@ int main() {
         advance(500);
         assert(focus_text(i18n::text(i18n::TextId::RadioBase)));
         app.on_input(App::InputAction::Confirm); // Base -> Network base
-        assert(device_requests.empty() && find_text(lv_scr_act(), i18n::text(i18n::TextId::NetworkBase)));
+        assert(device_requests.empty() && find_text(lv_screen_active(), i18n::text(i18n::TextId::NetworkBase)));
         assert(lv_group_get_obj_count(lv_group_get_default()) == 3); // Preset, Apply, Back.
         choose(i18n::TextId::Apply);
         app.on_input(App::InputAction::Confirm);
         assert(on_page("Pages/WorkSettings") && device_requests.size() == 1);
         assert(device_requests.back().target == DataProc::WorkTarget::Ntrip);
-        assert(find_text(lv_scr_act(), i18n::text(i18n::TextId::RequestWaiting)));
-        auto* work_dot = activity(lv_scr_act());
+        assert(find_text(lv_screen_active(), i18n::text(i18n::TextId::RequestWaiting)));
+        auto* work_dot = activity(lv_screen_active());
         assert(work_dot);
-        const auto initial_opacity = lv_obj_get_style_bg_opa(work_dot, 0);
+        const auto initial_opacity = lv_obj_get_style_bg_opa(work_dot, LV_PART_MAIN);
         advance(350);
-        assert(lv_obj_get_style_bg_opa(work_dot, 0) != initial_opacity);
+        assert(lv_obj_get_style_bg_opa(work_dot, LV_PART_MAIN) != initial_opacity);
         assert(lv_group_get_obj_count(lv_group_get_default()) == 1);
         app.on_input(App::InputAction::Commit);
         assert(device_requests.size() == 1);
         advance(15500);
-        assert(find_text(lv_scr_act(), i18n::text(i18n::TextId::RequestTimeout)));
+        assert(find_text(lv_screen_active(), i18n::text(i18n::TextId::RequestTimeout)));
         device.work_pending = false;
         assert(DeviceService::update(device));
-        assert(find_text(lv_scr_act(), i18n::text(i18n::TextId::RequestReceived)));
+        assert(find_text(lv_screen_active(), i18n::text(i18n::TextId::RequestReceived)));
         assert(!lv_anim_get(work_dot, page::settings_style::pulse));
         assert(app.back());
         advance(500);
@@ -376,7 +378,7 @@ int main() {
         choose(i18n::TextId::Apply);
         app.on_input(App::InputAction::Confirm);
         assert(on_page("Pages/WorkSettings") && device_requests.size() == 1);
-        assert(find_text(lv_scr_act(), i18n::text(i18n::TextId::SelectChannel)));
+        assert(find_text(lv_screen_active(), i18n::text(i18n::TextId::SelectChannel)));
         assert(app.back());
         advance(500);
         device.radio_channel = 5;
@@ -386,14 +388,14 @@ int main() {
         choose(i18n::TextId::Apply);
         reject_device = true;
         app.on_input(App::InputAction::Confirm);
-        assert(device_requests.size() == 1 && find_text(lv_scr_act(), i18n::text(i18n::TextId::RequestRejected)));
+        assert(device_requests.size() == 1 && find_text(lv_screen_active(), i18n::text(i18n::TextId::RequestRejected)));
         reject_device = false;
         app.on_input(App::InputAction::Confirm);
         assert(device_requests.size() == 2 && device_requests.back().radio_protocol == 3
                && device_requests.back().radio_channel == 5);
         assert(DeviceService::update(device));
         advance(100);
-        assert(find_text(lv_scr_act(), i18n::text(i18n::TextId::RequestReceived)));
+        assert(find_text(lv_screen_active(), i18n::text(i18n::TextId::RequestReceived)));
         assert(app.back());
         advance(500);
 
@@ -403,22 +405,22 @@ int main() {
         assert(focus_text(i18n::text(i18n::TextId::StartupStart)));
         reject_device = true;
         app.on_input(App::InputAction::Confirm);
-        assert(device_requests.size() == 2 && find_text(lv_scr_act(), i18n::text(i18n::TextId::RequestRejected)));
+        assert(device_requests.size() == 2 && find_text(lv_screen_active(), i18n::text(i18n::TextId::RequestRejected)));
         reject_device = false;
         app.on_input(App::InputAction::Confirm);
         assert(device_requests.size() == 3 && device_requests.back().command == DataProc::DeviceCommand::StartRecord);
         assert(device_requests.back().record_type == 1 && device_requests.back().record_interval == 2);
-        assert(find_text(lv_scr_act(), i18n::text(i18n::TextId::RequestWaiting)));
-        auto* record_dot = activity(lv_scr_act());
+        assert(find_text(lv_screen_active(), i18n::text(i18n::TextId::RequestWaiting)));
+        auto* record_dot = activity(lv_screen_active());
         assert(record_dot);
         app.on_input(App::InputAction::Commit); // 等待期间按钮禁用、焦点在返回；双击也不会重复发送。
         assert(device_requests.size() == 3);
         advance(15500);
-        assert(find_text(lv_scr_act(), i18n::text(i18n::TextId::RequestTimeout)));
+        assert(find_text(lv_screen_active(), i18n::text(i18n::TextId::RequestTimeout)));
         device.recording = true;
         assert(DeviceService::update(device));
         advance(100);
-        assert(find_text(lv_scr_act(), i18n::text(i18n::TextId::RequestReceived)));
+        assert(find_text(lv_screen_active(), i18n::text(i18n::TextId::RequestReceived)));
         choose(i18n::TextId::Stop);
         app.on_input(App::InputAction::Confirm);
         assert(device_requests.size() == 4 && device_requests.back().command == DataProc::DeviceCommand::StopRecord);
@@ -437,15 +439,15 @@ int main() {
         app.on_input(App::InputAction::Confirm);
         assert(wifi_requests == 1 && requested_wifi && SystemService::snapshot().wifi_pending);
         advance(50);
-        assert(find_text(lv_scr_act(), "..."));
-        auto* wifi_dot = activity(lv_scr_act());
+        assert(find_text(lv_screen_active(), "..."));
+        auto* wifi_dot = activity(lv_screen_active());
         assert(wifi_dot);
         app.on_input(App::InputAction::Confirm); // Ignored while pending.
         assert(wifi_requests == 1);
         assert(SystemService::set_wifi(true, false));
         assert(!lv_anim_get(wifi_dot, page::settings_style::pulse));
         advance(50);
-        assert(!find_text(lv_scr_act(), "...") && !SystemService::snapshot().wifi_pending);
+        assert(!find_text(lv_screen_active(), "...") && !SystemService::snapshot().wifi_pending);
         assert(SystemService::snapshot().wifi_on);
         assert(app.back());
         advance(500);
@@ -505,7 +507,7 @@ int main() {
         app.on_input(App::InputAction::Confirm);
         advance(100);
         assert(find_text(app.focused(), i18n::text(i18n::TextId::ShutdownAction)));
-        assert(!find_text(lv_scr_act(), i18n::text(i18n::TextId::RebootAction)));
+        assert(!find_text(lv_screen_active(), i18n::text(i18n::TextId::RebootAction)));
         assert(lv_group_get_obj_count(lv_group_get_default()) == 1);
         app.on_input(App::InputAction::Commit); // Double-click no longer confirms anything.
         advance(100);
@@ -516,7 +518,7 @@ int main() {
         app.on_input(App::InputAction::Release);
         advance(100);
         assert(focus_text(i18n::text(i18n::TextId::PowerTitle)) && !SystemService::snapshot().power_pending);
-        assert(!find_text(lv_scr_act(), i18n::text(i18n::TextId::ShutdownAction)));
+        assert(!find_text(lv_screen_active(), i18n::text(i18n::TextId::ShutdownAction)));
         app.on_input(App::InputAction::Confirm);
         advance(100);
         // Service-level guard: without platform reboot, even SystemDash's own Reboot request is rejected.
@@ -535,7 +537,7 @@ int main() {
         advance(600);
         assert(SystemService::snapshot().power_pending);
         // The dialog stays unchanged under the sliding SaveConfig; it closes only after the transition.
-        assert(find_text(lv_scr_act(), i18n::text(i18n::TextId::ShutdownAction)));
+        assert(find_text(lv_screen_active(), i18n::text(i18n::TextId::ShutdownAction)));
         advance(400);
         assert(on_page("Pages/SaveConfig"));
         app.on_input(App::InputAction::Release);
@@ -567,7 +569,7 @@ int main() {
         assert(SystemService::begin_shutdown(DataProc::PowerCause::Host));
         advance(600);
         assert(on_page("Pages/SaveConfig"));
-        assert(find_text(lv_scr_act(), i18n::text(i18n::TextId::SaveConfigPowerOffBoard)));
+        assert(find_text(lv_screen_active(), i18n::text(i18n::TextId::SaveConfigPowerOffBoard)));
         assert(app.back() && on_page("Pages/SaveConfig"));
         advance(10000);
         assert(off_calls == 1 && on_page("Pages/SaveConfig")); // Nothing is executed for a platform shutdown.
@@ -577,7 +579,7 @@ int main() {
         assert(!SystemService::begin_shutdown(DataProc::PowerCause::Forced)); // Already in standby.
         active = nullptr;
     }
-    lv_disp_remove(display);
+    lv_display_delete(display);
     std::puts("app_platform: OK");
     return 0;
 }

@@ -1,3 +1,4 @@
+#include "Utils/lv_ext/lv_label_format.h"
 #include "SystemInfosView.h"
 #include <cstdio>
 #include <cstring>
@@ -12,7 +13,7 @@ void SystemInfosView::create(lv_obj_t* root) {
     root_ = root;
     lv_obj_set_style_outline_width(root, 0, LV_STATE_FOCUSED);
     lv_obj_set_style_border_width(root, 0, LV_STATE_FOCUSED);
-    lv_obj_add_flag(root, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollable(root, true);
     lv_obj_set_scroll_dir(root, LV_DIR_VER);
     lv_obj_set_style_width(root, 3, LV_PART_SCROLLBAR);
     lv_obj_set_style_bg_color(root, style::kMuted, LV_PART_SCROLLBAR);
@@ -73,16 +74,16 @@ void SystemInfosView::destroy() {
     style_reset();
 }
 
-void SystemInfosView::set_scroll_to_y(lv_obj_t* obj, lv_coord_t y, lv_anim_enable_t en) {
-    const lv_coord_t scroll_y = lv_obj_get_scroll_y(obj);
-    const lv_coord_t diff = static_cast<lv_coord_t>(-y + scroll_y);
+void SystemInfosView::set_scroll_to_y(lv_obj_t* obj, int32_t y, lv_anim_enable_t en) {
+    const int32_t scroll_y = lv_obj_get_scroll_y(obj);
+    const int32_t diff = static_cast<int32_t>(-y + scroll_y);
 
     lv_obj_scroll_by(obj, 0, diff, en);
 }
 
 void SystemInfosView::on_focus(lv_group_t* g) {
     auto* focused = lv_group_get_focused(g);
-    if (lv_obj_get_parent(focused) == lv_scr_act())
+    if (lv_obj_get_parent(focused) == lv_screen_active())
         lv_obj_scroll_to_y(focused, 0, LV_ANIM_ON);
     else
         lv_obj_scroll_to_view(lv_obj_get_parent(focused), LV_ANIM_ON);
@@ -135,16 +136,16 @@ void SystemInfosView::item_create(item_t* item, lv_obj_t* par, const char* name,
     lv_obj_set_size(cont, LV_HOR_RES, ITEM_HEIGHT_MIN);
     style::panel(cont);
 
-    lv_obj_clear_flag(cont, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_add_flag(cont, LV_OBJ_FLAG_EVENT_BUBBLE);
+    lv_obj_set_scrollable(cont, false);
+    lv_obj_set_event_bubble(cont, true);
     item->cont = cont;
 
     /* icon */
     lv_obj_t* icon = lv_obj_create(cont);
     lv_obj_enable_style_refresh(false);
     lv_obj_remove_style_all(icon);
-    lv_obj_clear_flag(icon, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_add_flag(icon, LV_OBJ_FLAG_EVENT_BUBBLE);
+    lv_obj_set_scrollable(icon, false);
+    lv_obj_set_event_bubble(icon, true);
 
     lv_obj_add_style(icon, &style_.icon, 0);
     lv_obj_add_style(icon, &style_.focus, LV_STATE_FOCUSED);
@@ -153,9 +154,9 @@ void SystemInfosView::item_create(item_t* item, lv_obj_t* par, const char* name,
     lv_obj_set_flex_flow(icon, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(icon, LV_FLEX_ALIGN_SPACE_AROUND, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
-    lv_obj_t* img = lv_img_create(icon);
+    lv_obj_t* img = lv_image_create(icon);
     lv_obj_enable_style_refresh(false);
-    lv_img_set_src(img, resource_pool::get_image(img_src));
+    lv_image_set_src(img, resource_pool::get_image(img_src));
 
     lv_obj_t* label = lv_label_create(icon);
     lv_obj_enable_style_refresh(false);
@@ -190,13 +191,13 @@ void SystemInfosView::item_create(item_t* item, lv_obj_t* par, const char* name,
     // Clear the root's vertical scrollbar (drawn over the full-width cards' right edge).
     lv_obj_align(demo, LV_ALIGN_TOP_RIGHT, -15, 4);
 
-    lv_obj_move_foreground(icon);
-    lv_obj_move_foreground(demo);
+    lv_obj_move_to_index(icon, -1);
+    lv_obj_move_to_index(demo, -1);
     lv_obj_enable_style_refresh(true);
 
     /* get real max height */
     lv_obj_update_layout(item->label_info);
-    lv_coord_t height = lv_obj_get_height(item->label_info);
+    int32_t height = lv_obj_get_height(item->label_info);
     height = LV_MAX(height, ITEM_HEIGHT_MIN);
     lv_obj_set_height(cont, height);
     lv_obj_set_height(icon, height);
@@ -227,50 +228,50 @@ void SystemInfosView::update(const DataProc::DeviceSnapshot& device, const DataP
         const char* ntrip = device.ntrip == DataProc::NtripRole::Server   ? i18n::text(TextId::NtripServer)
                             : device.ntrip == DataProc::NtripRole::Client ? i18n::text(TextId::NtripClient)
                                                                           : na;
-        lv_label_set_text_fmt(
+        app_label_set_text_fmt(
             ui.work.label_data, "%s\n%s\n%s",
             i18n::text(device.work_mode == DataProc::WorkMode::Rover ? TextId::WorkModeRover : TextId::WorkModeBase),
             on_off(device.radio_on), ntrip);
     } else {
-        lv_label_set_text_fmt(ui.work.label_data, "%s\n%s\n%s", na, na, na);
+        app_label_set_text_fmt(ui.work.label_data, "%s\n%s\n%s", na, na, na);
     }
     if (device.position_valid)
-        lv_label_set_text_fmt(ui.gps.label_data, "%.6f\n%.6f\n%.2f m", device.latitude, device.longitude,
+        app_label_set_text_fmt(ui.gps.label_data, "%.6f\n%.6f\n%.2f m", device.latitude, device.longitude,
                               device.altitude);
     else
-        lv_label_set_text_fmt(ui.gps.label_data, "%s\n%s\n%s", na, na, na);
+        app_label_set_text_fmt(ui.gps.label_data, "%s\n%s\n%s", na, na, na);
     const char* wifi_state = state.wifi_pending ? "..." : on_off(state.wifi_on);
     if (device.wifi_valid)
-        lv_label_set_text_fmt(ui.wifi.label_data, "%s-%s\n%s\n%u.%u.%u.%u", device.wifi_station ? "STA" : "AP",
+        app_label_set_text_fmt(ui.wifi.label_data, "%s-%s\n%s\n%u.%u.%u.%u", device.wifi_station ? "STA" : "AP",
                               device.wifi_ssid.data(), wifi_state, device.wifi_ip[0], device.wifi_ip[1],
                               device.wifi_ip[2], device.wifi_ip[3]);
     else
-        lv_label_set_text_fmt(ui.wifi.label_data, "%s\n%s\n%s", na, wifi_state, na);
+        app_label_set_text_fmt(ui.wifi.label_data, "%s\n%s\n%s", na, wifi_state, na);
     if (device.power_valid) {
         const TextId charge = device.external_power                                 ? TextId::BatteryExternalPower
                               : device.charge == DataProc::ChargeState::NotCharging ? TextId::BatteryNotCharge
                               : device.charge == DataProc::ChargeState::Fast        ? TextId::BatteryFastCharge
                                                                                     : TextId::BatteryNormalCharge;
-        lv_label_set_text_fmt(ui.battery.label_data, "%.1f%%\n%.2f V\n%.1f C\n%s",
+        app_label_set_text_fmt(ui.battery.label_data, "%.1f%%\n%.2f V\n%.1f C\n%s",
                               static_cast<double>(device.battery_percent), static_cast<double>(device.battery_voltage),
                               static_cast<double>(device.battery_temperature), i18n::text(charge));
     } else {
-        lv_label_set_text_fmt(ui.battery.label_data, "%s\n%s\n%s\n%s", na, na, na, na);
+        app_label_set_text_fmt(ui.battery.label_data, "%s\n%s\n%s\n%s", na, na, na, na);
     }
     if (device.record_valid && device.recording) {
         char type[16], interval[16];
         option_text(TextId::RecordTypeOptions, device.record_type, type, sizeof(type));
         option_text(TextId::RecordIntervalOptions, device.record_interval, interval, sizeof(interval));
-        lv_label_set_text_fmt(ui.storage.label_data, "%s\n%s\n%.1f MB\n%s\n%s", on_off(true), device.record_name.data(),
+        app_label_set_text_fmt(ui.storage.label_data, "%s\n%s\n%.1f MB\n%s\n%s", on_off(true), device.record_name.data(),
                               static_cast<double>(device.record_space_mb), type, interval);
     } else {
-        lv_label_set_text_fmt(ui.storage.label_data, "%s\n-\n-\n-\n-", device.record_valid ? on_off(false) : na);
+        app_label_set_text_fmt(ui.storage.label_data, "%s\n-\n-\n-\n-", device.record_valid ? on_off(false) : na);
     }
     unsigned errors = 0;
     for (const auto& result : state.initialization)
         errors += result.status == DataProc::InitializationStatus::Failed;
     const auto uptime = device.uptime_s;
-    lv_label_set_text_fmt(ui.system.label_data, "%s\n%02u:%02u:%02u\n%u\n%s",
+    app_label_set_text_fmt(ui.system.label_data, "%s\n%02u:%02u:%02u\n%u\n%s",
                           device.firmware[0] ? device.firmware.data() : na, static_cast<unsigned>(uptime / 3600U),
                           static_cast<unsigned>(uptime / 60U % 60U), static_cast<unsigned>(uptime % 60U), errors,
                           device.build[0] ? device.build.data() : na);

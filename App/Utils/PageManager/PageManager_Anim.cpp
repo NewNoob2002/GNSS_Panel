@@ -30,8 +30,8 @@
   * @retval Whether the acquisition is successful
   */
 bool PageManager::get_load_anim_attr(const uint8_t anim, LoadAnimAttr_t* attr) {
-    const lv_coord_t hor = LV_HOR_RES;
-    const lv_coord_t ver = LV_VER_RES;
+    const int32_t hor = LV_HOR_RES;
+    const int32_t ver = LV_VER_RES;
 
     switch (anim) {
         case LOAD_ANIM_OVER_LEFT:
@@ -172,19 +172,19 @@ bool PageManager::get_load_anim_attr(const uint8_t anim, LoadAnimAttr_t* attr) {
     /* Determine the setter and getter of the animation */
     if (attr->drag_dir == ROOT_DRAG_DIR_HOR) {
         attr->setter = [](void* obj, const int32_t v) {
-            lv_obj_set_x(static_cast<lv_obj_t*>(obj), static_cast<lv_coord_t>(v));
+            lv_obj_set_x(static_cast<lv_obj_t*>(obj), static_cast<int32_t>(v));
         };
         attr->getter = [](void* obj) {
             // Match set_x's alignment-relative offset, not the resolved screen coordinate.
-            return static_cast<int32_t>(lv_obj_get_style_x(static_cast<lv_obj_t*>(obj), 0));
+            return static_cast<int32_t>(lv_obj_get_style_x(static_cast<lv_obj_t*>(obj), LV_PART_MAIN));
         };
     } else if (attr->drag_dir == ROOT_DRAG_DIR_VER) {
         attr->setter = [](void* obj, const int32_t v) {
-            lv_obj_set_y(static_cast<lv_obj_t*>(obj), static_cast<lv_coord_t>(v));
+            lv_obj_set_y(static_cast<lv_obj_t*>(obj), static_cast<int32_t>(v));
         };
         attr->getter = [](void* obj) {
             // Bottom-aligned pages (StarMap) have a nonzero screen origin even at offset zero.
-            return static_cast<int32_t>(lv_obj_get_style_y(static_cast<lv_obj_t*>(obj), 0));
+            return static_cast<int32_t>(lv_obj_get_style_y(static_cast<lv_obj_t*>(obj), LV_PART_MAIN));
         };
     } else {
         attr->setter = [](void* obj, const int32_t v) {

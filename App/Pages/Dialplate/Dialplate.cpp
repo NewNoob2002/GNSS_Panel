@@ -53,7 +53,7 @@ void Dialplate::on_view_unload() {
 
 void Dialplate::clicked(lv_event_t* event) {
     auto* self = static_cast<Dialplate*>(lv_event_get_user_data(event));
-    auto* button = lv_event_get_current_target(event);
+    auto* button = lv_event_get_current_target_obj(event);
     const char* destination = nullptr;
     if (button == self->view_.ui.btn_cont.btn_map)
         destination = "Pages/WorkSettings";

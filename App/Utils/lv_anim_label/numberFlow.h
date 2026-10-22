@@ -12,17 +12,17 @@ class NumberFlow {
 
     ~NumberFlow() {
         // 删除容器会自动删除所有子对象，不需要单独删除 digit_labels 中的指针
-        if (this->cont_ && lv_obj_is_valid(this->cont_)) {
-            lv_obj_del(this->cont_);
+        if (this->cont_ && lv_obj_is_in_widget_tree(this->cont_)) {
+            lv_obj_delete(this->cont_);
         }
         digit_labels_.clear();
     }
 
     void create(lv_obj_t* parent);
 
-    void set_pos(lv_align_t align, lv_coord_t x, lv_coord_t y) const;
+    void set_pos(lv_align_t align, int32_t x, int32_t y) const;
 
-    void set_align_to(const lv_obj_t* base, lv_align_t align, lv_coord_t x, lv_coord_t y) const;
+    void set_align_to(const lv_obj_t* base, lv_align_t align, int32_t x, int32_t y) const;
 
     void set_value(uint32_t target_value) const;
 

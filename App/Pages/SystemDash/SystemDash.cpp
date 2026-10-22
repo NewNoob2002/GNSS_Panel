@@ -32,10 +32,10 @@ void SystemDash::on_view_will_disappear() {
     // Stop the hold but keep the dialog and its full bar on screen while the next page slides over this one;
     // changing this page now would flash a different picture under the transition.
     if (hold_timer_) {
-        lv_timer_del(hold_timer_);
+        lv_timer_delete(hold_timer_);
         hold_timer_ = nullptr;
     }
-    lv_anim_del(this, set_hold_progress);
+    lv_anim_delete(this, set_hold_progress);
     last_focus_ = utils::leave_focus_group();
 }
 void SystemDash::on_view_did_disappear() {
@@ -72,11 +72,11 @@ bool SystemDash::on_back_request() {
 }
 void SystemDash::cancel_hold() {
     if (hold_timer_) {
-        lv_timer_del(hold_timer_);
+        lv_timer_delete(hold_timer_);
         hold_timer_ = nullptr;
     }
     if (holding_)
-        lv_anim_del(this, set_hold_progress);
+        lv_anim_delete(this, set_hold_progress);
     holding_ = nullptr;
     view_.set_hold(nullptr, 0);
 }
@@ -88,7 +88,7 @@ void SystemDash::set_hold_progress(void* self, int32_t percent) {
 // dialog. Only a completed hold prepares the power action.
 void SystemDash::hold_event(lv_event_t* event) {
     auto* self = static_cast<SystemDash*>(lv_event_get_user_data(event));
-    auto* target = lv_event_get_current_target(event);
+    auto* target = lv_event_get_current_target_obj(event);
     const auto code = lv_event_get_code(event);
     if (!self->view_.power_open() || self->page_manager->is_switching())
         return;
@@ -108,7 +108,7 @@ void SystemDash::hold_event(lv_event_t* event) {
         lv_anim_set_var(&anim, self);
         lv_anim_set_exec_cb(&anim, set_hold_progress);
         lv_anim_set_values(&anim, 0, 100);
-        lv_anim_set_time(&anim, kHoldMs);
+        lv_anim_set_duration(&anim, kHoldMs);
         if (!lv_anim_start(&anim))
             APP_LOG_W("SystemDash", "power hold animation allocation failed; confirmation still times the hold");
     } else if ((code == LV_EVENT_RELEASED || code == LV_EVENT_PRESS_LOST || code == LV_EVENT_DEFOCUSED)
@@ -117,12 +117,12 @@ void SystemDash::hold_event(lv_event_t* event) {
     }
 }
 void SystemDash::on_hold_complete(lv_timer_t* timer) {
-    auto* self = static_cast<SystemDash*>(timer->user_data);
+    auto* self = static_cast<SystemDash*>(lv_timer_get_user_data(timer));
     self->hold_timer_ = nullptr; // A one-shot timer deletes itself after this callback.
     const auto action =
         self->holding_ == self->view_.ui.reboot ? DataProc::PowerAction::Reboot : DataProc::PowerAction::Off;
     self->view_.set_hold(self->holding_, 100);
-    lv_anim_del(self, set_hold_progress);
+    lv_anim_delete(self, set_hold_progress);
     if (!self->model_.prepare_power(action)) {
         APP_LOG_E("SystemDash", "power preparation rejected");
         self->show_power(false);
@@ -138,7 +138,7 @@ void SystemDash::clicked(lv_event_t* event) {
     auto* self = static_cast<SystemDash*>(lv_event_get_user_data(event));
     if (self->page_manager->is_switching())
         return;
-    auto* target = lv_event_get_current_target(event);
+    auto* target = lv_event_get_current_target_obj(event);
     if (self->view_.power_open()) {
         self->show_power(false); // A short press never executes shutdown/reboot; it dismisses the dialog.
         return;

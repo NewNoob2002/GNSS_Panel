@@ -32,15 +32,15 @@ void SaveConfigView::create(lv_obj_t* root) {
     lv_anim_set_var(&progress_animation_, ring_);
     lv_anim_set_exec_cb(&progress_animation_, set_progress);
     lv_anim_set_values(&progress_animation_, 0, 1000);
-    lv_anim_set_time(&progress_animation_, 8000);
+    lv_anim_set_duration(&progress_animation_, 8000);
     lv_anim_set_path_cb(&progress_animation_, lv_anim_path_linear);
 }
 
 void SaveConfigView::stop() const {
-    lv_anim_del(ring_, set_progress);
-    lv_anim_del(ring_, rotate_spinner);
+    lv_anim_delete(ring_, set_progress);
+    lv_anim_delete(ring_, rotate_spinner);
     for (auto* obj : {ring_, column_})
-        lv_anim_del(obj, settings_style::move_in);
+        lv_anim_delete(obj, settings_style::move_in);
 }
 
 void SaveConfigView::appear() {
@@ -59,7 +59,7 @@ void SaveConfigView::appear() {
 void SaveConfigView::update(const DataProc::SystemState& state) {
     if (state.shutting_down && !shutting_down_) {
         shutting_down_ = true;
-        lv_anim_del(ring_, set_progress);
+        lv_anim_delete(ring_, set_progress);
         lv_arc_set_angles(ring_, 0, 90);
         settings_style::set_visible(icon_, false);
         settings_style::set_visible(seconds_, false);
@@ -69,14 +69,14 @@ void SaveConfigView::update(const DataProc::SystemState& state) {
         lv_anim_set_var(&animation, ring_);
         lv_anim_set_exec_cb(&animation, rotate_spinner);
         lv_anim_set_values(&animation, 270, 630);
-        lv_anim_set_time(&animation, 1200);
+        lv_anim_set_duration(&animation, 1200);
         lv_anim_set_path_cb(&animation, lv_anim_path_linear);
         lv_anim_set_repeat_count(&animation, LV_ANIM_REPEAT_INFINITE);
         lv_anim_start(&animation);
     }
     const bool restart = !shutting_down_ && state.power_action == DataProc::PowerAction::Reboot;
     const auto color = restart ? style::kAccent : style::kDanger;
-    if (lv_obj_get_style_arc_color(ring_, LV_PART_INDICATOR).full != color.full)
+    if (lv_color_to_u32(lv_obj_get_style_arc_color(ring_, LV_PART_INDICATOR)) != lv_color_to_u32(color))
         lv_obj_set_style_arc_color(ring_, color, LV_PART_INDICATOR);
     settings_style::set_recolor(icon_, color);
     settings_style::set_text_color(action_, color);

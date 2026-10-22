@@ -71,23 +71,23 @@ void RecordConfigView::update(const DataProc::DeviceSnapshot& device, bool confi
     const bool locked = device.recording || device.record_pending || !device.record_valid;
     for (auto* control : {ui.type, ui.interval}) {
         if (configurable && !locked)
-            lv_obj_clear_state(control, LV_STATE_DISABLED);
+            lv_obj_set_disabled(control, false);
         else
-            lv_obj_add_state(control, LV_STATE_DISABLED);
+            lv_obj_set_disabled(control, true);
         lv_style_value_t opa{};
         const lv_opa_t disabled_opa = configurable ? LV_OPA_50 : LV_OPA_COVER;
-        if (lv_obj_get_local_style_prop(control, LV_STYLE_OPA, &opa, LV_STATE_DISABLED) != LV_RES_OK
+        if (lv_obj_get_local_style_prop(control, LV_STYLE_OPA, &opa, LV_STATE_DISABLED) != LV_STYLE_RES_FOUND
             || opa.num != disabled_opa)
             lv_obj_set_style_opa(control, disabled_opa, LV_STATE_DISABLED);
         if (configurable)
-            lv_obj_add_flag(control, LV_OBJ_FLAG_CLICKABLE);
+            lv_obj_set_clickable(control, true);
         else
-            lv_obj_clear_flag(control, LV_OBJ_FLAG_CLICKABLE);
+            lv_obj_set_clickable(control, false);
     }
     if (device.record_pending || !device.record_valid)
-        lv_obj_add_state(ui.record, LV_STATE_DISABLED);
+        lv_obj_set_disabled(ui.record, true);
     else
-        lv_obj_clear_state(ui.record, LV_STATE_DISABLED);
+        lv_obj_set_disabled(ui.record, false);
     settings_style::set_border_color(ui.record, device.recording ? style::kDanger : style::kBorder);
     settings_style::set_text(feedback_, feedback == TextId::Count ? "" : i18n::text(feedback));
     settings_style::set_text_color(feedback_, feedback == TextId::RequestRejected || feedback == TextId::RequestTimeout

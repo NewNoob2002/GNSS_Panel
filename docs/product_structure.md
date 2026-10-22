@@ -13,7 +13,7 @@
 ```text
 App/                      共享应用：独立事件框架接入、无 LVGL 的核心服务、LVGL 页面及核心测试 App/tests/（本仓库为唯一来源）
 Frameworks/               跨平台框架：DataBroker、DeviceManager、PageManager、ResourceManager
-External/lvgl/            上游 LVGL 8.3.11 源码（src/、lvgl.h、demos/，不含平台 lv_conf.h 与 porting/）
+External/lvgl/            上游 LVGL 9.6.0 源码（include/、src/、lvgl.h、demos/，不含平台 lv_conf.h 与 porting/）
 Vendor/HC32/
   Platform/               CMSIS 启动、DDL/ 小华 LL 库、Peripherals/ 原生外设驱动（GpioPin、I2cMaster、SpiMaster、GPIO、UART、Flash、DWT、OTS）、System/ 系统与运行时胶水（中断、Syscalls、new、delay、调试宏）、Config/（board_pins.h 主板引脚、board_peripherals 板级外设实例）、共用 HAL/（电源策略、充电/电量计、按键、LED、时基）与 State/
   Libraries/              器件与第三方库（Bq40z50、Mp2762a、MillisTaskManager、Parser、SEGGER_RTT、easylogger、MultiButton）；LVGL 从 External/lvgl 构建
@@ -26,14 +26,14 @@ Vendor/Linux/             RK3506 Linux 端口、Backends/Demo 演示后端与主
 
 依赖只能自上而下：`Products` → `Display`/`Comm` → `Platform`/`Libraries`。`Vendor/HC32/Platform/` 不包含 LVGL 或 `App/` 头文件；为此做了以下解耦：
 
-- LVGL 使用 `LV_TICK_CUSTOM` 直接读取 `millis()`，SysTick 不再调用 `lv_tick_inc()`。
+- LVGL 使用 `lv_tick_set_cb(millis)` 直接读取时基，SysTick 不再调用 `lv_tick_inc()`。
 - C++ `operator new` 平台默认走 C 堆（弱符号），带屏产品在 `Vendor/HC32/Display/Lvgl/lvgl_new.cpp` 以强符号改用 LVGL 内存池。
 - `HAL::Power_OnCheck(idle)` 由入口传入等待开机期间的刷新函数；显示 DMA 回收 `lv_port_disp_poll()` 由带屏主循环调用。
 - `Platform/Peripherals/SpiMaster` 仅提供通用 SPI 主机与可选 TX DMA 原语，显示专用的 SPI/DMA 板级实例（`Display/Panel/board_display`）与面板驱动（`Display/Panel/PanelRm690a0`）放在 `Display/Panel/` 中。
 
 ## 产品差异放在哪里
 
-共享构建与架构边界见 [App/ARCHITECTURE.md](../App/ARCHITECTURE.md)：`app_framework` / `app_core` 不依赖 LVGL，`app_ui` 是 UI；固件、主机测试、模拟器与 Linux 端口复用同一个 `App/CMakeLists.txt`。平台通过 `app_build_options` 和 `app_lvgl` 绑定编译选项与显示库。`app_framework` 构建 DataBroker/DeviceManager，ResourceManager 使用静态数组模板；DataNode 同步分发，最多 16 个节点、32 个独立时钟定时器。资源池与页面外观不变，LVGL 仍为 8.3.11，页面管理仍使用 `App/Utils/PageManager`。`App/` 与 `Frameworks/` 直接在本仓库修改；平台相关行为放在 `Vendor/<平台>`。
+共享构建与架构边界见 [App/ARCHITECTURE.md](../App/ARCHITECTURE.md)：`app_framework` / `app_core` 不依赖 LVGL，`app_ui` 是 UI；固件、主机测试、模拟器与 Linux 端口复用同一个 `App/CMakeLists.txt`。平台通过 `app_build_options` 和 `app_lvgl` 绑定编译选项与显示库。`app_framework` 构建 DataBroker/DeviceManager，ResourceManager 使用静态数组模板；DataNode 同步分发，最多 16 个节点、32 个独立时钟定时器。资源池与页面外观不变，LVGL 为 9.6.0，页面管理仍使用 `App/Utils/PageManager`。`App/` 与 `Frameworks/` 直接在本仓库修改；平台相关行为放在 `Vendor/<平台>`。
 
 1. **功能开关**：`Vendor/HC32/Products/<产品>/product_config.h` 中的 `PRODUCT_*` 宏，经 `mcu_config.h` 被所有源码看到。带屏产品缺少任一开关时 `mcu_config.h` 直接报错，避免 `#if` 未定义被当作 0。
 2. **弱符号扩展点**（`Vendor/HC32/Platform/HAL/HAL.h`）：`Power_ProductInit`、`Power_ProductUpdate`、`Power_AdjustPercent`、`Key_ProductInit`、`Key_ProductUpdate`。默认无动作，产品源码覆盖（X1：电量补偿、MultiButton 按键动作）。
@@ -119,9 +119,14 @@ XBase 的差异取自其分支相对分叉点的产品级改动（无星图/过�
 
 | 产品 | Release 占用 / 剩余 | Debug 占用 / 剩余 |
 |---|---|---|
-| X1 | 25,216 B / 431.4 KiB | 37,488 B / 419.4 KiB |
-| X1Pro | 332,048 B / 131.7 KiB | 390,188 B / 75.0 KiB |
-| XBase | 330,584 B / 133.2 KiB | 388,580 B / 76.5 KiB |
+| X1 | 25,816 B / 430.8 KiB | 38,428 B / 418.5 KiB |
+| X1Pro | 415,496 B / 50.3 KiB | 452,804 B / 13.8 KiB |
+| XBase | 415,056 B / 50.7 KiB | 452,260 B / 14.3 KiB |
+
+带屏产品的 debug 仅将 LVGL 源码设为 `-Os`（保留调试符号），App 和平台代码继续使用 `-Og`。
+三端以整数坐标运行 LVGL；应用通过标准库格式化温度、电压和坐标，HC32 显式链接 newlib 浮点格式化支持。
+上表按 `text + data` 统计，Flash 总预算为 456 KiB；RAM 真实余量按 `__RamEnd - __StackTop` 计算，
+带屏产品 release 为 22,128 B，debug 为 19,488 B。
 
 ## 待确认事项
 

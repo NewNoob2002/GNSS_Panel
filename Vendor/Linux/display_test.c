@@ -6,6 +6,7 @@
 #include <time.h>
 #include "linux_display.h"
 #include "lv_display.h"
+#include "lv_tick_posix.h"
 
 static volatile sig_atomic_t stop;
 static void on_signal(int signal_number) {
@@ -50,14 +51,16 @@ int main(int argc, char** argv) {
         return EXIT_FAILURE;
     }
     int result = EXIT_FAILURE;
-    static struct lv_display port;
+    static struct panel_display port;
     if (rm_init(&screen) < 0) {
         perror("RM690A0 init");
         goto done;
     }
-    if (stop)
+    if (stop) {
         goto done;
+    }
     lv_init();
+    lv_tick_set_cb(lv_tick_posix_ms);
     if (lv_display_register(&port, &screen) < 0) {
         perror("LVGL display");
         goto done;
@@ -71,7 +74,6 @@ int main(int argc, char** argv) {
             port.error = EIO;
             break;
         }
-        lv_tick_inc((uint32_t)(now - last));
         last = now;
         lv_timer_handler();
         struct timespec wait = {.tv_nsec = 5000000};
@@ -83,7 +85,7 @@ int main(int argc, char** argv) {
     } else {
         result = EXIT_SUCCESS;
     }
-    lv_disp_remove(port.display);
+    lv_display_delete(port.display);
 done:
     if (linux_display_close(&io) < 0) {
         perror("display close");

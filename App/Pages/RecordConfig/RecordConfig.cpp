@@ -19,8 +19,8 @@ void RecordConfig::refresh() {
     const bool configurable = model_.settings().record_settings;
     const bool editable = configurable && device.record_valid && !device.recording && !device.record_pending;
     const bool changed =
-        lv_obj_has_state(view_.ui.type, LV_STATE_DISABLED) == editable
-        || lv_obj_has_state(view_.ui.record, LV_STATE_DISABLED) != (device.record_pending || !device.record_valid);
+        lv_obj_is_disabled(view_.ui.type) == editable
+        || lv_obj_is_disabled(view_.ui.record) != (device.record_pending || !device.record_valid);
     feedback_.poll(device.record_pending);
     if (!editable && device.record_valid)
         view_.set_selection(device.record_type, device.record_interval);
@@ -42,7 +42,7 @@ void RecordConfig::on_view_will_appear() {
     view_.appear();
     timer_ = lv_timer_create(
         [](lv_timer_t* timer) {
-            static_cast<RecordConfig*>(timer->user_data)->refresh();
+            static_cast<RecordConfig*>(lv_timer_get_user_data(timer))->refresh();
         },
         200, this);
     if (!timer_)
@@ -52,14 +52,14 @@ void RecordConfig::on_view_will_disappear() {
     view_.stop();
     model_.set_change_callback({});
     if (timer_) {
-        lv_timer_del(timer_);
+        lv_timer_delete(timer_);
         timer_ = nullptr;
     }
     utils::leave_focus_group();
 }
 void RecordConfig::on_view_unload() {
     if (timer_) {
-        lv_timer_del(timer_);
+        lv_timer_delete(timer_);
         timer_ = nullptr;
     }
     model_.set_change_callback({});
@@ -88,7 +88,7 @@ void RecordConfig::on_commit_request() {
 }
 void RecordConfig::clicked(lv_event_t* event) {
     auto* self = static_cast<RecordConfig*>(lv_event_get_user_data(event));
-    auto* control = lv_event_get_current_target(event);
+    auto* control = lv_event_get_current_target_obj(event);
     if (control == self->view_.ui.back) {
         self->page_manager->pop();
         return;

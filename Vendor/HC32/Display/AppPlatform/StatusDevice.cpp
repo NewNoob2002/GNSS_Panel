@@ -36,7 +36,7 @@ position_text(DataProc::StatusSnapshot& state) {
         }
     }
     std::snprintf(state.position.data(), state.position.size(), "%s", i18n::text(id));
-    state.position_color_rgb = lv_color_to32(color) & 0xffffffu;
+    state.position_color_rgb = lv_color_to_u32(color) & 0xffffffu;
 }
 
 } // namespace

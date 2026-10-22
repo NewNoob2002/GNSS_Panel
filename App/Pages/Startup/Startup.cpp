@@ -15,7 +15,7 @@ void Startup::on_view_load() {
         app_fatal("Startup", "Model initialization failed");
     view_.create(root);
     style::show_demo(root, model_.settings().simulated);
-    lv_obj_add_flag(view_.ui.btn_press, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_clickable(view_.ui.btn_press, true);
     lv_obj_add_event_cb(view_.ui.btn_press, hold_event, LV_EVENT_ALL, this);
     lv_obj_set_user_data(view_.ui.arc, this);
     lv_anim_set_exec_cb(&view_.ui.arc_anim, set_progress);
@@ -30,7 +30,7 @@ void Startup::on_view_will_appear() {
     view_.update(model_.status());
     view_.update_device(model_.device());
     set_progress(view_.ui.arc, 0);
-    lv_obj_clear_state(view_.ui.btn_press, LV_STATE_PRESSED);
+    lv_obj_set_pressed(view_.ui.btn_press, false);
     utils::focus_controls(std::array{view_.ui.btn_press}, view_.ui.btn_press);
 }
 
@@ -42,22 +42,22 @@ void Startup::on_view_did_appear() {
 
 void Startup::cancel_status_timer() {
     if (status_timer_) {
-        lv_timer_del(status_timer_);
+        lv_timer_delete(status_timer_);
         status_timer_ = nullptr;
     }
 }
 
 void Startup::on_status_timeout(lv_timer_t* timer) {
-    auto* self = static_cast<Startup*>(timer->user_data);
+    auto* self = static_cast<Startup*>(lv_timer_get_user_data(timer));
     self->status_timer_ = nullptr;
-    lv_timer_del(timer);
+    lv_timer_delete(timer);
     if (self->page_manager->get_current_page() == self)
         self->model_.set_status_bar(true);
 }
 
 void Startup::cancel_timer() {
     if (timer_) {
-        lv_timer_del(timer_);
+        lv_timer_delete(timer_);
         timer_ = nullptr;
     }
 }
@@ -66,7 +66,7 @@ void Startup::on_view_will_disappear() {
     model_.set_change_callback({});
     cancel_status_timer();
     cancel_timer();
-    lv_anim_del(view_.ui.arc, set_progress);
+    lv_anim_delete(view_.ui.arc, set_progress);
     view_.destroy();
     utils::leave_focus_group();
 }
@@ -75,7 +75,7 @@ void Startup::on_view_unload() {
     cancel_status_timer();
     model_.deinit();
     cancel_timer();
-    lv_anim_del(view_.ui.arc, set_progress);
+    lv_anim_delete(view_.ui.arc, set_progress);
     view_.destroy();
 }
 
@@ -100,11 +100,11 @@ void Startup::hold_event(lv_event_t* event) {
     if (code == LV_EVENT_PRESSED) {
         if (self->timer_)
             return;
-        lv_anim_del(obj, set_progress);
+        lv_anim_delete(obj, set_progress);
         set_progress(obj, 0);
         lv_anim_set_values(animation, 0, 100);
         constexpr uint32_t hold_ms = 2000;
-        lv_anim_set_time(animation, hold_ms);
+        lv_anim_set_duration(animation, hold_ms);
         self->timer_ = lv_timer_create(on_timeout, hold_ms, self);
         if (self->timer_)
             lv_anim_start(animation);
@@ -113,17 +113,17 @@ void Startup::hold_event(lv_event_t* event) {
     } else if (self->timer_ || !self->model_.settings().powered_on) {
         // Released early, or the platform has not confirmed power-on yet: the hold restarts from zero.
         self->cancel_timer();
-        lv_anim_del(obj, set_progress);
+        lv_anim_delete(obj, set_progress);
         lv_anim_set_values(animation, lv_arc_get_value(obj), 0);
-        lv_anim_set_time(animation, 300);
+        lv_anim_set_duration(animation, 300);
         lv_anim_start(animation);
     }
 }
 
 void Startup::on_timeout(lv_timer_t* timer) {
-    auto* self = static_cast<Startup*>(timer->user_data);
+    auto* self = static_cast<Startup*>(lv_timer_get_user_data(timer));
     self->timer_ = nullptr;
-    lv_timer_del(timer);
+    lv_timer_delete(timer);
     // Only a request: the platform confirms power-on (now, or after its own key timing) and App then
     // replaces Startup with SystemLoading.
     if (!self->model_.request_power_on())

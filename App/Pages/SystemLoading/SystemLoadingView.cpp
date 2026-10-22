@@ -8,7 +8,7 @@
 using namespace page;
 
 namespace {
-constexpr lv_coord_t kTrackWidth = 246;
+constexpr int32_t kTrackWidth = 246;
 constexpr lv_color_t kOrange = style::kAccent;
 constexpr lv_color_t kGreen = style::kSuccess;
 constexpr lv_color_t kRed = style::kDanger;
@@ -19,24 +19,27 @@ void set_opa(void* obj, int32_t opa) {
     lv_obj_set_style_opa(static_cast<lv_obj_t*>(obj), static_cast<lv_opa_t>(opa), 0);
 }
 void hide_after_fade(lv_anim_t* anim) {
-    lv_obj_add_flag(static_cast<lv_obj_t*>(anim->var), LV_OBJ_FLAG_HIDDEN);
+    lv_obj_set_hidden(static_cast<lv_obj_t*>(anim->var), true);
 }
 void draw_check(lv_event_t* event) {
-    auto* obj = lv_event_get_target(event);
+    auto* obj = lv_event_get_target_obj(event);
     lv_area_t area;
     lv_obj_get_coords(obj, &area);
-    const lv_point_t points[] = {{static_cast<lv_coord_t>(area.x1 + 1), static_cast<lv_coord_t>(area.y1 + 11)},
-                                 {static_cast<lv_coord_t>(area.x1 + 8), static_cast<lv_coord_t>(area.y1 + 18)},
-                                 {static_cast<lv_coord_t>(area.x1 + 24), static_cast<lv_coord_t>(area.y1 + 2)}};
+    const lv_point_t points[] = {{static_cast<int32_t>(area.x1 + 1), static_cast<int32_t>(area.y1 + 11)},
+                                 {static_cast<int32_t>(area.x1 + 8), static_cast<int32_t>(area.y1 + 18)},
+                                 {static_cast<int32_t>(area.x1 + 24), static_cast<int32_t>(area.y1 + 2)}};
     lv_draw_line_dsc_t line;
     lv_draw_line_dsc_init(&line);
     lv_obj_init_draw_line_dsc(obj, LV_PART_MAIN, &line);
-    auto* ctx = lv_event_get_draw_ctx(event);
-    lv_draw_line(ctx, &line, &points[0], &points[1]);
-    lv_draw_line(ctx, &line, &points[1], &points[2]);
+    auto* layer = lv_event_get_layer(event);
+    for (unsigned i = 0; i < 2; ++i) {
+        line.p1 = {static_cast<lv_value_precise_t>(points[i].x), static_cast<lv_value_precise_t>(points[i].y)};
+        line.p2 = {static_cast<lv_value_precise_t>(points[i + 1].x), static_cast<lv_value_precise_t>(points[i + 1].y)};
+        lv_draw_line(layer, &line);
+    }
 }
 void rotate_gear(void* obj, int32_t angle) {
-    lv_img_set_angle(static_cast<lv_obj_t*>(obj), static_cast<int16_t>(angle));
+    lv_image_set_rotation(static_cast<lv_obj_t*>(obj), angle);
 }
 // Checks take a variable time, so the gear turns until Ready instead of spanning a fixed duration.
 void spin_gear(lv_obj_t* gear) {
@@ -44,22 +47,22 @@ void spin_gear(lv_obj_t* gear) {
     lv_anim_init(&anim);
     lv_anim_set_var(&anim, gear);
     lv_anim_set_values(&anim, 0, 3600);
-    lv_anim_set_time(&anim, 1600);
+    lv_anim_set_duration(&anim, 1600);
     lv_anim_set_exec_cb(&anim, rotate_gear);
     lv_anim_set_repeat_count(&anim, LV_ANIM_REPEAT_INFINITE);
     if (!lv_anim_start(&anim))
         LV_LOG_WARN("SystemLoading: gear animation allocation failed");
 }
 void animate(lv_obj_t* obj, lv_anim_exec_xcb_t exec, int32_t from, int32_t to, uint32_t time_ms,
-             lv_anim_ready_cb_t finished = nullptr) {
+             lv_anim_completed_cb_t finished = nullptr) {
     lv_anim_t anim;
     lv_anim_init(&anim);
     lv_anim_set_var(&anim, obj);
     lv_anim_set_values(&anim, from, to);
-    lv_anim_set_time(&anim, time_ms);
+    lv_anim_set_duration(&anim, time_ms);
     lv_anim_set_exec_cb(&anim, exec);
     lv_anim_set_path_cb(&anim, lv_anim_path_ease_in_out);
-    lv_anim_set_ready_cb(&anim, finished);
+    lv_anim_set_completed_cb(&anim, finished);
     if (!lv_anim_start(&anim)) {
         exec(obj, to);
         if (finished)
@@ -81,7 +84,7 @@ void SystemLoadingView::create(lv_obj_t* root) {
     lv_obj_remove_style_all(ui_.ring);
     lv_obj_set_pos(ui_.ring, 119, 4);
     lv_obj_set_size(ui_.ring, 40, 40);
-    lv_obj_clear_flag(ui_.ring, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_clickable(ui_.ring, false); lv_obj_set_scrollable(ui_.ring, false);
     lv_arc_set_bg_angles(ui_.ring, 0, 360);
     lv_arc_set_rotation(ui_.ring, 270);
     lv_arc_set_range(ui_.ring, 0, 100);
@@ -91,12 +94,12 @@ void SystemLoadingView::create(lv_obj_t* root) {
     lv_obj_set_style_arc_rounded(ui_.ring, true, LV_PART_INDICATOR);
     lv_obj_set_style_arc_opa(ui_.ring, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_style_arc_opa(ui_.ring, LV_OPA_COVER, LV_PART_INDICATOR);
-    ui_.gear = lv_img_create(ui_.cont);
-    lv_img_set_src(ui_.gear, resource_pool::get_image("settings"));
+    ui_.gear = lv_image_create(ui_.cont);
+    lv_image_set_src(ui_.gear, resource_pool::get_image("settings"));
     lv_obj_set_pos(ui_.gear, 131, 16);
-    lv_img_set_zoom(ui_.gear, 384);
-    lv_obj_set_style_img_recolor(ui_.gear, lv_color_white(), 0);
-    lv_obj_set_style_img_recolor_opa(ui_.gear, LV_OPA_COVER, 0);
+    lv_image_set_scale(ui_.gear, 384);
+    lv_obj_set_style_image_recolor(ui_.gear, lv_color_white(), 0);
+    lv_obj_set_style_image_recolor_opa(ui_.gear, LV_OPA_COVER, 0);
     ui_.check = style::box(ui_.cont, 126, 13, 26, 23);
     lv_obj_add_event_cb(ui_.check, draw_check, LV_EVENT_DRAW_MAIN, nullptr);
     lv_obj_set_style_line_color(ui_.check, kGreen, 0);
@@ -137,13 +140,13 @@ void SystemLoadingView::create(lv_obj_t* root) {
     }
     ui_.footer = style::label(ui_.cont, small_font, 16, 105, 116);
     lv_obj_set_style_text_color(ui_.footer, kGrey, 0);
-    ui_.img_logo = lv_img_create(root);
+    ui_.img_logo = lv_image_create(root);
 #if defined(RGK_LOGO_USE)
-    lv_img_set_src(ui_.img_logo, resource_pool::get_image("RGKLogo"));
+    lv_image_set_src(ui_.img_logo, resource_pool::get_image("RGKLogo"));
 #elif defined(MIDDLE_LOGO_USE)
-    lv_img_set_src(ui_.img_logo, resource_pool::get_image("MiddleLogo"));
+    lv_image_set_src(ui_.img_logo, resource_pool::get_image("MiddleLogo"));
 #else
-    lv_img_set_src(ui_.img_logo, resource_pool::get_image("startupLogo"));
+    lv_image_set_src(ui_.img_logo, resource_pool::get_image("startupLogo"));
 #endif
     lv_obj_center(ui_.img_logo);
     update_text();
@@ -151,8 +154,8 @@ void SystemLoadingView::create(lv_obj_t* root) {
 }
 
 void SystemLoadingView::show_logo() const {
-    lv_obj_add_flag(ui_.cont, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_clear_flag(ui_.img_logo, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_set_hidden(ui_.cont, true);
+    lv_obj_set_hidden(ui_.img_logo, false);
     set_opa(ui_.img_logo, LV_OPA_COVER);
 }
 
@@ -161,9 +164,9 @@ void SystemLoadingView::show_initialization() {
     step_ = 1;
     waited_s_ = 0;
     failed_steps_ = 0;
-    lv_obj_clear_flag(ui_.cont, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_add_flag(ui_.check, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_clear_flag(ui_.gear, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_set_hidden(ui_.cont, false);
+    lv_obj_set_hidden(ui_.check, true);
+    lv_obj_set_hidden(ui_.gear, false);
     set_opa(ui_.gear, LV_OPA_COVER);
     set_opa(ui_.service, LV_OPA_COVER);
     set_opa(ui_.subtitle, LV_OPA_COVER);
@@ -215,11 +218,11 @@ void SystemLoadingView::show_waiting(uint32_t elapsed_ms) {
 }
 
 void SystemLoadingView::show_ready() {
-    lv_anim_del(ui_.bar, set_progress);
-    lv_anim_del(ui_.gear, rotate_gear);
+    lv_anim_delete(ui_.bar, set_progress);
+    lv_anim_delete(ui_.gear, rotate_gear);
     ready_ = true;
     step_ = 5;
-    lv_obj_clear_flag(ui_.check, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_set_hidden(ui_.check, false);
     update_progress(100);
     update_text();
     animate(ui_.cont, set_ready_mix, 0, LV_OPA_COVER, kTransitionMs);
@@ -248,7 +251,7 @@ void SystemLoadingView::set_ready_mix(void* obj, int32_t mix) {
 }
 void SystemLoadingView::update_progress(int32_t percent) {
     progress_ = percent < 0 ? 0 : (percent > 100 ? 100 : percent);
-    lv_obj_set_width(ui_.bar, static_cast<lv_coord_t>(progress_ * kTrackWidth / 100));
+    lv_obj_set_width(ui_.bar, static_cast<int32_t>(progress_ * kTrackWidth / 100));
     lv_arc_set_value(ui_.ring, static_cast<int16_t>(progress_));
     lv_label_set_text_fmt(ui_.percent, "%ld%%", static_cast<long>(progress_));
     update_step_label();
@@ -288,9 +291,9 @@ void SystemLoadingView::update_text() const {
 void SystemLoadingView::destroy() {
     // Includes fades and callbacks borrowing View/widget pointers; cancel before the root is destroyed.
     for (auto* obj : {ui_.cont, ui_.bar, ui_.gear, ui_.check, ui_.img_logo, ui_.service, ui_.subtitle})
-        lv_anim_del(obj, nullptr);
+        lv_anim_delete(obj, nullptr);
     for (auto* dot : ui_.dots)
-        lv_anim_del(dot, nullptr);
+        lv_anim_delete(dot, nullptr);
 }
 void SystemLoadingView::apply_language() const {
     update_text();

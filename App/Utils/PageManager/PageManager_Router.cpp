@@ -1,3 +1,4 @@
+#include <cstring>
 /*
  * MIT License
  * Copyright (c) 2021 _VIFEXTech
@@ -189,13 +190,13 @@ bool PageManager::switch_to(PageBase* new_node, const bool is_enter_act, const P
                 PM_LOG_INFO("stash(0x%p) resize[%lu -> %lu]", new_node->priv.stash.ptr,
                             static_cast<unsigned long>(new_node->priv.stash.size),
                             static_cast<unsigned long>(stash->size));
-                lv_mem_free(new_node->priv.stash.ptr);
+                lv_free(new_node->priv.stash.ptr);
                 new_node->priv.stash.ptr = nullptr;
                 new_node->priv.stash.size = 0;
             }
 
             if (new_node->priv.stash.ptr == nullptr) {
-                buffer = lv_mem_alloc(stash->size);
+                buffer = lv_malloc(stash->size);
                 if (buffer == nullptr) {
                     PM_LOG_ERROR("stash malloc failed");
                 } else {
@@ -256,14 +257,14 @@ bool PageManager::switch_to(PageBase* new_node, const bool is_enter_act, const P
     if (anim_state_.is_entering) {
         PM_LOG_INFO("Page ENTER is detect, move Page(%s) to foreground", page_current_->page_name);
         if (page_prev_) {
-            lv_obj_move_foreground(page_prev_->root);
+            lv_obj_move_to_index(page_prev_->root, -1);
         }
-        lv_obj_move_foreground(page_current_->root);
+        lv_obj_move_to_index(page_current_->root, -1);
     } else {
         PM_LOG_INFO("Page EXIT is detect, move Page(%s) to foreground", get_page_prev_name());
-        lv_obj_move_foreground(page_current_->root);
+        lv_obj_move_to_index(page_current_->root, -1);
         if (page_prev_) {
-            lv_obj_move_foreground(page_prev_->root);
+            lv_obj_move_to_index(page_prev_->root, -1);
         }
     }
     return true;
@@ -310,7 +311,7 @@ bool PageManager::preload(const char* name) {
         return false;
     // Same creation as a push's LOAD state; the page then waits like a cached page that has disappeared.
     base->priv.state = state_load_execute(base);
-    lv_obj_add_flag(base->root, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_set_hidden(base->root, true);
     if (!base->priv.is_cached) {
         // Manual-cache pages are not kept between pushes; preloading them would only waste memory.
         base->priv.state = state_unload_execute(base);
@@ -429,7 +430,7 @@ void PageManager::switch_anim_create(PageBase* base) const {
     anim_default_init(&a);
     lv_anim_set_user_data(&a, base);
     lv_anim_set_var(&a, base->root);
-    lv_anim_set_ready_cb(&a, on_switch_anim_finish);
+    lv_anim_set_completed_cb(&a, on_switch_anim_finish);
     lv_anim_set_exec_cb(&a, anim_attr.setter);
 
     int32_t start = 0;
@@ -509,6 +510,6 @@ void PageManager::anim_default_init(lv_anim_t* a) const {
     lv_anim_init(a);
 
     const uint32_t duration = (get_current_load_anim_type() == LOAD_ANIM_NONE) ? 0 : anim_state_.current.time;
-    lv_anim_set_time(a, duration);
+    lv_anim_set_duration(a, duration);
     lv_anim_set_path_cb(a, anim_state_.current.path);
 }

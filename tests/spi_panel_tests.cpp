@@ -32,6 +32,16 @@ static uint16_t transferCount;
 static int dmaResult = LL_OK;
 static int irqResult = LL_OK;
 static int spiResult = LL_OK;
+static const uint8_t* dmaPixels;
+
+extern "C" bool __real__ZN9SpiMaster13startDmaWriteEPKvm(SpiMaster*, const void*, size_t);
+
+/** @brief 在地址截为 MCU 的 32 位寄存器前观察真实 DMA 发送数据，不改变传输流程。 */
+extern "C" bool
+__wrap__ZN9SpiMaster13startDmaWriteEPKvm(SpiMaster* spi, const void* data, size_t size) {
+    dmaPixels = static_cast<const uint8_t*>(data);
+    return __real__ZN9SpiMaster13startDmaWriteEPKvm(spi, data, size);
+}
 
 /** 追加硬件事件，不模拟发送耗时。 */
 static void
@@ -330,9 +340,12 @@ expectedPanelInit(bool dmaInit) {
 /** 用真实 LVGL 注册的驱动执行 flush，验证窗口和 DMA，不运行 UI 定时器。 */
 static void
 flush(lv_area_t area) {
-    static lv_color_t pixels[294U * 42U];
-    auto* driver = lv_disp_get_default()->driver;
-    driver->flush_cb(driver, &area, pixels);
+    static uint16_t pixels[294U * 42U];
+    for (unsigned i = 0; i < 294U * 42U; ++i) {
+        pixels[i] = (i & 1U) ? 0x07E0 : 0xF800;
+    }
+    auto* display = lv_display_get_default();
+    lv_display_get_flush_cb(display)(display, &area, reinterpret_cast<uint8_t*>(pixels));
 }
 
 /** 验证上电与复位总线一致，DMA 完成/忙状态/超时/回绕，以及两产品偏移和裁剪。 */
@@ -343,10 +356,10 @@ main() {
     lv_port_disp_init();
     expectTrace(expectedPanelInit(true));
     assert(nowMs == 1800 && board_display_panel.width() == 126 && board_display_panel.height() == 294);
-    auto* driver = lv_disp_get_default()->driver;
-    assert(driver->hor_res == 294 && driver->ver_res == 126);
+    auto* display = lv_display_get_default();
+    assert(lv_display_get_horizontal_resolution(display) == 294 && lv_display_get_vertical_resolution(display) == 126);
     lv_area_t rounded = {3, 5, 8, 10};
-    driver->rounder_cb(driver, &rounded);
+    lv_display_send_event(display, LV_EVENT_INVALIDATE_AREA, &rounded);
     assert(rounded.x1 == 2 && rounded.y1 == 4 && rounded.x2 == 9 && rounded.y2 == 11);
 
     trace.clear();
@@ -386,6 +399,11 @@ main() {
     trace.clear();
     flush({0, 0, 1, 1});
     assert(transferCount == 8);
+    // 与 v8 交换格式完全一致：旋转后绿色、绿色、红色、红色，RGB565 高字节在前。
+    const uint8_t expectedPixels[] = {0x07, 0xE0, 0x07, 0xE0, 0xF8, 0x00, 0xF8, 0x00};
+    for (size_t i = 0; i < sizeof(expectedPixels); ++i) {
+        assert(dmaPixels[i] == expectedPixels[i]);
+    }
     assert(!board_display_spi.dmaDone());
     assert(clippedSource == sourceAddress + PRODUCT_DISPLAY_X_SHIFT * 42U * 2U);
     trace.clear();

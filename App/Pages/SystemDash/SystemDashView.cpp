@@ -14,7 +14,7 @@ lv_obj_t* SystemDashView::caption(lv_obj_t* parent, TextId id, int x, int y, int
 void SystemDashView::create(lv_obj_t* root, bool reboot_available) {
     caption_count_ = 0;
     reboot_available_ = reboot_available;
-    lv_obj_clear_flag(root, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollable(root, false);
     hero_ = style::box(root, 8, 4, 88, 118);
     settings_style::hero(hero_);
     settings_style::icon(hero_, "ui_settings_large", 28, 30, style::kAccent);
@@ -69,7 +69,7 @@ void SystemDashView::create(lv_obj_t* root, bool reboot_available) {
         lv_obj_set_style_text_align(text, LV_TEXT_ALIGN_CENTER, 0);
     }
     if (!reboot_available_) {
-        lv_obj_add_flag(ui.reboot, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_set_hidden(ui.reboot, true);
         lv_obj_set_x(ui.shutdown, 75); // Centered alone.
     }
     show_power(false);
@@ -96,10 +96,12 @@ void SystemDashView::update(const DataProc::SystemState& state) const {
     lv_label_set_text(language_value_, i18n::text(state.language == i18n::Language::English ? TextId::EnglishName
                                                                                             : TextId::RussianName));
     if (state.wifi_available)
-        lv_obj_clear_state(ui.wifi, LV_STATE_DISABLED);
+        lv_obj_set_disabled(ui.wifi, false);
     else
-        lv_obj_add_state(ui.wifi, LV_STATE_DISABLED);
+        lv_obj_set_disabled(ui.wifi, true);
     lv_obj_set_style_opa(ui.wifi, LV_OPA_50, LV_STATE_DISABLED);
+    // v8 的容器透明度对文字额外衰减；v9 显式设置文字透明度以保持禁用行外观。
+    lv_obj_set_style_text_opa(ui.wifi, LV_OPA_50, LV_STATE_DISABLED);
     lv_label_set_text(wifi_value_,
                       state.wifi_pending ? "..." : i18n::text(state.wifi_on ? TextId::StatusOn : TextId::StatusOff));
 }
@@ -108,8 +110,8 @@ void SystemDashView::set_hold(lv_obj_t* button, int32_t percent) const {
     for (unsigned i = 0; i < 2; ++i) {
         const bool active = button == (i == 0 ? ui.shutdown : ui.reboot);
         const auto width =
-            active ? static_cast<lv_coord_t>(lv_obj_get_width(lv_obj_get_parent(hold_fill_[i])) * percent / 100)
-                   : lv_coord_t{0};
+            active ? static_cast<int32_t>(lv_obj_get_width(lv_obj_get_parent(hold_fill_[i])) * percent / 100)
+                   : int32_t{0};
         if (lv_obj_get_width(hold_fill_[i]) != width)
             lv_obj_set_width(hold_fill_[i], width);
     }
@@ -118,12 +120,12 @@ void SystemDashView::show_power(bool visible) {
     power_open_ = visible;
     set_hold(nullptr, 0);
     for (auto* action : {ui.shutdown, ui.reboot})
-        lv_obj_clear_state(action, LV_STATE_PRESSED); // A completed hold leaves the page while still pressed.
+        lv_obj_set_pressed(action, false); // A completed hold leaves the page while still pressed.
     if (visible) {
-        lv_obj_clear_flag(ui.overlay, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_set_hidden(ui.overlay, false);
         style::appear(lv_obj_get_child(ui.overlay, 0));
     } else
-        lv_obj_add_flag(ui.overlay, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_set_hidden(ui.overlay, true);
 }
 std::array<lv_obj_t*, 4> SystemDashView::controls() const {
     return power_open_

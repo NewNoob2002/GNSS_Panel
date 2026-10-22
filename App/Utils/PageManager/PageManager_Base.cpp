@@ -1,3 +1,4 @@
+#include <cstring>
 /*
  * MIT License
  * Copyright (c) 2021 _VIFEXTech

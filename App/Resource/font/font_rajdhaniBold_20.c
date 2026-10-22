@@ -161,7 +161,6 @@ static lv_font_fmt_txt_dsc_t font_dsc = {
 
 };
 
-extern const lv_font_t lv_font_montserrat_18;
 
 
 /*-----------------

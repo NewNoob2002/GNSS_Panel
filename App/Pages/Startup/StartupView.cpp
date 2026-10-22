@@ -1,3 +1,4 @@
+#include <cstdio>
 #include "StartupView.h"
 #include "Utils/BatteryStyle.h"
 #include "Utils/SettingsStyle.h"
@@ -5,8 +6,8 @@
 using namespace page;
 
 namespace {
-constexpr lv_coord_t kStatusBarHeight = 26;
-constexpr lv_coord_t kBarMaxWidth = 148;
+constexpr int32_t kStatusBarHeight = 26;
+constexpr int32_t kBarMaxWidth = 148;
 } // namespace
 
 void StartupView::create(lv_obj_t* root) {
@@ -66,7 +67,7 @@ void StartupView::create(lv_obj_t* root) {
     lv_obj_set_style_text_color(ui.btn_press, style::kHighlight, LV_STATE_PRESSED);
     ui.arc = style::ring(ui.btn_press, 20, 0, 70, 4, style::kHighlight);
     // Keep the ring above the flex row while both labels remain direct children of the hold target.
-    lv_obj_add_flag(ui.arc, LV_OBJ_FLAG_FLOATING);
+    lv_obj_set_floating(ui.arc, true);
     settings_style::icon(ui.arc, "ui_power_large", 19, 10, style::kHighlight);
     ui.arc_percent = style::label(ui.arc, font_small, 8, 46, 54);
     lv_obj_set_style_text_align(ui.arc_percent, LV_TEXT_ALIGN_CENTER, 0);
@@ -81,8 +82,8 @@ void StartupView::create(lv_obj_t* root) {
 
     lv_anim_init(&ui.arc_anim);
     lv_anim_set_var(&ui.arc_anim, ui.arc);
-    lv_anim_set_time(&ui.arc_anim, 200);
-    lv_anim_set_playback_time(&ui.arc_anim, 0);
+    lv_anim_set_duration(&ui.arc_anim, 200);
+    lv_anim_set_reverse_duration(&ui.arc_anim, 0);
     lv_anim_set_repeat_count(&ui.arc_anim, 0);
     lv_anim_set_path_cb(&ui.arc_anim, lv_anim_path_linear);
     apply_language();
@@ -102,7 +103,7 @@ void StartupView::update(const DataProc::StatusSnapshot& status) {
         char text[24];
         lv_snprintf(text, sizeof(text), "%u", percent);
         settings_style::set_text(ui.bat_charge, text);
-        lv_snprintf(text, sizeof(text), "%.2f V", status.battery_voltage);
+        std::snprintf(text, sizeof(text), "%.2f V", status.battery_voltage);
         settings_style::set_text(ui.bat_voltage, text);
     } else {
         settings_style::set_text(ui.bat_voltage, "N/A");

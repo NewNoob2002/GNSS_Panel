@@ -9,10 +9,10 @@ namespace page {
 
 class DialplateView {
     typedef struct Transform {
-        lv_coord_t width_default;
-        lv_coord_t height_default;
-        lv_coord_t transform_width;
-        lv_coord_t transform_height;
+        int32_t width_default;
+        int32_t height_default;
+        int32_t transform_width;
+        int32_t transform_height;
     } TransformInfo_t;
 
   public:
@@ -63,9 +63,9 @@ class DialplateView {
     void top_info_create(lv_obj_t* par);
     void btn_cont_create(lv_obj_t* par);
 
-    static lv_obj_t* btn_create(lv_obj_t* par, const void* img_src, lv_coord_t x, lv_coord_t y,
+    static lv_obj_t* btn_create(lv_obj_t* par, const void* img_src, int32_t x, int32_t y,
                                 const TransformInfo_t& transform);
-    static void status_card(lv_obj_t* par, lv_coord_t x, const char* image, lv_obj_t*& card, lv_obj_t*& img,
+    static void status_card(lv_obj_t* par, int32_t x, const char* image, lv_obj_t*& card, lv_obj_t*& img,
                             lv_obj_t*& label);
     /** 页面可见且工作模式有效时运行动效；否则删除动画，画面保持静态。 */
     void sync_anim();
@@ -74,8 +74,8 @@ class DialplateView {
     static void radio_draw_event_cb(lv_event_t* e);
     static void mode_draw_event_cb(lv_event_t* e);
 
-    static constexpr lv_coord_t kCardWidth = 54, kCardHeight = 44;
-    static constexpr lv_coord_t kIconX = 19, kIconY = 9; // 16 px 图标在卡片内的位置，上方留给动效。
+    static constexpr int32_t kCardWidth = 54, kCardHeight = 44;
+    static constexpr int32_t kIconX = 19, kIconY = 9; // 16 px 图标在卡片内的位置，上方留给动效。
     static constexpr uint32_t kAnimPeriod = 1200, kAnimStep = 50;
 
     uint32_t anim_phase_ = 0;

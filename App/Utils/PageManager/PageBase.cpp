@@ -58,7 +58,7 @@ bool PageBase::stash_pop(void* ptr, const uint32_t size) {
     }
 
     lv_memcpy(ptr, priv.stash.ptr, priv.stash.size);
-    lv_mem_free(priv.stash.ptr);
+    lv_free(priv.stash.ptr);
     priv.stash.ptr = nullptr;
     priv.stash.size = 0;
     return true;

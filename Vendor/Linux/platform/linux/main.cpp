@@ -4,6 +4,7 @@
 #include "DemoStatus.h"
 extern "C" {
 #include "display/lv_display.h"
+#include "lv_tick_posix.h"
 #include "platform/linux_button.h"
 #include "platform/linux_display.h"
 }
@@ -92,7 +93,8 @@ int main(int argc, char** argv) {
         std::perror("RM690A0 init");
     } else if (!stop) {
         lv_init();
-        lv_display port{};
+        lv_tick_set_cb(lv_tick_posix_ms);
+        panel_display port{};
         if (lv_display_register(&port, &screen) < 0) {
             std::perror("LVGL display");
         } else {
@@ -102,7 +104,7 @@ int main(int argc, char** argv) {
                     std::fprintf(stderr, "App init failed\n");
                 } else {
                     if (page) {
-                        lv_tick_inc(50);
+                        lv_delay_ms(50);
                         lv_timer_handler();
                     }
                     if (page && !app.show_page(page)) {
@@ -117,7 +119,6 @@ int main(int argc, char** argv) {
                                 std::fprintf(stderr, "monotonic clock failed\n");
                                 break;
                             }
-                            lv_tick_inc(std::uint32_t(now - last));
                             last = now;
                             if (now >= next_status_update) {
                                 app.update_status(DemoStatus::sample(now - started));
@@ -168,7 +169,7 @@ int main(int argc, char** argv) {
                 errno = port.error;
                 std::perror("display flush");
             }
-            lv_disp_remove(port.display);
+            lv_display_delete(port.display);
         }
     }
     if (linux_display_close(&io) < 0) {

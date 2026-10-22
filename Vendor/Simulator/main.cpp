@@ -84,20 +84,25 @@ parse_args(int argc, char** argv, CliOptions& options) {
 }
 
 void
-flush(lv_disp_drv_t* driver, const lv_area_t* area, lv_color_t* colors) {
-    auto* frame = static_cast<Frame*>(driver->user_data);
+flush(lv_display_t* driver, const lv_area_t* area, uint8_t* px_map) {
+    uint16_t* colors = (uint16_t*)px_map;
+    auto* frame = static_cast<Frame*>(lv_display_get_user_data(driver));
     for (int y = area->y1; y <= area->y2; ++y) {
         for (int x = area->x1; x <= area->x2; ++x) {
-            frame->pixels[y * kWidth + x] = 0xff000000u | (lv_color_to32(*colors++) & 0xffffffu);
+            const uint16_t pixel = *colors++;
+            const uint32_t red = ((pixel >> 11) & 31) * 255 / 31;
+            const uint32_t green = ((pixel >> 5) & 63) * 255 / 63;
+            const uint32_t blue = (pixel & 31) * 255 / 31;
+            frame->pixels[y * kWidth + x] = 0xff000000u | (red << 16) | (green << 8) | blue;
         }
     }
     frame->dirty = true;
-    lv_disp_flush_ready(driver);
+    lv_display_flush_ready(driver);
 }
 
 void
-pointer_read(lv_indev_drv_t* driver, lv_indev_data_t* data) {
-    const auto* pointer = static_cast<const Pointer*>(driver->user_data);
+pointer_read(lv_indev_t* driver, lv_indev_data_t* data) {
+    const auto* pointer = static_cast<const Pointer*>(lv_indev_get_user_data(driver));
     data->point = pointer->point;
     data->state = pointer->state;
 }
@@ -304,26 +309,26 @@ main(int argc, char** argv) {
         std::fprintf(stderr, "SDL window: %s\n", SDL_GetError());
     } else {
         lv_init();
+        lv_tick_set_cb(SDL_GetTicks);
         static Frame frame;
-        static lv_color_t buffer[kWidth * 20];
-        static lv_disp_draw_buf_t draw;
-        lv_disp_draw_buf_init(&draw, buffer, nullptr, kWidth * 20);
-        static lv_disp_drv_t driver;
-        lv_disp_drv_init(&driver);
-        driver.hor_res = kWidth;
-        driver.ver_res = kHeight;
-        driver.draw_buf = &draw;
-        driver.flush_cb = flush;
-        driver.user_data = &frame;
-        lv_disp_t* display = lv_disp_drv_register(&driver);
+        static uint16_t buffer[kWidth * 20];
+        lv_display_t* display = lv_display_create(kWidth, kHeight);
+        if (display) {
+            lv_display_set_color_format(display, LV_COLOR_FORMAT_RGB565);
+            lv_display_set_buffers(display, buffer, nullptr, sizeof(buffer), LV_DISPLAY_RENDER_MODE_PARTIAL);
+            lv_display_set_flush_cb(display, flush);
+            lv_display_set_user_data(display, &frame);
+        }
 
         static Pointer pointer;
-        static lv_indev_drv_t pointer_driver;
-        lv_indev_drv_init(&pointer_driver);
-        pointer_driver.type = LV_INDEV_TYPE_POINTER;
-        pointer_driver.read_cb = pointer_read;
-        pointer_driver.user_data = &pointer;
-        lv_indev_t* indev = display ? lv_indev_drv_register(&pointer_driver) : nullptr;
+        lv_indev_t* indev = display ? lv_indev_create() : nullptr;
+        if (indev) {
+            lv_indev_set_type(indev, LV_INDEV_TYPE_POINTER);
+            lv_indev_set_read_cb(indev, pointer_read);
+            lv_indev_set_user_data(indev, &pointer);
+            lv_indev_set_display(indev, display);
+            lv_timer_set_period(lv_indev_get_read_timer(indev), 30);
+        }
 
         if (!indev) {
             std::fprintf(stderr, "LVGL display/pointer init failed\n");
@@ -396,7 +401,7 @@ main(int argc, char** argv) {
                                    || event.type == SDL_MOUSEBUTTONUP) {
                             const int x = event.type == SDL_MOUSEMOTION ? event.motion.x : event.button.x;
                             const int y = event.type == SDL_MOUSEMOTION ? event.motion.y : event.button.y;
-                            pointer.point = {static_cast<lv_coord_t>(x), static_cast<lv_coord_t>(y)};
+                            pointer.point = {static_cast<int32_t>(x), static_cast<int32_t>(y)};
                             if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_RIGHT) {
                                 app->on_input(App::InputAction::Back);
                             } else if (event.type != SDL_MOUSEMOTION && event.button.button == SDL_BUTTON_MIDDLE) {
@@ -408,7 +413,7 @@ main(int argc, char** argv) {
                             } else if (event.type != SDL_MOUSEMOTION && event.button.button == SDL_BUTTON_LEFT) {
                                 pointer.state = event.type == SDL_MOUSEBUTTONDOWN ? LV_INDEV_STATE_PRESSED
                                                                                   : LV_INDEV_STATE_RELEASED;
-                                lv_timer_ready(indev->driver->read_timer);
+                                lv_timer_ready(lv_indev_get_read_timer(indev));
                             }
                         } else if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_FOCUS_LOST) {
                             enter_down = false;
@@ -462,7 +467,7 @@ main(int argc, char** argv) {
             lv_indev_delete(indev);
         }
         if (display) {
-            lv_disp_remove(display);
+            lv_display_delete(display);
         }
     }
     if (texture) {

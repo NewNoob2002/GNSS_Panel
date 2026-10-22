@@ -2,6 +2,16 @@
 
 当前构建与平台边界见 [共享应用架构](ARCHITECTURE.md)。`App/` 与 `Frameworks/` 以本仓库为唯一来源，不再从外部仓库同步。事件框架位于 `Frameworks/DataBroker`，使用独立时钟调度；DataNode 的注册、发布销毁保护与请求校验保留。调度设计参考 X-TRACK `dev_lvgl_v9` 的 `Frameworks/DataBroker/DataTimer`（提交 `28b0e90898eb6fcb474c7a354459242c781d780a`）；没有整体引入其 LVGL 9 页面或 HAL。
 
+## LVGL v9.6.0
+
+`External/lvgl` 来自上游 tag `v9.6.0`，完整提交 `80ca777e37a2b176770726a02e07a6fb79ef0b39`（MIT）。
+原样导入 `include/`、`src/`、`lvgl.h`、`lvgl_private.h`、`lv_version.h`、`LICENCE.txt`；
+`demos/` 仅带 Linux benchmark 及其 widgets 依赖和公共入口，未加入平台 `lv_conf.h`。
+HC32、SDL 模拟器、Linux 统一使用 v9 原生 API，并关闭 API mapping。
+页面管理继续使用 `App/Utils/PageManager`，仅适配编译与运行所需接口；不接入 `Frameworks/PageManager`。
+正式图片位于 `Resource/img`（56 个文件、57 张图），转换及回读工具默认检查这个目录；`img_v9` 暂存目录已移除。
+Oswald 字体只增加俄语 ё 对已有同形 ë 字形的 cmap 映射；v8 的范围上界错误此前掩盖了缺字，位图未重新生成。
+
 ## 当前页面结构
 
 - 首页四个入口为工作配置、记录管理、设备信息、系统，使用原创同规格 16x16 白色 alpha 图标，不显示焦点文字；卫星区保持纯数值。图标源路径和生成检查位于 `Vendor/Linux/tools/generate_ui_icons.py`。

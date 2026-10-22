@@ -30,12 +30,12 @@ int pin_levels[32] = {};
 int reset_reason = RESET;
 int standby_calls = 0, charger_power_on_calls = 0;
 bool probe_battery_gauge = true, probe_charger = true; // SystemLoading 重新探测 I2C 时的应答
-lv_color_t draw_pixels[kWidth * 20];
+uint16_t draw_pixels[kWidth * 20];
 uint32_t peak_used = 0;
 
 void
-flush(lv_disp_drv_t* driver, const lv_area_t*, lv_color_t*) {
-    lv_disp_flush_ready(driver);
+flush(lv_display_t* driver, const lv_area_t*, uint8_t*) {
+    lv_display_flush_ready(driver);
 }
 
 // 与固件主循环相同的顺序：App_Update() 后 lv_timer_handler()。
@@ -68,13 +68,13 @@ on_page(const char* name) {
 
 lv_obj_t*
 find_text(lv_obj_t* root, const char* text) {
-    if (lv_obj_has_flag(root, LV_OBJ_FLAG_HIDDEN)) {
+    if (lv_obj_is_hidden(root)) {
         return nullptr;
     }
     if (lv_obj_check_type(root, &lv_label_class) && std::strstr(lv_label_get_text(root), text)) {
         return root;
     }
-    for (uint32_t i = 0; i < lv_obj_get_child_cnt(root); ++i) {
+    for (uint32_t i = 0; i < lv_obj_get_child_count(root); ++i) {
         if (auto* found = find_text(lv_obj_get_child(root, static_cast<int32_t>(i)), text)) {
             return found;
         }
@@ -84,10 +84,10 @@ find_text(lv_obj_t* root, const char* text) {
 
 lv_obj_t*
 find_image(lv_obj_t* root, const void* source) {
-    if (lv_obj_check_type(root, &lv_img_class) && lv_img_get_src(root) == source) {
+    if (lv_obj_check_type(root, &lv_image_class) && lv_image_get_src(root) == source) {
         return root;
     }
-    for (uint32_t i = 0; i < lv_obj_get_child_cnt(root); ++i) {
+    for (uint32_t i = 0; i < lv_obj_get_child_count(root); ++i) {
         if (auto* found = find_image(lv_obj_get_child(root, static_cast<int32_t>(i)), source)) {
             return found;
         }
@@ -101,7 +101,7 @@ startup_progress(lv_obj_t* root) {
     if (lv_obj_check_type(root, &lv_arc_class)) {
         return lv_arc_get_value(root);
     }
-    for (uint32_t i = 0; i < lv_obj_get_child_cnt(root); ++i) {
+    for (uint32_t i = 0; i < lv_obj_get_child_count(root); ++i) {
         if (const int value = startup_progress(lv_obj_get_child(root, static_cast<int32_t>(i))); value >= 0) {
             return value;
         }
@@ -114,7 +114,7 @@ bool
 status_recording() {
     auto* sd = find_image(lv_layer_top(), resource_pool::get_image("ui_sd_card"));
     assert(sd);
-    return lv_obj_get_style_img_recolor(sd, 0).full == page::style::kInfo.full;
+    return lv_color_to_u32(lv_obj_get_style_image_recolor(sd, LV_PART_MAIN)) == lv_color_to_u32(page::style::kInfo);
 }
 
 void
@@ -201,7 +201,7 @@ hal_power_on_and_boot() {
     assert(on_page("Pages/Startup") && gpio_read(POWER_CONTROL_PIN) == GPIO_LOW);
     power_key = false;
     run(100); // 进度尚未归零时重新按下，驻留恢复也必须重新计满 2 s。
-    assert(startup_progress(lv_scr_act()) > 0);
+    assert(startup_progress(lv_screen_active()) > 0);
     power_key = true;
     run(1995);
     assert(power_on_requests == before && !systemInfo.power.panel_power_on);
@@ -317,15 +317,12 @@ HAL::I2C_ProbeDevice(unsigned char address) {
 int
 main() {
     lv_init();
-    static lv_disp_draw_buf_t draw;
-    lv_disp_draw_buf_init(&draw, draw_pixels, nullptr, kWidth * 20);
-    static lv_disp_drv_t driver;
-    lv_disp_drv_init(&driver);
-    driver.hor_res = kWidth;
-    driver.ver_res = kHeight;
-    driver.draw_buf = &draw;
-    driver.flush_cb = flush;
-    assert(lv_disp_drv_register(&driver));
+    lv_tick_set_cb(millis);
+    lv_display_t* display = lv_display_create(kWidth, kHeight);
+    assert(display);
+    lv_display_set_color_format(display, LV_COLOR_FORMAT_RGB565);
+    lv_display_set_buffers(display, draw_pixels, NULL, sizeof(draw_pixels), LV_DISPLAY_RENDER_MODE_PARTIAL);
+    lv_display_set_flush_cb(display, flush);
 
     reset_system_info();
     HAL::Power_Init();
@@ -335,14 +332,14 @@ main() {
     App_Init();
     run(1000);
     assert(on_page("Pages/Startup"));
-    assert(!find_text(lv_scr_act(), "DEMO")); // 真实数据不显示 DEMO 标记
-    assert(startup_progress(lv_scr_act()) >= 30);
+    assert(!find_text(lv_screen_active(), "DEMO")); // 真实数据不显示 DEMO 标记
+    assert(startup_progress(lv_screen_active()) >= 30);
 
     run(500);
     assert(power_on_requests == 0 && gpio_read(POWER_CONTROL_PIN) == GPIO_LOW);
     power_key = false; // 约 1.5 s 松开，再在回退动画结束前重新按下。
     run(100);
-    assert(on_page("Pages/Startup") && startup_progress(lv_scr_act()) > 0);
+    assert(on_page("Pages/Startup") && startup_progress(lv_screen_active()) > 0);
     assert(power_on_requests == 0 && !systemInfo.power.panel_power_on);
     assert(!SystemService::snapshot().powered_on && gpio_read(POWER_CONTROL_PIN) == GPIO_LOW);
     power_key = true;
@@ -366,7 +363,7 @@ main() {
         run(800);
         assert(on_page(name));
         if (std::strcmp(name, "Pages/SystemInfos") == 0) {
-            assert(lv_obj_get_parent(App_Get()->focused()) == lv_scr_act());
+            assert(lv_obj_get_parent(App_Get()->focused()) == lv_screen_active());
             assert(lv_group_get_obj_count(lv_group_get_default()) == 7);
             App_Get()->on_input(App::InputAction::NextFocus);
             assert(find_text(App_Get()->focused(), i18n::text(i18n::TextId::SystemWorkTitle)));
@@ -424,11 +421,11 @@ main() {
     }
     assert(host.work.work_mode == rover_mode);
     assert(DeviceService::snapshot().work_pending);
-    assert(find_text(lv_scr_act(), i18n::text(i18n::TextId::RequestWaiting)));
+    assert(find_text(lv_screen_active(), i18n::text(i18n::TextId::RequestWaiting)));
     State::Confirm_Work(State::Work_Revision());
     run(600);
     assert(!DeviceService::snapshot().work_pending && host.work.work_mode == autobase_mode);
-    assert(find_text(lv_scr_act(), i18n::text(i18n::TextId::RequestReceived)));
+    assert(find_text(lv_screen_active(), i18n::text(i18n::TextId::RequestReceived)));
     assert(App_Get()->back());
     run(800);
 
@@ -459,7 +456,7 @@ main() {
     App_Get()->on_input(App::InputAction::Confirm);
     run(800);
     assert(on_page("Pages/WorkSettings") && !request.work_pending);
-    assert(find_text(lv_scr_act(), i18n::text(i18n::TextId::SelectChannel)));
+    assert(find_text(lv_screen_active(), i18n::text(i18n::TextId::SelectChannel)));
     assert(App_Get()->back());
     run(800);
 
@@ -475,7 +472,7 @@ main() {
         assert(record.record_type == 2 && record.record_interval == 0x01);
     }
     assert(DeviceService::snapshot().recording && DeviceService::snapshot().record_pending);
-    assert(find_text(lv_scr_act(), i18n::text(i18n::TextId::RequestWaiting)));
+    assert(find_text(lv_screen_active(), i18n::text(i18n::TextId::RequestWaiting)));
     run(400);
     assert(!status_recording()); // 主控确认前状态栏仍按实际（未录制）显示
     const auto revision = State::Record_Revision();
@@ -514,11 +511,11 @@ main() {
         App_Get()->on_input(App::InputAction::Confirm);
         assert(request.wifi_on == On_Off_Status_ON && request.wifi_pending);
         run(50);
-        assert(SystemService::snapshot().wifi_pending && find_text(lv_scr_act(), "..."));
+        assert(SystemService::snapshot().wifi_pending && find_text(lv_screen_active(), "..."));
         wifi.wifi_status = On_Off_Status_ON;
         run(50);
         assert(!SystemService::snapshot().wifi_pending && SystemService::snapshot().wifi_on);
-        assert(!find_text(lv_scr_act(), "..."));
+        assert(!find_text(lv_screen_active(), "..."));
         App_Get()->on_input(App::InputAction::Confirm);
         assert(request.wifi_on == On_Off_Status_OFF);
         run(14000);
@@ -537,7 +534,7 @@ main() {
     App_Get()->on_input(App::InputAction::Confirm); // 打开电源弹窗，默认焦点 Shutdown
     run(100);
     assert(find_text(App_Get()->focused(), i18n::text(i18n::TextId::ShutdownAction)));
-    assert(!find_text(lv_scr_act(), i18n::text(i18n::TextId::RebootAction)));
+    assert(!find_text(lv_screen_active(), i18n::text(i18n::TextId::RebootAction)));
     // 按键走固件路径：App_Update() 按 HAL::Key_PowerPressed() 电平轮询，弹窗打开时页面接管按下/松开。
     power_key = true;
     run(1000);
@@ -573,7 +570,7 @@ main() {
     State::Power().LinuxPowerOff = true;
     run(800);
     assert(on_page("Pages/SaveConfig"));
-    assert(find_text(lv_scr_act(), i18n::text(i18n::TextId::SaveConfigPowerOffBoard)));
+    assert(find_text(lv_screen_active(), i18n::text(i18n::TextId::SaveConfigPowerOffBoard)));
     assert(App_Get()->back() && on_page("Pages/SaveConfig"));
     run(10000);
     assert(SystemService::snapshot().power_calls == 1);
@@ -616,7 +613,7 @@ main() {
     power_on_to_loading();
     run(10000);
     assert(on_page("Pages/SystemLoading")); // 仍在等主控，主循环与界面照常运行
-    assert(find_text(lv_scr_act(), i18n::text(i18n::TextId::CheckingHostLink)));
+    assert(find_text(lv_screen_active(), i18n::text(i18n::TextId::CheckingHostLink)));
     run(25000); // 第 5 步约在加载开始 2 s 后开始，等满 30 s，再经过完成与就绪页（约 1.5 s）
     assert(on_page("Pages/Dialplate"));
     {
@@ -651,7 +648,7 @@ main() {
     // 单独验证 PowerDevice 收到强制关机事件时的页面；下一次 HAL 监控会立即完成强制断电。
     run(800, false);
     assert(on_page("Pages/SaveConfig"));
-    assert(find_text(lv_scr_act(), i18n::text(i18n::TextId::SaveConfigPowerOffForced)));
+    assert(find_text(lv_screen_active(), i18n::text(i18n::TextId::SaveConfigPowerOffForced)));
     hal_enter_standby();
     State::Host().online = true;
 
