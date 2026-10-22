@@ -62,6 +62,7 @@
 | 3.1 ★ | 在 LVGL 8 上加固并切换 `DataBroker`、`DeviceManager`、`ResourceManager`：修复定时器/发布遍历的释放后使用、容量与参数校验、`-Werror` 告警；`App/` 与三端 Bridge 改用新框架；删除 `Frameworks/DataCenter`、`App/Utils/ResourceManager`；`App/tests` 与 Linux 框架测试全部行为在新框架上通过 | sol |
 | 3.2 | 图片转换脚本（入库、可重复执行、逐像素回读校验）：v8 数组 → v9 `lv_image_dsc_t`（`RGB565A8`/`RGB565`，无索引格式）；更新 `generate_ui_icons.py`；产物在 3.3 一并接入 | argon（与 3.1 并行） |
 | 3.3 ★ | 切换 LVGL v9.6.0：导入 `External/lvgl`（含 `include/`），重建三份 `lv_conf.h`，HC32/模拟器/Linux 显示、输入、时基端口，`lvgl_new.cpp`，`App/` 全部 API 迁移（含 Dialplate 自定义绘制）与现有 `App/Utils/PageManager` 的最小 v9 适配，接入 3.2 的资源；`App/`、`Vendor/` 定义 `LV_DISABLE_API_MAPPING` | sol（sonnet 复核） |
+| 3.3b | 组件统一由 CMake 管理：导入 LVGL 上游 `CMakeLists.txt` 与 `env_support/cmake`，各平台通过 `add_subdirectory` + `LV_BUILD_CONF_PATH` 使用上游 `lvgl` 目标（demos 用上游 `lvgl_demos`），删除手写的 LVGL 源文件收集；`Vendor/HC32/Libraries/*`、`Frameworks/*` 每个组件在自身目录维护 `CMakeLists.txt`，父目录只 `add_subdirectory`；固件体积与截图不变 | sol（3.4 之后） |
 | 3.4 ★ | 加固并切换 `Frameworks/PageManager`：补齐应用依赖的接口与虚函数、页面池释放、出现顺序、动画复位、返回值语义、告警；迁移全部页面；删除 `App/Utils/PageManager` | sol（sonnet 复核） |
 | 3.5 | 主控截图对比（与 LVGL 8 基线逐页）与视觉/交互差异修正 | 主控 / sol |
 | 3.6 ★ | HC32 内存与性能调优：`LV_DRAW_LAYER_SIMPLE_BUF_SIZE`、C 堆缩减、`LV_MEM_SIZE`、图片 `A8` 取舍；记录 `lv_mem` 峰值、栈水印、帧率与 debug/release 体积 | sol |
