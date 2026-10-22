@@ -10,7 +10,7 @@
 #include "SystemService.h"
 #include "DemoStatus.h"
 #include "PageManager.h"
-#include "Resource/ResourcePool.h"
+#include "UI/Resource/ResourcePool.h"
 #include "I18n.h"
 
 /** @brief 通过公开 API 读取对象的屏幕绝对坐标供布局断言使用。 */

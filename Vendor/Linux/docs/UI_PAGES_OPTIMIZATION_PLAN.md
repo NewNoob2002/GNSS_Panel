@@ -30,9 +30,9 @@ Latest icon refresh replaces the enlarged 16px artwork with newly drawn **40×40
 Every routed page has `<Page>.h/.cpp`, `<Page>View.h/.cpp`, **`<Page>Model.h/.cpp` in its own directory**. Includes Dialplate, RecordConfig, WorkSettings, SystemDash, SystemSettings, SystemInfos, StarMap, Startup, SystemLoading and SaveConfig. StatusBar is a shared component.
 
 - `Frameworks/DataBroker` 使用加固后的 X-TRACK DataNode/DataBroker，保留 MIT 许可；同步路由、subscribe/publish/pull/notify 在该框架实现。
-- `Common/DataProc` initializes named processing DataNodes from `DP_LIST.inc` and exposes `DataProc::Broker()`. It is not an injected router object.
+- `Service/DataProc` initializes named processing DataNodes from `DP_LIST.inc` and exposes `DataProc::Broker()`. It is not an injected router object.
 - Each Model owns its DataNode and snapshots, initializes/deinitializes with the page, subscribes/pulls Status/System, handles publications and peer pulls, and sends StatusBar/service requests. Shared `Common/PageModel` was removed; Model constructors do not accept DataProc.
-- `Common/ModelUtils.h` shares transport validation only, not Model ownership or a base Model.
+- `UI/Common/ModelUtils.h` shares transport validation only, not Model ownership or a base Model.
 - `DP_Status.cpp` and `SystemService.cpp` own processing behavior. Providers outlive Models; teardown refuses to destroy providers beneath live UI DataNodes.
 - Synchronous LVGL-thread delivery only; callbacks borrow payloads during the call. Owned arrays avoid retained producer string pointers. No ISR/background-thread transport or wire-format ABI claim.
 - DataNode registry is bounded at 16 (excluding CENTER); serial-checked publication snapshots tolerate subscriber removal/recreation. A publishing DataNode/center must not be destroyed from its own callback.

@@ -11,14 +11,14 @@ add_subdirectory(../Frameworks/ResourceManager frameworks/resourcemanager)
 add_library(app_framework STATIC)
 target_link_libraries(app_framework PUBLIC fw::databroker fw::devicemanager fw::resourcemanager)
 add_library(app_i18n STATIC
-    Utils/I18n/I18n.cpp Utils/I18n/I18n_en.cpp Utils/I18n/I18n_ru.cpp)
+    Service/i18n/I18n.cpp Service/i18n/I18n_en.cpp Service/i18n/I18n_ru.cpp)
 add_library(app_core STATIC
-    Common/DataProc/DataProc.cpp
-    Common/DataProc/DP_Status.cpp
-    Common/DataProc/DP_Device.cpp
-    Common/SystemService.cpp
-    Common/SystemBackend.cpp
-    Common/FixedFormat.cpp)
+    Service/DataProc/DataProc.cpp
+    Service/DataProc/DP_Status.cpp
+    Service/DataProc/DP_Device.cpp
+    Service/DataProc/SystemService.cpp
+    Service/HAL/SystemBackend.cpp
+    Utils/FixedFormat/FixedFormat.cpp)
 foreach(target app_log app_framework app_i18n app_core)
     target_link_libraries(${target} PUBLIC proj::options)
     target_compile_options(${target} PRIVATE -Wall -Wextra -Werror
@@ -29,8 +29,12 @@ add_library(app::framework ALIAS app_framework)
 add_library(app::i18n ALIAS app_i18n)
 add_library(app::core ALIAS app_core)
 target_include_directories(app_log PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/Utils/Log")
-target_include_directories(app_i18n PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/Utils/I18n")
-target_include_directories(app_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/Common")
+target_include_directories(app_i18n PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/Service/i18n")
+target_include_directories(app_core PUBLIC
+    "${CMAKE_CURRENT_SOURCE_DIR}/Service"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Service/DataProc"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Service/HAL"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Utils/FixedFormat")
 target_link_libraries(app_framework PRIVATE app::log)
 target_link_libraries(app_core PUBLIC app::framework app::i18n app::log)
 # 平台继承核心设备接口，必须与核心保持一致的 RTTI 设置。
@@ -42,10 +46,10 @@ if(NOT TARGET lvgl::lvgl)
 endif()
 add_subdirectory(../Frameworks/PageManager frameworks/pagemanager)
 
-file(GLOB APP_RESOURCES CONFIGURE_DEPENDS "Resource/font/*.c" "Resource/img/*.c" "Resource/symbol/*.c")
+file(GLOB APP_RESOURCES CONFIGURE_DEPENDS "UI/Resource/font/*.c" "UI/Resource/img/*.c" "UI/Resource/symbol/*.c")
 add_library(app_dialplate STATIC
-    Pages/Dialplate/DialplateView.cpp
-    Resource/ResourcePool.cpp
+    UI/Dialplate/DialplateView.cpp
+    UI/Resource/ResourcePool.cpp
     Utils/lv_anim_label/numberFlow.cpp
     Utils/lv_anim_label/numberFlow_clock.cpp
     Utils/lv_ext/lv_anim_timeline_wrapper.c
@@ -56,37 +60,41 @@ target_link_libraries(app_dialplate PUBLIC lvgl::lvgl app::i18n proj::options fw
 target_compile_options(app_dialplate PRIVATE -Wall -Wextra)
 
 add_library(app_ui STATIC
-    ButtonGesture.cpp
+    Utils/ButtonGesture/ButtonGesture.cpp
     App.cpp
-    Pages/Dialplate/DialplateModel.cpp
-    Pages/WorkSettings/WorkSettingsModel.cpp
-    Pages/RecordConfig/RecordConfigModel.cpp
-    Pages/SystemInfos/SystemInfosModel.cpp
-    Pages/SystemDash/SystemDashModel.cpp
-    Pages/StarMap/StarMapModel.cpp
-    Pages/Startup/StartupModel.cpp
-    Pages/SystemLoading/SystemLoadingModel.cpp
-    Pages/SaveConfig/SaveConfigModel.cpp
-    Pages/StatusBar/StatusBar.cpp
-    Pages/BatteryWarning/BatteryWarning.cpp
-    Pages/Dialplate/Dialplate.cpp
-    Pages/WorkSettings/WorkSettings.cpp
-    Pages/WorkSettings/WorkSettingsView.cpp
-    Pages/RecordConfig/RecordConfig.cpp
-    Pages/RecordConfig/RecordConfigView.cpp
-    Pages/SystemInfos/SystemInfos.cpp
-    Pages/SystemInfos/SystemInfosView.cpp
-    Pages/SystemDash/SystemDash.cpp
-    Pages/SystemDash/SystemDashView.cpp
-    Pages/StarMap/StarMap.cpp
-    Pages/StarMap/StarMapView.cpp
-    Pages/Startup/Startup.cpp
-    Pages/Startup/StartupView.cpp
-    Pages/SystemLoading/SystemLoading.cpp
-    Pages/SystemLoading/SystemLoadingView.cpp
-    Pages/SaveConfig/SaveConfig.cpp
-    Pages/SaveConfig/SaveConfigView.cpp)
-target_include_directories(app_ui PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+    UI/AppFactory.cpp
+    UI/Dialplate/DialplateModel.cpp
+    UI/WorkSettings/WorkSettingsModel.cpp
+    UI/RecordConfig/RecordConfigModel.cpp
+    UI/SystemInfos/SystemInfosModel.cpp
+    UI/SystemDash/SystemDashModel.cpp
+    UI/StarMap/StarMapModel.cpp
+    UI/Startup/StartupModel.cpp
+    UI/SystemLoading/SystemLoadingModel.cpp
+    UI/SaveConfig/SaveConfigModel.cpp
+    UI/StatusBar/StatusBar.cpp
+    UI/BatteryWarning/BatteryWarning.cpp
+    UI/Dialplate/Dialplate.cpp
+    UI/WorkSettings/WorkSettings.cpp
+    UI/WorkSettings/WorkSettingsView.cpp
+    UI/RecordConfig/RecordConfig.cpp
+    UI/RecordConfig/RecordConfigView.cpp
+    UI/SystemInfos/SystemInfos.cpp
+    UI/SystemInfos/SystemInfosView.cpp
+    UI/SystemDash/SystemDash.cpp
+    UI/SystemDash/SystemDashView.cpp
+    UI/StarMap/StarMap.cpp
+    UI/StarMap/StarMapView.cpp
+    UI/Startup/Startup.cpp
+    UI/Startup/StartupView.cpp
+    UI/SystemLoading/SystemLoading.cpp
+    UI/SystemLoading/SystemLoadingView.cpp
+    UI/SaveConfig/SaveConfig.cpp
+    UI/SaveConfig/SaveConfigView.cpp)
+target_include_directories(app_ui PUBLIC
+    "${CMAKE_CURRENT_SOURCE_DIR}"
+    "${CMAKE_CURRENT_SOURCE_DIR}/UI/Common"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Utils/ButtonGesture")
 add_library(app::ui ALIAS app_ui)
 target_link_libraries(app_ui PUBLIC app::core fw::pagemanager app::dialplate)
 target_compile_options(app_ui PRIVATE -Wall -Wextra -Werror)

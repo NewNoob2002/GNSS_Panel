@@ -1,8 +1,8 @@
 #pragma once
 
 #include "ButtonGesture.h"
-#include "Pages/BatteryWarning/BatteryWarning.h"
-#include "Pages/StatusBar/StatusBar.h"
+#include "UI/BatteryWarning/BatteryWarning.h"
+#include "UI/StatusBar/StatusBar.h"
 #include "PageManager.h"
 
 #include <memory>

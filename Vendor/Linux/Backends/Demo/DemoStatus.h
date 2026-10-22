@@ -1,7 +1,7 @@
 #pragma once
 
 #include "SystemBackend.h"
-#include "Pages/StatusBar/StatusBar.h"
+#include "UI/StatusBar/StatusBar.h"
 
 #include <cstdint>
 

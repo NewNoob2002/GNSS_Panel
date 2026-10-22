@@ -3,17 +3,9 @@
 #include "SystemService.h"
 #include "Log.h"
 
-#include "Pages/Dialplate/Dialplate.h"
-#include "Pages/RecordConfig/RecordConfig.h"
-#include "Pages/SaveConfig/SaveConfig.h"
-#include "Pages/StarMap/StarMap.h"
-#include "Pages/Startup/Startup.h"
-#include "Pages/SystemDash/SystemDash.h"
-#include "Pages/SystemInfos/SystemInfos.h"
-#include "Pages/SystemLoading/SystemLoading.h"
-#include "Pages/WorkSettings/WorkSettings.h"
-#include "Resource/ResourcePool.h"
-#include "Utils/PageStyle.h"
+#include "UI/AppFactory.h"
+#include "UI/Resource/ResourcePool.h"
+#include "UI/Common/PageStyle.h"
 
 #include <cstring>
 
@@ -47,23 +39,7 @@ bool App::init(const Options& options) {
     // Default forward navigation is a smooth horizontal push; pages override this for boot/modal/context changes.
     manager_->setGlobalLoadAnim(PAGE_ANIM::MOVE_LEFT, page::style::kPageTransitionMs,
                                         lv_anim_path_ease_out);
-    auto register_page = [this](PageBase* page, const char* name) {
-        if (manager_->registerPage(page, name) != PageManager::RES_TYPE::OK) {
-            delete page;
-            return false;
-        }
-        page->onInstalled();
-        return true;
-    };
-    if (!register_page(new page::Dialplate, "Pages/Dialplate")
-        || !register_page(new page::WorkSettings, "Pages/WorkSettings")
-        || !register_page(new page::RecordConfig, "Pages/RecordConfig")
-        || !register_page(new page::SystemInfos, "Pages/SystemInfos")
-        || !register_page(new page::SystemDash, "Pages/SystemDash")
-        || (SystemService::snapshot().star_map && !register_page(new page::StarMap, "Pages/StarMap"))
-        || !register_page(new page::Startup, "Pages/Startup")
-        || !register_page(new page::SystemLoading, "Pages/SystemLoading")
-        || !register_page(new page::SaveConfig, "Pages/SaveConfig"))
+    if (!AppFactory::installAll(*manager_))
         return false;
     if (!status_bar_.create(lv_layer_top()))
         return false;

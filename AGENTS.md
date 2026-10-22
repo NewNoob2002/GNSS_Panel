@@ -6,6 +6,8 @@ This repository follows the X-TRACK workspace layout (`App/`, `Frameworks/`, `Ex
 
 - `CMakeLists.txt` is the top-level platform selector: it dispatches `add_subdirectory(Vendor/${PLATFORM})` based on the `PLATFORM` cache variable (`HC32`, `Simulator` or `Linux`, defaulting to `HC32`).
 - `App/` is the shared application (`app_core`, `app_i18n`, `app_log`, `app_page_manager`, `app_dialplate`, `app_ui`) used by HC32 display firmware, Simulator and Linux. `App/tests/` contains headless core tests that do not depend on LVGL.
+  - `Service/{DataProc,HAL,i18n}/` 分别存放核心服务与暂存的 SystemService、平台设备契约和多语言文本；`UI/` 存放各页面、StatusBar、BatteryWarning、Resource、公共样式与 AppFactory/PageList.inc，`UI/_Template/` 是参与 Linux 主机编译但不注册的 MVP 模板。
+  - `Utils/{FixedFormat,ButtonGesture,Log,lv_anim_label,lv_ext}/` 存放通用工具。AppFactory 按显式清单顺序安装页面，StarMap 按能力过滤，页面路由仍使用 `Pages/<页面>`。
 - `Frameworks/` 包含跨平台框架（`DataBroker`、`DeviceManager`、`PageManager`、`ResourceManager`），各组件在自身目录定义 CMake 目标及 `fw::` 别名；`App/CMakeLists.txt` 通过 `add_subdirectory` 汇总，ResourceManager 为 INTERFACE，页面管理保留 `app_page_manager` 目标名。
 - `External/lvgl/` contains unmodified upstream LVGL v9.6.0 sources (public headers in `include/`, plus `src/`, `lvgl.h`, `lvgl_private.h`, `lv_version.h`, and the demos used by the Linux port) without any platform-specific `lv_conf.h` or porting layer. App and platform targets compile with `LV_DISABLE_API_MAPPING`, so only v9 native API names are allowed.
 - `Vendor/HC32/` contains the HC32F460xE MCU firmware:
@@ -65,4 +67,4 @@ Keep vendored-library edits minimal (`External/lvgl/`, `Vendor/HC32/Libraries/`)
 
 `App/` 与 `Frameworks/` 以本仓库为唯一来源。`app_framework` 使用 DataBroker（最多 16 个 DataNode、32 个独立时钟定时器）、DeviceManager 和 ResourceManager 静态表；同步回调仅在应用线程分发，参数不跨回调保存。LVGL 为 v9.6.0（RGB565 原生渲染，HC32/Linux 在发送缓冲中交换字节）；页面管理使用 `Frameworks/PageManager`，导航结果必须与 `PageManager::RES_TYPE::OK` 比较（OK 为 0），页面成员通过 getter 访问。
 
-平台行为位于 `Vendor/<Platform>`：HC32 `Display/AppPlatform/` 的 `PowerDevice`、`BusinessDevice`、`StatusDevice` 分别注册为 `Power`、`Device`、`Status`；Board 模拟器编译同一份实现，Linux/模拟器 Demo 使用 `Backends/Demo`。`Common/SystemBackend.h` 定义三类设备的值快照和精确尺寸命令；SystemService/Model 的便捷函数通过 DeviceManager 同步 read/write/ioctl。HC32 选项下标与协议码转换只在 BusinessDevice 内，写入只经 `State::Request_*`，revision 采样与确认仍在 `display_protocol.cpp`。资源使用 `Frameworks/ResourceManager/ResourceManager.h` 静态数组模板，`ResourcePool.h` 的公开接口不变。
+平台行为位于 `Vendor/<Platform>`：HC32 `Display/AppPlatform/` 的 `PowerDevice`、`BusinessDevice`、`StatusDevice` 分别注册为 `Power`、`Device`、`Status`；Board 模拟器编译同一份实现，Linux/模拟器 Demo 使用 `Backends/Demo`。`Service/HAL/SystemBackend.h` 定义三类设备的值快照和精确尺寸命令；SystemService/Model 的便捷函数通过 DeviceManager 同步 read/write/ioctl。HC32 选项下标与协议码转换只在 BusinessDevice 内，写入只经 `State::Request_*`，revision 采样与确认仍在 `display_protocol.cpp`。资源使用 `Frameworks/ResourceManager/ResourceManager.h` 静态数组模板，`ResourcePool.h` 的公开接口不变。

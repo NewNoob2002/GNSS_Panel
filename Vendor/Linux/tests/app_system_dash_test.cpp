@@ -7,11 +7,11 @@
 #include "App.h"
 #include "SystemService.h"
 #include "DemoStatus.h"
-#include "Pages/SaveConfig/SaveConfigView.h"
-#include "Pages/SystemLoading/SystemLoadingView.h"
+#include "UI/SaveConfig/SaveConfigView.h"
+#include "UI/SystemLoading/SystemLoadingView.h"
 #include "Log.h"
-#include "Utils/PageStyle.h"
-#include "Utils/SettingsStyle.h"
+#include "UI/Common/PageStyle.h"
+#include "UI/Common/SettingsStyle.h"
 #include "lvgl_private.h"
 
 namespace {

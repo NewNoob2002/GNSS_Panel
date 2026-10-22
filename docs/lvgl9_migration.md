@@ -26,17 +26,17 @@
 | 时基 | `LV_TICK_CUSTOM` 宏 | `lv_tick_set_cb(millis)` / `SDL_GetTicks` | 三端初始化 |
 | 日志回调 | `void cb(const char*)` | `void cb(lv_log_level_t, const char*)` | HC32 `HAL_Display.cpp` |
 | 内存接口 | `lv_mem_alloc/free` | `lv_malloc/free`（无兼容别名） | `lvgl_new.cpp`、`App/Utils/PageManager` |
-| 自定义绘制 | `LV_EVENT_DRAW_PART_BEGIN` + `lv_obj_draw_part_dsc_t` + `lv_draw_*(draw_ctx, …)` | `LV_EVENT_DRAW_MAIN`（或 `DRAW_POST`）+ `lv_event_get_layer(e)` + 描述符内含坐标的 `lv_draw_arc/line/rect(layer, …)` | `App/Pages/Dialplate/DialplateView.cpp`（唯一高复杂度页面） |
+| 自定义绘制 | `LV_EVENT_DRAW_PART_BEGIN` + `lv_obj_draw_part_dsc_t` + `lv_draw_*(draw_ctx, …)` | `LV_EVENT_DRAW_MAIN`（或 `DRAW_POST`）+ `lv_event_get_layer(e)` + 描述符内含坐标的 `lv_draw_arc/line/rect(layer, …)` | `App/UI/Dialplate/DialplateView.cpp`（唯一高复杂度页面） |
 | 事件目标 | `lv_event_get_target`（C++ 中需强转） | `lv_event_get_target_obj` | 各页面控制器 |
 | 坐标类型 | `lv_coord_t` 为 `int16_t` | `int32_t`（`lv_coord_t` 仍保留为 typedef） | 结构体打包、比较时注意 |
 
 ### 2.2 机械改名
 
-`lv_img_*` → `lv_image_*`（`lv_img_set_zoom` → `lv_image_set_scale`）、`LV_IMG_DECLARE` → `LV_IMAGE_DECLARE`、`lv_obj_clear_flag` → `lv_obj_remove_flag`、`lv_obj_del(_async)` → `lv_obj_delete(_async)`、`lv_anim_set_time` → `lv_anim_set_duration`、`lv_anim_set_playback_time/delay` → `lv_anim_set_reverse_duration/delay`、`lv_anim_set_ready_cb` → `lv_anim_set_completed_cb`、`lv_scr_act` → `lv_screen_active`、`lv_indev_get_act` → `lv_indev_active`、`lv_disp_*` → `lv_display_*`、`lv_txt_*` → `lv_text_*`、`LV_RES_OK` → `LV_RESULT_OK`。涉及 `App/Pages/*`、`App/Utils/{SettingsStyle,BatteryStyle}.h`、`App/Utils/lv_anim_label/*`（组合封装，非自定义 `lv_obj_class_t`，只有上述改名）、`App/Resource/ResourcePool.cpp`。
+`lv_img_*` → `lv_image_*`（`lv_img_set_zoom` → `lv_image_set_scale`）、`LV_IMG_DECLARE` → `LV_IMAGE_DECLARE`、`lv_obj_clear_flag` → `lv_obj_remove_flag`、`lv_obj_del(_async)` → `lv_obj_delete(_async)`、`lv_anim_set_time` → `lv_anim_set_duration`、`lv_anim_set_playback_time/delay` → `lv_anim_set_reverse_duration/delay`、`lv_anim_set_ready_cb` → `lv_anim_set_completed_cb`、`lv_scr_act` → `lv_screen_active`、`lv_indev_get_act` → `lv_indev_active`、`lv_disp_*` → `lv_display_*`、`lv_txt_*` → `lv_text_*`、`LV_RES_OK` → `LV_RESULT_OK`。涉及 `App/UI/*`、`App/UI/Common/{SettingsStyle,BatteryStyle}.h`、`App/Utils/lv_anim_label/*`（组合封装，非自定义 `lv_obj_class_t`，只有上述改名）、`App/UI/Resource/ResourcePool.cpp`。
 
 ## 3. 资源
 
-**图片**（`App/Resource/img/` 56 个文件、57 张图；3.0a 调研统计的“19 张”有误，以 3.2 转换脚本的实际解析为准）：
+**图片**（`App/UI/Resource/img/` 56 个文件、57 张图；3.0a 调研统计的“19 张”有误，以 3.2 转换脚本的实际解析为准）：
 
 | v8 源格式 | 数量 | v9 目标格式 | 说明 |
 |---|---|---|---|
@@ -45,7 +45,7 @@
 | `TRUE_COLOR_ALPHA` | 约 14 | 全不透明 → `RGB565`，否则 `RGB565A8` | 交错布局需重排为平面布局 |
 | `INDEXED_8BIT`（startupLogo、MiddleLogo，294×126） | 2 | `RGB565`（不透明时） | 不能保留索引格式：v9 绘制时把整图解码到堆（294×126×4 ≈ 148 KB）；每张 38 KB → 74 KB |
 
-转换脚本 `App/Resource/tools/convert_images_v9.py` 入库、可重复执行，按源格式推导目标格式（`--format NAME=...` 可覆盖），从现有 C 数组解码再编码并逐像素回读校验（不依赖原始 PNG）。体积按各产品实际链接的资源计算（每个产品只链接一张启动 Logo）。
+转换脚本 `App/UI/Resource/tools/convert_images_v9.py` 入库、可重复执行，按源格式推导目标格式（`--format NAME=...` 可覆盖），从现有 C 数组解码再编码并逐像素回读校验（不依赖原始 PNG）。体积按各产品实际链接的资源计算（每个产品只链接一张启动 Logo）。
 
 **字体**（4 个字体 + `symbol_dialplate.c`）：由 lv_font_conv 1.5.3 生成，已带 `#if LVGL_VERSION_MAJOR == 8` 守卫，v9 原生兼容，无需重新生成；顺带删除 `font_rajdhaniBold_20/40.c` 中未使用的 `lv_font_montserrat_18` 声明。
 

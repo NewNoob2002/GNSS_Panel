@@ -1,13 +1,13 @@
 #include <cassert>
 #include <cstring>
 #include "SystemService.h"
-#include "Pages/SaveConfig/SaveConfigModel.h"
-#include "Pages/SystemDash/SystemDashModel.h"
-#include "Pages/SystemInfos/SystemInfosModel.h"
-#include "Pages/SystemLoading/SystemLoadingModel.h"
-#include "Resource/ResourcePool.h"
+#include "UI/SaveConfig/SaveConfigModel.h"
+#include "UI/SystemDash/SystemDashModel.h"
+#include "UI/SystemInfos/SystemInfosModel.h"
+#include "UI/SystemLoading/SystemLoadingModel.h"
+#include "UI/Resource/ResourcePool.h"
 #include "DemoStatus.h"
-#include "Utils/PageStyle.h"
+#include "UI/Common/PageStyle.h"
 
 /** @brief 通过公开 API 读取对象的屏幕绝对坐标供布局断言使用。 */
 static lv_area_t

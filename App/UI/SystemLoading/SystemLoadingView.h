@@ -1,0 +1,62 @@
+#ifndef LVGL_SYSTEM_LOADING_VIEW_H
+#define LVGL_SYSTEM_LOADING_VIEW_H
+
+#include "UI/Resource/ResourcePool.h"
+#include "I18n.h"
+#include "lvgl.h"
+
+namespace page {
+/** Simulated boot presentation; Ready is not evidence of initialized hardware. */
+class SystemLoadingView {
+  public:
+    static constexpr uint32_t kTransitionMs = 220;
+    static constexpr unsigned kStepCount = 5;
+    static constexpr uint32_t kProgressMs = 240; // Bar animation after a step finishes; steps themselves are not timed.
+    void create(lv_obj_t* root);
+    /** UI thread: cancel child animations before hiding/unloading; the page root still owns the widgets. */
+    void destroy();
+    void show_logo() const;
+    void show_initialization();
+    /** Step 0..4 started: headline and active node; the bar only advances when the step finishes. */
+    void begin_step(unsigned step);
+    /** Step 0..4 finished: advance the bar and keep red failed nodes through completion. */
+    void finish_step(unsigned step, bool success);
+    /** A running step has taken elapsed_ms; whole seconds are shown after the first one. */
+    void show_waiting(uint32_t elapsed_ms);
+    void show_ready();
+    bool has_failures() const {
+        return failed_steps_ != 0;
+    }
+    void apply_language() const;
+
+  private:
+    static void set_progress(void* obj, int32_t percent);
+    static void set_ready_mix(void* obj, int32_t mix);
+    void update_progress(int32_t percent);
+    void update_text() const;
+    void update_step_label() const;
+    void set_accent(lv_color_t color);
+    struct {
+        lv_obj_t* cont{};
+        lv_obj_t* ring{};
+        lv_obj_t* gear{};
+        lv_obj_t* check{};
+        lv_obj_t* service{};
+        lv_obj_t* subtitle{};
+        lv_obj_t* bar{};
+        lv_obj_t* step{};
+        lv_obj_t* percent{};
+        lv_obj_t* dots[5]{};
+        lv_obj_t* links[4]{};
+        lv_obj_t* footer{};
+        lv_obj_t* logo_container{};
+    } ui_{};
+    bool ready_ = false;
+    int32_t progress_ = 0;
+    int step_ = 1;
+    uint32_t waited_s_ = 0;
+    unsigned failed_steps_ = 0;
+};
+} // namespace page
+
+#endif

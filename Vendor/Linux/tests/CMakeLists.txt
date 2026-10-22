@@ -13,6 +13,8 @@ target_link_options(linux_display_test PRIVATE
 add_test(NAME linux_display COMMAND linux_display_test)
 
 include(${SHARED_APP_DIR}/tests/targets.cmake)
+# 编译未注册的 MVP 页面模板，避免接口随框架变更失效。
+add_subdirectory(${SHARED_APP_DIR}/UI/_Template app_page_template)
 app_add_core_test(app_core_test)
 
 add_executable(app_framework_test app_framework_test.cpp)

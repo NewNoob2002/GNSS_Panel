@@ -7,10 +7,10 @@
 #include "SystemBackend.h"
 #include "SystemService.h"
 #include "App.h"
-#include "Pages/SystemLoading/SystemLoadingModel.h"
-#include "Resource/ResourcePool.h"
+#include "UI/SystemLoading/SystemLoadingModel.h"
+#include "UI/Resource/ResourcePool.h"
 #include "I18n.h"
-#include "Utils/SettingsStyle.h"
+#include "UI/Common/SettingsStyle.h"
 
 namespace {
 constexpr int width = 294, height = 126;

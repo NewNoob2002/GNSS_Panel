@@ -59,6 +59,11 @@ DIRECTORY_LAYER_MAP: List[Tuple[str, Tuple[int, Optional[int]]]] = [
 
     # L3 共享应用及测试
     ("App/tests", (LAYER_L5, None)),
+    ("App/UI", (LAYER_L3, None)),
+    ("App/Service/DataProc", (LAYER_L3, None)),
+    ("App/Service/HAL", (LAYER_L3, None)),
+    ("App/Service/i18n", (LAYER_L3, None)),
+    ("App/Utils", (LAYER_L3, None)),
     ("App", (LAYER_L3, None)),
 
     # L4 HC32 子层 (4.1 -> 4.10)
@@ -184,7 +189,7 @@ def check_parent_includes(repo_root: str) -> list[str]:
                         continue
                     # 上游风格资源模板在 LV_BUILD_TEST 下回退到相邻 lvgl.h；正式构建不走此分支。
                     # 只豁免 img_src_*.c 中紧接该条件的既有精确路径，其他父目录包含仍报错。
-                    if (rel.startswith("App/Resource/img/img_src_") and rel.endswith(".c")
+                    if (rel.startswith("App/UI/Resource/img/img_src_") and rel.endswith(".c")
                             and include == "../lvgl.h"
                             and re.search(r"#elif\s+defined\(LV_BUILD_TEST\)\s*$", content[:match.start()])):
                         continue

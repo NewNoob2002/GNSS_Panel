@@ -7,7 +7,7 @@
     python3 Vendor/Linux/tools/generate_ui_icons.py --v9 --format RGB565A8 --output-dir build/icons-v9-rgb
     python3 Vendor/Linux/tools/generate_ui_icons.py --v9 --output-dir build/icons-v9
 
-v9 复用 App/Resource/tools/convert_images_v9.py 的编码和回读校验；
+v9 复用 App/UI/Resource/tools/convert_images_v9.py 的编码和回读校验；
 保留覆盖率、墨量及半透明像素比例自检。默认保留 A8 遮罩，颜色由主题 recolor 提供；
 显式 RGB565A8 使用白色平面。
 """
@@ -17,7 +17,7 @@ import math
 import subprocess
 import sys
 
-ROOT = Path(__file__).resolve().parents[3] / "App/Resource/img"
+ROOT = Path(__file__).resolve().parents[3] / "App/UI/Resource/img"
 FILL = 'fill="white" stroke="none"'
 
 
@@ -114,7 +114,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--v9", action="store_true", default=True, help="兼容显式开关；默认输出 v9")
     parser.add_argument("--format", choices=("A8", "RGB565A8"), help="v9 目标格式（默认 A8）")
-    parser.add_argument("--output-dir", type=Path, help="输出目录，默认 App/Resource/img")
+    parser.add_argument("--output-dir", type=Path, help="输出目录，默认 App/UI/Resource/img")
     args = parser.parse_args()
     v9_format = args.format or "A8"
     output = (args.output_dir or ROOT).resolve()

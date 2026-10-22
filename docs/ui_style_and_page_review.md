@@ -44,7 +44,7 @@
 
 ## 视觉与动画
 
-通用颜色集中在 `App/Utils/PageStyle.h`。
+通用颜色集中在 `App/UI/Common/PageStyle.h`。
 
 | 语义 | 颜色 |
 | --- | --- |

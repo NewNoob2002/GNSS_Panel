@@ -30,7 +30,7 @@ class ParentIncludeTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             for filename, include in (
-                    ("App/Pages/StatusBar/StatusBar.h", "../../Utils/lv_anim_label/numberFlow.h"),
+                    ("App/UI/StatusBar/StatusBar.h", "../../Utils/lv_anim_label/numberFlow.h"),
                     ("Vendor/Linux/tests/linux_button_test.c", "../platform/linux_button.h")):
                 path = root / filename
                 path.parent.mkdir(parents=True, exist_ok=True)
@@ -42,7 +42,7 @@ class ParentIncludeTests(unittest.TestCase):
         """仅生成图像的原有测试分支可回退，其他路径或分支均拒绝。"""
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            path = root / "App/Resource/img/img_src_t.c"
+            path = root / "App/UI/Resource/img/img_src_t.c"
             path.parent.mkdir(parents=True)
             fallback = '#elif defined(LV_BUILD_TEST)\n#include "../lvgl.h"\n'
             path.write_text(fallback)
@@ -50,7 +50,7 @@ class ParentIncludeTests(unittest.TestCase):
             for invalid in ('#include "../lvgl.h"\n', fallback.replace('../lvgl.h', '../other.h')):
                 path.write_text(invalid)
                 self.assertEqual(len(check_layers.check_parent_includes(directory)), 1)
-            path.write_text('#include "Resource/LogoLayout.h"\n')
+            path.write_text('#include "UI/Resource/LogoLayout.h"\n')
             self.assertEqual(check_layers.check_parent_includes(directory), [])
 
 

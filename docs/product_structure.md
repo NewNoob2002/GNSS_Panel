@@ -11,7 +11,11 @@
 ## 目录与依赖
 
 ```text
-App/                      共享应用：独立事件框架接入、无 LVGL 的核心服务、LVGL 页面及核心测试 App/tests/（本仓库为唯一来源）
+App/                      共享应用（本仓库为唯一来源）
+  Service/{DataProc,HAL,i18n}/ 核心服务、设备契约与多语言文本（无 LVGL 部分保留原目标）
+  UI/                     各页面、StatusBar、BatteryWarning、Common、Resource；AppFactory 与 PageList.inc 显式安装九页，_Template 为主机编译模板
+  Utils/                  FixedFormat、ButtonGesture、Log、lv_anim_label、lv_ext
+  tests/                  无 LVGL 核心测试
 Frameworks/               跨平台框架：DataBroker、DeviceManager、PageManager、ResourceManager
 External/lvgl/            上游 LVGL 9.6.0 源码与原样构建文件（CMakeLists.txt、env_support/cmake/、Kconfig；不含平台 lv_conf.h 与 porting/）
 Vendor/HC32/

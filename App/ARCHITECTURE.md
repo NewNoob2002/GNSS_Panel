@@ -1,6 +1,14 @@
 # 共享应用架构
 
-HC32、RK3506（`Vendor/Linux`）与 PC 模拟器（`Vendor/Simulator`）使用同一份 `App/`、`Frameworks/` 源码和 CMake 文件，本仓库为唯一来源。事件/设备框架与服务可独立于 LVGL 构建；平台通过 `Common/SystemBackend.h` 的 DeviceManager 设备契约实现业务操作，UI 通过 Model 发送命令并接收快照。
+HC32、RK3506（`Vendor/Linux`）与 PC 模拟器（`Vendor/Simulator`）使用同一份 `App/`、`Frameworks/` 源码和 CMake 文件，本仓库为唯一来源。事件/设备框架与服务可独立于 LVGL 构建；平台通过 `Service/HAL/SystemBackend.h` 的 DeviceManager 设备契约实现业务操作，UI 通过 Model 发送命令并接收快照。
+
+## 目录结构
+
+- `Service/DataProc/` 保存 DataProc 与暂存的 SystemService，`Service/HAL/` 保存 SystemBackend 设备契约，`Service/i18n/` 保存多语言文本；原有无 LVGL 源码仍归属 `app::core` 与 `app::i18n`。
+- `UI/<页面>/`、`UI/StatusBar/`、`UI/BatteryWarning/` 保存页面和组件，`UI/Resource/` 保存资源与生成工具，`UI/Common/` 保存 UI 样式、ModelUtils 和 RequestFeedback。
+- `Utils/FixedFormat/`、`Utils/ButtonGesture/` 与原有 Log、动画工具保存通用功能；`tests/` 位置不变。
+- `UI/AppFactory::installAll(PageManager&)` 按 `UI/PageList.inc` 的 `PAGE_DEF(Name, InstallPredicate)` 顺序创建页面并移交所有权，StarMap 按 `SystemService::snapshot().star_map` 过滤；注册失败立即释放当前实例。路由名仍为 `Pages/<页面>`。
+- `UI/Page.h` 汇总页面公共包含；`UI/_Template/` 提供最小 Page/Model/View 模板，通过 Linux 主机测试构建编译，但不加入页面清单或固件。
 
 ## 构建边界
 

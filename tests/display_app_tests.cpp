@@ -11,10 +11,10 @@
 #include "Charger.h"
 #include "SystemService.h"
 #include <HAL.h>
-#include "Resource/ResourcePool.h"
+#include "UI/Resource/ResourcePool.h"
 #include "SystemState.h"
 #include "I18n.h"
-#include "Utils/PageStyle.h"
+#include "UI/Common/PageStyle.h"
 #include <delay.h>
 #include <gpio.h>
 #include "mcu_config.h"
