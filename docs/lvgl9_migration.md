@@ -36,17 +36,16 @@
 
 ## 3. 资源
 
-**图片**（`App/Resource/img/` 19 个）：
+**图片**（`App/Resource/img/` 56 个文件、57 张图；3.0a 调研统计的“19 张”有误，以 3.2 转换脚本的实际解析为准）：
 
-| 类别 | 数量 | 当前格式 | 目标格式 |
+| v8 源格式 | 数量 | v9 目标格式 | 说明 |
 |---|---|---|---|
-| 脚本生成的 UI 图标（`Vendor/Linux/tools/generate_ui_icons.py`） | 12 | `TRUE_COLOR_ALPHA` | 改脚本直接输出 `RGB565A8` |
-| 历史图标 stop、ui_work、workmode | 3 | `TRUE_COLOR_ALPHA` | 从现有数组重排为 `RGB565A8` |
-| `SystemLoading_XYZ`（150×36，全不透明） | 1 | `TRUE_COLOR_ALPHA` | `RGB565`（省约 5.4 KB） |
-| `NationalFlag_EN/RU`（25×18）、`SystemLoading_Neutral`（90×90） | 3 | `INDEXED_4BIT/2BIT`，调色板全不透明 | `RGB565` |
-| `SystemLoading_RGK`（150×70，单色多级透明） | 1 | `INDEXED_4BIT` | `RGB565A8`；若 flash 紧张改 `A8` + `image_recolor` |
+| `ALPHA_8BIT`（`ui_*`、`system_dash_*` 等单色图标） | 约 38 | `A8` | v9.6 按 `draw_dsc->recolor` 着色（`lv_draw_sw_img.c:342-345, 481-484`），与应用设置 `img_recolor` + `LV_OPA_COVER` 的用法一致，体积不变 |
+| `TRUE_COLOR` | 3（battery、sd、RGKLogo） | `RGB565` | 色键透明的才用 `RGB565A8` |
+| `TRUE_COLOR_ALPHA` | 约 14 | 全不透明 → `RGB565`，否则 `RGB565A8` | 交错布局需重排为平面布局 |
+| `INDEXED_8BIT`（startupLogo、MiddleLogo，294×126） | 2 | `RGB565`（不透明时） | 不能保留索引格式：v9 绘制时把整图解码到堆（294×126×4 ≈ 148 KB）；每张 38 KB → 74 KB |
 
-转换脚本入库、可重复执行，从现有 C 数组解码再编码，并自带逐像素回读校验（不依赖原始 PNG）。`Neutral`、`RGK` 存为 `A8` 可再省约 29 KiB flash，是否采用由 3.6 的体积结果决定。
+转换脚本 `App/Resource/tools/convert_images_v9.py` 入库、可重复执行，按源格式推导目标格式（`--format NAME=...` 可覆盖），从现有 C 数组解码再编码并逐像素回读校验（不依赖原始 PNG）。体积按各产品实际链接的资源计算（每个产品只链接一张启动 Logo）。
 
 **字体**（4 个字体 + `symbol_dialplate.c`）：由 lv_font_conv 1.5.3 生成，已带 `#if LVGL_VERSION_MAJOR == 8` 守卫，v9 原生兼容，无需重新生成；顺带删除 `font_rajdhaniBold_20/40.c` 中未使用的 `lv_font_montserrat_18` 声明。
 
@@ -62,7 +61,7 @@
 | LVGL 池峰值 | 主机 64 位测试 31,606 B | 约 34–38 KiB（主机），HC32 预计 < 32 KiB；索引图预转换后无 41 KB 解码峰值 |
 | `lv_obj_t` | 36 B | 44 B（`LV_OBJ_STYLE_CACHE`），约 140 个对象 +1.1 KiB |
 | 栈 | — | 渲染调用链约 2.2–2.8 KiB + 中断，8 KiB 足够（需实测栈水印） |
-| flash（release） | 336 KiB | 约 +42 KiB（图片约 +36 KiB，LVGL 代码裁剪后 +5–10 KiB）→ 约 382/456 KiB |
+| flash（release） | 334 KiB | 图片增量以 3.2 按产品统计为准（启动 Logo 由 I8 改 RGB565 约 +36 KiB），LVGL 代码裁剪后 +5–10 KiB |
 | flash（debug） | 约 389 KiB | 约 434/456 KiB，余量偏紧 |
 
 `lv_conf.h` 关键项（HC32）：`LV_USE_STDLIB_MALLOC/STRING/SPRINTF = LV_STDLIB_BUILTIN`、`LV_MEM_SIZE (96U * 1024U)`、`LV_USE_OS LV_OS_NONE`、`LV_COLOR_DEPTH 16`、`LV_DEF_REFR_PERIOD 16`、`LV_DRAW_SW_SUPPORT_*` 只保留 `RGB565`、`RGB565A8`、`A8`、`ARGB8888`（简单图层需要）、`LV_DRAW_SW_COMPLEX 1`、`LV_DRAW_SW_CIRCLE_CACHE_SIZE 4`、`LV_CACHE_DEF_SIZE 0`、`LV_IMAGE_HEADER_CACHE_DEF_CNT 0`、`LV_BIN_DECODER_RAM_LOAD 0`、关闭 observer/obj_id/obj_name/obj_property/float/matrix/vector_graphic/thorvg、控件只开 arc/image/label/animimg、`LV_USE_SYSMON`/`LV_USE_PERF_MONITOR` 仅 debug。`LV_DRAW_LAYER_SIMPLE_BUF_SIZE` 按实测下调。8 KiB C 堆在带屏产品上基本闲置（`operator new` 走 LVGL 池），可在 3.6 缩减以换 RAM。
