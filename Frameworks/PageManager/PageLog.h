@@ -25,7 +25,8 @@
 
 #include "Utils/Log/Log.h"
 
-#define PAGE_LOG_INFO(...)  APP_LOG_D("PageManager", __VA_ARGS__)
+// 与原 App/Utils/PageManager 的 PM_LOG_INFO 保持同一级别：模拟器冒烟测试依赖安装与栈清理日志。
+#define PAGE_LOG_INFO(...)  APP_LOG_I("PageManager", __VA_ARGS__)
 #define PAGE_LOG_WARN(...)  APP_LOG_W("PageManager", __VA_ARGS__)
 #define PAGE_LOG_ERROR(...) APP_LOG_E("PageManager", __VA_ARGS__)
 

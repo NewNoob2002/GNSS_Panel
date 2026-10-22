@@ -128,6 +128,58 @@
       "--test-dir",
       "build/app-core-tests",
       "--output-on-failure"
+    ],
+    [
+      "cmake",
+      "--preset",
+      "simulator-x1pro"
+    ],
+    [
+      "cmake",
+      "--build",
+      "--preset",
+      "simulator-x1pro",
+      "-j"
+    ],
+    [
+      "python3",
+      "tests/simulator_smoke.py",
+      "build/simulator-x1pro/bin/main"
+    ],
+    [
+      "cmake",
+      "--preset",
+      "simulator-xbase"
+    ],
+    [
+      "cmake",
+      "--build",
+      "--preset",
+      "simulator-xbase",
+      "-j"
+    ],
+    [
+      "python3",
+      "tests/simulator_smoke.py",
+      "build/simulator-xbase/bin/main"
+    ],
+    [
+      "cmake",
+      "--preset",
+      "linux-host"
+    ],
+    [
+      "cmake",
+      "--build",
+      "--preset",
+      "linux-host",
+      "-j"
+    ],
+    [
+      "ctest",
+      "--test-dir",
+      "build/linux-host",
+      "--output-on-failure"
     ]
   ],
   "role_titles": {
