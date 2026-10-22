@@ -68,7 +68,7 @@
 | 3.5 | 主控截图对比（与 LVGL 8 基线逐页）与视觉/交互差异修正 | 主控 / sol |
 | 3.6 ★ | HC32 内存与性能调优：`LV_DRAW_LAYER_SIMPLE_BUF_SIZE`、C 堆缩减、`LV_MEM_SIZE`、图片 `A8` 取舍；记录 `lv_mem` 峰值、栈水印、帧率与 debug/release 体积 | sol |
 
-进度：3.0 调研与基线完成（`5c000cd`）；3.1 `4784fa7` 已合入（9 页渲染与 LVGL 8 基线逐字节一致，X1Pro/XBase release 334488/1344/169460，RAM 余量 21,776 B）。3.2 `c3f99d7`（57 张图转换脚本，逐像素回读通过）、3.3 `9ef6766`（三端 LVGL v9.6.0；release X1Pro flash 415,496 B、余量 51,448 B，debug 余量 14,140 B，RAM 余量 22,128 B；9 页布局/颜色/图片与基线一致，差异仅为渐变量化与抗锯齿；主机测试 LVGL 池峰值 70,376 B）已合入。3.4 `30b7d04`（切换到 `Frameworks/PageManager`，九页与 3.3 截图逐字节一致，X1Pro release flash 414,784 B、debug 余量 15,380 B）已合入。
+进度：3.0 调研与基线完成（`5c000cd`）；3.1 `4784fa7` 已合入（9 页渲染与 LVGL 8 基线逐字节一致，X1Pro/XBase release 334488/1344/169460，RAM 余量 21,776 B）。3.2 `c3f99d7`（57 张图转换脚本，逐像素回读通过）、3.3 `9ef6766`（三端 LVGL v9.6.0；release X1Pro flash 415,496 B、余量 51,448 B，debug 余量 14,140 B，RAM 余量 22,128 B；9 页布局/颜色/图片与基线一致，差异仅为渐变量化与抗锯齿；主机测试 LVGL 池峰值 70,376 B）已合入。3.4 `30b7d04`（切换到 `Frameworks/PageManager`，九页与 3.3 截图逐字节一致，X1Pro release flash 414,784 B、debug 余量 15,380 B）已合入。3.3b `87835be`（LVGL 使用上游 CMake，组件各自维护 CMakeLists；体积与截图完全不变）已合入；`555178a` 修复 3.4 引入的页面日志级别回归（模拟器冒烟失败），并把模拟器冒烟纳入验证策略。
 
 阶段 3 额外验收：截图与 3.0 基线逐页对比；HC32 RAM 以链接符号 `__RamEnd - __StackTop` 为准，余量不少于 8 KiB；`App/` 不再出现 LVGL 8 专有符号；`Frameworks/` 只剩被使用的模块。
 
