@@ -1,5 +1,6 @@
 #include "RecordConfigView.h"
 #include <cstdio>
+#include "Utils/FixedFormat.h"
 #include "Utils/SettingsStyle.h"
 using namespace page;
 using i18n::TextId;
@@ -53,7 +54,7 @@ void RecordConfigView::update(const DataProc::DeviceSnapshot& device, bool confi
                                              : device.recording   ? TextId::Recording
                                                                   : TextId::RecordIdle));
     char space[24];
-    std::snprintf(space, sizeof(space), "%.0f MB", device.record_space_mb);
+    app::format_fixed(space, sizeof(space), device.record_space_mb, 0, " MB");
     settings_style::set_text(space_, space);
     settings_style::set_text_color(state_, device.recording ? style::kDanger : style::kText);
     settings_style::activity(status_dot_, device.recording || device.record_pending,

@@ -1,3 +1,4 @@
+#include "Utils/FixedFormat.h"
 #include "Utils/lv_ext/lv_label_format.h"
 #include "SystemInfosView.h"
 #include <cstdio>
@@ -236,8 +237,8 @@ void SystemInfosView::update(const DataProc::DeviceSnapshot& device, const DataP
         app_label_set_text_fmt(ui.work.label_data, "%s\n%s\n%s", na, na, na);
     }
     if (device.position_valid)
-        app_label_set_text_fmt(ui.gps.label_data, "%.6f\n%.6f\n%.2f m", device.latitude, device.longitude,
-                              device.altitude);
+        app_label_set_text_fmt(ui.gps.label_data, "%s\n%s\n%s m", app::Fixed(device.latitude, 6).c_str(),
+                              app::Fixed(device.longitude, 6).c_str(), app::Fixed(device.altitude, 2).c_str());
     else
         app_label_set_text_fmt(ui.gps.label_data, "%s\n%s\n%s", na, na, na);
     const char* wifi_state = state.wifi_pending ? "..." : on_off(state.wifi_on);
@@ -252,9 +253,9 @@ void SystemInfosView::update(const DataProc::DeviceSnapshot& device, const DataP
                               : device.charge == DataProc::ChargeState::NotCharging ? TextId::BatteryNotCharge
                               : device.charge == DataProc::ChargeState::Fast        ? TextId::BatteryFastCharge
                                                                                     : TextId::BatteryNormalCharge;
-        app_label_set_text_fmt(ui.battery.label_data, "%.1f%%\n%.2f V\n%.1f C\n%s",
-                              static_cast<double>(device.battery_percent), static_cast<double>(device.battery_voltage),
-                              static_cast<double>(device.battery_temperature), i18n::text(charge));
+        app_label_set_text_fmt(ui.battery.label_data, "%s%%\n%s V\n%s C\n%s",
+                              app::Fixed(device.battery_percent, 1).c_str(), app::Fixed(device.battery_voltage, 2).c_str(),
+                              app::Fixed(device.battery_temperature, 1).c_str(), i18n::text(charge));
     } else {
         app_label_set_text_fmt(ui.battery.label_data, "%s\n%s\n%s\n%s", na, na, na, na);
     }
@@ -262,8 +263,8 @@ void SystemInfosView::update(const DataProc::DeviceSnapshot& device, const DataP
         char type[16], interval[16];
         option_text(TextId::RecordTypeOptions, device.record_type, type, sizeof(type));
         option_text(TextId::RecordIntervalOptions, device.record_interval, interval, sizeof(interval));
-        app_label_set_text_fmt(ui.storage.label_data, "%s\n%s\n%.1f MB\n%s\n%s", on_off(true), device.record_name.data(),
-                              static_cast<double>(device.record_space_mb), type, interval);
+        app_label_set_text_fmt(ui.storage.label_data, "%s\n%s\n%s MB\n%s\n%s", on_off(true), device.record_name.data(),
+                              app::Fixed(device.record_space_mb, 1).c_str(), type, interval);
     } else {
         app_label_set_text_fmt(ui.storage.label_data, "%s\n-\n-\n-\n-", device.record_valid ? on_off(false) : na);
     }

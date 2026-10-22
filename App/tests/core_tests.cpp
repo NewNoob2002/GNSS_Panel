@@ -1,3 +1,4 @@
+#include "fixed_format_tests.h"
 #include <cassert>
 #include <cstring>
 #include <memory>
@@ -270,6 +271,7 @@ void test_device_contract() {
 }
 
 int main() {
+    test_fixed_format();
     test_broker();
     test_node_capacity();
     test_device_contract();

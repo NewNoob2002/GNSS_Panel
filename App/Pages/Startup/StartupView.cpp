@@ -1,4 +1,5 @@
 #include <cstdio>
+#include "Utils/FixedFormat.h"
 #include "StartupView.h"
 #include "Utils/BatteryStyle.h"
 #include "Utils/SettingsStyle.h"
@@ -103,7 +104,7 @@ void StartupView::update(const DataProc::StatusSnapshot& status) {
         char text[24];
         lv_snprintf(text, sizeof(text), "%u", percent);
         settings_style::set_text(ui.bat_charge, text);
-        std::snprintf(text, sizeof(text), "%.2f V", status.battery_voltage);
+        app::format_fixed(text, sizeof(text), status.battery_voltage, 2, " V");
         settings_style::set_text(ui.bat_voltage, text);
     } else {
         settings_style::set_text(ui.bat_voltage, "N/A");

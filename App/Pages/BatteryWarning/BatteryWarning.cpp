@@ -1,3 +1,4 @@
+#include "Utils/FixedFormat.h"
 #include "Utils/lv_ext/lv_label_format.h"
 #include "BatteryWarning.h"
 #include "Resource/ResourcePool.h"
@@ -148,7 +149,7 @@ void BatteryWarning::update(bool valid, float temperature) {
 
 void BatteryWarning::update_text() {
     app_label_set_text_fmt(label_, i18n::text(i18n::TextId::BatteryTemperatureCritical),
-                          static_cast<double>(temperature_));
+                          app::Fixed(temperature_, 1).c_str());
 }
 
 void BatteryWarning::start_effects() {

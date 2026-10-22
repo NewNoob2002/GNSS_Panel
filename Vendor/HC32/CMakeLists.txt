@@ -51,9 +51,6 @@ target_link_options(${TARGET_NAME} PRIVATE
     -Wl,--defsym=FLASH_ORIGIN=0x00008000 -Wl,--defsym=FLASH_LENGTH=0x00072000
     -Wl,-Map=${CMAKE_BINARY_DIR}/${TARGET_NAME}.map
     -Wl,--gc-sections -Wl,--print-memory-usage --specs=nano.specs --specs=nosys.specs)
-if(PRODUCT_HAS_DISPLAY)
-    target_link_options(${TARGET_NAME} PRIVATE -u _printf_float)
-endif()
 add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
     COMMAND ${CMAKE_OBJCOPY} -O ihex $<TARGET_FILE:${TARGET_NAME}> ${CMAKE_BINARY_DIR}/generated/${TARGET_NAME}.hex
     COMMAND ${CMAKE_OBJCOPY} -O binary $<TARGET_FILE:${TARGET_NAME}> ${CMAKE_BINARY_DIR}/generated/${TARGET_NAME}.bin
