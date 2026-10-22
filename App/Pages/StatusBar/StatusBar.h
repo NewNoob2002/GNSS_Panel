@@ -1,8 +1,8 @@
 #pragma once
 
 #include <memory>
-#include "../../Utils/lv_anim_label/numberFlow.h"
-#include "../../Utils/lv_anim_label/numberFlow_clock.h"
+#include "Utils/lv_anim_label/numberFlow.h"
+#include "Utils/lv_anim_label/numberFlow_clock.h"
 #include "DataProc/DataProc.h"
 
 namespace page {

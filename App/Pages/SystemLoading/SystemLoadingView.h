@@ -49,7 +49,7 @@ class SystemLoadingView {
         lv_obj_t* dots[5]{};
         lv_obj_t* links[4]{};
         lv_obj_t* footer{};
-        lv_obj_t* img_logo{};
+        lv_obj_t* logo_container{};
     } ui_{};
     bool ready_ = false;
     int32_t progress_ = 0;

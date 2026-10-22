@@ -767,6 +767,11 @@ def run(src_dir: Path, dst_dir: Path, overrides: Dict[str, str], check_only: boo
         if len(encoded) != len(imgs):
             continue
         text = render_c_file(encoded)
+        # 专用 Logo 工具的布局常量不参与像素编码，规范化时原样保留。
+        marker = "/* Logo 布局：底色、前景色及原画面中的裁剪偏移。 */"
+        original = path.read_bytes().decode("utf-8").replace("\r\n", "\n")
+        if marker in original:
+            text += "\n" + original[original.index(marker):]
         errors += [f"{path.name}: {message}" for message in verify_text(imgs, text)]
         prepared.append((path, imgs, encoded, text))
     if errors:

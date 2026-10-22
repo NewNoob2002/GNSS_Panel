@@ -158,14 +158,49 @@ def get_target_def_dir(tgt: dict, cm_source: str, repo_root: str) -> str:
     return src_dir
 
 
+def check_parent_includes(repo_root: str) -> list[str]:
+    """扫描自有 C/C++ 源码的父目录包含，返回带文件和行号的规则 2 错误。
+
+    @param repo_root 仓库根目录。
+    @return 违规消息列表；第三方实现与既有生成模板回退分支不参与检查。
+    """
+    errors = []
+    excluded = {"Vendor/HC32/Libraries", "Vendor/HC32/Platform/DDL", "Vendor/HC32/Platform/CMSIS"}
+    extensions = (".c", ".h", ".cpp", ".hpp", ".cc", ".hh", ".cxx", ".hxx", ".inc")
+    for component in ("App", "Frameworks", "Vendor"):
+        for root, dirs, files in os.walk(os.path.join(repo_root, component)):
+            dirs[:] = sorted(d for d in dirs if d not in ("External", "build", ".git")
+                             and os.path.relpath(os.path.join(root, d), repo_root).replace(os.sep, "/") not in excluded)
+            for name in sorted(files):
+                if not name.endswith(extensions):
+                    continue
+                filepath = os.path.join(root, name)
+                rel = os.path.relpath(filepath, repo_root).replace(os.sep, "/")
+                with open(filepath, encoding="utf-8", errors="replace") as fp:
+                    content = fp.read()
+                for match in re.finditer(r'^[ \t]*#[ \t]*include[ \t]*"([^"\n]+)"', content, flags=re.M):
+                    include = match.group(1)
+                    if "../" not in include:
+                        continue
+                    # 上游风格资源模板在 LV_BUILD_TEST 下回退到相邻 lvgl.h；正式构建不走此分支。
+                    # 只豁免 img_src_*.c 中紧接该条件的既有精确路径，其他父目录包含仍报错。
+                    if (rel.startswith("App/Resource/img/img_src_") and rel.endswith(".c")
+                            and include == "../lvgl.h"
+                            and re.search(r"#elif\s+defined\(LV_BUILD_TEST\)\s*$", content[:match.start()])):
+                        continue
+                    line = content.count("\n", 0, match.start()) + 1
+                    errors.append(f'{rel}:{line}: 违规 (规则 2): 禁止父目录包含 #include "{include}"')
+    return errors
+
+
 def check_static_rules(repo_root: str) -> List[str]:
     """
-    Static scan for banned global include_directories().
+    静态检查全局 include_directories() 与源码父目录包含。
 
     @param repo_root Absolute path to repository root.
     @return List of error message strings.
     """
-    errors = []
+    errors = check_parent_includes(repo_root)
     for root, _, files in os.walk(repo_root):
         if any(ignored in root for ignored in ("External", "build", ".git")):
             continue
@@ -459,7 +494,7 @@ def main():
             print(f"  [ERROR] {err}")
         all_errors.extend(static_errors)
     else:
-        print("  [PASS] 静态源码规则 2 全局包含校验通过 (0 违规)")
+        print("  [PASS] 静态源码规则 2 全局包含与父目录包含校验通过 (0 违规)")
 
     print("\n=== 开始 CMake File API 目标与依赖模型校验 (codemodel-v2) ===")
     build_dirs = []

@@ -2359,3 +2359,7 @@ const lv_image_dsc_t img_src_RGKLogo = {
   .reserved = NULL,
   .reserved_2 = NULL,
 };
+
+/* Logo 布局：底色、前景色及原画面中的裁剪偏移。 */
+#include "Resource/LogoLayout.h"
+const system_loading_logo_layout_t img_src_RGKLogo_layout = {0xffffff, 0xde2821, 0, 0};

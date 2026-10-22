@@ -1,5 +1,5 @@
 // Linux evdev button mapping test
-#include "../platform/linux_button.h"
+#include "linux_button.h"
 
 #include <assert.h>
 #include <errno.h>

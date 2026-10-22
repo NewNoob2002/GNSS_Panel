@@ -4,6 +4,7 @@
 #include <initializer_list>
 #include "SystemBackend.h"
 #include "Utils/PageStyle.h"
+#include "Resource/LogoLayout.h"
 
 using namespace page;
 
@@ -140,23 +141,34 @@ void SystemLoadingView::create(lv_obj_t* root) {
     }
     ui_.footer = style::label(ui_.cont, small_font, 16, 105, 116);
     lv_obj_set_style_text_color(ui_.footer, kGrey, 0);
-    ui_.img_logo = lv_image_create(root);
 #if defined(RGK_LOGO_USE)
-    lv_image_set_src(ui_.img_logo, resource_pool::get_image("RGKLogo"));
+    const auto* logo_source = resource_pool::get_image("RGKLogo");
+    const auto& logo_layout = img_src_RGKLogo_layout;
 #elif defined(MIDDLE_LOGO_USE)
-    lv_image_set_src(ui_.img_logo, resource_pool::get_image("MiddleLogo"));
+    const auto* logo_source = resource_pool::get_image("MiddleLogo");
+    const auto& logo_layout = img_src_MiddleLogo_layout;
 #else
-    lv_image_set_src(ui_.img_logo, resource_pool::get_image("startupLogo"));
+    const auto* logo_source = resource_pool::get_image("startupLogo");
+    const auto& logo_layout = img_src_startupLogo_layout;
 #endif
-    lv_obj_center(ui_.img_logo);
+    ui_.logo_container = style::box(root, 0, 0, 294, 126);
+    lv_obj_set_style_bg_color(ui_.logo_container, lv_color_hex(logo_layout.background), 0);
+    lv_obj_set_style_bg_opa(ui_.logo_container, LV_OPA_COVER, 0);
+    auto* logo = lv_image_create(ui_.logo_container);
+    lv_image_set_src(logo, logo_source);
+    lv_obj_set_pos(logo, logo_layout.x, logo_layout.y);
+#if !defined(RGK_LOGO_USE)
+    lv_obj_set_style_image_recolor(logo, lv_color_hex(logo_layout.foreground), 0);
+    lv_obj_set_style_image_recolor_opa(logo, LV_OPA_COVER, 0);
+#endif
     update_text();
     show_logo();
 }
 
 void SystemLoadingView::show_logo() const {
     lv_obj_set_hidden(ui_.cont, true);
-    lv_obj_set_hidden(ui_.img_logo, false);
-    set_opa(ui_.img_logo, LV_OPA_COVER);
+    lv_obj_set_hidden(ui_.logo_container, false);
+    set_opa(ui_.logo_container, LV_OPA_COVER);
 }
 
 void SystemLoadingView::show_initialization() {
@@ -175,7 +187,7 @@ void SystemLoadingView::show_initialization() {
     set_accent(kOrange);
     update_progress(0);
     update_text();
-    animate(ui_.img_logo, set_opa, LV_OPA_COVER, LV_OPA_TRANSP, kTransitionMs, hide_after_fade);
+    animate(ui_.logo_container, set_opa, LV_OPA_COVER, LV_OPA_TRANSP, kTransitionMs, hide_after_fade);
     animate(ui_.cont, set_opa, LV_OPA_TRANSP, LV_OPA_COVER, kTransitionMs);
     spin_gear(ui_.gear);
 }
@@ -290,7 +302,7 @@ void SystemLoadingView::update_text() const {
 }
 void SystemLoadingView::destroy() {
     // Includes fades and callbacks borrowing View/widget pointers; cancel before the root is destroyed.
-    for (auto* obj : {ui_.cont, ui_.bar, ui_.gear, ui_.check, ui_.img_logo, ui_.service, ui_.subtitle})
+    for (auto* obj : {ui_.cont, ui_.bar, ui_.gear, ui_.check, ui_.logo_container, ui_.service, ui_.subtitle})
         lv_anim_delete(obj, nullptr);
     for (auto* dot : ui_.dots)
         lv_anim_delete(dot, nullptr);

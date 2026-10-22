@@ -5,8 +5,10 @@ import io
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 import convert_images_v9 as converter
+import convert_logo_a8 as logo_converter
 
 
 class ConversionTests(unittest.TestCase):
@@ -181,6 +183,81 @@ class ConversionTests(unittest.TestCase):
             with self.assertRaises(converter.ConvertError):
                 converter.run(dst, base / "empty", {}, False)
 
+
+    def test_logo_crop_readback_and_color_rejection(self):
+        """覆盖裁剪余量、透明边界、误差门槛、残留列及确定性。"""
+        pixels = bytearray(bytes((0, 0, 0, 255)) * 100)
+        for y in range(4, 6):
+            for x in range(4, 6):
+                pixels[(y * 10 + x) * 4:(y * 10 + x + 1) * 4] = bytes((255, 255, 255, 255))
+        source = converter.Image8(Path("t.c"), "img_src_t", "LV_IMG_CF_TRUE_COLOR",
+                                  10, 10, 200, bytes(pixels))
+        logo = logo_converter.convert(source)
+        self.assertEqual((logo.x, logo.y, logo.image.w, logo.image.h), (2, 2, 6, 6))
+        self.assertEqual(logo.maximum, 0)
+        self.assertEqual(logo.image.data[2 * 6 + 2], 255)
+        self.assertEqual(logo.image.data[0], 0)
+        self.assertEqual(logo_converter.render(logo), logo_converter.render(logo_converter.convert(source)))
+        for y in range(10):
+            pixels[y * 40:y * 40 + 4] = bytes((255, 255, 255, 255))
+        source.rgba = bytes(pixels)
+        excluded = logo_converter.convert(source, True)
+        self.assertEqual(excluded.image, logo.image)
+        source.rgba = bytes((0, 0, 0, 255)) * 8 + bytes((255, 0, 0, 255, 0, 255, 0, 255))
+        source.w, source.h = 10, 1
+        self.assertGreater(logo_converter.convert(source).maximum, 20)
+        source.rgba = bytes((0, 0, 0, 255)) * 10
+        with self.assertRaises(converter.ConvertError):
+            logo_converter.convert(source)
+        source.rgba = bytes((0, 0, 0, 128)) * 10
+        with self.assertRaises(converter.ConvertError):
+            logo_converter.convert(source)
+
+    def test_logo_lvgl_blend_and_metadata_preservation(self):
+        """已知 RGB565 混色与部署资源规范化保留布局常量。"""
+        self.assertEqual(logo_converter.blend565(0xffff, 0, 128), 0x7bef)
+        self.assertEqual(logo_converter.blend565(0xffff, 0, 2), 0)
+        self.assertEqual(logo_converter.blend565(0xffff, 0, 253), 0xffff)
+        image = converter.encode_v9("img_src_t", 1, 1, bytes((255, 255, 255, 255)), "A8")
+        logo = logo_converter.Logo(image, (0, 0, 0), (255, 255, 255), 2, 3, 0, 0)
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            path = base / "img_src_t.c"
+            path.write_text(logo_converter.render(logo))
+            self.assertIn('#include "Resource/LogoLayout.h"', path.read_text())
+            self.assertNotIn("Pages/SystemLoading", path.read_text())
+            original = path.read_bytes()
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(converter.run(base, base, {}, True), 0)
+                self.assertEqual(converter.run(base, base, {}, False), 0)
+            self.assertEqual(path.read_bytes(), original)
+
+    def test_logo_cli_rejects_loss_and_preserves_color_on_request(self):
+        """超限默认失败且不写文件；显式彩色回退保留像素与原有 CRLF。"""
+        rgba = bytes((0, 0, 0, 255)) * 8 + bytes((255, 0, 0, 255, 0, 255, 0, 255))
+        image = converter.encode_v9("img_src_t", 10, 1, rgba, "RGB565")
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            source, target = base / "source.c", base / "target.c"
+            source.write_text(converter.render_c_file([image]))
+            target.write_bytes(b"unchanged\r\n")
+            arguments = ["convert_logo_a8.py", str(source), str(target)]
+            with patch("sys.argv", arguments), contextlib.redirect_stdout(io.StringIO()), \
+                    contextlib.redirect_stderr(io.StringIO()):
+                with self.assertRaises(SystemExit) as failed:
+                    logo_converter.main()
+                self.assertEqual(failed.exception.code, 1)
+            self.assertEqual(target.read_bytes(), b"unchanged\r\n")
+            with patch("sys.argv", arguments + ["--keep-rgb565-on-error"]), \
+                    contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(logo_converter.main(), 0)
+                original = target.read_bytes()
+                self.assertEqual(logo_converter.main(), 0)
+            self.assertEqual(target.read_bytes(), original)
+            self.assertNotIn(b"\n", original.replace(b"\r\n", b""))
+            parsed, = converter.parse_v9_text(target.read_text())
+            self.assertEqual(parsed.data, image.data)
+            self.assertEqual(parsed.cf, "RGB565")
 
     def test_deployed_v9_check(self):
         """Check deployed v9 resources in place. 正式资源支持同目录只读校验，拒绝错误头字段。"""
