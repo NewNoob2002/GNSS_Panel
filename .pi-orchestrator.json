@@ -6,7 +6,10 @@
       "core.whitespace=cr-at-eol",
       "diff",
       "--check",
-      "{base}"
+      "{base}",
+      "--",
+      ".",
+      ":!External"
     ],
     [
       "cmake",
