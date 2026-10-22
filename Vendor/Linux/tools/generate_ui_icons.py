@@ -1,8 +1,21 @@
 #!/usr/bin/env python3
-"""重绘共享 UI 原生尺寸图标；需要项目环境已有的 ImageMagick，不在固件运行时缩放。"""
+"""重绘共享 UI 原生尺寸图标，需要已有的 ImageMagick，不在固件运行时缩放。
+
+仓库根目录用法：
+    python3 Vendor/Linux/tools/generate_ui_icons.py             # 默认保持 v8 A8 输出
+    python3 Vendor/Linux/tools/generate_ui_icons.py --v9        # v9 A8，写入 img_v9
+    python3 Vendor/Linux/tools/generate_ui_icons.py --v9 --format RGB565A8 --output-dir build/icons-v9-rgb
+    python3 Vendor/Linux/tools/generate_ui_icons.py --v9 --output-dir build/icons-v9
+
+v9 复用 App/Resource/tools/convert_images_v9.py 的编码和回读校验；
+两种模式均保留覆盖率、墨量及半透明像素比例自检。v9 默认保留 A8 遮罩，颜色由主题 recolor 提供；
+显式 RGB565A8 使用白色平面。v9 不允许覆盖原 v8 资源目录。
+"""
 from pathlib import Path
+import argparse
 import math
 import subprocess
+import sys
 
 ROOT = Path(__file__).resolve().parents[3] / "App/Resource/img"
 FILL = 'fill="white" stroke="none"'
@@ -81,6 +94,7 @@ SHARP = {"ui_satellite": (110, 146)}
 
 
 def render(path: str, size: int, low: int = LOW, high: int = HIGH) -> bytes:
+    """Render and validate native alpha coverage. 渲染并校验原生尺寸覆盖率。"""
     svg = (f'<svg xmlns="http://www.w3.org/2000/svg" width="{size * SUPERSAMPLE}" height="{size * SUPERSAMPLE}" '
            'viewBox="0 0 16 16"><g fill="none" stroke="white" stroke-width="2" stroke-linecap="square" '
            f'stroke-linejoin="miter">{path}</g></svg>')
@@ -96,7 +110,25 @@ def render(path: str, size: int, low: int = LOW, high: int = HIGH) -> bytes:
 
 
 def main() -> None:
+    """Generate v8 or staged v9 icons after pixel checks. 像素自检后输出资源。"""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--v9", action="store_true", help="输出 v9 A8，默认仍为 v8 A8")
+    parser.add_argument("--format", choices=("A8", "RGB565A8"), help="v9 目标格式（默认 A8）")
+    parser.add_argument("--output-dir", type=Path, help="输出目录，默认 v8 为 img，v9 为 img_v9")
+    args = parser.parse_args()
+    if args.format and not args.v9:
+        parser.error("--format 需要同时指定 --v9")
+    v9_format = args.format or "A8"
+    output = (args.output_dir or (ROOT.parent / "img_v9" if args.v9 else ROOT)).resolve()
+    if args.v9:
+        source_root = ROOT.resolve()
+        if output == source_root or source_root in output.parents or output in source_root.parents:
+            parser.error("v9 输出目录不得覆盖或包含原 v8 资源目录")
+        sys.path.insert(0, str(ROOT.parent / "tools"))
+        from convert_images_v9 import Image8, encode_v9, render_c_file, verify_text
+
     images = {}
+    pending = {}
     for name, variants in PATHS.items():
         for size, path in variants.items():
             key = f"ui_{name}" + ("_large" if size == 32 else "")
@@ -111,7 +143,19 @@ def main() -> None:
                       f'const lv_img_dsc_t img_src_{key} = {{\n'
                       f'    .header = {{.cf = LV_IMG_CF_ALPHA_8BIT, .w = {size}, .h = {size}}},\n'
                       f'    .data_size = sizeof({key}_alpha),\n    .data = {key}_alpha,\n}};\n')
-            (ROOT / f"img_src_{key}.c").write_text(source)
+            if args.v9:
+                rgba = b"".join(bytes((255, 255, 255, alpha)) for alpha in pixels)
+                symbol = f"img_src_{key}"
+                encoded = encode_v9(symbol, size, size, rgba, v9_format)
+                source = render_c_file([encoded])
+                original = Image8(ROOT / f"{symbol}.c", symbol, "LV_IMG_CF_ALPHA_8BIT",
+                                  size, size, len(pixels), rgba)
+                errors = verify_text([original], source)
+                if errors:
+                    raise RuntimeError("; ".join(errors))
+                pending[f"{symbol}.c"] = (source, original)
+            else:
+                pending[f"img_src_{key}.c"] = (source, None)
     # 首页四个图标必须同尺寸且具有接近基准的有效墨量，避免再出现过小、发灰的入口。
     reference = sum(images["ui_info"])
     for name in ("work", "record", "settings"):
@@ -121,7 +165,17 @@ def main() -> None:
     for key, pixels in images.items():
         partial = sum(1 for value in pixels if 0 < value < 255)
         assert partial <= 0.5 * sum(1 for value in pixels if value), (key, partial)
-    print(f"Generated and checked {len(images)} native-size alpha icons.")
+    output.mkdir(parents=True, exist_ok=True)
+    for filename, (source, original) in pending.items():
+        target = output / filename
+        newline = "\r\n" if target.exists() and b"\r\n" in target.read_bytes() else "\n"
+        target.write_bytes(source.replace("\n", newline).encode("utf-8"))
+        if args.v9:
+            errors = verify_text([original], target.read_bytes().decode("utf-8"))
+            if errors:
+                raise RuntimeError("; ".join(errors))
+    mode = f"v9 {v9_format}" if args.v9 else "alpha"
+    print(f"Generated and checked {len(images)} native-size {mode} icons.")
 
 
 if __name__ == "__main__":
