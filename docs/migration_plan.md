@@ -54,7 +54,7 @@
 
 目标：三端（HC32、模拟器、Linux）切到 LVGL v9.6.0；页面层改用 `Frameworks/PageManager`、`ResourceManager`，数据层改用 `DataBroker`，平台 Bridge 改为 `DeviceManager` 设备对象。界面外观与交互不变。
 
-设计依据见 `docs/lvgl9_migration.md`。调研结论调整了顺序：不依赖 LVGL 的数据/设备/资源框架先在 LVGL 8 上切换并单独验收；`Frameworks/PageManager` 已使用 v9 接口，只能在 LVGL 9 之后切换。
+设计依据见 `docs/lvgl9_migration.md`；构建分层见 `docs/build_architecture.md`。调研结论调整了顺序：不依赖 LVGL 的数据/设备/资源框架先在 LVGL 8 上切换并单独验收；`Frameworks/PageManager` 已使用 v9 接口，只能在 LVGL 9 之后切换。
 
 | # | 内容 | 负责 |
 |---|---|---|
@@ -63,6 +63,7 @@
 | 3.2 | 图片转换脚本（入库、可重复执行、逐像素回读校验）：v8 数组 → v9 `lv_image_dsc_t`（`RGB565A8`/`RGB565`，无索引格式）；更新 `generate_ui_icons.py`；产物在 3.3 一并接入 | argon（与 3.1 并行） |
 | 3.3 ★ | 切换 LVGL v9.6.0：导入 `External/lvgl`（含 `include/`），重建三份 `lv_conf.h`，HC32/模拟器/Linux 显示、输入、时基端口，`lvgl_new.cpp`，`App/` 全部 API 迁移（含 Dialplate 自定义绘制）与现有 `App/Utils/PageManager` 的最小 v9 适配，接入 3.2 的资源；`App/`、`Vendor/` 定义 `LV_DISABLE_API_MAPPING` | sol（sonnet 复核） |
 | 3.3b | 组件统一由 CMake 管理：导入 LVGL 上游 `CMakeLists.txt` 与 `env_support/cmake`，各平台通过 `add_subdirectory` + `LV_BUILD_CONF_PATH` 使用上游 `lvgl` 目标（demos 用上游 `lvgl_demos`），删除手写的 LVGL 源文件收集；`Vendor/HC32/Libraries/*`、`Frameworks/*` 每个组件在自身目录维护 `CMakeLists.txt`，父目录只 `add_subdirectory`；固件体积与截图不变 | sol（3.4 之后） |
+| 3.3c ★ | 按 `docs/build_architecture.md` 实施 CMake 分层：L0 选项 / L1 第三方 / L2 框架 / L3 应用 / L4 平台（HC32 内部 cmsis→ddl→system→peripherals→devices→board→state→hal→comm→display）/ L5 产品；目标只公开自身头文件、带 `<域>::<组件>` ALIAS；Bq40z50/Mp2762a 迁入 `Platform/Devices` 消除环；模拟器与主机测试经 `portable.cmake` 链接 HC32 共享目标；新增 `tests/check_layers.py` 自动校验依赖图并纳入验证策略；体积与截图不变 | sol（3.3b 之后） |
 | 3.4 ★ | 加固并切换 `Frameworks/PageManager`：补齐应用依赖的接口与虚函数、页面池释放、出现顺序、动画复位、返回值语义、告警；迁移全部页面；删除 `App/Utils/PageManager` | sol（sonnet 复核） |
 | 3.5 | 主控截图对比（与 LVGL 8 基线逐页）与视觉/交互差异修正 | 主控 / sol |
 | 3.6 ★ | HC32 内存与性能调优：`LV_DRAW_LAYER_SIMPLE_BUF_SIZE`、C 堆缩减、`LV_MEM_SIZE`、图片 `A8` 取舍；记录 `lv_mem` 峰值、栈水印、帧率与 debug/release 体积 | sol |
