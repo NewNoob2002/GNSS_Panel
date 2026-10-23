@@ -56,6 +56,7 @@ void RecordConfig::onViewUnload() {
 
 void RecordConfig::onLanguageChanged() {
     view_.update(model_->state());
+    view_.sync_focus();
     if (getState() != STATE::ACTIVITY)
         view_.stop();
 }

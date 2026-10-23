@@ -75,88 +75,22 @@ void SystemDashView::create(lv_obj_t* root, bool reboot_available) {
         lv_obj_set_x(ui.shutdown, 75); // Centered alone.
     }
     show_power(false);
-    auto* highlight = style::box(root, 0, 0, 1, 1);
-    style::card(highlight);
-    lv_obj_set_style_border_width(highlight, 2, 0);
-    lv_obj_set_style_border_color(highlight, style::kAccent, 0);
-    lv_obj_set_style_bg_opa(highlight, LV_OPA_TRANSP, 0);
-    lv_obj_set_ignore_layout(highlight, true);
-    lv_obj_set_floating(highlight, true);
-    lv_obj_set_hidden(highlight, true);
-    if (!focus_motion_.bind(highlight))
+    if (!focus_.bind(root, all_controls()))
         app_fatal("SystemDash", "Focus driver binding failed");
-    for (auto* object : all_controls()) {
-        /** 灰色边框仍占 1 px，补 1 px 内距以保留基线焦点内容的 2 px 占位。 */
-        lv_obj_set_style_border_width(object, 1, LV_STATE_FOCUSED);
-        lv_obj_set_style_border_color(object, style::kBorder, LV_STATE_FOCUSED);
-        lv_obj_set_style_pad_all(object, 1, LV_STATE_FOCUSED);
-        lv_obj_set_style_border_width(object, 2, LV_STATE_FOCUSED | LV_STATE_PRESSED);
-        lv_obj_set_style_border_color(object, style::kAccent, LV_STATE_FOCUSED | LV_STATE_PRESSED);
-        lv_obj_set_style_pad_all(object, 0, LV_STATE_FOCUSED | LV_STATE_PRESSED);
-        lv_obj_add_event_cb(object, on_focus_event, LV_EVENT_ALL, this);
-    }
 }
 
 void SystemDashView::destroy() {
     unbind();
     stop();
-    for (auto* object : all_controls())
-        if (object)
-            lv_obj_remove_event_cb_with_user_data(object, on_focus_event, this);
-    focus_motion_.unbind();
-    focused_ = nullptr;
-}
-
-void SystemDashView::focus_to(lv_obj_t* object, bool animated) {
-    auto* highlight = focus_motion_.object();
-    if (!highlight || !object || aligning_focus_)
-        return;
-    aligning_focus_ = true;
-    focused_ = object;
-    lv_obj_update_layout(object);
-    auto* parent = lv_obj_get_parent(object);
-    if (lv_obj_get_parent(highlight) != parent) {
-        lv_obj_set_parent(highlight, parent);
-        animated = false;
-    }
-    lv_obj_move_to_index(highlight, -1);
-    lv_obj_set_style_opa(highlight, lv_obj_get_style_opa(object, LV_PART_MAIN), 0);
-    lv_obj_set_hidden(highlight, lv_obj_is_pressed(object));
-    const auto x = lv_obj_get_x(object), y = lv_obj_get_y(object);
-    const auto width = lv_obj_get_width(object), height = lv_obj_get_height(object);
-    if (animated)
-        focus_motion_.retarget(x, y, width, height);
-    else
-        focus_motion_.snap(x, y, width, height);
-    aligning_focus_ = false;
-}
-
-void SystemDashView::on_focus_event(lv_event_t* event) {
-    auto* self = static_cast<SystemDashView*>(lv_event_get_user_data(event));
-    auto* object = lv_event_get_current_target_obj(event);
-    const auto code = lv_event_get_code(event);
-    if (code == LV_EVENT_FOCUSED)
-        self->focus_to(object, self->animate_focus_);
-    else if (code == LV_EVENT_DEFOCUSED && self->focused_ == object) {
-        self->focused_ = nullptr;
-        if (self->focus_motion_.object())
-            lv_obj_set_hidden(self->focus_motion_.object(), true);
-    } else if (code == LV_EVENT_SIZE_CHANGED && self->focused_ == object) {
-        /** 入场位移及语言重排使用真实布局直接对齐，不从旧尺寸飞入。 */
-        self->focus_to(object, false);
-    } else if ((code == LV_EVENT_PRESSED || code == LV_EVENT_RELEASED || code == LV_EVENT_PRESS_LOST)
-               && self->focused_ == object && self->focus_motion_.object()) {
-        lv_obj_set_hidden(self->focus_motion_.object(), lv_obj_is_pressed(object));
-    }
+    focus_.unbind();
 }
 
 void SystemDashView::sync_focus() {
-    focus_to(focused_, false);
+    focus_.sync();
 }
 
 void SystemDashView::resume_focus() {
-    sync_focus();
-    animate_focus_ = true;
+    focus_.resume();
 }
 
 void SystemDashView::appear() const {
@@ -168,8 +102,7 @@ void SystemDashView::appear() const {
 }
 
 void SystemDashView::stop() {
-    animate_focus_ = false;
-    focus_motion_.stop();
+    focus_.stop();
     settings_style::stop(status_dot_);
 }
 
@@ -257,8 +190,7 @@ void SystemDashView::set_hold(lv_obj_t* button, int32_t percent) const {
 }
 
 void SystemDashView::show_power(bool visible) {
-    animate_focus_ = false;
-    focus_motion_.stop();
+    focus_.stop();
     power_open_ = visible;
     set_hold(nullptr, 0);
     for (auto* action : {ui.shutdown, ui.reboot})

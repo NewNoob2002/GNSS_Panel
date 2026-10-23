@@ -1,4 +1,5 @@
 #include "WorkSettingsView.h"
+#include "Log.h"
 #include "UI/Common/SettingsStyle.h"
 #include "UI/Common/PageUtils.h"
 using namespace page;
@@ -38,9 +39,12 @@ void WorkSettingsView::create(lv_obj_t* root) {
     }
     feedback_ = style::label(root, font, 8, 108, 278);
     lv_obj_set_style_text_align(feedback_, LV_TEXT_ALIGN_CENTER, 0);
+    if (!focus_.bind(root, controls()))
+        app_fatal("WorkSettings", "Focus driver binding failed");
 }
 
-void WorkSettingsView::appear() const {
+void WorkSettingsView::appear() {
+    focus_.resume();
     settings_style::reveal(ui.preset);
     settings_style::reveal(ui.protocol, 40);
     settings_style::reveal(ui.channel, 80);
@@ -49,7 +53,8 @@ void WorkSettingsView::appear() const {
     settings_style::reveal(ui.back, 160);
 }
 
-void WorkSettingsView::stop() const {
+void WorkSettingsView::stop() {
+    focus_.stop();
     settings_style::stop(status_dot_);
 }
 

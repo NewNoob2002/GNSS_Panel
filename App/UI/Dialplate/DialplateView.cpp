@@ -1,4 +1,5 @@
 #include "DialplateView.h"
+#include "Log.h"
 #include "UI/Resource/ResourcePool.h"
 #include "UI/Common/PageStyle.h"
 #include "UI/Common/SettingsStyle.h"
@@ -36,6 +37,7 @@ void DialplateView::create(lv_obj_t* root) {
 void DialplateView::destroy() {
     unbind();
     anim_stop();
+    focus_.unbind();
     if (ui.anim_timeline) {
         lv_anim_timeline_delete(ui.anim_timeline);
         ui.anim_timeline = nullptr;
@@ -75,12 +77,20 @@ void DialplateView::on_state(lv_observer_t* observer, lv_subject_t* subject) {
     self->update(*static_cast<const DialplateState*>(lv_subject_get_pointer(subject)));
 }
 
+void DialplateView::resume_focus() {
+    /** @brief 独立表盘预览不建立导航覆盖框，由页面在组装焦点后显式启用。 */
+    if (!focus_.object() && !focus_.bind(lv_obj_get_parent(ui.top_info.cont), controls(true)))
+        app_fatal("Dialplate", "Focus driver binding failed");
+    focus_.resume();
+}
+
 void DialplateView::anim_start() {
     anim_enabled_ = true;
     sync_anim();
 }
 
 void DialplateView::anim_stop() {
+    focus_.stop();
     anim_enabled_ = false;
     sync_anim();
 }

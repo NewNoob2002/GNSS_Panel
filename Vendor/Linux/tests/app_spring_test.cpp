@@ -4,6 +4,9 @@
 #include "UI/Common/PageStyle.h"
 #include "UI/Common/PageUtils.h"
 #include "UI/SystemDash/SystemDashView.h"
+#include "UI/Dialplate/DialplateView.h"
+#include "UI/WorkSettings/WorkSettingsView.h"
+#include "UI/RecordConfig/RecordConfigView.h"
 #include "lv_spring.h"
 
 namespace {
@@ -211,6 +214,159 @@ focus() {
     advance(2000);
     assert(timers() == baseline);
 }
+/** @brief 共享组件的解绑恢复、禁用/按下状态、换父容器与滚动坐标回归。 */
+void
+component() {
+    const auto baseline = timers();
+    auto* root = page::style::box(lv_screen_active(), 0, 0, 294, 126);
+    auto* scroller = page::style::box(root, 0, 0, 200, 110);
+    lv_obj_set_scrollable(scroller, true);
+    auto* a = page::style::box(scroller, 10, 10, 80, 30, true);
+    auto* b = page::style::box(scroller, 10, 150, 80, 30, true);
+    auto* c = page::style::box(root, 210, 10, 80, 30, true);
+    for (auto* object : {a, b, c}) {
+        page::style::control(object);
+    }
+    lv_obj_update_layout(root);
+    const auto root_events = lv_obj_get_event_count(root);
+    const auto scroll_events = lv_obj_get_event_count(scroller);
+    const auto a_events = lv_obj_get_event_count(a);
+    {
+        page::FocusHighlight focus;
+        assert(!focus.bind(nullptr, std::array{a}));
+        assert(focus.bind(root, std::array{a, b, c}));
+        page::utils::focus_controls(std::array{a, b, c}, a);
+        focus.resume();
+        assert(focus.object() && !focus.motion().running());
+        lv_obj_set_pressed(a, true);
+        assert(lv_obj_is_hidden(focus.object()));
+        assert(lv_obj_get_style_border_width(a, LV_PART_MAIN) == 2);
+        assert(lv_color_to_u32(lv_obj_get_style_border_color(a, LV_PART_MAIN))
+               == lv_color_to_u32(page::style::kAccent));
+        lv_obj_set_pressed(a, false);
+        assert(!lv_obj_is_hidden(focus.object()));
+        lv_obj_set_disabled(a, true);
+        assert(lv_obj_is_hidden(focus.object()));
+        lv_obj_set_disabled(a, false);
+        assert(!lv_obj_is_hidden(focus.object()));
+        lv_group_focus_obj(b);
+        advance(60);
+        lv_obj_scroll_to_y(scroller, 100, LV_ANIM_OFF);
+        lv_obj_update_layout(root);
+        lv_area_t actual, expected;
+        lv_obj_get_coords(focus.object(), &actual);
+        lv_obj_get_coords(b, &expected);
+        assert(actual.x1 == expected.x1 && actual.y1 == expected.y1 && actual.x2 == expected.x2
+               && actual.y2 == expected.y2);
+        assert(!focus.motion().running());
+        lv_group_focus_obj(c);
+        assert(lv_obj_get_parent(focus.object()) == root && !focus.motion().running());
+        lv_group_focus_obj(a);
+        focus.resume();
+        lv_group_focus_obj(b);
+        advance(20);
+        focus.stop();
+        assert(!focus.motion().running());
+        page::utils::leave_focus_group();
+        lv_group_add_obj(lv_group_get_default(), c);
+        focus.resume();
+        assert(!focus.motion().running());
+        focus.unbind();
+        assert(!focus.object() && !focus.motion().running());
+        assert(lv_obj_get_event_count(a) == a_events);
+        assert(lv_obj_get_event_count(root) == root_events);
+        assert(lv_obj_get_event_count(scroller) == scroll_events);
+        assert(lv_obj_get_style_border_width(c, LV_PART_MAIN) == 2);
+        assert(lv_color_to_u32(lv_obj_get_style_border_color(c, LV_PART_MAIN))
+               == lv_color_to_u32(page::style::kAccent));
+        page::utils::leave_focus_group();
+        lv_obj_send_event(a, LV_EVENT_FOCUSED, nullptr);
+        assert(!focus.object());
+        assert(focus.bind(root, std::array{a, b, c}));
+        page::utils::focus_controls(std::array{a, b, c});
+        focus.resume();
+        lv_group_focus_obj(b);
+        advance(20);
+        /** @brief 控件及父容器先销毁，组件不保留回调、对象地址或定时器。 */
+        lv_obj_delete(root);
+        assert(!focus.object() && !focus.motion().running());
+        focus.unbind();
+    }
+    advance(1000);
+    assert(timers() == baseline);
+}
+
+/** @brief 每个接入页面的终态、60 ms 连切保速、离页停表与恢复回归。 */
+template <typename View, std::size_t N>
+void
+rollout(View& view, const std::array<lv_obj_t*, N>& controls) {
+    const auto baseline = timers();
+    page::utils::focus_controls(controls);
+    view.resume_focus();
+    const auto& focus = view.focus_highlight();
+    const auto check = [&] {
+        lv_obj_update_layout(focus.object());
+        lv_area_t actual, expected;
+        lv_obj_get_coords(focus.object(), &actual);
+        lv_obj_get_coords(lv_group_get_focused(lv_group_get_default()), &expected);
+        assert(actual.x1 == expected.x1 && actual.y1 == expected.y1 && actual.x2 == expected.x2
+               && actual.y2 == expected.y2);
+        assert(!focus.motion().running());
+    };
+    advance(800);
+    check();
+    for (unsigned index = 0; index < controls.size() * 3; ++index) {
+        const auto* parent = lv_obj_get_parent(lv_group_get_focused(lv_group_get_default()));
+        std::array<float, 4> positions{}, velocities{};
+        for (unsigned axis = 0; axis < 4; ++axis) {
+            const auto& value = focus.motion().value(static_cast<app::LvSpring::Axis>(axis));
+            positions[axis] = value.position();
+            velocities[axis] = value.velocity();
+        }
+        lv_group_focus_next(lv_group_get_default());
+        if (parent == lv_obj_get_parent(lv_group_get_focused(lv_group_get_default()))) {
+            for (unsigned axis = 0; axis < 4; ++axis) {
+                const auto& value = focus.motion().value(static_cast<app::LvSpring::Axis>(axis));
+                assert(value.position() == positions[axis] && value.velocity() == velocities[axis]);
+            }
+        } else {
+            check();
+        }
+        advance(60);
+    }
+    advance(800);
+    check();
+    assert(timers() == baseline);
+    lv_group_focus_next(lv_group_get_default());
+    advance(20);
+    view.destroy();
+    assert(!focus.object() && !focus.motion().running());
+    assert(timers() == baseline);
+    page::utils::leave_focus_group();
+}
+
+void
+rollout_pages() {
+    auto* root = page::style::box(lv_screen_active(), 0, 0, 294, 126);
+    {
+        page::DialplateView view{};
+        view.create(root);
+        rollout(view, view.controls(true));
+    }
+    lv_obj_clean(root);
+    {
+        page::WorkSettingsView view{};
+        view.create(root);
+        rollout(view, view.controls());
+    }
+    lv_obj_clean(root);
+    {
+        page::RecordConfigView view{};
+        view.create(root);
+        rollout(view, view.controls());
+    }
+    lv_obj_delete(root);
+}
 } // namespace
 
 int
@@ -228,6 +384,8 @@ main() {
     path();
     driver_lifetime();
     focus();
+    component();
+    rollout_pages();
     lv_group_delete(group);
     lv_display_delete(display);
     lv_deinit();

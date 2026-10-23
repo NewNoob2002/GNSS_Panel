@@ -31,6 +31,7 @@ void Dialplate::onViewWillAppear() {
     if (!view_.bind(model_->subject()))
         app_fatal("Dialplate", "View binding failed");
     utils::focus_controls(controls(), last_focus_ ? last_focus_ : view_.default_focus());
+    view_.resume_focus();
     if (entrance_pending_) {
         // Returning from a child slides the page back already; replaying the entrance would double the work.
         entrance_pending_ = false;

@@ -61,6 +61,7 @@ add_subdirectory(../Frameworks/PageManager frameworks/pagemanager)
 
 file(GLOB APP_RESOURCES CONFIGURE_DEPENDS "UI/Resource/font/*.c" "UI/Resource/img/*.c" "UI/Resource/symbol/*.c")
 add_library(app_dialplate STATIC
+    UI/Common/FocusHighlight.cpp
     UI/Dialplate/DialplateView.cpp
     UI/Resource/ResourcePool.cpp
     Utils/lv_anim_label/numberFlow.cpp
@@ -69,7 +70,7 @@ add_library(app_dialplate STATIC
     ${APP_RESOURCES})
 target_include_directories(app_dialplate PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 add_library(app::dialplate ALIAS app_dialplate)
-target_link_libraries(app_dialplate PUBLIC lvgl::lvgl app::i18n proj::options fw::resourcemanager app::core)
+target_link_libraries(app_dialplate PUBLIC lvgl::lvgl app::i18n proj::options fw::resourcemanager app::core app::lv_spring)
 target_compile_options(app_dialplate PRIVATE -Wall -Wextra)
 
 add_library(app_ui STATIC

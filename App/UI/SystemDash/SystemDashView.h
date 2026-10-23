@@ -3,7 +3,7 @@
 #include "SystemDashModel.h"
 #include "UI/Resource/ResourcePool.h"
 #include "lvgl.h"
-#include "lv_spring.h"
+#include "UI/Common/FocusHighlight.h"
 
 namespace page {
 class SystemDashView {
@@ -18,8 +18,8 @@ class SystemDashView {
     void resume_focus();
     /** @brief 布局或语言更新时直接对齐当前焦点。 */
     void sync_focus();
-    lv_obj_t* focus_highlight() const { return focus_motion_.object(); }
-    const app::LvSpring& focus_motion() const { return focus_motion_; }
+    lv_obj_t* focus_highlight() const { return focus_.object(); }
+    const app::LvSpring& focus_motion() const { return focus_.motion(); }
 
     bool bind(lv_subject_t* subject);
     void unbind();
@@ -49,11 +49,7 @@ class SystemDashView {
         lv_obj_t *language{}, *wifi{}, *power{}, *back{}, *overlay{}, *shutdown{}, *reboot{};
     } ui;
 
-    static void on_focus_event(lv_event_t* event);
-    void focus_to(lv_obj_t* object, bool animated);
-    app::LvSpring focus_motion_{};
-    lv_obj_t* focused_ = nullptr;
-    bool animate_focus_ = false, aligning_focus_ = false;
+    FocusHighlight focus_{};
 
     static void on_state(lv_observer_t* observer, lv_subject_t* subject);
     lv_observer_t* observer_ = nullptr;

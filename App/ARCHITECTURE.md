@@ -21,7 +21,7 @@ HC32、RK3506（`Vendor/Linux`）和 SDL 模拟器（`Vendor/Simulator`）共用
 | `app::framework` | 汇总 `fw::databroker`、`fw::devicemanager`、`fw::resourcemanager` |
 | `app::core` | DataProc、HAL 公共解码和通用工具；不依赖 LVGL 或 PageManager |
 | `fw::pagemanager` / `app_page_manager` | 页面池、生命周期与过渡；依赖 LVGL 和日志 |
-| `app::dialplate` | 表盘 View、资源、动画；依赖 LVGL、i18n、ResourceManager 与核心 |
+| `app::dialplate` | 表盘 View、资源、动画与 UI 共用 FocusHighlight；依赖 LVGL、i18n、ResourceManager、核心与 lv_spring |
 | `app::spring` | 无堆分配的 float 弹簧解析解；仅依赖 `proj::options`，可无屏测试 |
 | `app::lv_spring` | 固定目标曲线和可打断 x/y/w/h 驱动；依赖 `app::spring`、LVGL，落定删除定时器 |
 | `app::ui` | App、导航/输入与全部页面 MVP；依赖 core、PageManager、dialplate、lv_spring |
@@ -59,7 +59,7 @@ SystemLoading 的元数据从 Model 经 `dp::Init::info` 读取后交给 View，
 
 PageManager 拥有已注册页面；导航结果必须显式比较 `PageManager::RES_TYPE::OK`（值为 0）。各页保留 260 ms 缓出位移过渡，建页耗时不计入动画；根对象异步删除前清理动画、控件与外部样式引用。双键输入和 SDL 输入各用既有归一化路径，页面成员通过 getter 访问。
 
-所有 DataNode、设备、输入、定时器和 LVGL 操作只在应用线程执行。SystemDash 的焦点由 `Utils/Spring` 单定时器驱动上层透明边框，控件保留自身背景与普通边框，连续切换保留速度；入场、恢复和布局改变直接对齐，离页停止，卸载解除对象事件和 observer。其余页面保持共享焦点样式。DataBroker 最多注册 32 个外部节点和 32 个独立时钟定时器；Publish/Notify/Pull 同步完成，禁止中断/后台线程直接分发或保存载荷指针。发布时使用地址加注册序号快照，可在回调中解除订阅或删除订阅者，禁止销毁当前发布者或 Broker。
+所有 DataNode、设备、输入、定时器和 LVGL 操作只在应用线程执行。SystemDash、Dialplate、WorkSettings、RecordConfig 显式启用 `UI/Common/FocusHighlight`：单定时器驱动上层透明边框，控件保留自身背景与普通边框，连续切换保留速度；入场、恢复、语言、尺寸及父容器改变直接对齐，滚动按真实偏移对齐，按下/禁用时隐藏覆盖框，离页停止，卸载解除对象及父容器事件和 observer。覆盖框沿用 250 ms、bounce 0.15，匹配控件圆角；渐变卡片保留原 2 px 底边框以保持填充取样不变。SystemInfos 的整页滚动/收窄单侧边线、StarMap 的无边框整页焦点、Startup 的 hold 进度环保持原绘制。DataBroker 最多注册 32 个外部节点和 32 个独立时钟定时器；Publish/Notify/Pull 同步完成，禁止中断/后台线程直接分发或保存载荷指针。发布时使用地址加注册序号快照，可在回调中解除订阅或删除订阅者，禁止销毁当前发布者或 Broker。
 
 初始化先注入单调毫秒时钟 `DataProc_Init(clock)`，再创建页面；主循环运行平台更新、`App::update()`（即 DataProc_RunLoop）和 `lv_timer_handler()`。销毁先停止导航定时器、销毁页面和组件，再逆序销毁领域节点；Broker 必须比全部节点和定时器存活更久。HC32 的标准 `new` 仍由平台映射到 LVGL 池，Frameworks 不选择分配器。
 

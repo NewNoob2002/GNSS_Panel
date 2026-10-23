@@ -3,6 +3,7 @@
 #include "WorkSettingsModel.h"
 #include "I18n.h"
 #include "UI/Resource/ResourcePool.h"
+#include "UI/Common/FocusHighlight.h"
 #include "lvgl.h"
 
 namespace page {
@@ -14,9 +15,14 @@ class WorkSettingsView {
     void destroy() {
         unbind();
         stop();
+        focus_.unbind();
     }
-    void appear() const;
-    void stop() const;
+    void appear();
+    void stop();
+    /** @brief 组装焦点后直接对齐；语言更新不沿用旧几何。 */
+    void resume_focus() { focus_.resume(); }
+    void sync_focus() { focus_.sync(); }
+    const FocusHighlight& focus_highlight() const { return focus_; }
 
     bool bind(lv_subject_t* subject);
     void unbind();
@@ -38,6 +44,7 @@ class WorkSettingsView {
         lv_obj_t *preset{}, *protocol{}, *channel{}, *apply{}, *back{};
     } ui;
 
+    FocusHighlight focus_{};
     static void on_state(lv_observer_t* observer, lv_subject_t* subject);
     lv_observer_t* observer_ = nullptr;
 

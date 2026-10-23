@@ -4,6 +4,7 @@
 #include <array>
 #include "DialplateModel.h"
 #include "Utils/lv_anim_label/numberFlow.h"
+#include "UI/Common/FocusHighlight.h"
 #include "lvgl.h"
 
 namespace page {
@@ -63,6 +64,9 @@ class DialplateView {
     /** 释放动画和 C++ 辅助对象；调用方仍须清理 root 下的 LVGL 子对象。 */
     void destroy();
 
+    /** @brief 进入及恢复直接对齐，后续焦点切换保速。 */
+    void resume_focus();
+    const FocusHighlight& focus_highlight() const { return focus_; }
     void appear_anim_start(bool reverse = false) const;
     /** 页面出现/离开时开关电台波形与工作模式（基站播发/移动站测点）动效；实际运行与否还取决于设备状态。 */
     void anim_start();
@@ -90,6 +94,7 @@ class DialplateView {
     static constexpr int32_t kIconX = 19, kIconY = 9; // 16 px 图标在卡片内的位置，上方留给动效。
     static constexpr uint32_t kAnimPeriod = 1200, kAnimStep = 50;
 
+    FocusHighlight focus_{};
     uint32_t anim_phase_ = 0;
     bool anim_enabled_ = false;
     bool anim_running_ = false;

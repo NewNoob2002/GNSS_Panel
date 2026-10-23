@@ -1,5 +1,6 @@
 #include "RecordConfigView.h"
 #include <cstdio>
+#include "Log.h"
 #include "FixedFormat.h"
 #include "UI/Common/SettingsStyle.h"
 #include "UI/Common/PageUtils.h"
@@ -33,9 +34,12 @@ void RecordConfigView::create(lv_obj_t* root) {
     back_text_ = style::label(ui.back, font, 32, 2, 49);
     feedback_ = style::label(root, font, 8, 108, 278);
     lv_obj_set_style_text_align(feedback_, LV_TEXT_ALIGN_CENTER, 0);
+    if (!focus_.bind(root, controls()))
+        app_fatal("RecordConfig", "Focus driver binding failed");
 }
 
-void RecordConfigView::appear() const {
+void RecordConfigView::appear() {
+    focus_.resume();
     settings_style::reveal(hero_);
     settings_style::reveal(ui.type, 40);
     settings_style::reveal(ui.interval, 80);
@@ -43,7 +47,8 @@ void RecordConfigView::appear() const {
     settings_style::reveal(ui.back, 160);
 }
 
-void RecordConfigView::stop() const {
+void RecordConfigView::stop() {
+    focus_.stop();
     settings_style::stop(status_dot_);
 }
 

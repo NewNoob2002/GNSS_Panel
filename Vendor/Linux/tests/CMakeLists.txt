@@ -41,6 +41,16 @@ target_compile_options(app_focus_preview PRIVATE -Wall -Wextra -Werror -UNDEBUG)
 add_test(NAME app_focus_preview COMMAND app_focus_preview)
 add_test(NAME app_focus_rapid COMMAND app_focus_preview "${CMAKE_CURRENT_BINARY_DIR}/spring-rapid-frames" rapid)
 
+add_executable(app_focus_rollout_preview app_focus_rollout_preview.cpp)
+target_link_libraries(app_focus_rollout_preview PRIVATE linux::demo_backend)
+target_compile_options(app_focus_rollout_preview PRIVATE -Wall -Wextra -Werror -UNDEBUG)
+foreach(page SystemDash Dialplate WorkSettings RecordConfig)
+    foreach(mode normal rapid)
+        add_test(NAME focus_${page}_${mode}
+            COMMAND app_focus_rollout_preview "${CMAKE_CURRENT_BINARY_DIR}/focus-${page}-${mode}" ${page} ${mode} en)
+    endforeach()
+endforeach()
+
 add_executable(app_deferred_navigation_test app_deferred_navigation_test.cpp)
 target_link_libraries(app_deferred_navigation_test PRIVATE linux::demo_backend)
 target_compile_options(app_deferred_navigation_test PRIVATE -Wall -Wextra -Werror -UNDEBUG)

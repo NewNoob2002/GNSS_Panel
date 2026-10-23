@@ -27,16 +27,30 @@ def check(directory: Path) -> dict:
             assert stream.readline() == b"255\n", path
             pixels = stream.read()
         assert len(pixels) == WIDTH * HEIGHT * 3, f"{path}: 像素长度错误"
-        points = [(x, y) for y in range(HEIGHT) for x in range(100, WIDTH)
-                  if pixels[(y * WIDTH + x) * 3:(y * WIDTH + x + 1) * 3] == ACCENT]
-        assert points, f"{path}: 右侧没有任何高亮边框像素"
+        isolated = row.get("isolated") == "1"
+        background = None
+        if isolated:
+            background_path = directory / f"background-{index:04d}.ppm"
+            raw = background_path.read_bytes()
+            header = b"P6\n294 126\n255\n"
+            assert raw.startswith(header), background_path
+            background = raw[len(header):]
+            assert len(background) == WIDTH * HEIGHT * 3, background_path
+        expected = tuple(int(row[key]) for key in ("x1", "y1", "x2", "y2"))
+        x1, y1, x2, y2 = expected
+        assert 0 <= x1 <= x2 < WIDTH and 0 <= y1 <= y2 < HEIGHT, f"{path}: 边框超出画面"
+        radius = int(row.get("radius", RADIUS))
+        assert radius in (8, 10), f"{path}: 未验证的圆角参数"
+        points = [(x, y) for y in range(HEIGHT) for x in range(0 if isolated else 100, WIDTH)
+                  if pixels[(y * WIDTH + x) * 3:(y * WIDTH + x + 1) * 3] == ACCENT
+                  and (background is None or
+                       background[(y * WIDTH + x) * 3:(y * WIDTH + x + 1) * 3] != ACCENT)]
+        assert points, f"{path}: 没有任何高亮边框像素"
         bounds = (min(x for x, _ in points), min(y for _, y in points),
                   max(x for x, _ in points), max(y for _, y in points))
-        expected = tuple(int(row[key]) for key in ("x1", "y1", "x2", "y2"))
         assert bounds == expected, f"{path}: 可见边框 {bounds} 与 CSV {expected} 不一致"
-        x1, y1, x2, y2 = expected
-        edges = ([(x, y) for x in range(x1 + RADIUS, x2 - RADIUS + 1) for y in (y1, y2)]
-                 + [(x, y) for y in range(y1 + RADIUS, y2 - RADIUS + 1) for x in (x1, x2)])
+        edges = ([(x, y) for x in range(x1 + radius, x2 - radius + 1) for y in (y1, y2)]
+                 + [(x, y) for y in range(y1 + radius, y2 - radius + 1) for x in (x1, x2)])
         assert all(pixels[(y * WIDTH + x) * 3:(y * WIDTH + x + 1) * 3] == ACCENT for x, y in edges), \
             f"{path}: 覆盖框直边被遮挡"
         if "accent_pixels" in row:
