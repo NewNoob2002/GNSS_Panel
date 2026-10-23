@@ -89,6 +89,8 @@
 
 进度（2026-10-23）：4.1 在 4.2 改名后的工作区实际运行——6 个 HC32 preset `--fresh` + `--clean-first` 零告警；simulator-x1pro/xbase、sim-demo 构建与冒烟通过；host-tests 19/19、app-core-tests 4/4、linux-host 29/29、Linux ASan+UBSan 29/29；`check_layers.py`、`test_check_layers.py`、`check_state_ownership.py` 通过。release X1 25,680/136/19,136、X1Pro 357,528/676/168,644、XBase 357,088/676/168,644，RAM 余量 23,256 B（debug 20,584 B）；主机 LVGL 池峰值 X1Pro 76,208 B / XBase 73,584 B，DataNode 峰值 18/17。改名前后 release 镜像：X1 逐字节一致，X1Pro/XBase 仅 `__TIME__` 构建时间 5 字节不同。实机清单见阶段 2/3（已确认）。4.2：根与 `Vendor/HC32` 的 `project()` 改为 `GNSS_Panel`，`readme.md` 标题改为 GNSS_Panel；`App/SOURCE.md` 的来源记录与 `Vendor/Linux/docs` 历史文档中的旧名/旧路径按用户决定保留。
 
+4.3 完成（2026-10-23）：GitHub 仓库改名为 `NewNoob2002/GNSS_Panel`（旧 URL 自动重定向），`origin` 更新为 `https://github.com/NewNoob2002/GNSS_Panel.git`；仓库目录改为 `HC32_PROJ/GNSS_Panel`，清空 `build/` 后在新路径重新配置并复验：6 个 HC32 preset、simulator-x1pro/xbase、sim-demo、linux-host 构建无告警，host-tests 19/19、app-core-tests 4/4、linux-host 29/29，`check_layers.py`、`check_state_ownership.py` 通过，release 体积与 4.1 完全一致。**阶段 2–4 全部完成**；唯一未实机确认项为 Spring 焦点高亮推广到的 Dialplate/WorkSettings/RecordConfig（`1363915`）。
+
 ## 阶段 1 验收基线（2026-10-21，`dda2da1`）
 
 全部 preset、模拟器、`linux-host`、host-tests、app-core-tests 通过。release 体积：
