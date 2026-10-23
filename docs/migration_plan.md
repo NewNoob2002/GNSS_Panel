@@ -85,6 +85,10 @@
 | 4.2 | CMake `project()`、文档、`proj_hc32.code-workspace` 等文本中的名称改为 GNSS_Panel；固件镜像前缀不变 | flash |
 | 4.3 | 仓库目录 `HC32F460xE_Arduino` → `GNSS_Panel`、GitHub 远程仓库改名并更新 remote；执行前再次确认 | 主控 |
 
+阶段 3 之后的增量：Spring 弹簧动画 `5d51ccb`（SystemDash 试点）与 `1363915`（`FocusHighlight` 推广到 Dialplate/WorkSettings/RecordConfig；获批差异仅聚焦控件四角抗锯齿与 WorkSettings 预设卡状态点 4 px），debug 内存池监视 `613e6cd`。
+
+进度（2026-10-23）：4.1 在 4.2 改名后的工作区实际运行——6 个 HC32 preset `--fresh` + `--clean-first` 零告警；simulator-x1pro/xbase、sim-demo 构建与冒烟通过；host-tests 19/19、app-core-tests 4/4、linux-host 29/29、Linux ASan+UBSan 29/29；`check_layers.py`、`test_check_layers.py`、`check_state_ownership.py` 通过。release X1 25,680/136/19,136、X1Pro 357,528/676/168,644、XBase 357,088/676/168,644，RAM 余量 23,256 B（debug 20,584 B）；主机 LVGL 池峰值 X1Pro 76,208 B / XBase 73,584 B，DataNode 峰值 18/17。改名前后 release 镜像：X1 逐字节一致，X1Pro/XBase 仅 `__TIME__` 构建时间 5 字节不同。实机清单见阶段 2/3（已确认）。4.2：根与 `Vendor/HC32` 的 `project()` 改为 `GNSS_Panel`，`readme.md` 标题改为 GNSS_Panel；`App/SOURCE.md` 的来源记录与 `Vendor/Linux/docs` 历史文档中的旧名/旧路径按用户决定保留。
+
 ## 阶段 1 验收基线（2026-10-21，`dda2da1`）
 
 全部 preset、模拟器、`linux-host`、host-tests、app-core-tests 通过。release 体积：

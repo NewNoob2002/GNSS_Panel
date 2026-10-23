@@ -8,9 +8,9 @@ if(NOT PLATFORM IN_LIST PLATFORMS)
 endif()
 
 if(PLATFORM STREQUAL "HC32")
-    project(HC32F460xE_Arduino LANGUAGES C CXX ASM)
+    project(GNSS_Panel LANGUAGES C CXX ASM)
 else()
-    project(HC32F460xE_Arduino LANGUAGES C CXX)
+    project(GNSS_Panel LANGUAGES C CXX)
     enable_testing()
 endif()
 

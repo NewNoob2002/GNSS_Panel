@@ -1,4 +1,4 @@
-# HC32F460xE Embedded UI Framework
+# GNSS_Panel
 
 **基于 HC32F460xE 的嵌入式 UI 系统框架，集成原生外设驱动与 HAL、LVGL 9 界面库、X-TRACK 风格应用框架及跨平台模拟器。**
 
