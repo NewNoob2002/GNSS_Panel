@@ -99,7 +99,7 @@ class WorkDevice final : public hal::WriteObject<hal::WorkState, hal::WorkComman
         request.target = static_cast<DataProc::WorkTarget>(command.target);
         request.radio_protocol = command.protocol;
         request.radio_channel = command.channel;
-        return hal::write(&device_, request);
+        return device_.execute_device(request) ? RES_OK : RES_PARAM_ERROR;
     }
 
   private:
@@ -114,8 +114,10 @@ class RecorderDevice final : public hal::WriteObject<hal::RecorderState, hal::Re
     hal::RecorderState
     state() override {
         const auto d = device_.snapshot(lv_tick_get());
-        return {d.record_valid,    d.recording,   d.record_pending, d.record_type,
-                d.record_interval, d.record_name, d.record_space_mb};
+        return {d.record_valid,    d.recording,
+                d.record_pending,  d.record_type,
+                d.record_interval, d.record_name,
+                d.record_space_mb, systemInfo.host.record.record_status == On_Off_Status_ON};
     }
 
     int
@@ -128,7 +130,7 @@ class RecorderDevice final : public hal::WriteObject<hal::RecorderState, hal::Re
                                                                      : DataProc::DeviceCommand::StopRecord;
         request.record_type = command.type;
         request.record_interval = command.interval;
-        return hal::write(&device_, request);
+        return device_.execute_device(request) ? RES_OK : RES_PARAM_ERROR;
     }
 
   private:
@@ -143,11 +145,15 @@ class WifiDevice final : public hal::WriteObject<hal::WifiState, hal::WifiComman
 
     hal::WifiState
     state() override {
-        const auto r = device_.device_report();
-        const auto& d = r.snapshot;
-        return {
-            d.wifi_valid, status_.capabilities().wifi_available, r.wifi_on, r.wifi_pending, d.wifi_station, d.wifi_ssid,
-            d.wifi_ip};
+        device_.update(lv_tick_get());
+        const auto d = device_.snapshot(lv_tick_get());
+        return {d.wifi_valid,
+                status_.capabilities().wifi_available,
+                systemInfo.host.wifi.wifi_status == On_Off_Status_ON,
+                device_.wifi_pending(),
+                d.wifi_station,
+                d.wifi_ssid,
+                d.wifi_ip};
     }
 
     int
@@ -155,8 +161,7 @@ class WifiDevice final : public hal::WriteObject<hal::WifiState, hal::WifiComman
         if (!status_.capabilities().wifi_available) {
             return RES_UNSUPPORT;
         }
-        bool on = command.on;
-        return hal::ioctl(&device_, system_backend::kSetWifi, on);
+        return device_.request_wifi(command.on) ? RES_OK : RES_UNKNOWN;
     }
 
   private:
@@ -216,8 +221,7 @@ domain_devices(PowerDevice& power, BusinessDevice& device, StatusDevice& status)
     static WifiDevice wifi(device, status);
     static BoardDevice board(device, status);
     static InitDevice init(status);
-    static DeviceObject* list[] = {&power, &device,   &status, &battery, &gnss, &clock,
-                                   &work,  &recorder, &wifi,   &board,   &init};
+    static DeviceObject* list[] = {&power, &battery, &gnss, &clock, &work, &recorder, &wifi, &board, &init};
     static DeviceManager manager(list, sizeof(list) / sizeof(list[0]));
     return manager;
 }

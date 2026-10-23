@@ -99,6 +99,7 @@ int main(int argc, char** argv) {
             std::perror("LVGL display");
         } else {
             {
+                DemoStatus::configure(lv_tick_get);
                 App app;
                 if (!app.init()) {
                     std::fprintf(stderr, "App init failed\n");
@@ -111,8 +112,6 @@ int main(int argc, char** argv) {
                         std::fprintf(stderr, "Unknown or unavailable page: %s\n", page);
                     } else {
                         std::uint64_t last = milliseconds();
-                        const std::uint64_t started = last; // DemoStatus takes elapsed time, as in simulator.
-                        std::uint64_t next_status_update = last;
                         while (!stop && !port.error) {
                             std::uint64_t now = milliseconds();
                             if (!now || now < last) {
@@ -120,10 +119,6 @@ int main(int argc, char** argv) {
                                 break;
                             }
                             last = now;
-                            if (now >= next_status_update) {
-                                app.update_status(DemoStatus::sample(now - started));
-                                next_status_update = now + 200;
-                            }
                             if (button_fd >= 0) {
                                 // Drain every queued event: one key transition is several evdev records, and a
                                 // slow frame must not delay or merge clicks. Each transition keeps its own stamp.

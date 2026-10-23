@@ -47,7 +47,7 @@ add_test(NAME app_system_dash COMMAND app_system_dash_test "${CMAKE_CURRENT_BINA
 
 # Platform-decided power flow with a test system_backend (no simulation library).
 add_executable(app_platform_test app_platform_test.cpp)
-target_link_libraries(app_platform_test PRIVATE app::ui)
+target_link_libraries(app_platform_test PRIVATE app::ui app::hal_test_checks)
 target_compile_options(app_platform_test PRIVATE -Wall -Wextra -Werror -UNDEBUG)
 add_test(NAME app_platform COMMAND app_platform_test)
 

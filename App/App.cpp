@@ -152,28 +152,6 @@ void App::preload_next() {
     }
 }
 
-void App::update_status(const page::StatusBarState& state) {
-    DataProc::StatusSnapshot snapshot;
-    std::snprintf(snapshot.position.data(), snapshot.position.size(), "%s", state.position ? state.position : "DEMO");
-    snapshot.position_color_rgb = lv_color_to_u32(state.position_color) & 0xffffffu;
-    snapshot.satellites = state.satellites;
-    snapshot.satellites_valid = state.satellites_valid;
-    snapshot.battery_percent = state.battery_percent;
-    snapshot.battery_valid = state.battery_valid;
-    snapshot.charging = state.charging;
-    snapshot.battery_voltage = state.battery_voltage;
-    snapshot.battery_temperature_valid = state.battery_temperature_valid;
-    snapshot.battery_temperature = state.battery_temperature;
-    snapshot.hour = state.hour;
-    snapshot.minute = state.minute;
-    snapshot.second = state.second;
-    snapshot.clock_valid = state.clock_valid;
-    snapshot.recording = state.recording;
-    snapshot.wifi = state.wifi;
-    if (!StatusService::update(snapshot))
-        APP_LOG_E("Application", "status publication rejected");
-}
-
 void App::on_input(const InputAction action) {
     if (!group_ || !manager_ || manager_->isSwitching())
         return;

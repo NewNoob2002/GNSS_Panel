@@ -1,217 +1,160 @@
-#include "DomainDevices.h"
-#include "Def/HAL_Battery.h"
-#include "Def/HAL_Board.h"
-#include "Def/HAL_Clock.h"
-#include "Def/HAL_GNSS.h"
+#include <cstdio>
 #include "Def/HAL_Init.h"
-#include "Def/HAL_Recorder.h"
-#include "Def/HAL_WiFi.h"
-#include "Def/HAL_Work.h"
-#include "DemoStatus.h"
+#include "DemoModel.h"
+#include "SystemBackend.h"
 
 namespace {
-using Business = system_backend::BusinessObject;
-using Status = system_backend::StatusObject;
-
-// 两套旧模拟源互相矛盾，3.7c 统一为单一模拟模型；本步业务字段取 Device，
-// Battery.level_percent/temperature_valid 与 Clock 取 Status，保持旧数据路径和画面不变。
-/** @brief 两个旧模拟源分别提供业务电量计值和状态栏电量。 */
-class DemoBatteryDevice final : public hal::ReadObject<hal::BatteryState> {
+class DemoPower final : public system_backend::PowerObject {
   public:
-    DemoBatteryDevice(Business& device, Status& status)
-        : ReadObject(hal::names::Battery), device_(device), status_(status) {}
-
-    hal::BatteryState
-    state() override {
-        const auto d = device_.device_report().snapshot;
-        const auto s = status_.status_snapshot();
-        return {d.power_valid,
-                s.battery_percent,
-                d.battery_percent,
-                d.battery_voltage,
-                s.battery_temperature_valid,
-                d.battery_temperature,
-                static_cast<hal::ChargeState>(d.charge),
-                d.external_power};
+    system_backend::PowerReport
+    power_report() override {
+        return demo::model().power;
     }
 
-  private:
-    Business& device_;
-    Status& status_;
-};
-
-/** @brief Demo 的有效位置为单点定位，不从 UI 的 DEMO 文本反推定位状态。 */
-class DemoGNSSDevice final : public hal::ReadObject<hal::GNSSState> {
-  public:
-    explicit DemoGNSSDevice(Business& device) : ReadObject(hal::names::GNSS), device_(device) {}
-
-    hal::GNSSState
-    state() override {
-        const auto d = device_.device_report().snapshot;
-        return {d.position_valid,     d.latitude,
-                d.longitude,          d.altitude,
-                d.satellites_valid,   d.satellites_used,
-                d.satellites_tracked, d.constellations_valid,
-                d.constellations,     d.position_valid ? hal::FixStatus::Single : hal::FixStatus::None};
+    bool
+    request_power_on() override {
+        demo::model().power = {true, false, false, hal::PowerCause::User};
+        return true;
     }
 
-  private:
-    Business& device_;
-};
-
-/** @brief 时间与旧确定性/随机模拟采样时间完全一致。 */
-class DemoClockDevice final : public hal::ReadObject<hal::ClockState> {
-  public:
-    explicit DemoClockDevice(Status& status) : ReadObject(hal::names::Clock), status_(status) {}
-
-    hal::ClockState
-    state() override {
-        const auto s = status_.status_snapshot();
-        return {s.clock_valid, s.hour, s.minute, s.second, hal::ClockSource::Uptime, DemoStatus::uptime_ms()};
+    bool
+    execute_power(DataProc::PowerAction action) override {
+        if (action == hal::PowerCommand::Off) {
+            demo::model().power = {false, false, true, hal::PowerCause::User};
+        }
+        return true;
     }
-
-  private:
-    Status& status_;
 };
 
-/** @brief 工作命令继续修改原 Demo 状态，并复用旧范围校验。 */
-class DemoWorkDevice final : public hal::WriteObject<hal::WorkState, hal::WorkCommand> {
+template <class State, State demo::Model::* Field>
+class DemoRead final : public hal::ReadObject<State> {
   public:
-    explicit DemoWorkDevice(Business& device) : WriteObject(hal::names::Work), device_(device) {}
+    explicit DemoRead(const char* name) : hal::ReadObject<State>(name) {}
+
+    State
+    state() override {
+        demo::refresh();
+        return demo::model().*Field;
+    }
+};
+
+class DemoWork final : public hal::WriteObject<hal::WorkState, hal::WorkCommand> {
+  public:
+    DemoWork() : WriteObject(hal::names::Work) {}
 
     hal::WorkState
     state() override {
-        const auto d = device_.device_report().snapshot;
-        return {d.work_valid,     d.work_pending,  static_cast<hal::WorkMode>(d.work_mode), d.radio_on,
-                d.radio_protocol, d.radio_channel, static_cast<hal::NtripRole>(d.ntrip)};
+        demo::refresh();
+        return demo::model().work;
     }
 
     int
-    execute(const hal::WorkCommand& command) override {
-        if (command.target != hal::WorkTarget::Rover && command.target != hal::WorkTarget::Base
-            && command.target != hal::WorkTarget::Ntrip) {
+    execute(const hal::WorkCommand& c) override {
+        if ((c.target != hal::WorkTarget::Rover && c.target != hal::WorkTarget::Base
+             && c.target != hal::WorkTarget::Ntrip)
+            || c.protocol >= hal::kRadioProtocolCount || c.channel >= hal::kRadioChannelCount
+            || (c.target != hal::WorkTarget::Ntrip && !c.channel)) {
             return RES_PARAM_ERROR;
         }
-        DataProc::DeviceRequest request;
-        request.command = DataProc::DeviceCommand::ApplyWork;
-        request.target = static_cast<DataProc::WorkTarget>(command.target);
-        request.radio_protocol = command.protocol;
-        request.radio_channel = command.channel;
-        return hal::write(&device_, request);
+        auto& work = demo::model().work;
+        work.ntrip = c.target == hal::WorkTarget::Ntrip ? hal::NtripRole::Server : hal::NtripRole::None;
+        work.mode = c.target == hal::WorkTarget::Rover ? hal::WorkMode::Rover : hal::WorkMode::Base;
+        work.radio_on = c.target != hal::WorkTarget::Ntrip;
+        if (work.radio_on) {
+            work.protocol = c.protocol;
+            work.channel = c.channel;
+        }
+        return RES_OK;
     }
-
-  private:
-    Business& device_;
 };
 
-/** @brief 录制命令继续修改原 Demo 状态。 */
-class DemoRecorderDevice final : public hal::WriteObject<hal::RecorderState, hal::RecorderCommand> {
+class DemoRecorder final : public hal::WriteObject<hal::RecorderState, hal::RecorderCommand> {
   public:
-    explicit DemoRecorderDevice(Business& device) : WriteObject(hal::names::Recorder), device_(device) {}
+    DemoRecorder() : WriteObject(hal::names::Recorder) {}
 
     hal::RecorderState
     state() override {
-        const auto d = device_.device_report().snapshot;
-        return {d.record_valid,    d.recording,   d.record_pending, d.record_type,
-                d.record_interval, d.record_name, d.record_space_mb};
+        demo::refresh();
+        return demo::model().recorder;
     }
 
     int
-    execute(const hal::RecorderCommand& command) override {
-        if (command.action != hal::RecordAction::Start && command.action != hal::RecordAction::Stop) {
+    execute(const hal::RecorderCommand& c) override {
+        if (c.action != hal::RecordAction::Start && c.action != hal::RecordAction::Stop) {
             return RES_PARAM_ERROR;
         }
-        DataProc::DeviceRequest request;
-        request.command = command.action == hal::RecordAction::Start ? DataProc::DeviceCommand::StartRecord
-                                                                     : DataProc::DeviceCommand::StopRecord;
-        request.record_type = command.type;
-        request.record_interval = command.interval;
-        return hal::write(&device_, request);
+        if (c.action == hal::RecordAction::Start
+            && (c.type >= hal::kRecordTypeCount || c.interval >= hal::kRecordIntervalCount)) {
+            return RES_PARAM_ERROR;
+        }
+        auto& record = demo::model().recorder;
+        record.recording = record.reported_recording = c.action == hal::RecordAction::Start;
+        if (record.recording) {
+            record.type = c.type;
+            record.interval = c.interval;
+        }
+        return RES_OK;
     }
-
-  private:
-    Business& device_;
 };
 
-/** @brief Demo 无 Wi-Fi 操作能力，保留原模拟连接信息。 */
-class DemoWifiDevice final : public hal::WriteObject<hal::WifiState, hal::WifiCommand> {
+class DemoWifi final : public hal::WriteObject<hal::WifiState, hal::WifiCommand> {
   public:
-    DemoWifiDevice(Business& device, Status& status)
-        : WriteObject(hal::names::WiFi), device_(device), status_(status) {}
+    DemoWifi() : WriteObject(hal::names::WiFi) {}
 
     hal::WifiState
     state() override {
-        const auto r = device_.device_report();
-        const auto& d = r.snapshot;
-        return {
-            d.wifi_valid, status_.capabilities().wifi_available, r.wifi_on, r.wifi_pending, d.wifi_station, d.wifi_ssid,
-            d.wifi_ip};
+        demo::refresh();
+        return demo::model().wifi;
     }
 
     int
     execute(const hal::WifiCommand&) override {
         return RES_UNSUPPORT;
     }
-
-  private:
-    Business& device_;
-    Status& status_;
 };
 
-/** @brief 板卡信息由原 Demo 快照与能力提供。 */
-class DemoBoardDevice final : public hal::ReadObject<hal::BoardState> {
+class DemoInit final : public hal::InitObject {
   public:
-    DemoBoardDevice(Business& device, Status& status)
-        : ReadObject(hal::names::Board), device_(device), status_(status) {}
-
-    hal::BoardState
-    state() override {
-        const auto d = device_.device_report().snapshot;
-        return {d.firmware, d.hardware, d.build, d.uptime_s, status_.capabilities()};
-    }
-
-  private:
-    Business& device_;
-    Status& status_;
-};
-
-/** @brief 初始化耗时和结果保持不变，步骤语义不依赖本地化 ID。 */
-class DemoInitDevice final : public hal::InitObject {
-  public:
-    explicit DemoInitDevice(Status& status) : status_(status) {}
-
     void
-    info(hal::InitInfo& value) override {
+    info(hal::InitInfo& v) override {
+        constexpr const char* names[] = {"configuration", "services", "gnss", "network", "finalization"};
         constexpr hal::InitStage stages[] = {hal::InitStage::Configuration, hal::InitStage::Services,
                                              hal::InitStage::GNSS, hal::InitStage::Network,
                                              hal::InitStage::Finalization};
-        value.name = status_.initialization_name(value.step);
-        value.stage = stages[value.step];
+        v.name = names[v.step];
+        v.stage = stages[v.step];
     }
 
     void
-    poll(hal::InitPoll& value) override {
-        value.status = static_cast<hal::InitStatus>(
-            status_.poll_initialization_step(value.step, value.elapsed_ms, value.detail.data(), value.detail.size()));
+    poll(hal::InitPoll& v) override {
+        constexpr uint32_t durations[] = {0, 400, 1200, 700, 200};
+        constexpr const char* details[] = {"Rover, TRIMTALK, 455.05 MHz defaults loaded",
+                                           "status and logging services prepared", "GNSS receiver placeholder prepared",
+                                           "Wi-Fi backend reserved; continue offline", "working UI prepared"};
+        if (v.elapsed_ms < durations[v.step]) {
+            v.status = hal::InitStatus::Pending;
+            return;
+        }
+        v.status = v.step == 3 ? hal::InitStatus::Failed : hal::InitStatus::Ok;
+        std::snprintf(v.detail.data(), v.detail.size(), "%s", details[v.step]);
     }
-
-  private:
-    Status& status_;
 };
 } // namespace
 
 DeviceManager&
-demo_domain_devices(system_backend::PowerObject& power, Business& device, Status& status) {
-    static DemoBatteryDevice battery(device, status);
-    static DemoGNSSDevice gnss(device);
-    static DemoClockDevice clock(status);
-    static DemoWorkDevice work(device);
-    static DemoRecorderDevice recorder(device);
-    static DemoWifiDevice wifi(device, status);
-    static DemoBoardDevice board(device, status);
-    static DemoInitDevice init(status);
-    static DeviceObject* list[] = {&power, &device,   &status, &battery, &gnss, &clock,
-                                   &work,  &recorder, &wifi,   &board,   &init};
+system_backend::devices() {
+    static DemoPower power;
+    static DemoRead<hal::BatteryState, &demo::Model::battery> battery(hal::names::Battery);
+    static DemoRead<hal::GNSSState, &demo::Model::gnss> gnss(hal::names::GNSS);
+    static DemoRead<hal::ClockState, &demo::Model::clock> clock(hal::names::Clock);
+    static DemoWork work;
+    static DemoRecorder recorder;
+    static DemoWifi wifi;
+    static DemoRead<hal::BoardState, &demo::Model::board> board(hal::names::Board);
+    static DemoInit init;
+    static DeviceObject* list[] = {&power, &battery, &gnss, &clock, &work, &recorder, &wifi, &board, &init};
     static DeviceManager manager(list, sizeof(list) / sizeof(list[0]));
+    static const bool initialized = (manager.init(), true);
+    (void)initialized;
     return manager;
 }

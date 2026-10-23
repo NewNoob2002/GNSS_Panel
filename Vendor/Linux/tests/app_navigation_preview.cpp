@@ -7,11 +7,12 @@
 
 #include "App.h"
 #include "ButtonGesture.h"
-#include "SystemService.h"
 #include "DemoStatus.h"
-#include "PageManager.h"
-#include "UI/Resource/ResourcePool.h"
+#include "DomainTestInput.hpp"
 #include "I18n.h"
+#include "PageManager.h"
+#include "SystemService.h"
+#include "UI/Resource/ResourcePool.h"
 
 /** @brief 通过公开 API 读取对象的屏幕绝对坐标供布局断言使用。 */
 static lv_area_t
@@ -27,6 +28,8 @@ static uint16_t frame[width_px * height_px];
 static uint16_t dialplate_frame[width_px * height_px];
 static uint16_t draw_pixels[width_px * 20];
 static unsigned flushes;
+static size_t peak_nodes;
+static size_t peak_pool;
 
 static lv_obj_t* find_label(lv_obj_t* root, const char* text) {
     if (lv_obj_is_hidden(root)) {
@@ -72,7 +75,16 @@ static void advance(unsigned ms) {
     for (unsigned i = 0; i < ms; i += 10) {
         lv_tick_inc(10);
         DataProc_RunLoop();
+        const size_t nodes = DataProc::Broker()->getNodeNumber();
+        if (nodes > peak_nodes) {
+            peak_nodes = nodes;
+        }
         lv_timer_handler();
+        lv_mem_monitor_t memory;
+        lv_mem_monitor(&memory);
+        if (memory.max_used > peak_pool) {
+            peak_pool = memory.max_used;
+        }
     }
 }
 
@@ -160,14 +172,15 @@ int main(int argc, char** argv) {
         lv_anim_delete(&background, nullptr);
     }
     {
+        demo::model().power = {};
         App app;
         assert(app.init());
-        app.update_status(DemoStatus::sample(0));
+        test_input::status(DemoStatus::sample(0));
         using Input = App::InputAction;
         if (argc == 3) {
             lv_tick_inc(400);
             lv_timer_handler(); // 初始页面切换完成后才可再次 Push
-            app.update_status(DemoStatus::sample(16000));
+            test_input::status(DemoStatus::sample(16000));
             assert(app.show_page(argv[1]));
             lv_tick_inc(500);
             lv_timer_handler();
@@ -298,7 +311,10 @@ int main(int argc, char** argv) {
             for (const auto& page : pages) {
                 lv_tick_inc(300);
                 lv_timer_handler();
-                app.update_status(DemoStatus::sample(16000));
+                test_input::status(DemoStatus::sample(16000));
+                demo::model().recorder.recording = demo::model().recorder.reported_recording = false;
+                lv_tick_inc(500);
+                DataProc_RunLoop();
                 assert(app.show_page(page.name));
                 assert(std::strcmp(app.current_page(), page.name) == 0);
                 auto* page_root = find_label(lv_screen_active(), page.label);
@@ -468,5 +484,7 @@ int main(int argc, char** argv) {
             assert(!app.back()); // Off resets the root; no previous working/boot history remains.
         }
     }
+    std::printf("Linux app: LVGL pool peak %zu / %u bytes, DataNode peak %zu\n", peak_pool,
+                static_cast<unsigned>(LV_MEM_SIZE), peak_nodes);
     lv_display_delete(display);
 }

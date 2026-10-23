@@ -1,41 +1,71 @@
-#include "SystemService.h"
-#include "DataProc.h"
-#include "Log.h"
-
+#include "Aggregate.h"
+#include "Def/DP_Battery.h"
+#include "Def/DP_Clock.h"
+#include "Def/DP_GNSS.h"
+#include "Def/DP_Recorder.h"
+#include "Def/DP_Settings.h"
+#include "Def/DP_Version.h"
+#include "Def/DP_WiFi.h"
+#include "Def/DP_Work.h"
+#include <cstdio>
 namespace {
-DataProc::StatusSnapshot latest;
-int on_event(DataNode*, DataNode::EventParam_t* event) {
-    if (!event || event->event != DataNode::EVENT_PULL)
-        return DataNode::RES_UNSUPPORTED_REQUEST;
-    if (!event->data_p)
-        return DataNode::RES_PARAM_ERROR;
-    if (event->size != sizeof(latest))
-        return DataNode::RES_SIZE_MISMATCH;
-    std::memcpy(event->data_p, &latest, sizeof(latest));
-    return DataNode::RES_OK;
-}
-} // namespace
-DATA_PROC_INIT_DEF(Status) {
-    latest = {};
-    std::strcpy(latest.position.data(), "DEMO");
-    latest.battery_valid = true;
-    latest.battery_percent = 85;
-    latest.battery_voltage = 7.60f;
-    latest.charging = false;
-    account->setEventCallback(on_event);
-    return account->isRegistered();
-}
-bool StatusService::update(const DataProc::StatusSnapshot& status) {
-    auto* account = DataProc::Broker()->search("Status");
-    if (!account || status.position.back() != '\0')
-        return false;
-    latest = status;
-    // 同步分发期间保留本次快照，重入更新不改写当前事件。
-    const auto snapshot = latest;
-    const int result = account->publish(&snapshot, sizeof(snapshot));
-    if (result != DataNode::RES_OK && result != DataNode::RES_UNKNOWN) {
-        APP_LOG_W("Status", "subscriber rejected update: %d", result);
-        return false;
+class StatusNode final : public dp::Aggregate<DataProc::StatusSnapshot, dp::Battery, dp::Clock, dp::GNSS,
+    dp::Recorder, dp::Settings, dp::Version, dp::WiFi, dp::Work> {
+public:
+    explicit StatusNode(DataBroker* broker) : Aggregate(dp::names::Status, broker) {}
+    bool init() override {
+        if (!Aggregate::init()) return false;
+        startTimer(200);
+        return hasTimer();
     }
-    return true;
+    int onEvent(EventParam_t* event) override {
+        if (event && event->event == EVENT_TIMER) {
+            // 过渡兼容：旧 StatusBar 不 pull，沿用三端原 200 ms 无条件推送节拍；3.7f 删除聚合层。
+            const auto snapshot = state_;
+            (void)publish(&snapshot, sizeof(snapshot));
+            return RES_OK;
+        }
+        return Aggregate::onEvent(event);
+    }
+private:
+    DataProc::StatusSnapshot compose() const override {
+        DataProc::StatusSnapshot value;
+        const auto& battery = get<dp::Battery>();
+        const auto& clock = get<dp::Clock>().clock;
+        const auto& gnss = get<dp::GNSS>();
+        // LVGL Material palette 的 main RGB 值；核心不能依赖 LVGL。
+        i18n::TextId position = i18n::TextId::PositionNone;
+        value.position_color_rgb = 0xf44336;
+        if (get<dp::Work>().mode == hal::WorkMode::Base) {
+            position = i18n::TextId::PositionBase;
+            value.position_color_rgb = 0x2196f3;
+        } else {
+            switch (gnss.fix) {
+            case hal::FixStatus::Single: position = i18n::TextId::PositionSingle; value.position_color_rgb = 0xffeb3b; break;
+            case hal::FixStatus::Float: position = i18n::TextId::PositionFloat; value.position_color_rgb = 0xffeb3b; break;
+            case hal::FixStatus::Fixed: position = i18n::TextId::PositionFix; value.position_color_rgb = 0x4caf50; break;
+            default: break;
+            }
+        }
+        std::snprintf(value.position.data(), value.position.size(), "%s", i18n::text(position));
+        // Demo 原来明确显示 DEMO，保持此徽标；定位枚举仍用于真实平台。
+        if (get<dp::Version>().capabilities.simulated) {
+            std::snprintf(value.position.data(), value.position.size(), "%s", "DEMO");
+            value.position_color_rgb = 0xf44336;
+        }
+        value.satellites = gnss.satellites_used;
+        value.satellites_valid = gnss.satellites_valid;
+        value.battery_percent = battery.level_percent;
+        value.battery_valid = battery.valid;
+        value.battery_voltage = battery.voltage;
+        value.battery_temperature_valid = battery.temperature_valid;
+        value.battery_temperature = battery.temperature;
+        value.charging = battery.charge != hal::ChargeState::NotCharging;
+        value.hour = clock.hour; value.minute = clock.minute; value.second = clock.second; value.clock_valid = clock.time_valid;
+        value.recording = get<dp::Recorder>().reported_recording;
+        value.wifi = get<dp::WiFi>().on;
+        return value;
+    }
+};
 }
+DP_CREATE(Status, StatusNode)

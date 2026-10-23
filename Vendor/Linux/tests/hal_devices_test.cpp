@@ -5,7 +5,6 @@
 int
 main() {
     lv_init();
-    assert(DataProc_Init(lv_tick_get));
     hal_test::shapes();
     hal_test::equality();
     for (uint64_t elapsed : {uint64_t{0}, uint64_t{16000}, uint64_t{480000}, uint64_t{86400000}}) {
@@ -22,38 +21,34 @@ main() {
     assert(hal_test::read<hal::GNSSState>(hal::names::GNSS).fix == hal::FixStatus::Single);
     for (hal::WorkTarget target : {hal::WorkTarget::Rover, hal::WorkTarget::Base, hal::WorkTarget::Ntrip}) {
         for (unsigned protocol = 0; protocol < hal::kRadioProtocolCount; ++protocol) {
-            DataProc::DeviceRequest old;
-            old.command = DataProc::DeviceCommand::ApplyWork;
-            old.target = static_cast<DataProc::WorkTarget>(target);
-            old.radio_protocol = protocol;
-            old.radio_channel = 9;
-            assert(system_backend::execute_device(old));
-            const auto previous = hal_test::read<hal::WorkState>(hal::names::Work);
             assert(hal::write(hal_test::device(hal::names::Work), hal::WorkCommand{target, protocol, 9})
                    == DeviceObject::RES_OK);
-            assert(hal_test::read<hal::WorkState>(hal::names::Work) == previous);
+            const auto current = hal_test::read<hal::WorkState>(hal::names::Work);
+            assert(current.mode == (target == hal::WorkTarget::Rover ? hal::WorkMode::Rover : hal::WorkMode::Base));
+            assert(current.radio_on == (target != hal::WorkTarget::Ntrip));
+            assert(current.ntrip == (target == hal::WorkTarget::Ntrip ? hal::NtripRole::Server : hal::NtripRole::None));
+            if (current.radio_on) {
+                assert(current.protocol == protocol && current.channel == 9);
+            }
             hal_test::equivalent();
         }
     }
     for (hal::RecordAction action : {hal::RecordAction::Start, hal::RecordAction::Stop}) {
         for (unsigned type = 0; type < hal::kRecordTypeCount; ++type) {
             for (unsigned interval = 0; interval < hal::kRecordIntervalCount; ++interval) {
-                DataProc::DeviceRequest old;
-                old.command = action == hal::RecordAction::Start ? DataProc::DeviceCommand::StartRecord
-                                                                 : DataProc::DeviceCommand::StopRecord;
-                old.record_type = type;
-                old.record_interval = interval;
-                assert(system_backend::execute_device(old));
-                const auto previous = hal_test::read<hal::RecorderState>(hal::names::Recorder);
                 assert(hal::write(hal_test::device(hal::names::Recorder), hal::RecorderCommand{action, type, interval})
                        == DeviceObject::RES_OK);
-                assert(hal_test::read<hal::RecorderState>(hal::names::Recorder) == previous);
+                const auto current = hal_test::read<hal::RecorderState>(hal::names::Recorder);
+                assert(current.recording == (action == hal::RecordAction::Start)
+                       && current.reported_recording == current.recording);
+                if (current.recording) {
+                    assert(current.type == type && current.interval == interval);
+                }
                 hal_test::equivalent();
             }
         }
     }
     for (bool on : {false, true}) {
-        assert(!system_backend::request_wifi(on));
         assert(hal::write(hal_test::device(hal::names::WiFi), hal::WifiCommand{on}) == DeviceObject::RES_UNSUPPORT);
         hal_test::equivalent();
     }
@@ -80,7 +75,6 @@ main() {
     assert(hal::write(hal_test::device(hal::names::Power), hal::PowerCommand::Reboot) == DeviceObject::RES_OK);
     assert(hal::write(hal_test::device(hal::names::Power), hal::PowerCommand::Off) == DeviceObject::RES_OK);
     const auto power = hal_test::read<hal::PowerState>(hal::names::Power);
-    assert(power == system_backend::read_power() && power.standby);
-    assert(DataProc_Deinit());
+    assert(power.standby);
     lv_deinit();
 }

@@ -1,27 +1,16 @@
 #pragma once
 #include "DataProc/DataProc.h"
 
-/** System state provider. Power and initialization operations are delegated to system_backend. */
+/** @brief 页面迁移期的聚合状态读取接口；领域节点独占状态写入。 */
 namespace SystemService {
+/** @brief 返回当前 System 聚合值快照。 */
 DataProc::SystemState snapshot();
-bool power(DataProc::PowerAction action);
-/** Platform -> App, application thread. Each publishes System state; the UI observes it. */
-bool set_powered_on(bool on);                    // Power-on confirmed; leaves standby.
-bool begin_shutdown(DataProc::PowerCause cause); // Platform-initiated, non-cancellable shutdown.
-bool enter_standby();                            // Power-off finished while the UI keeps running.
-bool set_wifi(bool on, bool pending);            // Applied Wi-Fi state; pending while a toggle is in flight.
+/** @brief 校验应用 RAM 日期的范围及闰年。 */
 bool valid_date(const DataProc::DateTime& date);
+/** @brief 返回月份天数，非法月份返回零。 */
 unsigned days_in_month(unsigned year, unsigned month);
-} // namespace SystemService
-
-namespace StatusService {
-/** Feed an owned snapshot to Status and its subscribers, on the application thread. */
-bool update(const DataProc::StatusSnapshot& status);
-} // namespace StatusService
-
+}
 namespace DeviceService {
-/** Platform -> App, application thread: publish device/business data (Device provider). */
-bool update(const DataProc::DeviceSnapshot& device);
-/** Latest published device data. */
+/** @brief 返回当前 Device 聚合值快照。 */
 DataProc::DeviceSnapshot snapshot();
-} // namespace DeviceService
+}

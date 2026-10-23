@@ -21,7 +21,6 @@ class App {
     ~App();
     /** Run application-service timers before the LVGL handler on the same thread. */
     void update();
-    void update_status(const page::StatusBarState& state);
     enum class InputAction { None, NextFocus, PreviousFocus, Confirm, Back, Press, Release, Commit };
     enum class Key { Power, Function };
     /** Normalized two-button input; Key names are logical roles, not keyboard letters or evdev codes.

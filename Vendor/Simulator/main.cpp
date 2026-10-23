@@ -343,16 +343,13 @@ main(int argc, char** argv) {
             std::fprintf(stderr, "LVGL display/pointer init failed\n");
         } else {
 #if SIM_BACKEND_DEMO
+            DemoStatus::configure(lv_tick_get, options.random_status, options.seed);
             App demo_app;
             App* app = demo_app.init() ? &demo_app : nullptr;
             if (!app) {
                 std::fprintf(stderr, "App init failed\n");
             } else {
                 print_controls(options);
-                const auto started = SDL_GetTicks64();
-                auto last_status = started;
-                app->update_status(options.random_status ? DemoStatus::sample_random(0, options.seed)
-                                                         : DemoStatus::sample(0));
 #else
             init_system_info();
             HAL::HAL_Init();
@@ -435,15 +432,8 @@ main(int argc, char** argv) {
                         }
                     }
 #if SIM_BACKEND_DEMO
-                    const auto now = SDL_GetTicks64();
                     app->update();
                     lv_timer_handler();
-                    if (now - last_status >= 200) {
-                        app->update_status(options.random_status
-                                               ? DemoStatus::sample_random(now - started, options.seed)
-                                               : DemoStatus::sample(now - started));
-                        last_status = now;
-                    }
 #else
                     HAL::HAL_Update();
                     simulate_host(lv_tick_get());

@@ -15,6 +15,16 @@ add_library(app_i18n STATIC
 add_library(app_core STATIC
     Service/DataProc/DataProc.cpp
     Service/DataProc/DP_Status.cpp
+    Service/DataProc/DP_Power.cpp
+    Service/DataProc/DP_Battery.cpp
+    Service/DataProc/DP_GNSS.cpp
+    Service/DataProc/DP_Clock.cpp
+    Service/DataProc/DP_Work.cpp
+    Service/DataProc/DP_Recorder.cpp
+    Service/DataProc/DP_WiFi.cpp
+    Service/DataProc/DP_Version.cpp
+    Service/DataProc/DP_Init.cpp
+    Service/DataProc/DP_Settings.cpp
     Service/DataProc/DP_Device.cpp
     Service/DataProc/SystemService.cpp
     Service/HAL/SystemBackend.cpp

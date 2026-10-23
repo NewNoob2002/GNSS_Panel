@@ -5,12 +5,10 @@
 #include "DataProc_Def.h"
 #include "DataBroker.h"
 
-#define DATA_PROC_INIT_DEF(name) bool _DP_##name##_Init(DataNode* account)
-
-/** Initialize application services before page Models; the injected clock has no LVGL/OS dependency.
- * Failure rolls back partially initialized providers. No HAL/OS/power operations are performed.
+/** @brief 页面 Model 创建前初始化领域节点，注入独立于 LVGL/OS 的毫秒时钟。
+ * 同步读取 HAL 值，不发命令；任一节点或定时器创建失败时逆序回滚。
  */
-bool DataProc_Init(DataTimerManager::TickFunction_t clock);
+bool DataProc_Init(DataTimerManager::TickFunction_t tick_source);
 /** Execute service timers on the application thread; returns time until the next deadline. */
 uint32_t DataProc_RunLoop();
 /** Call after all page/component DataNodes have been destroyed. */

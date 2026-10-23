@@ -2,6 +2,8 @@
 #include <cassert>
 #include <cstring>
 #include "SystemBackend.h"
+#include "SystemService.h"
+#include "Helper/NodeHelper.h"
 #include "Def/HAL_Battery.h"
 #include "Def/HAL_GNSS.h"
 #include "Def/HAL_Clock.h"
@@ -86,9 +88,11 @@ inline void shapes() {
 }
 /** 所有可对应字段逐项比较，避免只检查少数代表字段。 */
 inline void equivalent() {
-    const auto report = system_backend::read_device();
-    const auto& d = report.snapshot;
-    const auto s = system_backend::read_status();
+    assert(DataProc_Init(+[]() -> uint32_t { return 0; }));
+    const auto d = DeviceService::snapshot();
+    DataProc::StatusSnapshot s;
+    assert(DataProc::Broker()->mainNode()->pull(dp::names::Status, &s, sizeof(s)) == DataNode::RES_OK);
+    const auto system = SystemService::snapshot();
     const auto battery = read<hal::BatteryState>(hal::names::Battery);
     assert(battery.valid == d.power_valid && battery.level_percent == s.battery_percent);
     assert(battery.gauge_percent == d.battery_percent && battery.voltage == d.battery_voltage);
@@ -113,11 +117,14 @@ inline void equivalent() {
     assert(record.space_mb == d.record_space_mb);
     const auto wifi = read<hal::WifiState>(hal::names::WiFi);
     assert(wifi.valid == d.wifi_valid && wifi.station == d.wifi_station && wifi.ssid == d.wifi_ssid && wifi.ip == d.wifi_ip);
-    assert(wifi.on == report.wifi_on && wifi.pending == report.wifi_pending);
+    assert(wifi.on == system.wifi_on && wifi.pending == system.wifi_pending);
     const auto board = read<hal::BoardState>(hal::names::Board);
     assert(board.firmware == d.firmware && board.hardware == d.hardware && board.build == d.build && board.uptime_s == d.uptime_s);
-    assert(board.capabilities == system_backend::capabilities());
+    assert(board.capabilities.simulated == system.simulated && board.capabilities.reboot_available == system.reboot_available
+        && board.capabilities.star_map == system.star_map && board.capabilities.record_settings == system.record_settings);
     assert(wifi.available == board.capabilities.wifi_available);
+    assert(record.reported_recording == s.recording);
+    assert(DataProc_Deinit());
 }
 /** 逐字段扰动：相等运算不能漏掉成员，也不能比较结构体填充字节。 */
 template<class State, class Field> void field(const State& original, Field State::*member, const Field& changed) {
@@ -153,6 +160,7 @@ inline void equality() {
     field(w, &hal::WorkState::protocol, 1U); field(w, &hal::WorkState::channel, 1U); field(w, &hal::WorkState::ntrip, hal::NtripRole::Client);
     hal::RecorderState r;
     field(r, &hal::RecorderState::valid, true); field(r, &hal::RecorderState::recording, true);
+    field(r, &hal::RecorderState::reported_recording, true);
     field(r, &hal::RecorderState::pending, true); field(r, &hal::RecorderState::type, 1U);
     field(r, &hal::RecorderState::interval, 1U); auto name = r.name; name[15] = 'x';
     field(r, &hal::RecorderState::name, name); field(r, &hal::RecorderState::space_mb, 1.f);

@@ -33,6 +33,7 @@ int standby_calls = 0, charger_power_on_calls = 0;
 bool probe_battery_gauge = true, probe_charger = true; // SystemLoading 重新探测 I2C 时的应答
 uint16_t draw_pixels[kWidth * 20];
 uint32_t peak_used = 0;
+size_t peak_nodes = 0;
 
 void
 flush(lv_display_t* driver, const lv_area_t*, uint8_t*) {
@@ -48,6 +49,10 @@ run(uint32_t ms, bool update_power = true) {
             HAL::HAL_Update();
         }
         App_Update();
+        const size_t nodes = DataProc::Broker()->getNodeNumber();
+        if (nodes > peak_nodes) {
+            peak_nodes = nodes;
+        }
         lv_timer_handler();
     }
     lv_mem_monitor_t monitor;
@@ -395,7 +400,7 @@ main() {
     host.record.record_interval = 0x01; // 60 min，索引 2
     std::memcpy(host.record.record_name, "ABCDEFGHIJKLMNOP", sizeof(host.record.record_name));
     std::snprintf(State::Board().hardware_version, sizeof(systemInfo.board.hardware_version), "V1.5");
-    run(600);
+    run(1000); // Version 节点按 1000 ms 拉取版本信息。
     {
         const auto device = DeviceService::snapshot();
         assert(device.work_mode == DataProc::WorkMode::Rover && device.radio_on);
@@ -500,10 +505,10 @@ main() {
     assert(SystemService::snapshot().wifi_available == (PRODUCT_SHUTDOWN_WIFI_BUTTON != 0));
     // 无论能否切换，主控回报的状态都要显示。
     host.wifi.wifi_status = On_Off_Status_ON;
-    run(50);
+    run(500);
     assert(SystemService::snapshot().wifi_on && !SystemService::snapshot().wifi_pending);
     host.wifi.wifi_status = On_Off_Status_OFF;
-    run(50);
+    run(500);
     assert(!SystemService::snapshot().wifi_on);
     if (PRODUCT_SHUTDOWN_WIFI_BUTTON) {
         auto& wifi = host.wifi;
@@ -515,7 +520,7 @@ main() {
         run(50);
         assert(SystemService::snapshot().wifi_pending && find_text(lv_screen_active(), "..."));
         wifi.wifi_status = On_Off_Status_ON;
-        run(50);
+        run(500);
         assert(!SystemService::snapshot().wifi_pending && SystemService::snapshot().wifi_on);
         assert(!find_text(lv_screen_active(), "..."));
         App_Get()->on_input(App::InputAction::Confirm);
@@ -673,6 +678,8 @@ main() {
     run(7000);
     assert(on_page("Pages/Dialplate") && power_on_requests == before_reset);
 
+    std::printf("%s: DataNode peak %zu (providers 13, DataBroker capacity %zu)\n", PRODUCT_NAME, peak_nodes,
+                DataBroker::MaxNodes);
     std::printf("%s: LVGL pool peak %lu / %lu bytes (free margin %lu)\n", PRODUCT_NAME,
                 static_cast<unsigned long>(peak_used), static_cast<unsigned long>(LV_MEM_SIZE),
                 static_cast<unsigned long>(LV_MEM_SIZE - peak_used));

@@ -1,6 +1,5 @@
 #include "PowerDevice.h"
 
-#include "SystemService.h"
 #include <HAL.h>
 #include "mcu_config.h"
 
@@ -22,25 +21,6 @@ shutdown_cause() {
 }
 
 } // namespace
-
-void
-PowerDevice::update() {
-    const auto power = system_backend::read_power();
-    if (power.powered_on && !powered_on_) {
-        // Startup 请求已同步发布 powered_on；此处幂等补报，并覆盖软件复位自动开机。
-        SystemService::set_powered_on(true);
-        shutdown_reported_ = standby_reported_ = false;
-    }
-    powered_on_ = power.powered_on;
-
-    const bool shutting_down = power.shutting_down;
-    if (powered_on_ && shutting_down && !shutdown_reported_) {
-        shutdown_reported_ = SystemService::begin_shutdown(power.cause);
-    }
-    if (power.standby && !standby_reported_) {
-        standby_reported_ = SystemService::enter_standby();
-    }
-}
 
 /** 仅采样电源状态；revision/确认仍只属于显示协议。 */
 system_backend::PowerReport

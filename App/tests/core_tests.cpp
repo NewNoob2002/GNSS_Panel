@@ -1,3 +1,5 @@
+#include "DomainFixture.hpp"
+#include "hal_device_checks.h"
 #include "fixed_format_tests.h"
 #include <cassert>
 #include <cstring>
@@ -130,7 +132,7 @@ void test_broker() {
     assert(first.subscribe("Publisher"));
     assert(publisher.publish(&value, sizeof(value)) == DataNode::RES_STOP_PROCESS);
 }
-/** 节点数固定为 16，失败对象析构不能影响同名有效节点。 */
+/** 节点数固定为 32，失败对象析构不能影响同名有效节点。 */
 void test_node_capacity() {
     DataBroker broker("CAPACITY");
     std::array<std::array<char, 16>, DataBroker::MaxNodes + 1> names{};
@@ -140,134 +142,39 @@ void test_node_capacity() {
         nodes[i] = std::make_unique<DataNode>(names[i].data(), &broker);
         assert(nodes[i]->isRegistered() == (i < DataBroker::MaxNodes));
     }
-    assert(broker.getNodeNumber() == 16);
+    assert(broker.getNodeNumber() == DataBroker::MaxNodes);
     nodes[0].reset();
     nodes.back() = std::make_unique<DataNode>(names.back().data(), &broker);
-    assert(nodes.back()->isRegistered() && broker.getNodeNumber() == 16);
+    assert(nodes.back()->isRegistered() && broker.getNodeNumber() == DataBroker::MaxNodes);
     // 所有订阅关系也应能覆盖满额节点。
-    for (size_t i = 1; i < 16; ++i) assert(nodes.back()->subscribe(names[i].data()));
-    assert(nodes.back()->getPublishersNumber() == 15);
+    for (size_t i = 1; i < DataBroker::MaxNodes; ++i) assert(nodes.back()->subscribe(names[i].data()));
+    assert(nodes.back()->getPublishersNumber() == DataBroker::MaxNodes - 1);
 }
 } // namespace
 
-// This backend and the entire test link without LVGL, a screen, or platform headers.
-
-namespace {
-/** 演示/测试电源设备，保留原即时或延后确认行为。 */
-class BackendPower : public system_backend::PowerObject {
-public:
-    /** 读取服务已有的电源报告，无硬件操作。 */
-    system_backend::PowerReport power_report() override {
-        const auto s = SystemService::snapshot();
-        return {s.powered_on, s.shutting_down, s.standby, s.power_cause};
-    }
-    /** 原后端开机操作。 */
-    bool request_power_on() override;
-    /** 原后端关机/重启操作。 */
-    bool execute_power(DataProc::PowerAction) override;
-};
-/** 演示/测试业务设备，保留原请求结果及快照。 */
-class BackendDevice : public system_backend::BusinessObject {
-public:
-    /** 返回设备及服务已知的 Wi-Fi 状态。 */
-    system_backend::DeviceReport device_report() override;
-    /** 原后端业务请求。 */
-    bool execute_device(const DataProc::DeviceRequest&) override;
-    /** 原后端 Wi-Fi 请求。 */
-    bool request_wifi(bool) override;
-};
-/** 演示/测试状态设备，提供能力与初始化检查。 */
-class BackendStatus : public system_backend::StatusObject {
-public:
-    /** 返回已发布状态，测试可继续直接注入快照。 */
-    DataProc::StatusSnapshot status_snapshot() override { return {}; }
-    /** 原后端能力。 */
-    system_backend::Capabilities capabilities() override;
-    /** 原后端初始化元数据。 */
-    const char* initialization_name(unsigned) override;
-    /** 原后端步骤标题。 */
-    i18n::TextId initialization_title(unsigned) override;
-    /** 原后端非阻塞检查。 */
-    DataProc::InitializationStatus poll_initialization_step(unsigned, uint32_t, char*, size_t) override;
-};
-}
-/** 三个静态设备不依赖 LVGL 或实际屏幕即可初始化。 */
-DeviceManager& system_backend::devices() {
-    static BackendPower power;
-    static BackendDevice device;
-    static BackendStatus status;
-    static ::DeviceObject* list[] = {&power, &device, &status};
-    static DeviceManager manager(list, 3);
-    static const bool initialized = (manager.init(), true);
-    (void)initialized;
-    return manager;
-}
-
-system_backend::Capabilities BackendStatus::capabilities() {
-    return {};
-}
-bool BackendPower::request_power_on() {
-    return true;
-}
-bool BackendPower::execute_power(DataProc::PowerAction) {
-    return true;
-}
-bool BackendDevice::request_wifi(bool) {
-    return false;
-}
-system_backend::DeviceReport BackendDevice::device_report() {
-    return {};
-}
-bool BackendDevice::execute_device(const DataProc::DeviceRequest&) {
-    return false;
-}
-
-/** 无屏核心测试无需实际初始化器件。 */
-const char* BackendStatus::initialization_name(unsigned) { return "test"; }
-/** 无屏测试的默认步骤标题。 */
-i18n::TextId BackendStatus::initialization_title(unsigned) { return i18n::TextId::Initializing; }
-/** 核心测试只验证同步设备调用，不等待硬件。 */
-DataProc::InitializationStatus BackendStatus::poll_initialization_step(unsigned, uint32_t, char*, size_t) {
-    return DataProc::InitializationStatus::Ok;
-}
-
-/** 三类设备共享相同的精确尺寸命令表，并按值访问未对齐缓冲区。 */
+// 无屏测试使用九个可变细设备，全部值由 DataProc 定时器读取。
+DeviceManager& system_backend::devices() { return fixture::devices(); }
 void test_device_contract() {
-    auto& manager = system_backend::devices();
-    auto* power = manager.getDevice("Power");
-    auto* device = manager.getDevice("Device");
-    auto* status = manager.getDevice("Status");
-    assert(power && device && status && !manager.getDevice("Missing"));
-    ::DeviceObject uninitialized("Uninitialized");
+    hal_test::shapes();
+    hal_test::equality();
+    assert(!system_backend::devices().getDevice("Device") && !system_backend::devices().getDevice("Status"));
+    DeviceObject uninitialized("Uninitialized");
     unsigned value = 0;
-    assert(uninitialized.read(&value, sizeof(value)) == ::DeviceObject::RES_INIT_FAILED);
-    assert(uninitialized.write(&value, sizeof(value)) == ::DeviceObject::RES_INIT_FAILED);
-    assert(uninitialized.ioctl(0) == ::DeviceObject::RES_INIT_FAILED);
-    system_backend::Capabilities caps{};
-    assert(status->read(nullptr, 0) == ::DeviceObject::RES_PARAM_ERROR);
-    assert(status->write(nullptr, 0) == ::DeviceObject::RES_PARAM_ERROR);
-    assert(status->ioctl(system_backend::kCapabilities, &caps, sizeof(caps) - 1) == ::DeviceObject::RES_PARAM_ERROR);
-    assert(status->ioctl(system_backend::kCapabilities, nullptr, sizeof(caps)) == ::DeviceObject::RES_PARAM_ERROR);
-    assert(status->ioctl(system_backend::kCapabilities ^ (1U << 30), &caps, sizeof(caps)) == ::DeviceObject::RES_UNSUPPORT);
-    assert(status->ioctl(system_backend::kCapabilities, &caps, sizeof(caps)) == ::DeviceObject::RES_OK);
-    assert(power->ioctl(system_backend::kSetWifi, &value, sizeof(bool)) == ::DeviceObject::RES_UNSUPPORT);
-    assert(device->ioctl(system_backend::kRequestPowerOn) == ::DeviceObject::RES_UNSUPPORT);
-    std::array<unsigned char, sizeof(system_backend::DeviceReport) + 1> unaligned{};
-    assert(device->read(unaligned.data() + 1, sizeof(system_backend::DeviceReport)) == ::DeviceObject::RES_OK);
-    assert(device->read(unaligned.data() + 1, sizeof(system_backend::DeviceReport) - 1) == ::DeviceObject::RES_PARAM_ERROR);
-    DataProc::DeviceRequest request{};
-    request.radio_protocol = DataProc::kRadioProtocolCount;
-    std::memcpy(unaligned.data() + 1, &request, sizeof(request));
-    assert(device->write(unaligned.data() + 1, sizeof(request)) == ::DeviceObject::RES_PARAM_ERROR);
-    assert(device->write(&request, sizeof(request) - 1) == ::DeviceObject::RES_PARAM_ERROR);
-    request.command = static_cast<DataProc::DeviceCommand>(99);
-    assert(device->write(&request, sizeof(request)) == ::DeviceObject::RES_PARAM_ERROR);
-    system_backend::InitializationInfo info;
-    info.step = DataProc::kInitializationStepCount;
-    assert(status->ioctl(system_backend::kInitializationInfo, &info, sizeof(info)) == ::DeviceObject::RES_PARAM_ERROR);
-    info.step = 0;
-    std::memcpy(unaligned.data() + 1, &info, sizeof(info));
-    assert(status->ioctl(system_backend::kInitializationInfo, unaligned.data() + 1, sizeof(info)) == ::DeviceObject::RES_OK);
+    assert(uninitialized.read(&value,sizeof(value)) == DeviceObject::RES_INIT_FAILED);
+    assert(uninitialized.write(&value,sizeof(value)) == DeviceObject::RES_INIT_FAILED);
+    assert(uninitialized.ioctl(0) == DeviceObject::RES_INIT_FAILED);
+    std::array<unsigned char,sizeof(hal::WorkState)+1> bytes{};
+    auto* work = system_backend::devices().getDevice(hal::names::Work);
+    assert(work->read(bytes.data()+1,sizeof(hal::WorkState)) == DeviceObject::RES_OK);
+    assert(work->read(bytes.data()+1,sizeof(hal::WorkState)-1) == DeviceObject::RES_PARAM_ERROR);
+    hal::WorkCommand invalid{hal::WorkTarget::Rover,hal::kRadioProtocolCount,1};
+    std::memcpy(bytes.data()+1,&invalid,sizeof(invalid));
+    assert(work->write(bytes.data()+1,sizeof(invalid)) == DeviceObject::RES_PARAM_ERROR);
+    std::array<unsigned char,sizeof(hal::InitInfo)+1> information{};
+    hal::InitInfo info;
+    std::memcpy(information.data()+1,&info,sizeof(info));
+    assert(system_backend::devices().getDevice(hal::names::Init)->ioctl(hal::kInitializationInfo,
+        information.data()+1,sizeof(info)) == DeviceObject::RES_OK);
 }
 
 int main() {
@@ -348,37 +255,35 @@ int main() {
         assert(startup.notify("System", &request, sizeof(request)) == DataNode::RES_OK);
         assert(SystemService::snapshot().powered_on);
         assert(!DataProc_Deinit());
+        DataBroker timer_broker("TimerBroker");
+        assert(timer_broker.initTimerManager(clock_ms));
+        DataNode timed("Timed", &timer_broker);
         unsigned timer_calls = 0;
-        startup.setUserData(&timer_calls);
-        startup.setEventCallback(count_account_timer);
-        startup.setTimerPeriod(100);
-        assert(DataProc_RunLoop() == 100);
+        timed.setUserData(&timer_calls);
+        timed.setEventCallback(count_account_timer);
+        timed.setTimerPeriod(100);
+        assert(timer_broker.handleTimer() == 100);
         tick += 100;
-        assert(DataProc_RunLoop() == 100 && timer_calls == 1);
+        assert(timer_broker.handleTimer() == 100 && timer_calls == 1);
         tick += 50;
-        startup.resetTimer();
-        assert(DataProc_RunLoop() == 100 && timer_calls == 1);
+        timed.resetTimer();
+        assert(timer_broker.handleTimer() == 100 && timer_calls == 1);
         tick += 99;
-        assert(DataProc_RunLoop() == 1 && timer_calls == 1);
+        assert(timer_broker.handleTimer() == 1 && timer_calls == 1);
         ++tick;
-        assert(DataProc_RunLoop() == 100 && timer_calls == 2);
-        startup.stopTimer();
+        assert(timer_broker.handleTimer() == 100 && timer_calls == 2);
+        timed.stopTimer();
         tick += 100;
-        assert(DataProc_RunLoop() == UINT32_MAX && timer_calls == 2);
-        startup.resetTimer(); // 暂停时重置不应隐式恢复。
-        assert(DataProc_RunLoop() == UINT32_MAX);
-        startup.startTimer(100);
-        assert(DataProc_RunLoop() == 100);
+        assert(timer_broker.handleTimer() == UINT32_MAX && timer_calls == 2);
+        timed.resetTimer(); // 暂停时重置不应隐式恢复。
+        assert(timer_broker.handleTimer() == UINT32_MAX);
+        timed.startTimer(100);
+        assert(timer_broker.handleTimer() == 100);
         tick += 100;
-        assert(DataProc_RunLoop() == 100 && timer_calls == 3);
-        startup.setTimerPeriod(0);
-        assert(DataProc_RunLoop() == UINT32_MAX);
+        assert(timer_broker.handleTimer() == 100 && timer_calls == 3);
+        timed.setTimerPeriod(0);
+        assert(timer_broker.handleTimer() == UINT32_MAX);
     }
-    DataProc::StatusSnapshot status;
-    std::strcpy(status.position.data(), "FIX");
-    assert(StatusService::update(status));
-    status.position.fill('x');
-    assert(!StatusService::update(status));
     assert(DataProc_Deinit() && DataProc_RunLoop() == UINT32_MAX);
     assert(DataProc_Init(clock_ms) && DataProc_Deinit());
 }

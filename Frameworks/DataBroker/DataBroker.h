@@ -28,7 +28,7 @@
 class DataBroker {
     friend class DataNode;
 public:
-  static constexpr size_t MaxNodes = 16;
+  static constexpr size_t MaxNodes = 32;
   /** 构造值成员，避免在禁用异常的固件上隐式分配失败。 */
   explicit DataBroker(const char* name);
   /** 释放主节点订阅；调用前必须已销毁所有外部节点。 */

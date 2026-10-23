@@ -1,32 +1,21 @@
 #pragma once
-
+#include <cstdint>
+#include "DemoModel.h"
 #include "SystemBackend.h"
 #include "UI/StatusBar/StatusBar.h"
 
-#include <cstdint>
-
-/** Deterministic placeholder status producer used until the real backend exists. */
-class DemoStatus : public system_backend::StatusObject {
+/** @brief Demo 单一模型的确定性/随机采样配置；不发布应用快照。 */
+class DemoStatus {
   public:
-    /** 按当前预览时间和模式生成状态栏值快照。 */
-    DataProc::StatusSnapshot status_snapshot() override;
-    /** 演示平台的功能能力。 */
-    system_backend::Capabilities capabilities() override;
-    /** 演示初始化步骤名称。 */
-    const char* initialization_name(unsigned step) override;
-    /** 演示初始化步骤标题。 */
-    i18n::TextId initialization_title(unsigned step) override;
-    /** 保留原演示步骤耗时及失败结果。 */
-    DataProc::InitializationStatus poll_initialization_step(unsigned, uint32_t, char*, size_t) override;
-    /**
-     * Build a synthetic status snapshot from monotonic elapsed milliseconds.
-     * The result contains no hardware or business data and is safe to copy.
-     */
-    static page::StatusBarState sample(std::uint64_t elapsed_ms);
-
-    /** @brief 当前模拟采样的运行时长（ms），应用线程同步读取，不推进采样。 */
-    static std::uint64_t uptime_ms();
-
-    /** Host 随机预览：每 3 秒生成一组状态，相同 seed/时间可复现；由 LVGL 线程发布。 */
-    static page::StatusBarState sample_random(std::uint64_t elapsed_ms, std::uint32_t seed);
+    using Clock = uint32_t (*)();
+    /** @brief 启用自动采样；以当前 tick 为零点，同种子与时间可复现。 */
+    static void configure(Clock clock, bool random = false, uint32_t seed = 0);
+    /** @brief 测试/离线预览冻结在指定采样时间，返回同一模型的显示值。 */
+    static page::StatusBarState sample(uint64_t elapsed_ms);
+    /** @brief 每 3 秒生成随机状态，保持原 --random-status 语义。 */
+    static page::StatusBarState sample_random(uint64_t elapsed_ms, uint32_t seed);
+    /** @brief 当前模型运行时长，单位 ms。 */
+    static uint64_t uptime_ms();
+    /** @brief 设备同步读取前按自动时钟更新模型。 */
+    static void refresh();
 };

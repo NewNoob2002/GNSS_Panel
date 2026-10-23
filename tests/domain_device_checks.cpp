@@ -1,3 +1,4 @@
+#include "BusinessDevice.h"
 #include "SystemState.h"
 #include "hal_device_checks.h"
 #include "mcu_config.h"
@@ -89,7 +90,8 @@ check_domain_devices() {
             old.target = static_cast<DataProc::WorkTarget>(target);
             old.radio_protocol = protocol;
             old.radio_channel = 9;
-            assert(system_backend::execute_device(old));
+            BusinessDevice original;
+            assert(original.execute_device(old));
             const WorkConfig_t previous = State::Effective_Work();
             const auto revision = State::Work_Revision();
             State::Reset();
@@ -110,7 +112,8 @@ check_domain_devices() {
                                                                  : DataProc::DeviceCommand::StopRecord;
                 old.record_type = type;
                 old.record_interval = interval;
-                assert(system_backend::execute_device(old));
+                BusinessDevice original;
+                assert(original.execute_device(old));
                 const RecordInfo_t previous = State::Effective_Record();
                 const auto revision = State::Record_Revision();
                 State::Reset();
@@ -125,7 +128,8 @@ check_domain_devices() {
     }
     State::Reset();
     for (bool on : {false, true}) {
-        const bool old = system_backend::request_wifi(on);
+        BusinessDevice original;
+        const bool old = original.request_wifi(on);
         const auto previous = systemInfo.request.wifi_on;
         const int result = hal::write(hal_test::device(hal::names::WiFi), hal::WifiCommand{on});
         assert(old == (result == DeviceObject::RES_OK) && systemInfo.request.wifi_on == previous);

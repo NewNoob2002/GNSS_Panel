@@ -5,13 +5,14 @@
 #include <string>
 #include <vector>
 #include "App.h"
-#include "SystemService.h"
 #include "DemoStatus.h"
-#include "UI/SaveConfig/SaveConfigView.h"
-#include "UI/SystemLoading/SystemLoadingView.h"
+#include "DomainTestInput.hpp"
 #include "Log.h"
+#include "SystemService.h"
 #include "UI/Common/PageStyle.h"
 #include "UI/Common/SettingsStyle.h"
+#include "UI/SaveConfig/SaveConfigView.h"
+#include "UI/SystemLoading/SystemLoadingView.h"
 #include "lvgl_private.h"
 
 namespace {
@@ -197,6 +198,10 @@ capture(lv_display_t* display, const std::string& directory, const std::string& 
     }
     check_layout(checked);
     auto* position = label(lv_layer_top(), "DEMO");
+    if (!position || on_screen(position) != status) {
+        std::fprintf(stderr, "capture failed: %s position=%p visible=%d expected=%d\n", name.c_str(),
+                     static_cast<void*>(position), on_screen(position), status);
+    }
     assert(position && on_screen(position) == status);
     lv_refr_now(display);
     if (directory.empty())
@@ -289,7 +294,7 @@ random_battery_events(lv_display_t* display, const std::string& output) {
     auto* status_fill = status_battery_fill();
     auto state = DemoStatus::sample(0);
     const auto check = [&] {
-        active->update_status(state); // Exercise Application -> Status provider -> Model -> View.
+        test_input::status(state); // Exercise Application -> Status provider -> Model -> View.
         advance(40);
         const auto percent = state.battery_percent > 100 ? 100 : state.battery_percent;
         char text[24];
@@ -375,7 +380,7 @@ random_battery_events(lv_display_t* display, const std::string& output) {
     state.charging = false;
     check();
     state.charging = true;
-    active->update_status(state);
+    test_input::status(state);
     lv_obj_update_layout(lv_screen_active());
     lv_obj_update_layout(lv_layer_top());
     assert(lv_obj_get_width(fill) == 0 && lv_obj_get_width(status_fill) == 0);
@@ -436,7 +441,7 @@ random_battery_events(lv_display_t* display, const std::string& output) {
         check();
         assert(active->show_page("Pages/SystemInfos"));
         assert(!lv_anim_get(fill, nullptr));
-        active->update_status(state); // An update during the outgoing transition must not restart its animation.
+        test_input::status(state); // An update during the outgoing transition must not restart its animation.
         assert(!lv_anim_get(fill, nullptr));
         advance(400);
         assert(active->back());
@@ -668,6 +673,7 @@ saveconfig_scenarios(lv_display_t* display, const std::string& output) {
         for (unsigned scenario = 0; scenario < 5; ++scenario) {
             i18n::set_language(language);
             {
+                demo::model().power = {};
                 App app;
                 active = &app;
                 assert(app.init());
@@ -723,7 +729,7 @@ saveconfig_scenarios(lv_display_t* display, const std::string& output) {
                     const auto id = scenario == 2   ? TextId::SaveConfigPowerOffBoard
                                     : scenario == 3 ? TextId::SaveConfigPowerOffLowBattery
                                                     : TextId::SaveConfigPowerOffForced;
-                    assert(SystemService::begin_shutdown(cause));
+                    assert(test_input::shutdown(cause));
                     // No tick or navigation: the System publication must update the existing widgets.
                     assert(label(root, i18n::text(id)));
                     assert(lv_color_to_u32(lv_obj_get_style_arc_color(ring, LV_PART_INDICATOR))
@@ -797,7 +803,7 @@ saveconfig_scenarios(lv_display_t* display, const std::string& output) {
                     assert(SystemService::snapshot().power_calls == calls);
                     assert(std::strcmp(app.current_page(), "Pages/SaveConfig") == 0);
                     assert(app.back() && std::strcmp(app.current_page(), "Pages/SaveConfig") == 0);
-                    assert(SystemService::enter_standby());
+                    assert(test_input::standby());
                     advance(600);
                     assert(std::strcmp(app.current_page(), "Pages/Startup") == 0);
                 }
@@ -825,12 +831,13 @@ int main(int argc, char** argv) {
     lv_display_set_flush_cb(display, flush);
     assert(display);
     {
+        demo::model().power = {};
         App app;
         active = &app;
         assert(app.init());
         advance(400);
         assert(label(lv_screen_active(), "1.0.0") && label(lv_screen_active(), "85") && label(lv_screen_active(), "%")
-               && label(lv_screen_active(), "7.60 V"));
+               && label(lv_screen_active(), "8.08 V"));
         assert(!label(lv_screen_active(), "N/A"));
         assert(!on_screen(label(lv_layer_top(), "DEMO")));
         check_startup();
@@ -859,7 +866,7 @@ int main(int argc, char** argv) {
         boot_sequence(display, output, "-en");
         assert(std::strcmp(app.current_page(), "Pages/Dialplate") == 0);
         assert(!app.back());
-        app.update_status(DemoStatus::sample(16000));
+        test_input::status(DemoStatus::sample(16000));
         input(App::InputAction::NextFocus);
         input(App::InputAction::Confirm);
         assert(std::strcmp(app.current_page(), "Pages/SystemDash") == 0);
@@ -912,7 +919,7 @@ int main(int argc, char** argv) {
             assert(app.show_page("Pages/SystemInfos"));
             advance(400);
             assert(label(lv_screen_active(), "31.230400\n121.473700\n12.50 m")); // Simulated Device data.
-            assert(label(lv_screen_active(), "1.0.0\n02:15:30\n1\nDEMO-001"));
+            assert(label(lv_screen_active(), "1.0.0\n00:00:16\n1\nDEMO-001"));
             assert(!label(lv_screen_active(), "N/A"));
             assert(!DataProc::Broker()->search("SystemLoadingModel"));
             assert(!label(lv_screen_active(), i18n::text(i18n::TextId::SystemInitialization)));
@@ -947,7 +954,7 @@ int main(int argc, char** argv) {
             assert(app.show_page("Pages/SystemInfos"));
             advance(400);
             assert(lv_obj_get_parent(app.focused()) == lv_screen_active()); // 每次进入从根页开始。
-            assert(label(lv_screen_active(), "1.0.0\n02:15:30\n1\nDEMO-001"));
+            assert(label(lv_screen_active(), "1.0.0\n00:00:16\n1\nDEMO-001"));
             assert(lv_group_get_obj_count(lv_group_get_default()) == 7);
             capture(display, output, "SystemInfos-Reopen" + suffix, false);
             product_click(App::Key::Power); // 根页也可点击返回。
@@ -1063,6 +1070,7 @@ int main(int argc, char** argv) {
     // A fresh application before any startup reports zero initialization errors and six inventory controls.
     for (auto language : {i18n::Language::English, i18n::Language::Russian}) {
         i18n::set_language(language);
+        demo::model().power = {};
         App app;
         active = &app;
         assert(app.init());
@@ -1072,7 +1080,7 @@ int main(int argc, char** argv) {
         capture(display, output, "Startup-modern" + suffix, false);
         assert(app.show_page("Pages/SystemInfos"));
         advance(400);
-        assert(label(lv_screen_active(), "1.0.0\n02:15:30\n0\nDEMO-001"));
+        assert(label(lv_screen_active(), "1.0.0\n00:00:16\n0\nDEMO-001"));
         assert(lv_group_get_obj_count(lv_group_get_default()) == 7);
         assert(lv_obj_get_parent(app.focused()) == lv_screen_active());
         assert(!label(lv_screen_active(), i18n::text(i18n::TextId::SystemInitialization)));
@@ -1117,10 +1125,11 @@ int main(int argc, char** argv) {
         i18n::set_language(language);
         for (const char* page : {"Pages/WorkSettings", "Pages/RecordConfig", "Pages/SystemDash"}) {
             {
+                demo::model().power = {};
                 App app;
                 active = &app;
                 assert(app.init());
-                app.update_status(DemoStatus::sample(0));
+                test_input::status(DemoStatus::sample(0));
                 advance(400);
                 assert(app.show_page(page));
                 auto* entering = app.focused();
@@ -1165,6 +1174,7 @@ int main(int argc, char** argv) {
     }
     // Test battery levels and charging animations on Startup page
     {
+        demo::model().power = {};
         App app;
         active = &app;
         assert(app.init());
@@ -1177,7 +1187,7 @@ int main(int argc, char** argv) {
         state.battery_percent = 85;
         state.charging = false;
         state.battery_voltage = 7.60f;
-        app.update_status(state);
+        test_input::status(state);
         advance(50);
         assert(label(lv_screen_active(), "85") && label(lv_screen_active(), "%") && label(lv_screen_active(), "7.60 V")
                && label(lv_screen_active(), "BAT"));
@@ -1186,7 +1196,7 @@ int main(int argc, char** argv) {
         // 2. Medium battery (20%~49%): Amber #FF931E
         state.battery_percent = 35;
         state.battery_voltage = 7.45f;
-        app.update_status(state);
+        test_input::status(state);
         advance(50);
         assert(label(lv_screen_active(), "35") && label(lv_screen_active(), "%") && label(lv_screen_active(), "7.45 V")
                && label(lv_screen_active(), "BAT"));
@@ -1195,7 +1205,7 @@ int main(int argc, char** argv) {
         // 3. Low battery (10%~19%): Red #EA5455
         state.battery_percent = 15;
         state.battery_voltage = 7.20f;
-        app.update_status(state);
+        test_input::status(state);
         advance(50);
         assert(label(lv_screen_active(), "15") && label(lv_screen_active(), "%") && label(lv_screen_active(), "7.20 V")
                && label(lv_screen_active(), "BAT"));
@@ -1204,7 +1214,7 @@ int main(int argc, char** argv) {
         // 4. Critical low battery (<10%): Dark red #D03C3B
         state.battery_percent = 5;
         state.battery_voltage = 6.90f;
-        app.update_status(state);
+        test_input::status(state);
         advance(50);
         assert(label(lv_screen_active(), "5") && label(lv_screen_active(), "%") && label(lv_screen_active(), "6.90 V")
                && label(lv_screen_active(), "BAT"));
@@ -1214,7 +1224,7 @@ int main(int argc, char** argv) {
         state.battery_percent = 40;
         state.battery_voltage = 7.80f;
         state.charging = true;
-        app.update_status(state);
+        test_input::status(state);
         advance(50);
         assert(label(lv_screen_active(), "40") && label(lv_screen_active(), "%") && label(lv_screen_active(), "7.80 V")
                && label(lv_screen_active(), "CHG"));
@@ -1226,7 +1236,7 @@ int main(int argc, char** argv) {
 
         // 6. Unplug charger: returns to BAT, static width
         state.charging = false;
-        app.update_status(state);
+        test_input::status(state);
         advance(50);
         assert(label(lv_screen_active(), "40") && label(lv_screen_active(), "%") && label(lv_screen_active(), "7.80 V")
                && label(lv_screen_active(), "BAT"));

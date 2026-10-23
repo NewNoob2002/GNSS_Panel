@@ -29,6 +29,8 @@
 #include "DataBrokerLog.h"
 #include "DataTimer.h"
 
+static_assert(DataNode::kRelationshipCapacity == DataBroker::MaxNodes + 1, "DataNode relationship capacity mismatch");
+
 DataNode::DataNode(const char* id, DataBroker* broker, void* userData)
     : _ID(id ? id : ""), _broker(broker), _userData(userData), _eventCallback(nullptr), _eventFilterMask(EVENT_ALL),
       _timer(nullptr) {
@@ -133,7 +135,7 @@ int DataNode::publish(const void* data_p, size_t size)
     }
     int result = RES_OK;
     // 地址加序号快照：回调删除或原址重建后续订阅者时不能再向旧对象分发。
-    std::array<std::pair<DataNode*, uint64_t>, 17> snapshot{};
+    std::array<std::pair<DataNode*, uint64_t>, DataBroker::MaxNodes + 1> snapshot{};
     for (size_t i = 0; i < _subscribers.size(); ++i) {
         auto* sub = _subscribers[i];
         if (sub) {

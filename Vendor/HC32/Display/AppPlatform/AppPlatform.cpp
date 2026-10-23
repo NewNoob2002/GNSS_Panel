@@ -1,4 +1,4 @@
-// HC32 平台入口：通过静态 DeviceManager 连接三个设备对象，保留主循环及 HAL 时序。
+// HC32 平台入口：通过静态 DeviceManager 连接九个细设备，保留主循环及 HAL 时序。
 #include "AppPlatform.h"
 
 #include <cstdio>
@@ -100,9 +100,7 @@ App_Update() {
     app->poll_keys(now);
 #endif
     app->update();
-    objects.power.update();
     objects.device.update(now);
-    objects.status.update(now);
 }
 
 void

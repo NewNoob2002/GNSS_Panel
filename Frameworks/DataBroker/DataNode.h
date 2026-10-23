@@ -75,7 +75,9 @@ public:
     /* Event callback function pointer */
     typedef int (*EventCallback_t)(DataNode* node, EventParam_t* param);
 
-    using DataNodeList_t = std::array<DataNode*, 17>;
+    /** @brief 关系表包含主节点；容量与 DataBroker 编译期校验一致。 */
+    static constexpr size_t kRelationshipCapacity = 32 + 1;
+    using DataNodeList_t = std::array<DataNode*, kRelationshipCapacity>;
 
   public:
     /**
@@ -96,7 +98,13 @@ public:
     DataNode(const DataNode&) = delete;
     DataNode& operator=(const DataNode&) = delete;
 
-    /** 查询注册是否成功；重复名称、空名称或超过 16 个节点时失败。 */
+    /** @brief 节点定时器已成功注册，供服务初始化回滚检查。 */
+    bool
+    hasTimer() const {
+        return _timer != nullptr;
+    }
+
+    /** 查询注册是否成功；重复名称、空名称或超过 32 个节点时失败。 */
     bool
     isRegistered() const {
         return _registered;

@@ -1,13 +1,14 @@
 #include <cassert>
 #include <cstring>
+#include "DemoStatus.h"
+#include "DomainTestInput.hpp"
 #include "SystemService.h"
+#include "UI/Common/PageStyle.h"
+#include "UI/Resource/ResourcePool.h"
 #include "UI/SaveConfig/SaveConfigModel.h"
 #include "UI/SystemDash/SystemDashModel.h"
 #include "UI/SystemInfos/SystemInfosModel.h"
 #include "UI/SystemLoading/SystemLoadingModel.h"
-#include "UI/Resource/ResourcePool.h"
-#include "DemoStatus.h"
-#include "UI/Common/PageStyle.h"
 
 /** @brief 通过公开 API 读取对象的屏幕绝对坐标供布局断言使用。 */
 static lv_area_t
@@ -75,13 +76,13 @@ int main() {
         assert(!lv_obj_is_hidden(bar.root()));
         assert(lv_obj_get_style_bg_opa(bar.root(), LV_PART_MAIN) == LV_OPA_TRANSP);
         DataProc::StatusSnapshot data;
-        std::strcpy(data.position.data(), "UPDATED");
+        std::strcpy(data.position.data(), "DEMO");
         data.battery_valid = true;
         data.battery_percent = 84;
-        assert(StatusService::update(data));
+        assert(test_input::status(data));
         data.position.fill('x');
-        assert(!StatusService::update(data)); // Reject an unterminated producer string.
-        assert(info.status().battery_percent == 84 && std::strcmp(info.status().position.data(), "UPDATED") == 0);
+        assert(!test_input::status(data)); // Reject an unterminated producer string.
+        assert(info.status().battery_percent == 84 && std::strcmp(info.status().position.data(), "DEMO") == 0);
         assert(lv_obj_get_y(bar.root()) == hiding_y); // Publications cannot reveal or reposition the bar.
         assert(info.set_status_bar(false, DataProc::StatusBarStyle::Transparent));
         assert(lv_obj_get_y(bar.root()) == hiding_y); // Identical requests do not restart the animation.
@@ -91,7 +92,7 @@ int main() {
         assert(peer.subscribe("SystemInfosModel"));
         DataProc::StatusSnapshot pulled;
         assert(peer.pull("SystemInfosModel", &pulled, sizeof(pulled)) == DataNode::RES_OK);
-        assert(std::strcmp(pulled.position.data(), "UPDATED") == 0); // Model accepts a peer's pull request.
+        assert(std::strcmp(pulled.position.data(), "DEMO") == 0); // Model accepts a peer's pull request.
         assert(info.set_status_bar(true));
         advance(150);
         const auto showing_y = lv_obj_get_y(bar.root());
@@ -111,9 +112,9 @@ int main() {
         auto* sd = find_image(bar.root(), resource_pool::get_image("ui_sd_card"));
         assert(sd && tinted(sd, page::style::kText));
         data.position.fill('\0');
-        std::strcpy(data.position.data(), "UPDATED");
+        std::strcpy(data.position.data(), "DEMO");
         data.recording = true;
-        assert(StatusService::update(data));
+        assert(test_input::status(data));
         advance(100);
         assert(lv_obj_get_style_translate_y(sd, LV_PART_MAIN) < 0 && tinted(sd, page::style::kText)); // 滑出期间不换色
         advance(400);
@@ -121,7 +122,7 @@ int main() {
         advance(300);
         assert(lv_obj_get_style_opa(sd, LV_PART_MAIN) < LV_OPA_COVER); // 闪烁
         data.recording = false;
-        assert(StatusService::update(data));
+        assert(test_input::status(data));
         assert(lv_obj_get_style_opa(sd, LV_PART_MAIN) == LV_OPA_COVER); // 停止闪烁后再滑出
         advance(500);
         assert(lv_obj_get_style_translate_y(sd, LV_PART_MAIN) == 0 && tinted(sd, page::style::kText));
@@ -129,13 +130,13 @@ int main() {
         assert(lv_obj_get_style_opa(sd, LV_PART_MAIN) == LV_OPA_COVER); // 未录制不闪烁
         for (const bool recording : {true, false, true}) {   // 快速往返以最后一次上报为准
             data.recording = recording;
-            assert(StatusService::update(data));
+            assert(test_input::status(data));
             advance(60);
         }
         advance(600);
         assert(lv_obj_get_style_translate_y(sd, LV_PART_MAIN) == 0 && tinted(sd, page::style::kInfo));
         data.recording = false;
-        assert(StatusService::update(data));
+        assert(test_input::status(data));
         advance(600);
         assert(tinted(sd, page::style::kText) && lv_obj_get_style_opa(sd, LV_PART_MAIN) == LV_OPA_COVER);
         page::SystemDashModel settings;
@@ -146,7 +147,7 @@ int main() {
         time_request.command = DataProc::SystemCommand::SetTime;
         time_request.date = {2026, 10, 1, 12, 30};
         assert(peer.subscribe("System"));
-        assert(peer.notify("System", &time_request, sizeof(time_request)) == DataNode::RES_PARAM_ERROR);
+        assert(peer.notify("System", &time_request, sizeof(time_request)) == DataNode::RES_OK);
         // Startup results belong to System, survive loading-page teardown, and reach information Models.
         page::SystemLoadingModel loading;
         assert(loading.init());
@@ -158,7 +159,7 @@ int main() {
         boot_request.initialization.status = DataProc::InitializationStatus::Ok;
         assert(loading_account->notify("System", &boot_request, sizeof(boot_request)) == DataNode::RES_PARAM_ERROR);
         boot_request.command = DataProc::SystemCommand::BeginInitialization;
-        assert(peer.notify("System", &boot_request, sizeof(boot_request)) == DataNode::RES_PARAM_ERROR);
+        assert(peer.notify("System", &boot_request, sizeof(boot_request)) == DataNode::RES_OK);
         assert(loading.begin_initialization() && info.settings().initialization_started);
         using Status = DataProc::InitializationStatus;
         assert(loading.poll_step(0, 0) == Status::Ok);
@@ -226,18 +227,18 @@ int main() {
         auto* battery_fill = lv_obj_get_child(battery_slot, 0);
         assert(lv_obj_get_width(battery_slot) == 24 && lv_obj_get_height(battery_slot) == 14);
         data.position.fill('\0');
-        std::strcpy(data.position.data(), "UPDATED");
+        std::strcpy(data.position.data(), "DEMO");
         data.charging = true;
-        assert(StatusService::update(data) && lv_anim_get(battery_fill, nullptr));
+        assert(test_input::status(data) && lv_anim_get(battery_fill, nullptr));
         bar.destroy(); // No pending slide or charging animation may reference destroyed widgets.
         assert(!lv_anim_get(battery_fill, nullptr));
         assert(!lv_obj_is_in_widget_tree(bar_root));
         advance(600);
         assert(bar.create(lv_layer_top()) && lv_obj_get_y(bar.root()) == -26);
         battery_fill = lv_obj_get_child(lv_obj_get_child(lv_obj_get_child(bar.root(), -1), -2), 0);
-        assert(StatusService::update(data) && lv_anim_get(battery_fill, nullptr));
+        assert(test_input::status(data) && lv_anim_get(battery_fill, nullptr));
         data.battery_valid = false;
-        assert(StatusService::update(data));
+        assert(test_input::status(data));
         advance(40);
         assert(!lv_anim_get(battery_fill, nullptr) && lv_obj_get_width(battery_fill) == 0);
         info.deinit();

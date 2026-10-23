@@ -8,11 +8,10 @@
 
 /** @brief 应用线程同步 HAL 契约；数据归调用方所有，指针不跨同步回调保存。 */
 namespace hal {
-/** @brief 设备注册名；Legacy 名称只用于兼容旧路径。 */
+/** @brief 设备注册名，领域节点仅依赖这些集中定义的契约 ID。 */
 namespace names {
 inline constexpr char Power[] = "Power", Battery[] = "Battery", GNSS[] = "GNSS", Clock[] = "Clock";
 inline constexpr char Work[] = "Work", Recorder[] = "Recorder", WiFi[] = "WiFi", Board[] = "Board", Init[] = "Init";
-inline constexpr char LegacyDevice[] = "Device", LegacyStatus[] = "Status";
 }
 
 /** @brief 精确尺寸同步读取；空设备返回 RES_INIT_FAILED，输出仅在成功时更新。 */

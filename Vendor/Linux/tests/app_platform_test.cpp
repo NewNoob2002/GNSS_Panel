@@ -3,16 +3,18 @@
 #include <cstdio>
 #include <cstring>
 #include <vector>
+#include "App.h"
 #include "DataProc/DataProc.h"
+#include "DomainFixture.hpp"
+#include "I18n.h"
 #include "SystemBackend.h"
 #include "SystemService.h"
-#include "App.h"
-#include "UI/SystemLoading/SystemLoadingModel.h"
-#include "UI/Resource/ResourcePool.h"
-#include "I18n.h"
 #include "UI/Common/SettingsStyle.h"
+#include "UI/Resource/ResourcePool.h"
+#include "UI/SystemLoading/SystemLoadingModel.h"
 
 namespace {
+bool power_on();
 constexpr int width = 294, height = 126;
 uint16_t pixels[width * 20];
 unsigned power_on_requests = 0, off_calls = 0, reboot_calls = 0;
@@ -65,13 +67,11 @@ bool on_page(const char* name) {
     return active->current_page() && std::strcmp(active->current_page(), name) == 0;
 }
 void publish_status(bool temperature_valid = true, float temperature = 30.0f) {
-    page::StatusBarState status;
-    status.position = "RTK FIX"; // Real data: no "DEMO" text anywhere on screen.
-    status.battery_valid = true;
-    status.battery_percent = 60;
-    status.battery_temperature_valid = temperature_valid;
-    status.battery_temperature = temperature;
-    active->update_status(status);
+    fixture::source.battery = {true, 60, 60.f, 7.6f, temperature_valid, temperature, hal::ChargeState::NotCharging,
+                               false};
+    fixture::source.gnss.fix = hal::FixStatus::Fixed;
+    lv_tick_inc(200);
+    DataProc_RunLoop();
 }
 bool banner_shown() {
     return find_text(lv_layer_top(), "BATTERY HOT");
@@ -119,7 +119,7 @@ void choose(i18n::TextId id) {
 }
 void boot_to_dialplate() {
     assert(on_page("Pages/Startup"));
-    assert(SystemService::set_powered_on(true)); // Platform decided (e.g. HAL key timing).
+    assert(power_on()); // Platform decided (e.g. HAL key timing).
     advance(200);
     assert(on_page("Pages/SystemLoading"));
     advance(7000); // Logo, five steps, completion and the fade to the working root.
@@ -127,138 +127,113 @@ void boot_to_dialplate() {
 }
 } // namespace
 
-// Test platform: power-on is decided outside the UI, Reboot is not offered, data is real.
-
-namespace {
-/** 演示/测试电源设备，保留原即时或延后确认行为。 */
-class BackendPower : public system_backend::PowerObject {
-  public:
-    /** 读取服务已有的电源报告，无硬件操作。 */
-    system_backend::PowerReport
-    power_report() override {
-        const auto s = SystemService::snapshot();
-        return {s.powered_on, s.shutting_down, s.standby, s.power_cause};
-    }
-
-    /** 原后端开机操作。 */
-    bool request_power_on() override;
-    /** 原后端关机/重启操作。 */
-    bool execute_power(DataProc::PowerAction) override;
-};
-
-/** 演示/测试业务设备，保留原请求结果及快照。 */
-class BackendDevice : public system_backend::BusinessObject {
-  public:
-    /** 返回设备及服务已知的 Wi-Fi 状态。 */
-    system_backend::DeviceReport device_report() override;
-    /** 原后端业务请求。 */
-    bool execute_device(const DataProc::DeviceRequest&) override;
-    /** 原后端 Wi-Fi 请求。 */
-    bool request_wifi(bool) override;
-};
-
-/** 演示/测试状态设备，提供能力与初始化检查。 */
-class BackendStatus : public system_backend::StatusObject {
-  public:
-    /** 返回已发布状态，测试可继续直接注入快照。 */
-    DataProc::StatusSnapshot
-    status_snapshot() override {
-        return {};
-    }
-
-    /** 原后端能力。 */
-    system_backend::Capabilities capabilities() override;
-    /** 原后端初始化元数据。 */
-    const char* initialization_name(unsigned) override;
-    /** 原后端步骤标题。 */
-    i18n::TextId initialization_title(unsigned) override;
-    /** 原后端非阻塞检查。 */
-    DataProc::InitializationStatus poll_initialization_step(unsigned, uint32_t, char*, size_t) override;
-};
-} // namespace
-
-/** 三个静态设备不依赖 LVGL 或实际屏幕即可初始化。 */
+// 可变测试平台实现九个细设备，异步结果通过修改 source 后推进定时器上报。
 DeviceManager&
 system_backend::devices() {
-    static BackendPower power;
-    static BackendDevice device;
-    static BackendStatus status;
-    static ::DeviceObject* list[] = {&power, &device, &status};
-    static DeviceManager manager(list, 3);
-    static const bool initialized = (manager.init(), true);
-    (void)initialized;
-    return manager;
+    return fixture::devices();
 }
 
-system_backend::Capabilities
-BackendStatus::capabilities() {
-    return {.simulated = false,
-            .reboot_available = false,
-            .wifi_available = true,
-            .star_map = false,
-            .record_settings = false};
-}
-
+namespace {
 bool
-BackendPower::request_power_on() {
+request_on() {
     ++power_on_requests;
     return false;
 }
 
 bool
-BackendPower::execute_power(DataProc::PowerAction action) {
+execute_power(DataProc::PowerAction action) {
     ++(action == DataProc::PowerAction::Off ? off_calls : reboot_calls);
-    return true; // Completion is reported later with SystemService::enter_standby().
-}
-
-i18n::TextId
-BackendStatus::initialization_title(unsigned step) {
-    constexpr i18n::TextId titles[] = {i18n::TextId::LoadingConfiguration, i18n::TextId::CheckingBatteryGauge,
-                                       i18n::TextId::CheckingCharger, i18n::TextId::PoweringHostBoard,
-                                       i18n::TextId::CheckingHostLink};
-    return titles[step];
+    return true;
 }
 
 bool
-BackendDevice::request_wifi(bool on) {
+request_wifi(bool on) {
     ++wifi_requests;
     requested_wifi = on;
-    return true; // Applied later by the test through SystemService::set_wifi().
-}
-
-system_backend::DeviceReport
-BackendDevice::device_report() {
-    return {}; // Nothing known until the platform publishes.
+    fixture::source.wifi.pending = true;
+    return true;
 }
 
 bool
-BackendDevice::execute_device(const DataProc::DeviceRequest& request) {
-    if (reject_device)
+execute_device(const DataProc::DeviceRequest& request) {
+    if (reject_device) {
         return false;
+    }
     device_requests.push_back(request);
-    auto device = DeviceService::snapshot();
-    if (request.command == DataProc::DeviceCommand::ApplyWork)
-        device.work_pending = true;
-    else
-        device.record_pending = true;
-    return DeviceService::update(device);
-}
-
-const char*
-BackendStatus::initialization_name(unsigned) {
-    return "device";
+    if (request.command == DataProc::DeviceCommand::ApplyWork) {
+        fixture::source.work.pending = true;
+    } else {
+        fixture::source.recorder.pending = true;
+    }
+    return true;
 }
 
 DataProc::InitializationStatus
-BackendStatus::poll_initialization_step(unsigned step, std::uint32_t elapsed_ms, char* detail, std::size_t size) {
-    // Checks take different times; the last one waits for the host and may never answer.
-    if ((step == 1 && elapsed_ms < 500) || (step == 4 && stall_last_step))
+poll(unsigned step, uint32_t elapsed, char* detail, size_t size) {
+    if ((step == 1 && elapsed < 500) || (step == 4 && stall_last_step)) {
         return DataProc::InitializationStatus::Pending;
+    }
     std::snprintf(detail, size, "device %u online", step + 1);
     return DataProc::InitializationStatus::Ok;
 }
 
+bool
+set_device(const DataProc::DeviceSnapshot& value) {
+    if (!fixture::set_device(value)) {
+        return false;
+    }
+    lv_tick_inc(1000);
+    DataProc_RunLoop();
+    return true;
+}
+
+bool
+power_on() {
+    fixture::source.power = {true, false, false, hal::PowerCause::User};
+    lv_tick_inc(20);
+    DataProc_RunLoop();
+    return true;
+}
+
+bool
+shutdown(hal::PowerCause cause) {
+    auto& p = fixture::source.power;
+    if (p.standby) {
+        return false;
+    }
+    p.shutting_down = true;
+    p.cause = cause;
+    lv_tick_inc(20);
+    DataProc_RunLoop();
+    return true;
+}
+
+bool
+standby() {
+    fixture::source.power = {false, false, true, hal::PowerCause::User};
+    lv_tick_inc(20);
+    DataProc_RunLoop();
+    return true;
+}
+
+bool
+wifi(bool on, bool pending) {
+    fixture::source.wifi.on = on;
+    fixture::source.wifi.pending = pending;
+    lv_tick_inc(500);
+    DataProc_RunLoop();
+    return true;
+}
+} // namespace
+
 int main() {
+    fixture::source.board.capabilities = {false, false, true, false, false};
+    fixture::source.wifi.available = true;
+    fixture::source.request_on = request_on;
+    fixture::source.execute_power = execute_power;
+    fixture::source.request_wifi = request_wifi;
+    fixture::source.execute_device = execute_device;
+    fixture::source.poll = poll;
     lv_init();
     lv_display_t* display = lv_display_create(width, height);
     assert(display);
@@ -328,7 +303,7 @@ int main() {
         // Before the platform publishes, device fields show N/A; afterwards pages show the real data.
         assert(find_text(lv_screen_active(), "N/A") || on_page("Pages/Dialplate"));
         auto device = real_device();
-        assert(DeviceService::update(device));
+        assert(set_device(device));
         advance(100);
 
         // SystemInfos cards from device data (formats as on the former HC32 pages).
@@ -366,13 +341,13 @@ int main() {
         advance(15500);
         assert(find_text(lv_screen_active(), i18n::text(i18n::TextId::RequestTimeout)));
         device.work_pending = false;
-        assert(DeviceService::update(device));
+        assert(set_device(device));
         assert(find_text(lv_screen_active(), i18n::text(i18n::TextId::RequestReceived)));
         assert(!lv_anim_get(work_dot, page::settings_style::pulse));
         assert(app.back());
         advance(500);
         device.radio_channel = 0;
-        assert(DeviceService::update(device));
+        assert(set_device(device));
         assert(app.show_page("Pages/WorkSettings"));
         advance(500);
         choose(i18n::TextId::Apply);
@@ -382,7 +357,7 @@ int main() {
         assert(app.back());
         advance(500);
         device.radio_channel = 5;
-        assert(DeviceService::update(device));
+        assert(set_device(device));
         assert(app.show_page("Pages/WorkSettings"));
         advance(500);
         choose(i18n::TextId::Apply);
@@ -393,7 +368,7 @@ int main() {
         app.on_input(App::InputAction::Confirm);
         assert(device_requests.size() == 2 && device_requests.back().radio_protocol == 3
                && device_requests.back().radio_channel == 5);
-        assert(DeviceService::update(device));
+        assert(set_device(device));
         advance(100);
         assert(find_text(lv_screen_active(), i18n::text(i18n::TextId::RequestReceived)));
         assert(app.back());
@@ -418,14 +393,14 @@ int main() {
         advance(15500);
         assert(find_text(lv_screen_active(), i18n::text(i18n::TextId::RequestTimeout)));
         device.recording = true;
-        assert(DeviceService::update(device));
+        assert(set_device(device));
         advance(100);
         assert(find_text(lv_screen_active(), i18n::text(i18n::TextId::RequestReceived)));
         choose(i18n::TextId::Stop);
         app.on_input(App::InputAction::Confirm);
         assert(device_requests.size() == 4 && device_requests.back().command == DataProc::DeviceCommand::StopRecord);
         device.recording = false;
-        assert(DeviceService::update(device));
+        assert(set_device(device));
         assert(!lv_anim_get(record_dot, page::settings_style::pulse));
         assert(app.back());
         advance(500);
@@ -444,7 +419,7 @@ int main() {
         assert(wifi_dot);
         app.on_input(App::InputAction::Confirm); // Ignored while pending.
         assert(wifi_requests == 1);
-        assert(SystemService::set_wifi(true, false));
+        assert(wifi(true, false));
         assert(!lv_anim_get(wifi_dot, page::settings_style::pulse));
         advance(50);
         assert(!find_text(lv_screen_active(), "...") && !SystemService::snapshot().wifi_pending);
@@ -543,17 +518,17 @@ int main() {
         app.on_input(App::InputAction::Release);
         advance(10000);
         assert(off_calls == 1 && reboot_calls == 0 && on_page("Pages/SaveConfig"));
-        assert(SystemService::begin_shutdown(DataProc::PowerCause::User)); // e.g. HAL ShutdownGoing.
+        assert(shutdown(DataProc::PowerCause::User)); // e.g. HAL ShutdownGoing.
         advance(100);
         assert(app.back() && on_page("Pages/SaveConfig")); // Back is consumed during a shutdown.
-        assert(SystemService::enter_standby());
+        assert(standby());
         advance(600);
         assert(on_page("Pages/Startup") && !app.back());
 
         // A platform step that never finishes cannot block startup: it is recorded as failed after the page's
         // limit and the working root is still reached (power on/off keep working meanwhile).
         stall_last_step = true;
-        assert(SystemService::set_powered_on(true));
+        assert(power_on());
         advance(200);
         assert(on_page("Pages/SystemLoading"));
         advance(page::SystemLoadingModel::kStepLimitMs);
@@ -566,17 +541,17 @@ int main() {
         stall_last_step = false;
 
         // Platform shutdown (host request): SaveConfig shows the cause, cannot be left, standby returns.
-        assert(SystemService::begin_shutdown(DataProc::PowerCause::Host));
+        assert(shutdown(DataProc::PowerCause::Host));
         advance(600);
         assert(on_page("Pages/SaveConfig"));
         assert(find_text(lv_screen_active(), i18n::text(i18n::TextId::SaveConfigPowerOffBoard)));
         assert(app.back() && on_page("Pages/SaveConfig"));
         advance(10000);
         assert(off_calls == 1 && on_page("Pages/SaveConfig")); // Nothing is executed for a platform shutdown.
-        assert(SystemService::enter_standby());
+        assert(standby());
         advance(600);
         assert(on_page("Pages/Startup"));
-        assert(!SystemService::begin_shutdown(DataProc::PowerCause::Forced)); // Already in standby.
+        assert(!shutdown(DataProc::PowerCause::Forced)); // Already in standby.
         active = nullptr;
     }
     lv_display_delete(display);

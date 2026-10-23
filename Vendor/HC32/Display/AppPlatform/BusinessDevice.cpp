@@ -5,7 +5,6 @@
 #include <cstdio>
 #include <cstring>
 
-#include "SystemService.h"
 #include "SystemState.h"
 #include "Log.h"
 #include "lvgl.h"
@@ -116,30 +115,19 @@ BusinessDevice::snapshot(std::uint32_t now) {
 
 void
 BusinessDevice::update(std::uint32_t now) {
-    forward_wifi(now);
-    if (!polled_ || now - last_poll_ms_ >= kPeriodMs) {
-        polled_ = true;
-        last_poll_ms_ = now;
-        publish(now);
-    }
-}
-
-/** 内容变化时发布设备快照（运行时长每秒变化，即最多约每秒一次）。 */
-void
-BusinessDevice::publish(std::uint32_t now) {
-    const DataProc::DeviceSnapshot device = system_backend::read_device().snapshot;
-    (void)now;
-    if (sent_ && std::memcmp(&device, &last_, sizeof(device)) == 0) {
-        return;
-    }
-    if (DeviceService::update(device)) {
-        sent_ = true;
-        std::memcpy(static_cast<void*>(&last_), &device, sizeof(device));
+    const WifiInfo_t& wifi = systemInfo.host.wifi;
+    const On_Off_Status_t target = systemInfo.request.wifi_on;
+    if (wifi_requested_ && wifi.wifi_status == target) {
+        wifi_requested_ = false;
+    } else if (wifi_requested_ && now - wifi_request_ms_ >= kWifiTimeoutMs) {
+        wifi_requested_ = false;
+        APP_LOG_W("Wifi", "host did not apply wifi %s within %lu ms", target ? "on" : "off",
+                  static_cast<unsigned long>(kWifiTimeoutMs));
     }
 }
 
 bool
-BusinessDevice::execute(const DataProc::DeviceRequest& request, std::uint32_t now) {
+BusinessDevice::execute(const DataProc::DeviceRequest& request) {
     switch (request.command) {
         case DataProc::DeviceCommand::ApplyWork: {
             WorkConfig_t work = State::Effective_Work();
@@ -182,55 +170,42 @@ BusinessDevice::execute(const DataProc::DeviceRequest& request, std::uint32_t no
         }
         default: return false;
     }
-    publish(now);
     return true;
 }
 
 bool
-BusinessDevice::request_wifi(bool on, std::uint32_t now) {
+BusinessDevice::request_wifi(bool on) {
 #if PRODUCT_SHUTDOWN_WIFI_BUTTON
-    // 设定值由面板协议发给主控，主控回报 wifi_status 后 forward_wifi() 结束等待。
     State::Request_Wifi(on);
     wifi_requested_ = true;
-    wifi_request_ms_ = now;
+    wifi_request_ms_ = lv_tick_get();
     return true;
 #else
     (void)on;
-    (void)now;
     return false;
 #endif
 }
 
-/** 上报主控的 Wi-Fi 状态（无开关按钮的产品也在 SystemInfos 显示）。
- * 回报与设定值一致前视为切换中；超时后放弃等待。 */
-void
-BusinessDevice::forward_wifi(std::uint32_t now) {
-    const WifiInfo_t& wifi = systemInfo.host.wifi;
-    const On_Off_Status_t target = systemInfo.request.wifi_on;
-    if (wifi_requested_ && wifi.wifi_status == target) {
-        wifi_requested_ = false;
-    } else if (wifi_requested_ && now - wifi_request_ms_ >= kWifiTimeoutMs) {
-        wifi_requested_ = false;
-        APP_LOG_W("Wifi", "host did not apply wifi %s within %lu ms", target ? "on" : "off",
-                  static_cast<unsigned long>(kWifiTimeoutMs));
-    }
-    SystemService::set_wifi(wifi.wifi_status == On_Off_Status_ON, wifi_requested_);
-}
-
-/** 同步返回快照和 Wi-Fi 状态；主控协议仍拥有请求确认。 */
-system_backend::DeviceReport
-BusinessDevice::device_report() {
-    return {snapshot(lv_tick_get()), systemInfo.host.wifi.wifi_status == On_Off_Status_ON, wifi_requested_};
-}
-
-/** write 已按值解码和校验范围，此处保留原协议映射及发布。 */
 bool
 BusinessDevice::execute_device(const DataProc::DeviceRequest& request) {
-    return execute(request, lv_tick_get());
-}
-
-/** ioctl 请求不等待主控回应。 */
-bool
-BusinessDevice::request_wifi(bool on) {
-    return request_wifi(on, lv_tick_get());
+    switch (request.command) {
+        case DataProc::DeviceCommand::ApplyWork:
+            if ((request.target != DataProc::WorkTarget::Rover && request.target != DataProc::WorkTarget::Base
+                 && request.target != DataProc::WorkTarget::Ntrip)
+                || request.radio_protocol >= DataProc::kRadioProtocolCount
+                || request.radio_channel >= DataProc::kRadioChannelCount
+                || (request.target != DataProc::WorkTarget::Ntrip && !request.radio_channel)) {
+                return false;
+            }
+            break;
+        case DataProc::DeviceCommand::StartRecord:
+            if (request.record_type >= DataProc::kRecordTypeCount
+                || request.record_interval >= DataProc::kRecordIntervalCount) {
+                return false;
+            }
+            break;
+        case DataProc::DeviceCommand::StopRecord: break;
+        default: return false;
+    }
+    return execute(request);
 }

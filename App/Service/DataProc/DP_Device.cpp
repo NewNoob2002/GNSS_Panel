@@ -1,80 +1,63 @@
-#include "SystemBackend.h"
+#include "Aggregate.h"
 #include "SystemService.h"
-#include "DataProc.h"
-#include "Log.h"
-
+#include "Def/DP_Battery.h"
+#include "Def/DP_GNSS.h"
+#include "Def/DP_Recorder.h"
+#include "Def/DP_Version.h"
+#include "Def/DP_WiFi.h"
+#include "Def/DP_Work.h"
 namespace {
-DataProc::DeviceSnapshot latest;
-DataNode* provider = nullptr;
-
-bool sender_is(const DataNode::EventParam_t* event, const char* name) {
-    return event->tran && std::strcmp(event->tran->getID(), name) == 0;
-}
-/** Only the page that owns an action may send it, and option indexes must be in range. */
-bool valid(const DataNode::EventParam_t* event, const DataProc::DeviceRequest& request) {
-    switch (request.command) {
+class DeviceNode final : public dp::Aggregate<DataProc::DeviceSnapshot, dp::Battery, dp::GNSS, dp::Recorder,
+    dp::Version, dp::WiFi, dp::Work> {
+public:
+    explicit DeviceNode(DataBroker* broker) : Aggregate(dp::names::Device, broker) {}
+    int onEvent(EventParam_t* event) override {
+        if (!event || event->event != EVENT_NOTIFY) return Aggregate::onEvent(event);
+        DataProc::DeviceRequest request;
+        const int decoded = DataProc::ReadPayload(event, request);
+        if (decoded != RES_OK) return decoded;
+        switch (request.command) {
         case DataProc::DeviceCommand::ApplyWork:
-            return sender_is(event, "WorkSettingsModel") && !latest.work_pending
-                   && (request.target == DataProc::WorkTarget::Rover || request.target == DataProc::WorkTarget::Base
-                       || request.target == DataProc::WorkTarget::Ntrip)
-                   && request.radio_protocol < DataProc::kRadioProtocolCount
-                   && request.radio_channel < DataProc::kRadioChannelCount
-                   && (request.target == DataProc::WorkTarget::Ntrip || request.radio_channel != 0);
+            return dp::Work::notify(*this, {static_cast<hal::WorkTarget>(request.target), request.radio_protocol, request.radio_channel});
         case DataProc::DeviceCommand::StartRecord:
-            return sender_is(event, "RecordConfigModel") && latest.record_valid && !latest.record_pending
-                   && !latest.recording && request.record_type < DataProc::kRecordTypeCount
-                   && request.record_interval < DataProc::kRecordIntervalCount;
+            return dp::Recorder::notify(*this, {hal::RecordAction::Start, request.record_type, request.record_interval});
         case DataProc::DeviceCommand::StopRecord:
-            return sender_is(event, "RecordConfigModel") && latest.record_valid && !latest.record_pending
-                   && latest.recording;
-        default:
-            return false;
+            return dp::Recorder::notify(*this, {hal::RecordAction::Stop});
+        default: return RES_UNSUPPORTED_REQUEST;
+        }
     }
-}
-int on_event(DataNode*, DataNode::EventParam_t* event) {
-    if (!event || !event->data_p)
-        return DataNode::RES_PARAM_ERROR;
-    if (event->event == DataNode::EVENT_PULL) {
-        if (event->size != sizeof(latest))
-            return DataNode::RES_SIZE_MISMATCH;
-        std::memcpy(event->data_p, &latest, sizeof(latest));
-        return DataNode::RES_OK;
+private:
+    DataProc::DeviceSnapshot compose() const override {
+        DataProc::DeviceSnapshot value;
+        const auto& battery = get<dp::Battery>(); const auto& gnss = get<dp::GNSS>();
+        const auto& record = get<dp::Recorder>(); const auto& version = get<dp::Version>();
+        const auto& wifi = get<dp::WiFi>(); const auto& work = get<dp::Work>();
+        value.position_valid = gnss.position_valid; value.latitude = gnss.latitude; value.longitude = gnss.longitude;
+        value.altitude = gnss.altitude; value.satellites_valid = gnss.satellites_valid;
+        value.satellites_used = gnss.satellites_used; value.satellites_tracked = gnss.satellites_tracked;
+        value.constellations_valid = gnss.constellations_valid; value.constellations = gnss.constellations;
+        value.work_valid = work.valid; value.work_pending = work.pending; value.work_mode = static_cast<DataProc::WorkMode>(work.mode);
+        value.radio_on = work.radio_on; value.radio_protocol = work.protocol; value.radio_channel = work.channel;
+        value.ntrip = static_cast<DataProc::NtripRole>(work.ntrip);
+        value.record_valid = record.valid; value.recording = record.recording; value.record_pending = record.pending;
+        value.record_type = record.type; value.record_interval = record.interval; value.record_name = record.name;
+        value.record_space_mb = record.space_mb;
+        value.wifi_valid = wifi.valid; value.wifi_station = wifi.station; value.wifi_ssid = wifi.ssid; value.wifi_ip = wifi.ip;
+        value.power_valid = battery.valid; value.external_power = battery.external_power; value.battery_percent = battery.gauge_percent;
+        value.battery_voltage = battery.voltage; value.battery_temperature = battery.temperature;
+        value.charge = static_cast<DataProc::ChargeState>(battery.charge);
+        value.firmware = version.firmware; value.hardware = version.hardware; value.build = version.build; value.uptime_s = version.uptime_s;
+        return value;
     }
-    if (event->event != DataNode::EVENT_NOTIFY)
-        return DataNode::RES_UNSUPPORTED_REQUEST;
-    DataProc::DeviceRequest request;
-    const int decoded = DataProc::ReadPayload(event, request);
-    if (decoded != DataNode::RES_OK)
-        return decoded;
-    if (!valid(event, request))
-        return DataNode::RES_PARAM_ERROR;
-    return system_backend::execute_device(request) ? DataNode::RES_OK : DataNode::RES_UNKNOWN;
+};
 }
-} // namespace
-
-DATA_PROC_INIT_DEF(Device) {
-    provider = account;
-    latest = system_backend::initial_device();
-    account->setEventCallback(on_event);
-    return account->isRegistered();
-}
-bool DeviceService::update(const DataProc::DeviceSnapshot& device) {
-    if (!provider || DataProc::Broker()->search("Device") != provider)
-        return false;
-    // Every text field must be NUL-terminated within its array before it is shown.
-    if (device.record_name.back() || device.wifi_ssid.back() || device.firmware.back() || device.hardware.back()
-        || device.build.back())
-        return false;
-    latest = device;
-    // 同步分发期间保留本次快照，重入更新不改写当前事件。
-    const auto snapshot = latest;
-    const int result = provider->publish(&snapshot, sizeof(snapshot));
-    if (result != DataNode::RES_OK && result != DataNode::RES_UNKNOWN) {
-        APP_LOG_W("Device", "subscriber rejected update: %d", result);
-        return false;
-    }
-    return true;
-}
+DP_CREATE(Device, DeviceNode)
 DataProc::DeviceSnapshot DeviceService::snapshot() {
-    return latest;
+    DataProc::DeviceSnapshot result;
+    auto* node = DataProc::Broker()->search(dp::names::Device);
+    if (node) {
+        DataNode::EventParam_t event(nullptr, node, DataNode::EVENT_PULL, &result, sizeof(result));
+        (void)node->onEvent(&event);
+    }
+    return result;
 }
