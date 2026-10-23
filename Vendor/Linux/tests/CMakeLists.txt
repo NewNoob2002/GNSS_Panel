@@ -30,6 +30,17 @@ target_link_libraries(app_navigation_preview PRIVATE linux::demo_backend app::ha
 target_compile_options(app_navigation_preview PRIVATE -Wall -Wextra -Werror -UNDEBUG)
 add_test(NAME app_navigation_preview COMMAND app_navigation_preview)
 
+add_executable(app_spring_test app_spring_test.cpp)
+target_link_libraries(app_spring_test PRIVATE app::ui)
+target_compile_options(app_spring_test PRIVATE -Wall -Wextra -Werror -UNDEBUG)
+add_test(NAME app_spring COMMAND app_spring_test)
+
+add_executable(app_focus_preview app_focus_preview.cpp)
+target_link_libraries(app_focus_preview PRIVATE linux::demo_backend)
+target_compile_options(app_focus_preview PRIVATE -Wall -Wextra -Werror -UNDEBUG)
+add_test(NAME app_focus_preview COMMAND app_focus_preview)
+add_test(NAME app_focus_rapid COMMAND app_focus_preview "${CMAKE_CURRENT_BINARY_DIR}/spring-rapid-frames" rapid)
+
 add_executable(app_deferred_navigation_test app_deferred_navigation_test.cpp)
 target_link_libraries(app_deferred_navigation_test PRIVATE linux::demo_backend)
 target_compile_options(app_deferred_navigation_test PRIVATE -Wall -Wextra -Werror -UNDEBUG)

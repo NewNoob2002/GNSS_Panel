@@ -11,7 +11,7 @@
 | L0 选项 | `cmake/` | `proj::options`（语言标准、告警、`-fno-exceptions/-fno-rtti` 等，按平台定义） | — |
 | L1 第三方组件 | `External/lvgl`、各平台 `Libraries/` 中的第三方库 | `lvgl::lvgl`、`lvgl::demos`（上游 CMake）、`hc32::segger_rtt`、`hc32::easylogger`、`hc32::multibutton`、`hc32::parser`、`hc32::millis_task` | L0；需要平台端口的库通过 `*_port` INTERFACE 目标注入（如 easylogger 的输出端口） |
 | L2 框架 | `Frameworks/*` | `fw::databroker`、`fw::devicemanager`、`fw::resourcemanager`（INTERFACE）、`fw::pagemanager` | L0、L1（只有 `fw::pagemanager` 可以依赖 `lvgl::lvgl`），以及 `app::log`（日志宏桥接，见 4.3） |
-| L3 应用 | `App/` | `app::log`、`app::i18n`、`app::core`（无 LVGL）、`app::ui`（页面、资源、组件） | L0–L2；`app::core` 不得依赖 `lvgl::lvgl`、`fw::pagemanager` |
+| L3 应用 | `App/` | `app::log`、`app::i18n`、`app::core`（无 LVGL）、`app::spring`（无 LVGL）、`app::lv_spring`、`app::ui`（页面、资源、组件） | L0–L2；`app::core` 不得依赖 `lvgl::lvgl`、`fw::pagemanager`；同层弹簧依赖仅 `app::ui → app::lv_spring → app::spring` |
 | L4 平台 | `Vendor/<Platform>/` | 见第 2 节 | L0–L3；只依赖本平台目标，不得依赖其他 `Vendor/` 平台，第 3 节的共享子集除外 |
 | L5 产品/可执行 | `Vendor/HC32/Products/*`、各平台入口 | 固件 ELF、模拟器、Linux 可执行与测试 | 任意下层 |
 

@@ -30,6 +30,7 @@ void SystemDash::onViewWillAppear() {
     if (!view_.bind(model_->subject()))
         app_fatal("SystemDash", "View binding failed");
     utils::focus_controls(view_.controls(), last_focus_);
+    view_.resume_focus();
     view_.appear();
 }
 
@@ -74,6 +75,7 @@ void SystemDash::show_power(bool visible) {
     lv_group_remove_all_objs(lv_group_get_default());
     view_.show_power(visible);
     utils::focus_controls(view_.controls(), view_.default_focus(visible));
+    view_.resume_focus();
 }
 
 bool SystemDash::onBackRequest() {

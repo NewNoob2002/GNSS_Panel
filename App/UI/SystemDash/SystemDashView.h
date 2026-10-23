@@ -3,6 +3,7 @@
 #include "SystemDashModel.h"
 #include "UI/Resource/ResourcePool.h"
 #include "lvgl.h"
+#include "lv_spring.h"
 
 namespace page {
 class SystemDashView {
@@ -10,17 +11,20 @@ class SystemDashView {
     enum class Control { Language, Wifi, Power, Back, Shutdown, Reboot, None };
 
     void create(lv_obj_t* root, bool reboot_available = true);
-    void destroy() {
-        unbind();
-        stop();
-    }
+    void destroy();
     void appear() const;
-    void stop() const;
+    void stop();
+    /** @brief 组装或恢复焦点后直接落位，再启用后续保速移动。 */
+    void resume_focus();
+    /** @brief 布局或语言更新时直接对齐当前焦点。 */
+    void sync_focus();
+    lv_obj_t* focus_highlight() const { return focus_motion_.object(); }
+    const app::LvSpring& focus_motion() const { return focus_motion_; }
 
     bool bind(lv_subject_t* subject);
     void unbind();
 
-    void apply_language() const;
+    void apply_language();
     void update(const SystemDashState& state) const;
     void show_power(bool visible);
     /** Hold-to-confirm progress 0..100 inside button (shutdown or reboot); 0 clears both. */
@@ -44,6 +48,12 @@ class SystemDashView {
     struct {
         lv_obj_t *language{}, *wifi{}, *power{}, *back{}, *overlay{}, *shutdown{}, *reboot{};
     } ui;
+
+    static void on_focus_event(lv_event_t* event);
+    void focus_to(lv_obj_t* object, bool animated);
+    app::LvSpring focus_motion_{};
+    lv_obj_t* focused_ = nullptr;
+    bool animate_focus_ = false, aligning_focus_ = false;
 
     static void on_state(lv_observer_t* observer, lv_subject_t* subject);
     lv_observer_t* observer_ = nullptr;

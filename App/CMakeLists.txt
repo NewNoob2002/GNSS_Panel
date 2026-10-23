@@ -3,6 +3,8 @@ if(NOT TARGET proj::options)
     include(${CMAKE_CURRENT_LIST_DIR}/../cmake/options.cmake)
 endif()
 
+add_subdirectory(Utils/Spring)
+
 add_library(app_log STATIC Utils/Log/Log.cpp)
 add_subdirectory(../Frameworks/DataBroker frameworks/databroker)
 add_subdirectory(../Frameworks/DeviceManager frameworks/devicemanager)
@@ -110,5 +112,5 @@ target_include_directories(app_ui PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}/UI/Common"
     "${CMAKE_CURRENT_SOURCE_DIR}/Utils/ButtonGesture")
 add_library(app::ui ALIAS app_ui)
-target_link_libraries(app_ui PUBLIC app::core fw::pagemanager app::dialplate)
+target_link_libraries(app_ui PUBLIC app::core fw::pagemanager app::dialplate app::lv_spring)
 target_compile_options(app_ui PRIVATE -Wall -Wextra -Werror)
