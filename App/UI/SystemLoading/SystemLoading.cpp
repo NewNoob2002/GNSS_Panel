@@ -1,8 +1,10 @@
 #include "SystemLoading.h"
 #include "Log.h"
 #include "PageManager.h"
+#include "UI/PageId.h"
 #include "UI/Common/PageUtils.h"
 #include "UI/Common/PageStyle.h"
+#include <memory>
 
 using namespace page;
 
@@ -13,17 +15,18 @@ void SystemLoading::onInstalled() {
 }
 
 void SystemLoading::onViewLoad() {
-    if (!model_.init())
+    model_ = std::make_unique<SystemLoadingModel>();
+    if (!model_->init())
         app_fatal("SystemLoading", "Model initialization failed");
     view_.create(getRoot());
-    style::show_demo(getRoot(), model_.settings().simulated);
+    style::show_demo(getRoot(), model_->state().simulated);
 }
 
 void SystemLoading::onViewWillAppear() {
-    model_.set_status_bar(false);
+    model_->set_status_bar(false);
     phase_ = Phase::Logo;
     step_ = 0;
-    model_.begin_initialization(); // Report reset failures are logged; startup remains non-blocking.
+    model_->begin_initialization(); // Report reset failures are logged; startup remains non-blocking.
     view_.show_logo();
     APP_LOG_I("SystemLoading", "window=Logo%s", demo_tag());
 }
@@ -49,7 +52,7 @@ void SystemLoading::onViewWillDisappear() {
 }
 
 void SystemLoading::onViewUnload() {
-    model_.deinit();
+    model_.reset();
     cancel_timer();
     view_.destroy();
 }
@@ -70,7 +73,7 @@ void SystemLoading::poll_initialization(lv_timer_t* timer) {
     const uint32_t elapsed = lv_tick_elaps(step_started_);
     if (step_status_ == DataProc::InitializationStatus::Pending) {
         // Non-blocking: the backend reports Pending until its check (or its own timeout) is done.
-        step_status_ = model_.poll_step(step_, timer ? elapsed : 0);
+        step_status_ = model_->poll_step(step_, timer ? elapsed : 0);
         if (step_status_ == DataProc::InitializationStatus::Pending) {
             view_.show_waiting(elapsed);
             return;
@@ -117,6 +120,6 @@ void SystemLoading::on_timeout(lv_timer_t* timer) {
     self->timer_ = nullptr;
     lv_timer_delete(timer);
     APP_LOG_I("SystemLoading", "window=Dialplate%s", self->demo_tag());
-    if (self->getManager()->replace("Pages/Dialplate") != PageManager::RES_TYPE::OK)
+    if (self->getManager()->replace(page::name(PageId::Dialplate)) != PageManager::RES_TYPE::OK)
         LV_LOG_WARN("SystemLoading: preview transition rejected");
 }

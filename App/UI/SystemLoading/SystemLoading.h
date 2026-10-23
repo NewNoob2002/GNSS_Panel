@@ -4,6 +4,7 @@
 
 #include "SystemLoadingView.h"
 #include "PageBase.h"
+#include <memory>
 
 namespace page {
 /** Loading animation and preview transition, not a hardware-check model. */
@@ -21,7 +22,7 @@ class SystemLoading final : public PageBase {
     void cancel_timer();
     /** " [DEMO]" in logs only when the platform reports simulated data. */
     const char* demo_tag() const {
-        return model_.settings().simulated ? " [DEMO]" : "";
+        return model_->state().simulated ? " [DEMO]" : "";
     }
     static void on_timeout(lv_timer_t* timer);
     /** Initialization phase tick: poll the running step, then advance once it has a result. */
@@ -30,7 +31,7 @@ class SystemLoading final : public PageBase {
     // Steps take their real check time; these only keep each headline and result readable.
     static constexpr uint32_t kPollMs = 50, kMinStepMs = 300, kResultMs = 150;
     SystemLoadingView view_{};
-    SystemLoadingModel model_;
+    std::unique_ptr<SystemLoadingModel> model_;
     enum class Phase { Logo, Initialization, Completion, Ready };
     lv_timer_t* timer_ = nullptr;
     Phase phase_ = Phase::Logo;

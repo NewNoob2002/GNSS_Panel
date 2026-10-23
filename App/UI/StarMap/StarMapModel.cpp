@@ -1,39 +1,43 @@
 #include "StarMapModel.h"
-#include <algorithm>
-#include "ModelUtils.h"
-#include "SystemService.h"
 #include "Log.h"
 
 using namespace page;
 
 bool StarMapModel::init() {
-    if (account_)
-        return true;
-    account_ = std::make_unique<DataNode>("StarMapModel", DataProc::Broker(), this);
-    account_->setEventCallback(on_event);
-    if (!account_->isRegistered() || !model_utils::subscribe(*account_, status_, state_, device_)) {
-        account_.reset();
-        APP_LOG_E("StarMapModel", "DataNode initialization failed");
-        return false;
-    }
-    return true;
+    return ready() && subscribe("StatusBar") && load<dp::GNSS>() && load<dp::Version>();
 }
-void StarMapModel::deinit() {
-    account_.reset();
-}
-bool StarMapModel::set_status_bar(bool visible, DataProc::StatusBarStyle style) const {
+
+bool StarMapModel::set_status_bar(bool visible, DataProc::StatusBarStyle style) {
     const DataProc::StatusBarPresentation request{visible, style};
-    const bool ok = account_ && account_->notify("StatusBar", &request, sizeof(request)) == DataNode::RES_OK;
+    const bool ok = isRegistered() && notify("StatusBar", &request, sizeof(request)) == RES_OK;
     if (!ok)
         APP_LOG_E("StarMapModel", "StatusBar notification rejected");
     return ok;
 }
-int StarMapModel::on_event(DataNode* account, DataNode::EventParam_t* event) {
-    auto* self = static_cast<StarMapModel*>(account->getUserData());
-    const int result = model_utils::receive(event, self->status_, self->state_, self->device_);
-    // Device/System changes only: the 5 Hz Status feed is shown by the StatusBar, not by this page.
-    if (result == DataNode::RES_OK && event->event == DataNode::EVENT_PUBLISH && event->tran
-        && std::strcmp(event->tran->getID(), "Status") != 0 && self->change_cb_)
-        self->change_cb_();
+
+int StarMapModel::onEvent(EventParam_t* event) {
+    int result = RES_UNSUPPORTED_REQUEST;
+    dp::GNSS::State gnss;
+    dp::Version::State version;
+    if ((result = dp::GNSS::receive(event, gnss)) != RES_UNSUPPORTED_REQUEST) {
+        if (result == RES_OK)
+            apply(gnss);
+    } else if ((result = dp::Version::receive(event, version)) != RES_UNSUPPORTED_REQUEST) {
+        if (result == RES_OK)
+            apply(version);
+    }
     return result;
+}
+
+void StarMapModel::apply(const dp::GNSS::State& value) {
+    if (state_.constellations_valid == value.constellations_valid
+        && state_.constellations == value.constellations)
+        return;
+    state_.constellations_valid = value.constellations_valid;
+    state_.constellations = value.constellations;
+    changed();
+}
+
+void StarMapModel::apply(const dp::Version::State& value) {
+    state_.simulated = value.capabilities.simulated;
 }

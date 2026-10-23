@@ -10,104 +10,88 @@ void RecordConfig::onInstalled() {
     setLoadAnimTime(style::kPageTransitionMs);
     setLoadAnimPath(lv_anim_path_ease_out);
 }
+
 void RecordConfig::onViewLoad() {
-    if (!model_.init())
+    model_ = std::make_unique<RecordConfigModel>();
+    if (!model_->init())
         app_fatal("RecordConfig", "Model initialization failed");
     view_.create(getRoot());
     utils::attach_controls(view_.controls(), clicked, this);
 }
-void RecordConfig::refresh() {
-    const auto& device = model_.device();
-    const bool configurable = model_.settings().record_settings;
-    const bool editable = configurable && device.record_valid && !device.recording && !device.record_pending;
-    const bool changed =
-        lv_obj_is_disabled(view_.ui.type) == editable
-        || lv_obj_is_disabled(view_.ui.record) != (device.record_pending || !device.record_valid);
-    feedback_.poll(device.record_pending);
-    if (!editable && device.record_valid)
-        view_.set_selection(device.record_type, device.record_interval);
-    view_.update(device, configurable, feedback_.text);
-    if (changed)
-        utils::focus_controls(view_.controls(), lv_group_get_focused(lv_group_get_default()));
-}
+
 void RecordConfig::onViewWillAppear() {
-    model_.set_status_bar(true);
-    view_.set_selection(model_.device().record_type, model_.device().record_interval);
-    feedback_ = {};
-    if (model_.device().record_pending)
-        feedback_.begin();
-    model_.set_change_callback([this] {
-        refresh();
-    });
-    refresh();
-    utils::focus_controls(view_.controls(), view_.ui.record);
+    model_->set_status_bar(true);
+    model_->sync_initial(model_->state().recorder, model_->state().record_settings);
+    if (!view_.bind(model_->subject()))
+        app_fatal("RecordConfig", "View binding failed");
+    utils::focus_controls(view_.controls(), view_.record_control());
     view_.appear();
     timer_ = lv_timer_create(
         [](lv_timer_t* timer) {
-            static_cast<RecordConfig*>(lv_timer_get_user_data(timer))->refresh();
+            static_cast<RecordConfig*>(lv_timer_get_user_data(timer))->model_->poll_feedback();
         },
         200, this);
     if (!timer_)
         app_fatal("RecordConfig", "Feedback timer allocation failed");
 }
+
 void RecordConfig::onViewWillDisappear() {
     view_.stop();
-    model_.set_change_callback({});
+    view_.unbind();
     if (timer_) {
         lv_timer_delete(timer_);
         timer_ = nullptr;
     }
     utils::leave_focus_group();
 }
+
 void RecordConfig::onViewUnload() {
     if (timer_) {
         lv_timer_delete(timer_);
         timer_ = nullptr;
     }
-    model_.set_change_callback({});
-    model_.deinit();
     view_.destroy();
+    model_.reset();
 }
+
 void RecordConfig::onLanguageChanged() {
-    view_.update(model_.device(), model_.settings().record_settings, feedback_.text);
+    view_.update(model_->state());
     if (getState() != STATE::ACTIVITY)
         view_.stop();
 }
+
 // 开始与停止一致：单击即切换；双击（Commit）同样生效。等待主控确认期间不发第二个请求。
 void RecordConfig::toggle() {
-    const auto& device = model_.device();
-    if (device.record_pending || !device.record_valid)
+    const auto& recorder = model_->state().recorder;
+    if (recorder.pending || !recorder.valid)
         return;
-    const bool start = !device.recording;
-    feedback_.begin();
-    const bool accepted = start ? model_.start_record(view_.type(), view_.interval()) : model_.stop_record();
-    feedback_.finish(accepted, model_.device().record_pending);
-    refresh();
+    model_->toggle();
 }
+
 void RecordConfig::onCommitRequest() {
-    if (lv_group_get_focused(lv_group_get_default()) == view_.ui.record)
+    if (view_.control(lv_group_get_focused(lv_group_get_default())) == RecordConfigView::Control::Record)
         toggle();
 }
+
 void RecordConfig::clicked(lv_event_t* event) {
     auto* self = static_cast<RecordConfig*>(lv_event_get_user_data(event));
     auto* control = lv_event_get_current_target_obj(event);
-    if (control == self->view_.ui.back) {
+    const auto target_ctrl = self->view_.control(control);
+    if (target_ctrl == RecordConfigView::Control::Back) {
         self->getManager()->pop();
         return;
     }
-    const auto& device = self->model_.device();
-    if (device.record_pending || !device.record_valid)
+    const auto& recorder = self->model_->state().recorder;
+    if (recorder.pending || !recorder.valid)
         return;
-    if (control == self->view_.ui.record) {
+    if (target_ctrl == RecordConfigView::Control::Record) {
         self->toggle();
         return;
     }
-    if (!self->model_.settings().record_settings || device.recording)
+    if (!self->model_->state().record_settings || recorder.recording)
         return;
-    self->feedback_ = {};
-    if (control == self->view_.ui.type)
-        self->view_.cycle_type();
-    else if (control == self->view_.ui.interval)
-        self->view_.cycle_interval();
-    self->refresh();
+    if (target_ctrl == RecordConfigView::Control::Type)
+        self->model_->cycle_type();
+    else if (target_ctrl == RecordConfigView::Control::Interval)
+        self->model_->cycle_interval();
 }

@@ -1,37 +1,44 @@
 #pragma once
-#include <functional>
-#include <memory>
-#include "DataProc/DataProc.h"
+
+#include "UI/Common/Model.h"
+#include <array>
+#include "Def/DP_Battery.h"
+#include "Def/DP_Power.h"
+#include "Def/DP_Version.h"
 
 namespace page {
-/** Page-owned DataNode and received data. Init on view load, Deinit on unload, LVGL thread only. */
-class StartupModel {
+/** @brief 开机页面实际显示的值；不包含聚合快照或借用的回调指针。 */
+struct StartupState {
+    unsigned battery_percent = 0;
+    bool battery_valid = false;
+    float battery_voltage = 7.60f;
+    bool charging = false;
+    std::array<char, 16> firmware{};
+    std::array<char, 16> hardware{};
+    bool simulated = false;
+    bool powered_on = false;
+};
+
+/** @brief 随页面加载创建、卸载销毁；只订阅 Battery、Version、Power，通知 StatusBar。 */
+class StartupModel final : public Model<StartupState> {
   public:
+    StartupModel() : Model("StartupModel") {}
     bool init();
-    void deinit();
-    /** Called on the LVGL thread after published Status or Device data was received. */
-    void set_change_callback(std::function<void()> callback) {
-        change_cb_ = std::move(callback);
-    }
-    bool set_status_bar(bool visible, DataProc::StatusBarStyle style = {}) const;
-    /** Hold completed: ask System to power on. Confirmation arrives as SystemState::powered_on. */
-    bool request_power_on() const;
-    const DataProc::StatusSnapshot& status() const {
-        return status_;
-    }
-    const DataProc::SystemState& settings() const {
-        return state_;
-    }
-    const DataProc::DeviceSnapshot& device() const {
-        return device_;
-    }
+    bool set_status_bar(bool visible, DataProc::StatusBarStyle style = {});
+    /** @brief 长按完成后请求开机；确认作为 PowerState::powered_on 送达。 */
+    bool request_power_on();
+    int onEvent(EventParam_t* event) override;
 
   private:
-    static int on_event(DataNode* account, DataNode::EventParam_t* event);
-    std::unique_ptr<DataNode> account_;
-    DataProc::StatusSnapshot status_{};
-    DataProc::SystemState state_{};
-    DataProc::DeviceSnapshot device_{};
-    std::function<void()> change_cb_;
+    void apply(const dp::Battery::State& value);
+    void apply(const dp::Version::State& value);
+    void apply(const dp::Power::State& value);
+    template <class Domain> bool load() {
+        typename Domain::State value;
+        if (!Domain::subscribe(*this) || Domain::pull(*this, value) != RES_OK)
+            return false;
+        apply(value);
+        return true;
+    }
 };
 } // namespace page

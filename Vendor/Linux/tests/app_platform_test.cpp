@@ -12,6 +12,7 @@
 #include "UI/Common/SettingsStyle.h"
 #include "UI/Resource/ResourcePool.h"
 #include "UI/SystemLoading/SystemLoadingModel.h"
+#include "Def/DP_Power.h"
 
 namespace {
 bool power_on();
@@ -497,11 +498,10 @@ int main() {
         app.on_input(App::InputAction::Confirm);
         advance(100);
         // Service-level guard: without platform reboot, even SystemDash's own Reboot request is rejected.
-        DataProc::SystemRequest reboot{};
-        reboot.command = DataProc::SystemCommand::PreparePower;
-        reboot.action = DataProc::PowerAction::Reboot;
         auto* dash = DataProc::Broker()->search("SystemDashModel");
-        assert(dash && dash->notify("System", &reboot, sizeof(reboot)) == DataNode::RES_PARAM_ERROR);
+        assert(dash
+               && dp::Power::notify(*dash, {dp::PowerOperation::Prepare, hal::PowerCommand::Reboot})
+                      == DataNode::RES_PARAM_ERROR);
         assert(!SystemService::snapshot().power_pending);
         assert(find_text(app.focused(), i18n::text(i18n::TextId::ShutdownAction)));
 

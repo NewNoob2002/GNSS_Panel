@@ -1,5 +1,6 @@
 #include "WorkSettingsView.h"
 #include "UI/Common/SettingsStyle.h"
+#include "UI/Common/PageUtils.h"
 using namespace page;
 using i18n::TextId;
 
@@ -38,6 +39,7 @@ void WorkSettingsView::create(lv_obj_t* root) {
     feedback_ = style::label(root, font, 8, 108, 278);
     lv_obj_set_style_text_align(feedback_, LV_TEXT_ALIGN_CENTER, 0);
 }
+
 void WorkSettingsView::appear() const {
     settings_style::reveal(ui.preset);
     settings_style::reveal(ui.protocol, 40);
@@ -46,34 +48,69 @@ void WorkSettingsView::appear() const {
     settings_style::reveal(ui.apply, 120);
     settings_style::reveal(ui.back, 160);
 }
+
 void WorkSettingsView::stop() const {
     settings_style::stop(status_dot_);
 }
-void WorkSettingsView::set_selection(unsigned protocol, unsigned channel) {
-    if (protocol < DataProc::kRadioProtocolCount)
-        protocol_ = protocol;
-    if (channel < DataProc::kRadioChannelCount)
-        channel_ = channel;
+
+bool WorkSettingsView::bind(lv_subject_t* subject) {
+    unbind();
+    observer_ = lv_subject_add_observer(subject, on_state, this);
+    return observer_ != nullptr;
 }
-void WorkSettingsView::update(DataProc::WorkTarget target, bool pending, TextId feedback) const {
-    const auto title = target == DataProc::WorkTarget::Base    ? TextId::RadioBase
-                       : target == DataProc::WorkTarget::Rover ? TextId::RadioRover
-                                                               : TextId::NetworkBase;
+
+void WorkSettingsView::unbind() {
+    if (observer_) {
+        lv_observer_delete(observer_);
+        observer_ = nullptr;
+    }
+}
+
+void WorkSettingsView::on_state(lv_observer_t* observer, lv_subject_t* subject) {
+    auto* self = static_cast<WorkSettingsView*>(lv_observer_get_user_data(observer));
+    self->update(*static_cast<const WorkSettingsState*>(lv_subject_get_pointer(subject)));
+}
+
+WorkSettingsView::Control WorkSettingsView::control(const lv_obj_t* object) const {
+    if (object == ui.preset)
+        return Control::Preset;
+    if (object == ui.protocol)
+        return Control::Protocol;
+    if (object == ui.channel)
+        return Control::Channel;
+    if (object == ui.apply)
+        return Control::Apply;
+    if (object == ui.back)
+        return Control::Back;
+    return Control::None;
+}
+
+bool WorkSettingsView::update(const WorkSettingsState& state) {
+    const auto target = state.target;
+    const auto pending = state.work.pending;
+    const auto feedback = state.feedback;
+    const bool radio = target != hal::WorkTarget::Ntrip;
+    const bool controls_changed =
+        (lv_obj_is_disabled(ui.apply) != pending)
+        || (lv_obj_is_hidden(ui.protocol) == radio);
+
+    const auto title = target == hal::WorkTarget::Base    ? TextId::RadioBase
+                       : target == hal::WorkTarget::Rover ? TextId::RadioRover
+                                                          : TextId::NetworkBase;
     settings_style::value(preset_text_, i18n::text(title));
-    const char* image = target == DataProc::WorkTarget::Base    ? "ui_base_large"
-                        : target == DataProc::WorkTarget::Rover ? "ui_rover_large"
-                                                                : "ui_network_large";
-    const auto color = target == DataProc::WorkTarget::Rover ? style::kSuccess : style::kInfo;
+    const char* image = target == hal::WorkTarget::Base    ? "ui_base_large"
+                        : target == hal::WorkTarget::Rover ? "ui_rover_large"
+                                                           : "ui_network_large";
+    const auto color = target == hal::WorkTarget::Rover ? style::kSuccess : style::kInfo;
     settings_style::set_image(mode_icon_, image);
     settings_style::set_recolor(mode_icon_, color);
     settings_style::activity(status_dot_, pending, pending ? style::kAccent : color);
     char value[64];
-    i18n::option_text(TextId::WorkRadioProtocolOptions, protocol_, value, sizeof(value));
+    i18n::option_text(TextId::WorkRadioProtocolOptions, state.protocol, value, sizeof(value));
     settings_style::value(protocol_text_, value);
-    i18n::option_text(TextId::WorkRadioChannelOptions, channel_, value, sizeof(value));
+    i18n::option_text(TextId::WorkRadioChannelOptions, state.channel, value, sizeof(value));
     settings_style::value(channel_text_, value);
     settings_style::set_text(apply_text_, i18n::text(TextId::Apply));
-    const bool radio = target != DataProc::WorkTarget::Ntrip;
     for (auto* control : {ui.protocol, ui.channel})
         settings_style::set_visible(control, radio);
     settings_style::set_visible(network_card_, !radio);
@@ -89,4 +126,7 @@ void WorkSettingsView::update(DataProc::WorkTarget target, bool pending, TextId 
                                                   ? style::kDanger
                                               : feedback == TextId::RequestReceived ? style::kSuccess
                                                                                     : style::kMuted);
+    if (controls_changed)
+        utils::focus_controls(controls(), lv_group_get_focused(lv_group_get_default()));
+    return controls_changed;
 }

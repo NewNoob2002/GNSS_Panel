@@ -71,8 +71,27 @@ void SystemInfosView::group_init() {
 }
 
 void SystemInfosView::destroy() {
+    unbind();
     lv_group_set_focus_cb(lv_group_get_default(), nullptr);
     style_reset();
+}
+
+bool SystemInfosView::bind(lv_subject_t* subject) {
+    unbind();
+    observer_ = lv_subject_add_observer(subject, on_state, this);
+    return observer_ != nullptr;
+}
+
+void SystemInfosView::unbind() {
+    if (observer_) {
+        lv_observer_delete(observer_);
+        observer_ = nullptr;
+    }
+}
+
+void SystemInfosView::on_state(lv_observer_t* observer, lv_subject_t* subject) {
+    auto* self = static_cast<SystemInfosView*>(lv_observer_get_user_data(observer));
+    self->update(*static_cast<const SystemInfosState*>(lv_subject_get_pointer(subject)));
 }
 
 void SystemInfosView::set_scroll_to_y(lv_obj_t* obj, int32_t y, lv_anim_enable_t en) {
@@ -219,61 +238,61 @@ void SystemInfosView::apply_language() const {
     lv_label_set_text(ui.system.label_info, i18n::text(i18n::TextId::SystemInfo));
 }
 
-void SystemInfosView::update(const DataProc::DeviceSnapshot& device, const DataProc::SystemState& state) const {
+void SystemInfosView::update(const SystemInfosState& state) const {
     using i18n::TextId;
     const char* na = i18n::text(TextId::NotAvailable);
     const auto on_off = [](bool on) {
         return i18n::text(on ? TextId::StatusOn : TextId::StatusOff);
     };
-    if (device.work_valid) {
-        const char* ntrip = device.ntrip == DataProc::NtripRole::Server   ? i18n::text(TextId::NtripServer)
-                            : device.ntrip == DataProc::NtripRole::Client ? i18n::text(TextId::NtripClient)
-                                                                          : na;
+    if (state.work.valid) {
+        const char* ntrip = state.work.ntrip == hal::NtripRole::Server   ? i18n::text(TextId::NtripServer)
+                            : state.work.ntrip == hal::NtripRole::Client ? i18n::text(TextId::NtripClient)
+                                                                         : na;
         app_label_set_text_fmt(
             ui.work.label_data, "%s\n%s\n%s",
-            i18n::text(device.work_mode == DataProc::WorkMode::Rover ? TextId::WorkModeRover : TextId::WorkModeBase),
-            on_off(device.radio_on), ntrip);
+            i18n::text(state.work.mode == hal::WorkMode::Rover ? TextId::WorkModeRover : TextId::WorkModeBase),
+            on_off(state.work.radio_on), ntrip);
     } else {
         app_label_set_text_fmt(ui.work.label_data, "%s\n%s\n%s", na, na, na);
     }
-    if (device.position_valid)
-        app_label_set_text_fmt(ui.gps.label_data, "%s\n%s\n%s m", app::Fixed(device.latitude, 6).c_str(),
-                              app::Fixed(device.longitude, 6).c_str(), app::Fixed(device.altitude, 2).c_str());
+    if (state.gnss.position_valid)
+        app_label_set_text_fmt(ui.gps.label_data, "%s\n%s\n%s m", app::Fixed(state.gnss.latitude, 6).c_str(),
+                              app::Fixed(state.gnss.longitude, 6).c_str(), app::Fixed(state.gnss.altitude, 2).c_str());
     else
         app_label_set_text_fmt(ui.gps.label_data, "%s\n%s\n%s", na, na, na);
-    const char* wifi_state = state.wifi_pending ? "..." : on_off(state.wifi_on);
-    if (device.wifi_valid)
-        app_label_set_text_fmt(ui.wifi.label_data, "%s-%s\n%s\n%u.%u.%u.%u", device.wifi_station ? "STA" : "AP",
-                              device.wifi_ssid.data(), wifi_state, device.wifi_ip[0], device.wifi_ip[1],
-                              device.wifi_ip[2], device.wifi_ip[3]);
+    const char* wifi_state = state.wifi.pending ? "..." : on_off(state.wifi.on);
+    if (state.wifi.valid)
+        app_label_set_text_fmt(ui.wifi.label_data, "%s-%s\n%s\n%u.%u.%u.%u", state.wifi.station ? "STA" : "AP",
+                              state.wifi.ssid.data(), wifi_state, state.wifi.ip[0], state.wifi.ip[1],
+                              state.wifi.ip[2], state.wifi.ip[3]);
     else
         app_label_set_text_fmt(ui.wifi.label_data, "%s\n%s\n%s", na, wifi_state, na);
-    if (device.power_valid) {
-        const TextId charge = device.external_power                                 ? TextId::BatteryExternalPower
-                              : device.charge == DataProc::ChargeState::NotCharging ? TextId::BatteryNotCharge
-                              : device.charge == DataProc::ChargeState::Fast        ? TextId::BatteryFastCharge
+    if (state.battery.valid) {
+        const TextId charge = state.battery.external_power                         ? TextId::BatteryExternalPower
+                              : state.battery.charge == hal::ChargeState::NotCharging ? TextId::BatteryNotCharge
+                              : state.battery.charge == hal::ChargeState::Fast        ? TextId::BatteryFastCharge
                                                                                     : TextId::BatteryNormalCharge;
         app_label_set_text_fmt(ui.battery.label_data, "%s%%\n%s V\n%s C\n%s",
-                              app::Fixed(device.battery_percent, 1).c_str(), app::Fixed(device.battery_voltage, 2).c_str(),
-                              app::Fixed(device.battery_temperature, 1).c_str(), i18n::text(charge));
+                              app::Fixed(state.battery.gauge_percent, 1).c_str(), app::Fixed(state.battery.voltage, 2).c_str(),
+                              app::Fixed(state.battery.temperature, 1).c_str(), i18n::text(charge));
     } else {
         app_label_set_text_fmt(ui.battery.label_data, "%s\n%s\n%s\n%s", na, na, na, na);
     }
-    if (device.record_valid && device.recording) {
+    if (state.recorder.valid && state.recorder.recording) {
         char type[16], interval[16];
-        option_text(TextId::RecordTypeOptions, device.record_type, type, sizeof(type));
-        option_text(TextId::RecordIntervalOptions, device.record_interval, interval, sizeof(interval));
-        app_label_set_text_fmt(ui.storage.label_data, "%s\n%s\n%s MB\n%s\n%s", on_off(true), device.record_name.data(),
-                              app::Fixed(device.record_space_mb, 1).c_str(), type, interval);
+        option_text(TextId::RecordTypeOptions, state.recorder.type, type, sizeof(type));
+        option_text(TextId::RecordIntervalOptions, state.recorder.interval, interval, sizeof(interval));
+        app_label_set_text_fmt(ui.storage.label_data, "%s\n%s\n%s MB\n%s\n%s", on_off(true), state.recorder.name.data(),
+                              app::Fixed(state.recorder.space_mb, 1).c_str(), type, interval);
     } else {
-        app_label_set_text_fmt(ui.storage.label_data, "%s\n-\n-\n-\n-", device.record_valid ? on_off(false) : na);
+        app_label_set_text_fmt(ui.storage.label_data, "%s\n-\n-\n-\n-", state.recorder.valid ? on_off(false) : na);
     }
     unsigned errors = 0;
-    for (const auto& result : state.initialization)
+    for (const auto& result : state.init.results)
         errors += result.status == DataProc::InitializationStatus::Failed;
-    const auto uptime = device.uptime_s;
+    const auto uptime = state.version.uptime_s;
     app_label_set_text_fmt(ui.system.label_data, "%s\n%02u:%02u:%02u\n%u\n%s",
-                          device.firmware[0] ? device.firmware.data() : na, static_cast<unsigned>(uptime / 3600U),
+                          state.version.firmware[0] ? state.version.firmware.data() : na, static_cast<unsigned>(uptime / 3600U),
                           static_cast<unsigned>(uptime / 60U % 60U), static_cast<unsigned>(uptime % 60U), errors,
-                          device.build[0] ? device.build.data() : na);
+                          state.version.build[0] ? state.version.build.data() : na);
 }

@@ -1,44 +1,66 @@
 #include "StartupModel.h"
 #include <algorithm>
-#include "ModelUtils.h"
-#include "SystemService.h"
 #include "Log.h"
 
 using namespace page;
 
 bool StartupModel::init() {
-    if (account_)
-        return true;
-    account_ = std::make_unique<DataNode>("StartupModel", DataProc::Broker(), this);
-    account_->setEventCallback(on_event);
-    if (!account_->isRegistered() || !model_utils::subscribe(*account_, status_, state_, device_)) {
-        account_.reset();
-        APP_LOG_E("StartupModel", "DataNode initialization failed");
-        return false;
-    }
-    return true;
+    return ready() && subscribe("StatusBar") && load<dp::Battery>() && load<dp::Version>() && load<dp::Power>();
 }
-void StartupModel::deinit() {
-    account_.reset();
-}
-bool StartupModel::set_status_bar(bool visible, DataProc::StatusBarStyle style) const {
+
+bool StartupModel::set_status_bar(bool visible, DataProc::StatusBarStyle style) {
     const DataProc::StatusBarPresentation request{visible, style};
-    const bool ok = account_ && account_->notify("StatusBar", &request, sizeof(request)) == DataNode::RES_OK;
+    const bool ok = isRegistered() && notify("StatusBar", &request, sizeof(request)) == RES_OK;
     if (!ok)
         APP_LOG_E("StartupModel", "StatusBar notification rejected");
     return ok;
 }
-bool StartupModel::request_power_on() const {
-    DataProc::SystemRequest request{};
-    request.command = DataProc::SystemCommand::RequestPowerOn;
-    return account_ && account_->notify("System", &request, sizeof(request)) == DataNode::RES_OK;
+
+bool StartupModel::request_power_on() {
+    return dp::Power::notify(*this, {dp::PowerOperation::RequestOn}) == RES_OK;
 }
-int StartupModel::on_event(DataNode* account, DataNode::EventParam_t* event) {
-    auto* self = static_cast<StartupModel*>(account->getUserData());
-    const int res = model_utils::receive(event, self->status_, self->state_, self->device_);
-    if (res == DataNode::RES_OK && event->event == DataNode::EVENT_PUBLISH && event->tran
-        && (std::strcmp(event->tran->getID(), "Status") == 0 || std::strcmp(event->tran->getID(), "Device") == 0)
-        && self->change_cb_)
-        self->change_cb_();
-    return res;
+
+int StartupModel::onEvent(EventParam_t* event) {
+    int result = RES_UNSUPPORTED_REQUEST;
+    dp::Battery::State battery;
+    dp::Version::State version;
+    dp::Power::State power;
+    if ((result = dp::Battery::receive(event, battery)) != RES_UNSUPPORTED_REQUEST) {
+        if (result == RES_OK)
+            apply(battery);
+    } else if ((result = dp::Version::receive(event, version)) != RES_UNSUPPORTED_REQUEST) {
+        if (result == RES_OK)
+            apply(version);
+    } else if ((result = dp::Power::receive(event, power)) != RES_UNSUPPORTED_REQUEST) {
+        if (result == RES_OK)
+            apply(power);
+    }
+    return result;
+}
+
+void StartupModel::apply(const dp::Battery::State& value) {
+    const bool charging = value.charge != hal::ChargeState::NotCharging;
+    if (state_.battery_percent == value.level_percent && state_.battery_valid == value.valid
+        && state_.battery_voltage == value.voltage && state_.charging == charging)
+        return;
+    state_.battery_percent = value.level_percent;
+    state_.battery_valid = value.valid;
+    state_.battery_voltage = value.voltage;
+    state_.charging = charging;
+    changed();
+}
+
+void StartupModel::apply(const dp::Version::State& value) {
+    if (state_.firmware == value.firmware && state_.hardware == value.hardware
+        && state_.simulated == value.capabilities.simulated)
+        return;
+    state_.firmware = value.firmware;
+    state_.hardware = value.hardware;
+    state_.simulated = value.capabilities.simulated;
+    changed();
+}
+
+void StartupModel::apply(const dp::Power::State& value) {
+    // 非显示字段不通知：powered_on 仅供开机长按判定，不触发画面刷新。
+    state_.powered_on = value.platform.powered_on;
 }

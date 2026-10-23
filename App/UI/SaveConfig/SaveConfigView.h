@@ -1,7 +1,6 @@
-#ifndef SAVECONFIG_VIEW_H
-#define SAVECONFIG_VIEW_H
+#pragma once
 
-#include "DataProc/DataProc.h"
+#include "SaveConfigModel.h"
 #include "UI/Resource/ResourcePool.h"
 #include "I18n.h"
 #include "lvgl.h"
@@ -9,23 +8,34 @@
 namespace page {
 class SaveConfigView {
   public:
-    /** Create the power progress ring and text column below the visible status bar. */
     void create(lv_obj_t* root);
-    /** Cancel animations borrowing widgets before the page is hidden or destroyed. */
+    void destroy();
     void stop() const;
-    /** Reset the countdown and reveal the ring and text using translation only. */
     void appear();
-    /** Refresh the action, cause and cancellation hint from the latest System state. */
-    void update(const DataProc::SystemState& state);
-    /** Return the unchanged eight-second progress animation for controller scheduling. */
+
+    bool bind(lv_subject_t* subject);
+    void unbind();
+
+    void update(const SaveConfigState& state);
+    void update(const DataProc::SystemState& state) {
+        SaveConfigState s{};
+        s.shutting_down = state.shutting_down;
+        s.power_cause = state.power_cause;
+        s.power_action = state.power_action;
+        s.power_pending = state.power_pending;
+        s.power_token = state.power_token;
+        update(s);
+    }
+
     lv_anim_t* progress_animation() {
         return &progress_animation_;
     }
 
   private:
-    /** Apply fine-grained progress and the ceiling of remaining whole seconds. */
+    static void on_state(lv_observer_t* observer, lv_subject_t* subject);
+    lv_observer_t* observer_ = nullptr;
+
     static void set_progress(void* obj, int32_t progress);
-    /** Rotate the fixed shutdown segment without changing its value or children. */
     static void rotate_spinner(void* obj, int32_t angle);
     lv_obj_t* ring_ = nullptr;
     lv_obj_t* icon_ = nullptr;
@@ -39,5 +49,3 @@ class SaveConfigView {
     lv_anim_t progress_animation_{};
 };
 } // namespace page
-
-#endif // SAVECONFIG_VIEW_H

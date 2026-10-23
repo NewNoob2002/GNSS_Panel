@@ -1,6 +1,7 @@
 #include "SystemDash.h"
 #include "Log.h"
 #include "PageManager.h"
+#include "UI/PageId.h"
 #include "UI/Common/PageUtils.h"
 #include "UI/Common/PageStyle.h"
 using namespace page;
@@ -10,27 +11,31 @@ void SystemDash::onInstalled() {
     setLoadAnimTime(style::kPageTransitionMs);
     setLoadAnimPath(lv_anim_path_ease_out);
 }
+
 void SystemDash::onViewLoad() {
-    if (!model_.init())
+    model_ = std::make_unique<SystemDashModel>();
+    if (!model_->init())
         app_fatal("SystemDash", "Model initialization failed");
-    view_.create(getRoot(), model_.settings().reboot_available);
+    view_.create(getRoot(), model_->state().reboot_available);
     utils::attach_controls(view_.all_controls(), clicked, this);
-    for (auto* action : {view_.ui.shutdown, view_.ui.reboot})
-        lv_obj_add_event_cb(action, hold_event, LV_EVENT_ALL, this);
+    for (auto* action : view_.power_actions()) {
+        if (action)
+            lv_obj_add_event_cb(action, hold_event, LV_EVENT_ALL, this);
+    }
 }
+
 void SystemDash::onViewWillAppear() {
-    model_.set_status_bar(false);
+    model_->set_status_bar(false);
     view_.apply_language();
-    view_.update(model_.settings());
-    model_.set_change_callback([this] {
-        view_.update(model_.settings());
-    });
+    if (!view_.bind(model_->subject()))
+        app_fatal("SystemDash", "View binding failed");
     utils::focus_controls(view_.controls(), last_focus_);
     view_.appear();
 }
+
 void SystemDash::onViewWillDisappear() {
     view_.stop();
-    model_.set_change_callback({});
+    view_.unbind();
     // Stop the hold but keep the dialog and its full bar on screen while the next page slides over this one;
     // changing this page now would flash a different picture under the transition.
     if (hold_timer_) {
@@ -40,38 +45,44 @@ void SystemDash::onViewWillDisappear() {
     lv_anim_delete(this, set_hold_progress);
     last_focus_ = utils::leave_focus_group();
 }
+
 void SystemDash::onViewDidDisappear() {
     cancel_hold();
     if (view_.power_open()) {
         // Leaving (SaveConfig or a platform shutdown) ends the confirmation; return lands on the Power row.
         view_.show_power(false);
-        last_focus_ = view_.ui.power;
+        last_focus_ = view_.control_object(SystemDashView::Control::Power);
     }
 }
+
 void SystemDash::onViewUnload() {
     cancel_hold();
-    model_.deinit();
     view_.destroy();
+    model_.reset();
     last_focus_ = nullptr;
 }
+
 void SystemDash::onLanguageChanged() {
     view_.apply_language();
-    view_.update(model_.settings());
+    view_.update(model_->state());
     if (getState() != STATE::ACTIVITY)
         view_.stop();
 }
+
 void SystemDash::show_power(bool visible) {
     cancel_hold();
     lv_group_remove_all_objs(lv_group_get_default());
     view_.show_power(visible);
-    utils::focus_controls(view_.controls(), visible ? view_.ui.shutdown : view_.ui.power);
+    utils::focus_controls(view_.controls(), view_.default_focus(visible));
 }
+
 bool SystemDash::onBackRequest() {
     if (!view_.power_open())
         return false;
     show_power(false);
     return true;
 }
+
 void SystemDash::cancel_hold() {
     if (hold_timer_) {
         lv_timer_delete(hold_timer_);
@@ -82,10 +93,12 @@ void SystemDash::cancel_hold() {
     holding_ = nullptr;
     view_.set_hold(nullptr, 0);
 }
+
 void SystemDash::set_hold_progress(void* self, int32_t percent) {
     auto* page = static_cast<SystemDash*>(self);
     page->view_.set_hold(page->holding_, percent);
 }
+
 // Press on Shutdown/Reboot starts the bar; releasing before it fills (or losing the press/focus) closes the
 // dialog. Only a completed hold prepares the power action.
 void SystemDash::hold_event(lv_event_t* event) {
@@ -118,24 +131,26 @@ void SystemDash::hold_event(lv_event_t* event) {
         self->show_power(false);
     }
 }
+
 void SystemDash::on_hold_complete(lv_timer_t* timer) {
     auto* self = static_cast<SystemDash*>(lv_timer_get_user_data(timer));
     self->hold_timer_ = nullptr; // A one-shot timer deletes itself after this callback.
     const auto action =
-        self->holding_ == self->view_.ui.reboot ? DataProc::PowerAction::Reboot : DataProc::PowerAction::Off;
+        self->view_.is_reboot_action(self->holding_) ? hal::PowerCommand::Reboot : hal::PowerCommand::Off;
     self->view_.set_hold(self->holding_, 100);
     lv_anim_delete(self, set_hold_progress);
-    if (!self->model_.prepare_power(action)) {
+    if (!self->model_->prepare_power(action)) {
         APP_LOG_E("SystemDash", "power preparation rejected");
         self->show_power(false);
         return;
     }
-    if (self->getManager()->push("Pages/SaveConfig") != PageManager::RES_TYPE::OK) {
-        if (!self->model_.cancel_power())
+    if (self->getManager()->push(page::name(PageId::SaveConfig)) != PageManager::RES_TYPE::OK) {
+        if (!self->model_->cancel_power())
             APP_LOG_E("SystemDash", "power rollback failed");
         self->show_power(false);
     }
 }
+
 void SystemDash::clicked(lv_event_t* event) {
     auto* self = static_cast<SystemDash*>(lv_event_get_user_data(event));
     if (self->getManager()->isSwitching())
@@ -145,15 +160,18 @@ void SystemDash::clicked(lv_event_t* event) {
         self->show_power(false); // A short press never executes shutdown/reboot; it dismisses the dialog.
         return;
     }
-    if (target == self->view_.ui.power)
+    const auto ctrl = self->view_.control(target);
+    if (ctrl == SystemDashView::Control::Power)
         self->show_power(true);
-    else if (target == self->view_.ui.language) {
-        if (!self->model_.toggle_language())
+    else if (ctrl == SystemDashView::Control::Language) {
+        if (!self->model_->toggle_language())
             APP_LOG_E("SystemDash", "language request rejected");
-    } else if (target == self->view_.ui.wifi) {
-        const auto state = self->model_.settings();
-        if (state.wifi_available && !state.wifi_pending && !self->model_.set_wifi(!state.wifi_on))
+    } else if (ctrl == SystemDashView::Control::Wifi) {
+        const auto& state = self->model_->state();
+        if (state.wifi_available && !state.wifi_pending && !self->model_->set_wifi(!state.wifi_on))
             APP_LOG_E("SystemDash", "Wi-Fi request rejected");
-    } else if (target == self->view_.ui.back && self->getManager()->pop() != PageManager::RES_TYPE::OK)
-        APP_LOG_E("SystemDash", "Return navigation rejected");
+    } else if (ctrl == SystemDashView::Control::Back) {
+        if (self->getManager()->pop() != PageManager::RES_TYPE::OK)
+            APP_LOG_E("SystemDash", "Return navigation rejected");
+    }
 }

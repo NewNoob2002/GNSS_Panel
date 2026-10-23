@@ -2,6 +2,7 @@
 #include <cstdio>
 #include "FixedFormat.h"
 #include "UI/Common/SettingsStyle.h"
+#include "UI/Common/PageUtils.h"
 using namespace page;
 using i18n::TextId;
 
@@ -33,6 +34,7 @@ void RecordConfigView::create(lv_obj_t* root) {
     feedback_ = style::label(root, font, 8, 108, 278);
     lv_obj_set_style_text_align(feedback_, LV_TEXT_ALIGN_CENTER, 0);
 }
+
 void RecordConfigView::appear() const {
     settings_style::reveal(hero_);
     settings_style::reveal(ui.type, 40);
@@ -40,36 +42,69 @@ void RecordConfigView::appear() const {
     settings_style::reveal(ui.record, 120);
     settings_style::reveal(ui.back, 160);
 }
+
 void RecordConfigView::stop() const {
     settings_style::stop(status_dot_);
 }
-void RecordConfigView::set_selection(unsigned type, unsigned interval) {
-    if (type < DataProc::kRecordTypeCount)
-        type_ = type;
-    if (interval < DataProc::kRecordIntervalCount)
-        interval_ = interval;
+
+bool RecordConfigView::bind(lv_subject_t* subject) {
+    unbind();
+    observer_ = lv_subject_add_observer(subject, on_state, this);
+    return observer_ != nullptr;
 }
-void RecordConfigView::update(const DataProc::DeviceSnapshot& device, bool configurable, TextId feedback) const {
-    settings_style::value(state_, i18n::text(!device.record_valid ? TextId::NotAvailable
-                                             : device.recording   ? TextId::Recording
-                                                                  : TextId::RecordIdle));
+
+void RecordConfigView::unbind() {
+    if (observer_) {
+        lv_observer_delete(observer_);
+        observer_ = nullptr;
+    }
+}
+
+void RecordConfigView::on_state(lv_observer_t* observer, lv_subject_t* subject) {
+    auto* self = static_cast<RecordConfigView*>(lv_observer_get_user_data(observer));
+    self->update(*static_cast<const RecordConfigState*>(lv_subject_get_pointer(subject)));
+}
+
+RecordConfigView::Control RecordConfigView::control(const lv_obj_t* object) const {
+    if (object == ui.type)
+        return Control::Type;
+    if (object == ui.interval)
+        return Control::Interval;
+    if (object == ui.record)
+        return Control::Record;
+    if (object == ui.back)
+        return Control::Back;
+    return Control::None;
+}
+
+bool RecordConfigView::update(const RecordConfigState& state) {
+    const auto& recorder = state.recorder;
+    const bool configurable = state.record_settings;
+    const bool locked = recorder.recording || recorder.pending || !recorder.valid;
+    const bool editable = configurable && !locked;
+    const bool controls_changed =
+        (lv_obj_is_disabled(ui.type) == editable)
+        || (lv_obj_is_disabled(ui.record) != (recorder.pending || !recorder.valid));
+
+    settings_style::value(state_, i18n::text(!recorder.valid ? TextId::NotAvailable
+                                             : recorder.recording   ? TextId::Recording
+                                                                    : TextId::RecordIdle));
     char space[24];
-    app::format_fixed(space, sizeof(space), device.record_space_mb, 0, " MB");
+    app::format_fixed(space, sizeof(space), recorder.space_mb, 0, " MB");
     settings_style::set_text(space_, space);
-    settings_style::set_text_color(state_, device.recording ? style::kDanger : style::kText);
-    settings_style::activity(status_dot_, device.recording || device.record_pending,
-                             device.record_pending ? style::kAccent
-                             : device.recording    ? style::kDanger
+    settings_style::set_text_color(state_, recorder.recording ? style::kDanger : style::kText);
+    settings_style::activity(status_dot_, recorder.recording || recorder.pending,
+                             recorder.pending ? style::kAccent
+                             : recorder.recording    ? style::kDanger
                                                    : style::kMuted);
     char value[64];
-    i18n::option_text(TextId::RecordTypeOptions, type_, value, sizeof(value));
+    i18n::option_text(TextId::RecordTypeOptions, state.type, value, sizeof(value));
     settings_style::value(type_text_, value);
-    i18n::option_text(TextId::RecordIntervalOptions, interval_, value, sizeof(value));
+    i18n::option_text(TextId::RecordIntervalOptions, state.interval, value, sizeof(value));
     settings_style::value(interval_text_, value);
-    settings_style::set_text(record_text_, i18n::text(device.recording ? TextId::Stop : TextId::StartupStart));
-    settings_style::set_image(record_icon_, device.recording ? "ui_stop" : "ui_play");
+    settings_style::set_text(record_text_, i18n::text(recorder.recording ? TextId::Stop : TextId::StartupStart));
+    settings_style::set_image(record_icon_, recorder.recording ? "ui_stop" : "ui_play");
     settings_style::set_text(back_text_, i18n::text(TextId::Back));
-    const bool locked = device.recording || device.record_pending || !device.record_valid;
     for (auto* control : {ui.type, ui.interval}) {
         if (configurable && !locked)
             lv_obj_set_disabled(control, false);
@@ -85,14 +120,17 @@ void RecordConfigView::update(const DataProc::DeviceSnapshot& device, bool confi
         else
             lv_obj_set_clickable(control, false);
     }
-    if (device.record_pending || !device.record_valid)
+    if (recorder.pending || !recorder.valid)
         lv_obj_set_disabled(ui.record, true);
     else
         lv_obj_set_disabled(ui.record, false);
-    settings_style::set_border_color(ui.record, device.recording ? style::kDanger : style::kBorder);
-    settings_style::set_text(feedback_, feedback == TextId::Count ? "" : i18n::text(feedback));
-    settings_style::set_text_color(feedback_, feedback == TextId::RequestRejected || feedback == TextId::RequestTimeout
+    settings_style::set_border_color(ui.record, recorder.recording ? style::kDanger : style::kBorder);
+    settings_style::set_text(feedback_, state.feedback == TextId::Count ? "" : i18n::text(state.feedback));
+    settings_style::set_text_color(feedback_, state.feedback == TextId::RequestRejected || state.feedback == TextId::RequestTimeout
                                                   ? style::kDanger
-                                              : feedback == TextId::RequestReceived ? style::kSuccess
+                                              : state.feedback == TextId::RequestReceived ? style::kSuccess
                                                                                     : style::kMuted);
+    if (controls_changed)
+        utils::focus_controls(controls(), lv_group_get_focused(lv_group_get_default()));
+    return controls_changed;
 }

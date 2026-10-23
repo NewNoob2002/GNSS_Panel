@@ -1,7 +1,10 @@
 #pragma once
+
+#include <memory>
 #include "SystemDashModel.h"
 #include "SystemDashView.h"
 #include "PageBase.h"
+
 namespace page {
 class SystemDash final : public PageBase {
   public:
@@ -27,7 +30,7 @@ class SystemDash final : public PageBase {
     static void on_hold_complete(lv_timer_t* timer);
     static void set_hold_progress(void* self, int32_t percent);
     SystemDashView view_{};
-    SystemDashModel model_;
+    std::unique_ptr<SystemDashModel> model_;
     lv_obj_t* last_focus_ = nullptr;
     lv_obj_t* holding_ = nullptr; // Action button being held.
     lv_timer_t* hold_timer_ = nullptr;

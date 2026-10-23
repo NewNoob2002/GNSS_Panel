@@ -1,7 +1,7 @@
 #pragma once
 
+#include <memory>
 #include "SystemInfosModel.h"
-
 #include "SystemInfosView.h"
 #include "PageBase.h"
 
@@ -18,6 +18,6 @@ class SystemInfos final : public PageBase {
   private:
     static void clicked(lv_event_t* event);
     SystemInfosView view_{};
-    SystemInfosModel model_;
+    std::unique_ptr<SystemInfosModel> model_;
 };
 } // namespace page

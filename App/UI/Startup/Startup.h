@@ -1,7 +1,7 @@
 #pragma once
 
+#include <memory>
 #include "StartupModel.h"
-
 #include "StartupView.h"
 #include "PageBase.h"
 
@@ -24,11 +24,10 @@ class Startup final : public PageBase {
     void cancel_timer();
     void cancel_status_timer();
     static void on_status_timeout(lv_timer_t* timer);
-    static void set_progress(void* obj, int32_t value);
     static void hold_event(lv_event_t* event);
     static void on_timeout(lv_timer_t* timer);
     StartupView view_{};
-    StartupModel model_;
+    std::unique_ptr<StartupModel> model_;
     lv_timer_t* timer_ = nullptr;
     lv_timer_t* status_timer_ = nullptr;
 };

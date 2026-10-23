@@ -1,63 +1,90 @@
 #include "SystemDashModel.h"
-#include <algorithm>
-#include "ModelUtils.h"
-#include "SystemService.h"
 #include "Log.h"
 
 using namespace page;
 
 bool SystemDashModel::init() {
-    if (account_)
-        return true;
-    account_ = std::make_unique<DataNode>("SystemDashModel", DataProc::Broker(), this);
-    account_->setEventCallback(on_event);
-    if (!account_->isRegistered() || !model_utils::subscribe(*account_, status_, state_)) {
-        account_.reset();
-        APP_LOG_E("SystemDashModel", "DataNode initialization failed");
-        return false;
-    }
-    return true;
+    return ready() && subscribe("StatusBar") && load<dp::Settings>() && load<dp::WiFi>()
+           && load<dp::Version>() && load<dp::Power>() && load<dp::Clock>();
 }
-void SystemDashModel::deinit() {
-    change_cb_ = {};
-    account_.reset();
-}
-bool SystemDashModel::set_status_bar(bool visible, DataProc::StatusBarStyle style) const {
+
+bool SystemDashModel::set_status_bar(bool visible, DataProc::StatusBarStyle style) {
     const DataProc::StatusBarPresentation request{visible, style};
-    const bool ok = account_ && account_->notify("StatusBar", &request, sizeof(request)) == DataNode::RES_OK;
+    const bool ok = isRegistered() && notify("StatusBar", &request, sizeof(request)) == RES_OK;
     if (!ok)
         APP_LOG_E("SystemDashModel", "StatusBar notification rejected");
     return ok;
 }
-int SystemDashModel::on_event(DataNode* account, DataNode::EventParam_t* event) {
-    auto* self = static_cast<SystemDashModel*>(account->getUserData());
-    const int result = model_utils::receive(event, self->status_, self->state_);
-    if (result == DataNode::RES_OK && event->event == DataNode::EVENT_PUBLISH && event->tran
-        && std::strcmp(event->tran->getID(), "System") == 0 && self->change_cb_)
-        self->change_cb_();
+
+bool SystemDashModel::toggle_language() {
+    const auto next = state_.language == i18n::Language::English ? i18n::Language::Russian : i18n::Language::English;
+    return dp::Settings::notify(*this, {next}) == RES_OK;
+}
+
+bool SystemDashModel::set_wifi(bool on) {
+    return dp::WiFi::notify(*this, {on}) == RES_OK;
+}
+
+bool SystemDashModel::prepare_power(hal::PowerCommand action) {
+    return dp::Power::notify(*this, {dp::PowerOperation::Prepare, action}) == RES_OK;
+}
+
+bool SystemDashModel::cancel_power() {
+    return dp::Power::notify(*this, {dp::PowerOperation::Cancel, {}, state_.power_token}) == RES_OK;
+}
+
+int SystemDashModel::onEvent(EventParam_t* event) {
+    int result = RES_UNSUPPORTED_REQUEST;
+    dp::Settings::State settings;
+    dp::WiFi::State wifi;
+    dp::Version::State version;
+    dp::Power::State power;
+    dp::Clock::State clock;
+    if ((result = dp::Settings::receive(event, settings)) != RES_UNSUPPORTED_REQUEST) {
+        if (result == RES_OK)
+            apply(settings);
+    } else if ((result = dp::WiFi::receive(event, wifi)) != RES_UNSUPPORTED_REQUEST) {
+        if (result == RES_OK)
+            apply(wifi);
+    } else if ((result = dp::Version::receive(event, version)) != RES_UNSUPPORTED_REQUEST) {
+        if (result == RES_OK)
+            apply(version);
+    } else if ((result = dp::Power::receive(event, power)) != RES_UNSUPPORTED_REQUEST) {
+        if (result == RES_OK)
+            apply(power);
+    } else if ((result = dp::Clock::receive(event, clock)) != RES_UNSUPPORTED_REQUEST) {
+        if (result == RES_OK)
+            apply(clock);
+    }
     return result;
 }
-bool SystemDashModel::toggle_language() {
-    DataProc::SystemRequest request{};
-    request.command = DataProc::SystemCommand::SetLanguage;
-    request.language = state_.language == i18n::Language::English ? i18n::Language::Russian : i18n::Language::English;
-    return account_ && account_->notify("System", &request, sizeof(request)) == DataNode::RES_OK;
+
+void SystemDashModel::apply(const dp::Settings::State& value) {
+    if (state_.language == value.language)
+        return;
+    state_.language = value.language;
+    changed();
 }
-bool SystemDashModel::set_wifi(bool on) const {
-    DataProc::SystemRequest request{};
-    request.command = DataProc::SystemCommand::SetWifi;
-    request.wifi_on = on;
-    return account_ && account_->notify("System", &request, sizeof(request)) == DataNode::RES_OK;
+
+void SystemDashModel::apply(const dp::WiFi::State& value) {
+    if (state_.wifi_available == value.available && state_.wifi_on == value.on
+        && state_.wifi_pending == value.pending)
+        return;
+    state_.wifi_available = value.available;
+    state_.wifi_on = value.on;
+    state_.wifi_pending = value.pending;
+    changed();
 }
-bool SystemDashModel::prepare_power(DataProc::PowerAction action) {
-    DataProc::SystemRequest request{};
-    request.command = DataProc::SystemCommand::PreparePower;
-    request.action = action;
-    return account_ && account_->notify("System", &request, sizeof(request)) == DataNode::RES_OK;
+
+void SystemDashModel::apply(const dp::Version::State& value) {
+    state_.reboot_available = value.capabilities.reboot_available;
+    state_.simulated = value.capabilities.simulated;
 }
-bool SystemDashModel::cancel_power() {
-    DataProc::SystemRequest request{};
-    request.command = DataProc::SystemCommand::CancelPower;
-    request.token = state_.power_token;
-    return account_ && account_->notify("System", &request, sizeof(request)) == DataNode::RES_OK;
+
+void SystemDashModel::apply(const dp::Power::State& value) {
+    state_.power_token = value.token;
+}
+
+void SystemDashModel::apply(const dp::Clock::State& value) {
+    state_.date = value.date;
 }

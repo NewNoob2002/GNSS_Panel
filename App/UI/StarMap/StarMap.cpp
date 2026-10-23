@@ -13,34 +13,34 @@ void StarMap::onInstalled() {
 }
 
 void StarMap::onViewLoad() {
-    if (!model_.init())
+    model_ = std::make_unique<StarMapModel>();
+    if (!model_->init())
         app_fatal("StarMap", "Model initialization failed");
     view_.create(getRoot());
-    style::show_demo(getRoot(), model_.settings().simulated);
+    style::show_demo(getRoot(), model_->state().simulated);
     utils::attach_controls(std::array{getRoot()}, clicked, this);
 }
 
 void StarMap::onViewWillAppear() {
-    model_.set_status_bar(true);
-    view_.update(model_.device());
-    model_.set_change_callback([this] {
-        view_.update(model_.device());
-    });
+    model_->set_status_bar(true);
+    if (!view_.bind(model_->subject()))
+        app_fatal("StarMap", "View binding failed");
     utils::focus_controls(std::array{getRoot()}, getRoot());
 }
 
 void StarMap::onViewWillDisappear() {
-    model_.set_change_callback({});
+    view_.unbind();
     utils::leave_focus_group();
 }
 
 void StarMap::onViewUnload() {
-    model_.deinit();
     view_.destroy();
+    model_.reset();
 }
 
 void StarMap::onLanguageChanged() {
     view_.apply_language();
+    view_.update(model_->state());
 }
 
 void StarMap::clicked(lv_event_t* event) {

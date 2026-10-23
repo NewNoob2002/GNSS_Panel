@@ -7,8 +7,16 @@
 #include "UI/Common/PageStyle.h"
 #include "UI/Dialplate/DialplateModel.h"
 #include "UI/Dialplate/DialplateView.h"
+#include "UI/RecordConfig/RecordConfigModel.h"
 #include "UI/Resource/ResourcePool.h"
+#include "UI/SaveConfig/SaveConfigModel.h"
+#include "UI/StarMap/StarMapModel.h"
+#include "UI/Startup/StartupModel.h"
 #include "UI/StatusBar/StatusBar.h"
+#include "UI/SystemDash/SystemDashModel.h"
+#include "UI/SystemInfos/SystemInfosModel.h"
+#include "UI/SystemLoading/SystemLoadingModel.h"
+#include "UI/WorkSettings/WorkSettingsModel.h"
 
 namespace {
 void
@@ -203,6 +211,142 @@ main() {
         ++gnss.satellites_tracked;
         publish(dp::names::GNSS, gnss);
         assert(changes == 4 && !DataProc::Broker()->search("DialplateModel"));
+
+        // SystemLoadingModel: publishers == 3 (Init, Version, StatusBar)
+        auto loading = std::make_unique<page::SystemLoadingModel>();
+        assert(loading->init() && loading->getPublishersNumber() == 3);
+        check_subscription<dp::Init>(*loading);
+        check_subscription<dp::Version>(*loading);
+        assert(loading->state().simulated == input.board.capabilities.simulated);
+        loading.reset();
+        assert(!DataProc::Broker()->search("SystemLoadingModel"));
+
+        // StartupModel: publishers == 4 (Battery, Version, Power, StatusBar)
+        auto startup = std::make_unique<page::StartupModel>();
+        assert(startup->init() && startup->getPublishersNumber() == 4);
+        check_subscription<dp::Battery>(*startup);
+        check_subscription<dp::Version>(*startup);
+        check_subscription<dp::Power>(*startup);
+        assert(startup->state().battery_percent == input.battery.level_percent);
+        changes = 0;
+        observer = lv_subject_add_observer(startup->subject(), count_change, &changes);
+        assert(observer && changes == 1);
+        publish(dp::names::Power, dp::PowerState{}); // Non-display field does not notify.
+        assert(changes == 1);
+        auto bat = input.battery;
+        bat.level_percent = 99;
+        publish(dp::names::Battery, bat);
+        assert(changes == 2 && startup->state().battery_percent == 99);
+        startup.reset();
+        publish(dp::names::Battery, bat);
+        assert(changes == 2 && !DataProc::Broker()->search("StartupModel"));
+
+        // WorkSettingsModel: publishers == 2 (Work, StatusBar)
+        auto work_model = std::make_unique<page::WorkSettingsModel>();
+        assert(work_model->init() && work_model->getPublishersNumber() == 2);
+        check_subscription<dp::Work>(*work_model);
+        assert(work_model->state().work.mode == input.work.mode);
+        changes = 0;
+        observer = lv_subject_add_observer(work_model->subject(), count_change, &changes);
+        assert(observer && changes == 1);
+        auto w = input.work;
+        w.radio_on = !w.radio_on;
+        publish(dp::names::Work, w);
+        assert(changes == 2);
+        publish(dp::names::Work, w);
+        assert(changes == 2); // Unchanged field does not notify.
+        work_model.reset();
+        publish(dp::names::Work, w);
+        assert(changes == 2 && !DataProc::Broker()->search("WorkSettingsModel"));
+
+        // RecordConfigModel: publishers == 3 (Recorder, Version, StatusBar)
+        auto rec_model = std::make_unique<page::RecordConfigModel>();
+        assert(rec_model->init() && rec_model->getPublishersNumber() == 3);
+        check_subscription<dp::Recorder>(*rec_model);
+        check_subscription<dp::Version>(*rec_model);
+        assert(rec_model->state().recorder.recording == input.recorder.recording);
+        changes = 0;
+        observer = lv_subject_add_observer(rec_model->subject(), count_change, &changes);
+        assert(observer && changes == 1);
+        auto r = input.recorder;
+        r.reported_recording = !r.reported_recording;
+        publish(dp::names::Recorder, r);
+        assert(changes == 1); // RecordConfig uses recording, not reported_recording!
+        r.recording = !r.recording;
+        publish(dp::names::Recorder, r);
+        assert(changes == 2);
+        rec_model.reset();
+        publish(dp::names::Recorder, r);
+        assert(changes == 2 && !DataProc::Broker()->search("RecordConfigModel"));
+
+        // SystemInfosModel: publishers == 8 (Work, GNSS, WiFi, Battery, Recorder, Version, Init, StatusBar)
+        auto sys_infos = std::make_unique<page::SystemInfosModel>();
+        assert(sys_infos->init() && sys_infos->getPublishersNumber() == 8);
+        check_subscription<dp::Work>(*sys_infos);
+        check_subscription<dp::GNSS>(*sys_infos);
+        check_subscription<dp::WiFi>(*sys_infos);
+        check_subscription<dp::Battery>(*sys_infos);
+        check_subscription<dp::Recorder>(*sys_infos);
+        check_subscription<dp::Version>(*sys_infos);
+        check_subscription<dp::Init>(*sys_infos);
+        assert(sys_infos->state().gnss.satellites_used == input.gnss.satellites_used);
+        changes = 0;
+        observer = lv_subject_add_observer(sys_infos->subject(), count_change, &changes);
+        assert(observer && changes == 1);
+        sys_infos.reset();
+        assert(!DataProc::Broker()->search("SystemInfosModel"));
+
+        // SystemDashModel: publishers == 6 (Settings, WiFi, Version, Power, Clock, StatusBar)
+        auto dash_model = std::make_unique<page::SystemDashModel>();
+        assert(dash_model->init() && dash_model->getPublishersNumber() == 6);
+        check_subscription<dp::Settings>(*dash_model);
+        check_subscription<dp::WiFi>(*dash_model);
+        check_subscription<dp::Version>(*dash_model);
+        check_subscription<dp::Power>(*dash_model);
+        check_subscription<dp::Clock>(*dash_model);
+        changes = 0;
+        observer = lv_subject_add_observer(dash_model->subject(), count_change, &changes);
+        assert(observer && changes == 1);
+        publish(dp::names::Clock, dp::ClockState{}); // Clock date is non-display in SystemDash.
+        assert(changes == 1);
+        auto wf = input.wifi;
+        wf.on = !wf.on;
+        publish(dp::names::WiFi, wf);
+        assert(changes == 2);
+        dash_model.reset();
+        publish(dp::names::WiFi, wf);
+        assert(changes == 2 && !DataProc::Broker()->search("SystemDashModel"));
+
+        // StarMapModel: publishers == 3 (GNSS, Version, StatusBar)
+        auto star_model = std::make_unique<page::StarMapModel>();
+        assert(star_model->init() && star_model->getPublishersNumber() == 3);
+        check_subscription<dp::GNSS>(*star_model);
+        check_subscription<dp::Version>(*star_model);
+        changes = 0;
+        observer = lv_subject_add_observer(star_model->subject(), count_change, &changes);
+        assert(observer && changes == 1);
+        auto g = input.gnss;
+        g.latitude += 1;
+        publish(dp::names::GNSS, g);
+        assert(changes == 1); // latitude is non-display in StarMap.
+        g.constellations_valid = true;
+        g.constellations[0] += 1;
+        publish(dp::names::GNSS, g);
+        assert(changes == 2);
+        star_model.reset();
+        publish(dp::names::GNSS, g);
+        assert(changes == 2 && !DataProc::Broker()->search("StarMapModel"));
+
+        // SaveConfigModel: publishers == 2 (Power, StatusBar)
+        auto save_model = std::make_unique<page::SaveConfigModel>();
+        assert(save_model->init() && save_model->getPublishersNumber() == 2);
+        check_subscription<dp::Power>(*save_model);
+        changes = 0;
+        observer = lv_subject_add_observer(save_model->subject(), count_change, &changes);
+        assert(observer && changes == 1);
+        save_model.reset();
+        assert(!DataProc::Broker()->search("SaveConfigModel"));
+
         warning.destroy();
         bar.destroy();
         publish(dp::names::Battery, input.battery);

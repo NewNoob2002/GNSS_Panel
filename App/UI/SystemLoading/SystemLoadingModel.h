@@ -1,37 +1,44 @@
 #pragma once
 #include <cstdint>
-#include <memory>
-#include "DataProc/DataProc.h"
+#include "UI/Common/Model.h"
+#include "Def/DP_Version.h"
+#include "Def/DP_Init.h"
 
 namespace page {
-/** Page-owned DataNode and received data. Init on view load, Deinit on unload, LVGL thread only. */
-class SystemLoadingModel {
+/** @brief SystemLoading 只需要一个字段：平台是否为模拟环境。 */
+struct SystemLoadingState {
+    bool simulated = false;
+};
+
+/** @brief 命令节点：订阅 Version 取初值，通过 Init 节点发送 Begin/Record 命令。
+ *  不需要 PUBLISH 接收——初始化步骤结果由 Page 轮询，不走发布路径。
+ */
+class SystemLoadingModel final : public Model<SystemLoadingState> {
   public:
+    SystemLoadingModel() : Model("SystemLoadingModel") {}
     bool init();
-    void deinit();
-    bool set_status_bar(bool visible, DataProc::StatusBarStyle style = {}) const;
-    /** UI thread: clear the retained report when a new initialization attempt starts. */
-    bool begin_initialization() const;
-    /** Upper bound for one step, above the platform's own timeouts: a backend that never finishes a step is
-     * recorded as failed so startup always reaches the working UI.
-     */
-    static constexpr std::uint32_t kStepLimitMs = 35000;
-    /** UI thread: poll initialization step 0..4 through system_backend (elapsed_ms from its first poll, 0).
-     * Returns Pending while it runs; once it has a result, records it in System and returns Ok/Failed.
-     * Failed is shown and logged, never a gate for the next step.
-     */
-    DataProc::InitializationStatus poll_step(unsigned step, std::uint32_t elapsed_ms) const;
-    const DataProc::StatusSnapshot& status() const {
-        return status_;
-    }
-    const DataProc::SystemState& settings() const {
-        return state_;
-    }
+
+    bool set_status_bar(bool visible, DataProc::StatusBarStyle style = {});
+
+    /** UI 线程：开始新一轮初始化（发送 Begin 命令）。 */
+    bool begin_initialization();
+
+    /** UI 线程：轮询初始化步骤 0..4；返回 Pending/Ok/Failed。 */
+    DataProc::InitializationStatus poll_step(unsigned step, uint32_t elapsed_ms);
+
+    static constexpr uint32_t kStepLimitMs = 35000;
+
+    int onEvent(EventParam_t* event) override;
 
   private:
-    static int on_event(DataNode* account, DataNode::EventParam_t* event);
-    std::unique_ptr<DataNode> account_;
-    DataProc::StatusSnapshot status_{};
-    DataProc::SystemState state_{};
+    template <class Domain>
+    bool load() {
+        typename Domain::State value;
+        if (!Domain::subscribe(*this) || Domain::pull(*this, value) != RES_OK)
+            return false;
+        apply(value);
+        return true;
+    }
+    void apply(const dp::Version::State& value);
 };
 } // namespace page

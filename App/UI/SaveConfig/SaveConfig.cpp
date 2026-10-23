@@ -13,31 +13,26 @@ void SaveConfig::onInstalled() {
 }
 
 void SaveConfig::onViewLoad() {
-    if (!model_.init())
+    model_ = std::make_unique<SaveConfigModel>();
+    if (!model_->init())
         app_fatal("SaveConfig", "Model initialization failed");
     view_.create(getRoot());
 }
 
-void SaveConfig::apply_text() {
-    view_.update(model_.settings());
-}
-
 bool SaveConfig::onBackRequest() {
-    return model_.settings().shutting_down; // A platform shutdown cannot be left or cancelled.
+    return model_->state().shutting_down;
 }
 
 void SaveConfig::onViewWillAppear() {
-    model_.set_status_bar(true);
-    model_.set_change_callback([this] {
-        apply_text();
-    });
+    model_->set_status_bar(true);
+    if (!view_.bind(model_->subject()))
+        app_fatal("SaveConfig", "View binding failed");
     view_.appear();
-    apply_text();
 }
 
 void SaveConfig::onViewDidAppear() {
     // A long host frame cannot execute power completion while navigation is still busy.
-    if (!model_.settings().shutting_down)
+    if (!model_->state().shutting_down)
         lv_anim_start(view_.progress_animation());
     timer_ = lv_timer_create(on_timeout, lv_anim_get_playtime(view_.progress_animation()) + 500, this);
     if (!timer_)
@@ -52,37 +47,37 @@ void SaveConfig::cancel_timer() {
 }
 
 void SaveConfig::onViewWillDisappear() {
-    model_.set_change_callback({});
     view_.stop();
+    view_.unbind();
     cancel_timer();
-    if (model_.settings().power_pending && !model_.cancel_power())
+    if (model_->state().power_pending && !model_->cancel_power())
         LV_LOG_ERROR("SaveConfig: cancellation failed");
     utils::leave_focus_group();
 }
 
 void SaveConfig::onViewUnload() {
-    model_.deinit();
     cancel_timer();
-    view_.stop();
+    view_.destroy();
+    model_.reset();
 }
 
 void SaveConfig::onLanguageChanged() {
-    apply_text();
+    view_.update(model_->state());
 }
 
 void SaveConfig::on_timeout(lv_timer_t* timer) {
     auto* self = static_cast<SaveConfig*>(lv_timer_get_user_data(timer));
     self->timer_ = nullptr;
     lv_timer_delete(timer);
-    const auto request = self->model_.settings(); // Copy before navigation unloads this Model/View.
+    const auto request = self->model_->state(); // Copy before navigation unloads this Model/View.
     if (!request.power_pending)
         return; // Platform shutdown: the platform reports standby (App returns to Startup).
-    if (!self->model_.finish_power()) {
+    if (!self->model_->finish_power()) {
         LV_LOG_ERROR("SaveConfig: power service failed");
         return;
     }
     // Off ends with the platform's standby report (App resets to Startup); Reboot resumes the working root.
-    if (request.power_action == DataProc::PowerAction::Reboot
+    if (request.power_action == hal::PowerCommand::Reboot
         && self->getManager()->backHome() != PageManager::RES_TYPE::OK)
         LV_LOG_WARN("SaveConfig: return to the working root rejected");
 }

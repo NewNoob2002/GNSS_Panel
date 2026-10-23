@@ -1,7 +1,7 @@
-#ifndef SYSTEM_INFOS_VIEW_H
-#define SYSTEM_INFOS_VIEW_H
+#pragma once
 
-#include "DataProc/DataProc_Def.h"
+#include <array>
+#include "SystemInfosModel.h"
 #include "UI/Resource/ResourcePool.h"
 #include "I18n.h"
 #include "lvgl.h"
@@ -10,7 +10,6 @@ namespace page {
 class SystemInfosView {
   public:
     SystemInfosView() = default;
-
     ~SystemInfosView() = default;
 
     void create(lv_obj_t* root);
@@ -20,10 +19,13 @@ class SystemInfosView {
 
     void destroy();
 
+    bool bind(lv_subject_t* subject);
+    void unbind();
+
     /** Localized card titles and field names. */
     void apply_language() const;
-    /** Card values from device data and the System state (Wi-Fi state, initialization failures). */
-    void update(const DataProc::DeviceSnapshot& device, const DataProc::SystemState& state) const;
+    /** Card values from domain states. */
+    void update(const SystemInfosState& state) const;
 
     /** Inventory controls in visible top-to-bottom order, after create(). */
     std::array<lv_obj_t*, 6> controls() const;
@@ -46,7 +48,6 @@ class SystemInfosView {
     } ui;
 
     static void set_scroll_to_y(lv_obj_t* obj, int32_t y, lv_anim_enable_t en);
-
     static void on_focus(lv_group_t* e);
 
   private:
@@ -57,14 +58,12 @@ class SystemInfosView {
         lv_style_t data;
     } style_;
 
-  private:
+    static void on_state(lv_observer_t* observer, lv_subject_t* subject);
+    lv_observer_t* observer_ = nullptr;
+
     lv_obj_t* root_ = nullptr;
     void style_init();
-
     void style_reset();
-
     void item_create(item_t* item, lv_obj_t* par, const char* name, const char* img_src, const char* infos);
 };
 } // namespace page
-
-#endif // SYSTEM_INFOS_VIEW_H

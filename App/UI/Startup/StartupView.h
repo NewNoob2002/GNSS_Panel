@@ -1,7 +1,7 @@
 #ifndef STARTUP_VIEW_H
 #define STARTUP_VIEW_H
 
-#include "DataProc/DataProc_Def.h"
+#include "StartupModel.h"
 #include "UI/Resource/ResourcePool.h"
 #include "I18n.h"
 #include "lvgl.h"
@@ -12,17 +12,29 @@ class StartupView {
     /** Create the standby battery readout and transparent hold-to-start target. */
     void create(lv_obj_t* root);
 
-    /** Stop the charging animation before the page is hidden or destroyed. */
-    void destroy() const;
+    /** Stop the charging animation and hold anim before the page is hidden or destroyed. */
+    void destroy();
 
-    /** Firmware/board versions from device data; empty text shows N/A. */
-    void update_device(const DataProc::DeviceSnapshot& device) const;
-    /** Refresh the split digits/unit readout and battery slot from live measurements. */
-    void update(const DataProc::StatusSnapshot& status);
+    /** @brief 绑定时立即渲染 Model 自有值；离页解绑，卸载后不触碰控件。 */
+    bool bind(lv_subject_t* subject);
+    void unbind();
+
+    /** Refresh the split digits/unit readout, battery slot, and version info. */
+    void update(const StartupState& state);
 
     /** Refresh the start and hold labels without changing the hold target. */
     void apply_language() const;
 
+    lv_obj_t* hold_control() const { return ui.btn_press; }
+    void reset_hold();
+    void set_hold_progress(int32_t value);
+    void start_hold_anim(uint32_t hold_ms);
+    void reset_hold_anim(uint32_t restore_ms = 300);
+    void stop_hold_anim();
+
+    const auto& widgets() const { return ui; }
+
+  private:
     struct {
         lv_obj_t* arc;
         lv_obj_t* arc_percent;
@@ -40,7 +52,11 @@ class StartupView {
 
         lv_obj_t* firmware;
         lv_obj_t* hardware;
-    } ui;
+    } ui{};
+
+    static void on_state(lv_observer_t* observer, lv_subject_t* subject);
+    static void anim_cb(void* var, int32_t value);
+    lv_observer_t* observer_ = nullptr;
 };
 } // namespace page
 

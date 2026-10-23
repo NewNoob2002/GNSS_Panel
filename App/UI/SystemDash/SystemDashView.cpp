@@ -11,6 +11,7 @@ lv_obj_t* SystemDashView::caption(lv_obj_t* parent, TextId id, int x, int y, int
     lv_label_set_text(label, i18n::text(id));
     return label;
 }
+
 void SystemDashView::create(lv_obj_t* root, bool reboot_available) {
     caption_count_ = 0;
     reboot_available_ = reboot_available;
@@ -74,6 +75,7 @@ void SystemDashView::create(lv_obj_t* root, bool reboot_available) {
     }
     show_power(false);
 }
+
 void SystemDashView::appear() const {
     settings_style::reveal(hero_);
     settings_style::reveal(ui.language, 40);
@@ -81,14 +83,64 @@ void SystemDashView::appear() const {
     settings_style::reveal(ui.power, 120);
     settings_style::reveal(ui.back, 160);
 }
+
 void SystemDashView::stop() const {
     settings_style::stop(status_dot_);
 }
+
+bool SystemDashView::bind(lv_subject_t* subject) {
+    unbind();
+    observer_ = lv_subject_add_observer(subject, on_state, this);
+    return observer_ != nullptr;
+}
+
+void SystemDashView::unbind() {
+    if (observer_) {
+        lv_observer_delete(observer_);
+        observer_ = nullptr;
+    }
+}
+
+void SystemDashView::on_state(lv_observer_t* observer, lv_subject_t* subject) {
+    auto* self = static_cast<SystemDashView*>(lv_observer_get_user_data(observer));
+    self->update(*static_cast<const SystemDashState*>(lv_subject_get_pointer(subject)));
+}
+
+SystemDashView::Control SystemDashView::control(const lv_obj_t* object) const {
+    if (object == ui.language)
+        return Control::Language;
+    if (object == ui.wifi)
+        return Control::Wifi;
+    if (object == ui.power)
+        return Control::Power;
+    if (object == ui.back)
+        return Control::Back;
+    if (object == ui.shutdown)
+        return Control::Shutdown;
+    if (object == ui.reboot)
+        return Control::Reboot;
+    return Control::None;
+}
+
+lv_obj_t* SystemDashView::control_object(Control control) const {
+    switch (control) {
+    case Control::Language: return ui.language;
+    case Control::Wifi: return ui.wifi;
+    case Control::Power: return ui.power;
+    case Control::Back: return ui.back;
+    case Control::Shutdown: return ui.shutdown;
+    case Control::Reboot: return ui.reboot;
+    case Control::None: return nullptr;
+    }
+    return nullptr;
+}
+
 void SystemDashView::apply_language() const {
     for (unsigned i = 0; i < caption_count_; ++i)
         lv_label_set_text(captions_[i].label, i18n::text(captions_[i].id));
 }
-void SystemDashView::update(const DataProc::SystemState& state) const {
+
+void SystemDashView::update(const SystemDashState& state) const {
     settings_style::activity(status_dot_, state.wifi_pending,
                              state.wifi_pending ? style::kAccent
                              : state.wifi_on    ? style::kSuccess
@@ -105,6 +157,7 @@ void SystemDashView::update(const DataProc::SystemState& state) const {
     lv_label_set_text(wifi_value_,
                       state.wifi_pending ? "..." : i18n::text(state.wifi_on ? TextId::StatusOn : TextId::StatusOff));
 }
+
 void SystemDashView::set_hold(lv_obj_t* button, int32_t percent) const {
     percent = percent < 0 ? 0 : percent > 100 ? 100 : percent;
     for (unsigned i = 0; i < 2; ++i) {
@@ -116,6 +169,7 @@ void SystemDashView::set_hold(lv_obj_t* button, int32_t percent) const {
             lv_obj_set_width(hold_fill_[i], width);
     }
 }
+
 void SystemDashView::show_power(bool visible) {
     power_open_ = visible;
     set_hold(nullptr, 0);
@@ -127,11 +181,13 @@ void SystemDashView::show_power(bool visible) {
     } else
         lv_obj_set_hidden(ui.overlay, true);
 }
+
 std::array<lv_obj_t*, 4> SystemDashView::controls() const {
     return power_open_
                ? std::array<lv_obj_t*, 4>{ui.shutdown, reboot_available_ ? ui.reboot : nullptr, nullptr, nullptr}
                : std::array<lv_obj_t*, 4>{ui.language, ui.wifi, ui.power, ui.back};
 }
+
 std::array<lv_obj_t*, 6> SystemDashView::all_controls() const {
     return {ui.language, ui.wifi, ui.power, ui.back, ui.shutdown, ui.reboot};
 }

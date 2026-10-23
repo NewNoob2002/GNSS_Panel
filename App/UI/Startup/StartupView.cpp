@@ -82,7 +82,7 @@ void StartupView::create(lv_obj_t* root) {
     lv_obj_set_style_text_color(ui.hold_hint, style::kMuted, 0);
 
     lv_anim_init(&ui.arc_anim);
-    lv_anim_set_var(&ui.arc_anim, ui.arc);
+    lv_anim_set_var(&ui.arc_anim, this);
     lv_anim_set_duration(&ui.arc_anim, 200);
     lv_anim_set_reverse_duration(&ui.arc_anim, 0);
     lv_anim_set_repeat_count(&ui.arc_anim, 0);
@@ -90,38 +90,101 @@ void StartupView::create(lv_obj_t* root) {
     apply_language();
 }
 
-void StartupView::destroy() const {
+void StartupView::destroy() {
+    unbind();
+    stop_hold_anim();
     battery::stop(ui.bat_fill);
 }
 
-void StartupView::update(const DataProc::StatusSnapshot& status) {
+bool StartupView::bind(lv_subject_t* subject) {
+    unbind();
+    observer_ = lv_subject_add_observer(subject, on_state, this);
+    return observer_ != nullptr;
+}
+
+void StartupView::unbind() {
+    if (observer_) {
+        lv_observer_delete(observer_);
+        observer_ = nullptr;
+    }
+}
+
+void StartupView::on_state(lv_observer_t* observer, lv_subject_t* subject) {
+    auto* self = static_cast<StartupView*>(lv_observer_get_user_data(observer));
+    self->update(*static_cast<const StartupState*>(lv_subject_get_pointer(subject)));
+}
+
+void StartupView::anim_cb(void* var, int32_t value) {
+    static_cast<StartupView*>(var)->set_hold_progress(value);
+}
+
+void StartupView::set_hold_progress(int32_t value) {
+    if (ui.arc)
+        lv_arc_set_value(ui.arc, static_cast<int16_t>(value));
+    if (ui.arc_percent)
+        lv_label_set_text_fmt(ui.arc_percent, "%ld%%", static_cast<long>(value));
+}
+
+void StartupView::reset_hold() {
+    set_hold_progress(0);
+    if (ui.btn_press)
+        lv_obj_set_pressed(ui.btn_press, false);
+}
+
+void StartupView::start_hold_anim(uint32_t hold_ms) {
+    if (!ui.arc)
+        return;
+    lv_anim_delete(this, anim_cb);
+    set_hold_progress(0);
+    lv_anim_set_var(&ui.arc_anim, this);
+    lv_anim_set_exec_cb(&ui.arc_anim, anim_cb);
+    lv_anim_set_values(&ui.arc_anim, 0, 100);
+    lv_anim_set_duration(&ui.arc_anim, hold_ms);
+    lv_anim_start(&ui.arc_anim);
+}
+
+void StartupView::reset_hold_anim(uint32_t restore_ms) {
+    if (!ui.arc)
+        return;
+    lv_anim_delete(this, anim_cb);
+    const int32_t current = lv_arc_get_value(ui.arc);
+    lv_anim_set_var(&ui.arc_anim, this);
+    lv_anim_set_exec_cb(&ui.arc_anim, anim_cb);
+    lv_anim_set_values(&ui.arc_anim, current, 0);
+    lv_anim_set_duration(&ui.arc_anim, restore_ms);
+    lv_anim_start(&ui.arc_anim);
+}
+
+void StartupView::stop_hold_anim() {
+    lv_anim_delete(this, anim_cb);
+}
+
+void StartupView::update(const StartupState& state) {
     if (!ui.bat_charge || !ui.bat_fill)
         return;
-    const unsigned percent = status.battery_percent > 100 ? 100 : status.battery_percent;
-    settings_style::set_visible(ui.bat_charge, status.battery_valid);
-    settings_style::set_text(ui.bat_unit, status.battery_valid ? "%" : "N/A");
-    if (status.battery_valid) {
+    const unsigned percent = state.battery_percent > 100 ? 100 : state.battery_percent;
+    settings_style::set_visible(ui.bat_charge, state.battery_valid);
+    settings_style::set_text(ui.bat_unit, state.battery_valid ? "%" : "N/A");
+    if (state.battery_valid) {
         char text[24];
         lv_snprintf(text, sizeof(text), "%u", percent);
         settings_style::set_text(ui.bat_charge, text);
-        app::format_fixed(text, sizeof(text), status.battery_voltage, 2, " V");
+        app::format_fixed(text, sizeof(text), state.battery_voltage, 2, " V");
         settings_style::set_text(ui.bat_voltage, text);
     } else {
         settings_style::set_text(ui.bat_voltage, "N/A");
     }
-    const bool charging = status.battery_valid && status.charging;
-    const auto color = status.battery_valid ? battery::color(percent, charging) : style::kMuted;
+    const bool charging = state.battery_valid && state.charging;
+    const auto color = state.battery_valid ? battery::color(percent, charging) : style::kMuted;
     settings_style::set_text(ui.bat_caption, charging ? "CHG" : "BAT");
     settings_style::set_text_color(ui.bat_caption, charging ? color : style::kMuted);
-    battery::update_fill(ui.bat_fill, percent, charging, status.battery_valid);
+    battery::update_fill(ui.bat_fill, percent, charging, state.battery_valid);
+
+    settings_style::set_text(ui.firmware, state.firmware[0] ? state.firmware.data() : "N/A");
+    settings_style::set_text(ui.hardware, state.hardware[0] ? state.hardware.data() : "N/A");
 }
 
 void StartupView::apply_language() const {
     settings_style::set_text(ui.btn_label, i18n::text(i18n::TextId::StartupStart));
     settings_style::set_text(ui.hold_hint, i18n::text(i18n::TextId::StartupHoldHint));
-}
-
-void StartupView::update_device(const DataProc::DeviceSnapshot& device) const {
-    settings_style::set_text(ui.firmware, device.firmware[0] ? device.firmware.data() : "N/A");
-    settings_style::set_text(ui.hardware, device.hardware[0] ? device.hardware.data() : "N/A");
 }

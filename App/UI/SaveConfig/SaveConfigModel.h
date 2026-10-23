@@ -1,33 +1,38 @@
 #pragma once
-#include <functional>
-#include <memory>
-#include "DataProc/DataProc.h"
+
+#include "UI/Common/Model.h"
+#include "Def/DP_Power.h"
 
 namespace page {
-/** Page-owned DataNode and received data. Init on view load, Deinit on unload, LVGL thread only. */
-class SaveConfigModel {
+/** @brief 关机/重启倒计时页面状态。 */
+struct SaveConfigState {
+    bool shutting_down = false;
+    hal::PowerCause power_cause{};
+    hal::PowerCommand power_action{};
+    bool power_pending = false;
+    uint64_t power_token = 0;
+};
+
+/** @brief 随页面加载创建、卸载销毁；只订阅 Power，通知 StatusBar。 */
+class SaveConfigModel final : public Model<SaveConfigState> {
   public:
+    SaveConfigModel() : Model("SaveConfigModel") {}
     bool init();
-    void deinit();
-    bool set_status_bar(bool visible, DataProc::StatusBarStyle style = {}) const;
-    const DataProc::StatusSnapshot& status() const {
-        return status_;
-    }
-    const DataProc::SystemState& settings() const {
-        return state_;
-    }
-    /** Observe accepted System publications while the page is visible. */
-    void set_change_callback(std::function<void()> callback) {
-        change_cb_ = std::move(callback);
-    }
+    bool set_status_bar(bool visible, DataProc::StatusBarStyle style = {});
+
     bool finish_power();
     bool cancel_power();
 
+    int onEvent(EventParam_t* event) override;
+
   private:
-    std::function<void()> change_cb_;
-    static int on_event(DataNode* account, DataNode::EventParam_t* event);
-    std::unique_ptr<DataNode> account_;
-    DataProc::StatusSnapshot status_{};
-    DataProc::SystemState state_{};
+    void apply(const dp::Power::State& value);
+    template <class Domain> bool load() {
+        typename Domain::State value;
+        if (!Domain::subscribe(*this) || Domain::pull(*this, value) != RES_OK)
+            return false;
+        apply(value);
+        return true;
+    }
 };
 } // namespace page

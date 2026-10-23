@@ -108,11 +108,31 @@ void StarMapView::create(lv_obj_t* root) {
         }
     }
 
-    update(DataProc::DeviceSnapshot{}); // "-" until the platform publishes constellation counts.
+    update(StarMapState{}); // "-" until the platform publishes constellation counts.
     apply_language();
 }
 
-void StarMapView::destroy() {}
+void StarMapView::destroy() {
+    unbind();
+}
+
+bool StarMapView::bind(lv_subject_t* subject) {
+    unbind();
+    observer_ = lv_subject_add_observer(subject, on_state, this);
+    return observer_ != nullptr;
+}
+
+void StarMapView::unbind() {
+    if (observer_) {
+        lv_observer_delete(observer_);
+        observer_ = nullptr;
+    }
+}
+
+void StarMapView::on_state(lv_observer_t* observer, lv_subject_t* subject) {
+    auto* self = static_cast<StarMapView*>(lv_observer_get_user_data(observer));
+    self->update(*static_cast<const StarMapState*>(lv_subject_get_pointer(subject)));
+}
 
 void StarMapView::apply_language() const {
     lv_label_set_text(ui.label_title, i18n::text(i18n::TextId::StarMapTitle));
@@ -124,16 +144,15 @@ void StarMapView::update_activity_indicator() {
     lv_obj_set_style_bg_opa(ui.activity_indicator, activity_indicator_on ? LV_OPA_COVER : LV_OPA_30, 0);
 }
 
-void StarMapView::update(const DataProc::DeviceSnapshot& device) {
-    static_assert(DataProc::kConstellationCount == 7, "one column per constellation");
+void StarMapView::update(const StarMapState& state) {
     char buf[16];
-    for (std::size_t i = 0; i < DataProc::kConstellationCount; ++i) {
-        if (device.constellations_valid)
-            std::snprintf(buf, sizeof(buf), "%u", device.constellations[i]);
+    for (std::size_t i = 0; i < 7; ++i) {
+        if (state.constellations_valid)
+            std::snprintf(buf, sizeof(buf), "%u", state.constellations[i]);
         else
             std::snprintf(buf, sizeof(buf), "-");
         lv_label_set_text(ui.constell[i].label_val, buf);
     }
-    if (device.constellations_valid)
+    if (state.constellations_valid)
         update_activity_indicator(); // Blinks while fresh counts arrive.
 }

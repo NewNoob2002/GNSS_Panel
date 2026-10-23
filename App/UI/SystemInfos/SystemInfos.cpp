@@ -13,37 +13,36 @@ void SystemInfos::onInstalled() {
 }
 
 void SystemInfos::onViewLoad() {
-    if (!model_.init())
+    model_ = std::make_unique<SystemInfosModel>();
+    if (!model_->init())
         app_fatal("SystemInfos", "Model initialization failed");
     view_.create(getRoot());
-    style::show_demo(getRoot(), model_.settings().simulated);
+    style::show_demo(getRoot(), model_->state().version.capabilities.simulated);
     utils::attach_controls(std::array{getRoot()}, clicked, this);
 }
 
 void SystemInfos::onViewWillAppear() {
-    model_.set_status_bar(false);
+    model_->set_status_bar(false);
     view_.apply_language();
-    view_.update(model_.device(), model_.settings());
-    model_.set_change_callback([this] {
-        view_.update(model_.device(), model_.settings());
-    });
+    if (!view_.bind(model_->subject()))
+        app_fatal("SystemInfos", "View binding failed");
     view_.group_init();
 }
 
 void SystemInfos::onViewWillDisappear() {
-    model_.set_change_callback({});
+    view_.unbind();
     lv_group_set_focus_cb(lv_group_get_default(), nullptr);
     utils::leave_focus_group();
 }
 
 void SystemInfos::onViewUnload() {
-    model_.deinit();
     view_.destroy();
+    model_.reset();
 }
 
 void SystemInfos::onLanguageChanged() {
     view_.apply_language();
-    view_.update(model_.device(), model_.settings());
+    view_.update(model_->state());
 }
 
 void SystemInfos::clicked(lv_event_t* event) {

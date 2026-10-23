@@ -1,7 +1,7 @@
 #pragma once
 
+#include <memory>
 #include "StarMapModel.h"
-
 #include "StarMapView.h"
 #include "PageBase.h"
 
@@ -18,6 +18,6 @@ class StarMap final : public PageBase {
   private:
     static void clicked(lv_event_t* event);
     StarMapView view_{};
-    StarMapModel model_;
+    std::unique_ptr<StarMapModel> model_;
 };
 } // namespace page

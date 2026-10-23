@@ -1,35 +1,37 @@
 #pragma once
-#include <functional>
-#include <memory>
-#include "DataProc/DataProc.h"
+
+#include <array>
+#include "UI/Common/Model.h"
+#include "Def/DP_GNSS.h"
+#include "Def/DP_Version.h"
 
 namespace page {
-/** Page-owned DataNode and received data. Init on view load, Deinit on unload, LVGL thread only. */
-class StarMapModel {
+/** @brief 星历图页面状态。 */
+struct StarMapState {
+    bool constellations_valid = false;
+    std::array<unsigned, 7> constellations{};
+    bool simulated = false;
+};
+
+/** @brief 随页面加载创建、卸载销毁；只订阅 GNSS、Version，通知 StatusBar。 */
+class StarMapModel final : public Model<StarMapState> {
   public:
+    StarMapModel() : Model("StarMapModel") {}
     bool init();
-    void deinit();
-    bool set_status_bar(bool visible, DataProc::StatusBarStyle style = {}) const;
-    const DataProc::StatusSnapshot& status() const {
-        return status_;
-    }
-    const DataProc::SystemState& settings() const {
-        return state_;
-    }
-    const DataProc::DeviceSnapshot& device() const {
-        return device_;
-    }
-    /** Called on the LVGL thread after published System or Device data was received. */
-    void set_change_callback(std::function<void()> callback) {
-        change_cb_ = std::move(callback);
-    }
+    bool set_status_bar(bool visible, DataProc::StatusBarStyle style = {});
+
+    int onEvent(EventParam_t* event) override;
 
   private:
-    static int on_event(DataNode* account, DataNode::EventParam_t* event);
-    std::unique_ptr<DataNode> account_;
-    DataProc::StatusSnapshot status_{};
-    DataProc::SystemState state_{};
-    DataProc::DeviceSnapshot device_{};
-    std::function<void()> change_cb_;
+    void apply(const dp::GNSS::State& value);
+    void apply(const dp::Version::State& value);
+
+    template <class Domain> bool load() {
+        typename Domain::State value;
+        if (!Domain::subscribe(*this) || Domain::pull(*this, value) != RES_OK)
+            return false;
+        apply(value);
+        return true;
+    }
 };
 } // namespace page

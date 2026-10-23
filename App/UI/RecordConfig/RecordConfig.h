@@ -1,8 +1,10 @@
 #pragma once
-#include "RequestFeedback.h"
+
+#include <memory>
+#include "PageBase.h"
 #include "RecordConfigModel.h"
 #include "RecordConfigView.h"
-#include "PageBase.h"
+
 namespace page {
 class RecordConfig final : public PageBase {
   public:
@@ -15,12 +17,10 @@ class RecordConfig final : public PageBase {
     void onCommitRequest() override;
 
   private:
-    void refresh();
     void toggle();
     static void clicked(lv_event_t* event);
     RecordConfigView view_{};
-    RecordConfigModel model_;
-    RequestFeedback feedback_{};
+    std::unique_ptr<RecordConfigModel> model_;
     lv_timer_t* timer_ = nullptr;
 };
 } // namespace page

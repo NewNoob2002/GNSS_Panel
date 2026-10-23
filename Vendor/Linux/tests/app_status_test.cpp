@@ -62,14 +62,14 @@ int main() {
     {
         page::StatusBar bar;
         assert(bar.create(lv_layer_top()));
-        page::SystemInfosModel info;
-        assert(info.init() && info.init());
+        auto info = std::make_unique<page::SystemInfosModel>();
+        assert(info->init());
         assert(DataProc::Broker()->search("SystemInfosModel"));
         assert(lv_obj_get_y(bar.root()) == -26 && !lv_obj_is_hidden(bar.root()));
-        assert(info.set_status_bar(true));
+        assert(info->set_status_bar(true));
         advance(600);
         assert(lv_obj_get_y(bar.root()) == 0);
-        assert(info.set_status_bar(false, DataProc::StatusBarStyle::Transparent));
+        assert(info->set_status_bar(false, DataProc::StatusBarStyle::Transparent));
         advance(150);
         const auto hiding_y = lv_obj_get_y(bar.root());
         assert(hiding_y < 0 && hiding_y > -26);
@@ -82,9 +82,9 @@ int main() {
         assert(test_input::status(data));
         data.position.fill('x');
         assert(!test_input::status(data)); // Reject an unterminated producer string.
-        assert(info.status().battery_percent == 84 && std::strcmp(info.status().position.data(), "DEMO") == 0);
+        assert(info->status().battery_percent == 84 && std::strcmp(info->status().position.data(), "DEMO") == 0);
         assert(lv_obj_get_y(bar.root()) == hiding_y); // Publications cannot reveal or reposition the bar.
-        assert(info.set_status_bar(false, DataProc::StatusBarStyle::Transparent));
+        assert(info->set_status_bar(false, DataProc::StatusBarStyle::Transparent));
         assert(lv_obj_get_y(bar.root()) == hiding_y); // Identical requests do not restart the animation.
         advance(400);
         assert(lv_obj_get_y(bar.root()) == -26 && object_coords(bar.root()).y2 < 0);
@@ -93,16 +93,16 @@ int main() {
         DataProc::StatusSnapshot pulled;
         assert(peer.pull("SystemInfosModel", &pulled, sizeof(pulled)) == DataNode::RES_OK);
         assert(std::strcmp(pulled.position.data(), "DEMO") == 0); // Model accepts a peer's pull request.
-        assert(info.set_status_bar(true));
+        assert(info->set_status_bar(true));
         advance(150);
         const auto showing_y = lv_obj_get_y(bar.root());
         assert(showing_y > -26 && showing_y < 0);
-        assert(info.set_status_bar(false)); // Reverse mid-flight without snapping to a fixed endpoint.
+        assert(info->set_status_bar(false)); // Reverse mid-flight without snapping to a fixed endpoint.
         assert(lv_obj_get_y(bar.root()) == showing_y);
         advance(150);
         const auto reversing_y = lv_obj_get_y(bar.root());
         assert(reversing_y < showing_y);
-        assert(info.set_status_bar(true));
+        assert(info->set_status_bar(true));
         assert(lv_obj_get_y(bar.root()) == reversing_y);
         advance(600);
         assert(lv_obj_get_y(bar.root()) == 0 && object_coords(bar.root()).y1 == 0);
@@ -149,62 +149,59 @@ int main() {
         assert(peer.subscribe("System"));
         assert(peer.notify("System", &time_request, sizeof(time_request)) == DataNode::RES_OK);
         // Startup results belong to System, survive loading-page teardown, and reach information Models.
-        page::SystemLoadingModel loading;
-        assert(loading.init());
-        assert(!info.settings().initialization_started);
-        auto* loading_account = DataProc::Broker()->search("SystemLoadingModel");
-        assert(loading_account);
+        auto loading = std::make_unique<page::SystemLoadingModel>();
+        assert(loading->init());
+        assert(!info->settings().initialization_started);
         DataProc::SystemRequest boot_request{};
         boot_request.command = DataProc::SystemCommand::RecordInitialization;
         boot_request.initialization.status = DataProc::InitializationStatus::Ok;
-        assert(loading_account->notify("System", &boot_request, sizeof(boot_request)) == DataNode::RES_PARAM_ERROR);
         boot_request.command = DataProc::SystemCommand::BeginInitialization;
         assert(peer.notify("System", &boot_request, sizeof(boot_request)) == DataNode::RES_OK);
-        assert(loading.begin_initialization() && info.settings().initialization_started);
+        assert(loading->begin_initialization() && info->settings().initialization_started);
         using Status = DataProc::InitializationStatus;
-        assert(loading.poll_step(0, 0) == Status::Ok);
+        assert(loading->poll_step(0, 0) == Status::Ok);
         // A running check (simulated 400 ms) reports Pending and records nothing until it finishes.
-        assert(loading.poll_step(1, 0) == Status::Pending && loading.poll_step(1, 399) == Status::Pending);
-        assert(info.settings().initialization[1].status == Status::NotRun);
-        assert(loading.poll_step(1, 400) == Status::Ok);
-        loading.deinit(); // A partial attempt retains completed nodes and leaves later nodes NOT RUN.
-        assert(info.settings().initialization[1].status == Status::Ok);
-        assert(info.settings().initialization[2].status == Status::NotRun);
-        assert(loading.init() && loading.begin_initialization());
+        assert(loading->poll_step(1, 0) == Status::Pending && loading->poll_step(1, 399) == Status::Pending);
+        assert(info->settings().initialization[1].status == Status::NotRun);
+        assert(loading->poll_step(1, 400) == Status::Ok);
+        loading.reset(); // A partial attempt retains completed nodes and leaves later nodes NOT RUN.
+        assert(info->settings().initialization[1].status == Status::Ok);
+        assert(info->settings().initialization[2].status == Status::NotRun);
+        loading = std::make_unique<page::SystemLoadingModel>();
+        assert(loading->init() && loading->begin_initialization());
         for (unsigned i = 0; i < DataProc::kInitializationStepCount; ++i)
-            assert(loading.poll_step(i, 2000) == (i != 3 ? Status::Ok : Status::Failed));
-        assert(loading.poll_step(DataProc::kInitializationStepCount, 0) == Status::Failed);
-        loading.deinit();
-        info.deinit();
-        assert(info.init()); // A new information DataNode pulls the retained report after loading is gone.
+            assert(loading->poll_step(i, 2000) == (i != 3 ? Status::Ok : Status::Failed));
+        assert(loading->poll_step(DataProc::kInitializationStepCount, 0) == Status::Failed);
+        loading.reset();
+        info.reset();
+        info = std::make_unique<page::SystemInfosModel>();
+        assert(info->init()); // A new information DataNode pulls the retained report after loading is gone.
         assert(!DataProc::Broker()->search("SystemLoadingModel"));
-        assert(info.settings().initialization[3].status == DataProc::InitializationStatus::Failed);
-        assert(std::strcmp(info.settings().initialization[3].detail.data(), "Wi-Fi backend reserved; continue offline")
+        assert(info->settings().initialization[3].status == DataProc::InitializationStatus::Failed);
+        assert(std::strcmp(info->settings().initialization[3].detail.data(), "Wi-Fi backend reserved; continue offline")
                == 0);
-        assert(info.settings().initialization[4].status == DataProc::InitializationStatus::Ok);
-        assert(loading.init());
-        loading_account = DataProc::Broker()->search("SystemLoadingModel");
+        assert(info->settings().initialization[4].status == DataProc::InitializationStatus::Ok);
+        loading = std::make_unique<page::SystemLoadingModel>();
+        assert(loading->init());
         boot_request.command = DataProc::SystemCommand::RecordInitialization;
         boot_request.initialization_step = DataProc::kInitializationStepCount;
-        assert(loading_account->notify("System", &boot_request, sizeof(boot_request)) == DataNode::RES_PARAM_ERROR);
+        assert(peer.notify("System", &boot_request, sizeof(boot_request)) == DataNode::RES_PARAM_ERROR);
         boot_request.initialization_step = 3;
         boot_request.initialization.status = static_cast<DataProc::InitializationStatus>(99);
-        assert(loading_account->notify("System", &boot_request, sizeof(boot_request)) == DataNode::RES_PARAM_ERROR);
+        assert(peer.notify("System", &boot_request, sizeof(boot_request)) == DataNode::RES_PARAM_ERROR);
         boot_request.initialization.status = DataProc::InitializationStatus::Ok;
         boot_request.initialization.detail.fill('x');
-        assert(loading_account->notify("System", &boot_request, sizeof(boot_request)) == DataNode::RES_PARAM_ERROR);
-        assert(info.settings().initialization[3].status == DataProc::InitializationStatus::Failed);
+        assert(peer.notify("System", &boot_request, sizeof(boot_request)) == DataNode::RES_PARAM_ERROR);
+        assert(info->settings().initialization[3].status == DataProc::InitializationStatus::Failed);
         boot_request.initialization.detail.back() = '\0'; // The maximum terminated message is accepted.
-        assert(loading_account->notify("System", &boot_request, sizeof(boot_request)) == DataNode::RES_OK);
-        assert(std::strlen(info.settings().initialization[3].detail.data()) == 95);
-        assert(loading.begin_initialization());
-        for (const auto& node : info.settings().initialization)
+        assert(peer.notify("System", &boot_request, sizeof(boot_request)) == DataNode::RES_OK);
+        assert(std::strlen(info->settings().initialization[3].detail.data()) == 95);
+        assert(loading->begin_initialization());
+        for (const auto& node : info->settings().initialization)
             assert(node.status == DataProc::InitializationStatus::NotRun && node.detail[0] == '\0');
-        loading.deinit();
+        loading.reset();
+        assert(peer.notify("System", &time_request, sizeof(time_request)) == DataNode::RES_OK);
         assert(peer.unsubscribe("System"));
-        auto* settings_account = DataProc::Broker()->search("SystemDashModel");
-        assert(settings_account
-               && settings_account->notify("System", &time_request, sizeof(time_request)) == DataNode::RES_OK);
         assert(settings.settings().date.month == 10 && SystemService::snapshot().date.month == 10);
         assert(settings.toggle_language() && settings.settings().language == i18n::Language::Russian);
         assert(settings.toggle_language() && settings.settings().language == i18n::Language::English);
@@ -219,7 +216,7 @@ int main() {
         assert(save.finish_power() && SystemService::snapshot().power_calls == 1); // Duplicate request is idempotent.
         assert(SystemService::snapshot().power_action == DataProc::PowerAction::Reboot);
         assert(!DataProc_Deinit()); // Live page DataNodes prevent provider teardown.
-        assert(info.set_status_bar(false));
+        assert(info->set_status_bar(false));
         advance(100);
         auto* bar_root = bar.root();
         // 右侧分组最后两项为电池槽与电量数字。
@@ -241,7 +238,7 @@ int main() {
         assert(test_input::status(data));
         advance(40);
         assert(!lv_anim_get(battery_fill, nullptr) && lv_obj_get_width(battery_fill) == 0);
-        info.deinit();
+        info.reset();
         assert(!DataProc::Broker()->search("SystemInfosModel"));
         assert(peer.getPublishersNumber() == 0);
     }

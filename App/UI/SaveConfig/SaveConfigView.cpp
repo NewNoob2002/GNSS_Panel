@@ -43,6 +43,29 @@ void SaveConfigView::stop() const {
         lv_anim_delete(obj, settings_style::move_in);
 }
 
+void SaveConfigView::destroy() {
+    unbind();
+    stop();
+}
+
+bool SaveConfigView::bind(lv_subject_t* subject) {
+    unbind();
+    observer_ = lv_subject_add_observer(subject, on_state, this);
+    return observer_ != nullptr;
+}
+
+void SaveConfigView::unbind() {
+    if (observer_) {
+        lv_observer_delete(observer_);
+        observer_ = nullptr;
+    }
+}
+
+void SaveConfigView::on_state(lv_observer_t* observer, lv_subject_t* subject) {
+    auto* self = static_cast<SaveConfigView*>(lv_observer_get_user_data(observer));
+    self->update(*static_cast<const SaveConfigState*>(lv_subject_get_pointer(subject)));
+}
+
 void SaveConfigView::appear() {
     stop();
     shutting_down_ = false;
@@ -56,7 +79,7 @@ void SaveConfigView::appear() {
     settings_style::reveal(column_, 40);
 }
 
-void SaveConfigView::update(const DataProc::SystemState& state) {
+void SaveConfigView::update(const SaveConfigState& state) {
     if (state.shutting_down && !shutting_down_) {
         shutting_down_ = true;
         lv_anim_delete(ring_, set_progress);
@@ -74,7 +97,7 @@ void SaveConfigView::update(const DataProc::SystemState& state) {
         lv_anim_set_repeat_count(&animation, LV_ANIM_REPEAT_INFINITE);
         lv_anim_start(&animation);
     }
-    const bool restart = !shutting_down_ && state.power_action == DataProc::PowerAction::Reboot;
+    const bool restart = !shutting_down_ && state.power_action == hal::PowerCommand::Reboot;
     const auto color = restart ? style::kAccent : style::kDanger;
     if (lv_color_to_u32(lv_obj_get_style_arc_color(ring_, LV_PART_INDICATOR)) != lv_color_to_u32(color))
         lv_obj_set_style_arc_color(ring_, color, LV_PART_INDICATOR);
@@ -84,10 +107,10 @@ void SaveConfigView::update(const DataProc::SystemState& state) {
                              i18n::text(restart ? TextId::SaveConfigRestarting : TextId::SaveConfigPoweringOff));
     auto headline = TextId::SaveConfigWarning;
     if (shutting_down_) {
-        headline = state.power_cause == DataProc::PowerCause::Host         ? TextId::SaveConfigPowerOffBoard
-                   : state.power_cause == DataProc::PowerCause::LowBattery ? TextId::SaveConfigPowerOffLowBattery
-                   : state.power_cause == DataProc::PowerCause::User       ? TextId::SaveConfigPowerOffPushKey
-                                                                           : TextId::SaveConfigPowerOffForced;
+        headline = state.power_cause == hal::PowerCause::Host         ? TextId::SaveConfigPowerOffBoard
+                   : state.power_cause == hal::PowerCause::LowBattery ? TextId::SaveConfigPowerOffLowBattery
+                   : state.power_cause == hal::PowerCause::User       ? TextId::SaveConfigPowerOffPushKey
+                                                                       : TextId::SaveConfigPowerOffForced;
     }
     settings_style::set_text(headline_, i18n::text(headline));
     settings_style::set_text(subtitle_,

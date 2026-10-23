@@ -1,38 +1,47 @@
 #pragma once
-#include <functional>
-#include <memory>
-#include "DataProc/DataProc.h"
+
+#include "UI/Common/Model.h"
+#include "UI/Common/RequestFeedback.h"
+#include "Def/DP_Recorder.h"
+#include "Def/DP_Version.h"
 
 namespace page {
-/** Page-owned DataNode and received data. Init on view load, Deinit on unload, LVGL thread only. */
-class RecordConfigModel {
+/** @brief 录制配置页面显示与交互值。 */
+struct RecordConfigState {
+    hal::RecorderState recorder{};
+    bool record_settings = false;
+    unsigned type = 0;
+    unsigned interval = 0;
+    i18n::TextId feedback = i18n::TextId::Count;
+};
+
+/** @brief 随页面加载创建、卸载销毁；只订阅 Recorder、Version，通知 StatusBar。 */
+class RecordConfigModel final : public Model<RecordConfigState> {
   public:
+    RecordConfigModel() : Model("RecordConfigModel") {}
     bool init();
-    void deinit();
-    bool set_status_bar(bool visible, DataProc::StatusBarStyle style = {}) const;
-    /** Start recording with the roller selection (option indexes), or stop it. */
-    bool start_record(unsigned record_type, unsigned record_interval) const;
-    bool stop_record() const;
-    const DataProc::StatusSnapshot& status() const {
-        return status_;
-    }
-    const DataProc::SystemState& settings() const {
-        return state_;
-    }
-    const DataProc::DeviceSnapshot& device() const {
-        return device_;
-    }
-    /** Called on the LVGL thread after published System or Device data was received. */
-    void set_change_callback(std::function<void()> callback) {
-        change_cb_ = std::move(callback);
-    }
+    bool set_status_bar(bool visible, DataProc::StatusBarStyle style = {});
+
+    void sync_initial(const hal::RecorderState& recorder, bool record_settings);
+    void cycle_type();
+    void cycle_interval();
+    void clear_feedback();
+    void poll_feedback();
+
+    bool toggle();
+
+    int onEvent(EventParam_t* event) override;
 
   private:
-    static int on_event(DataNode* account, DataNode::EventParam_t* event);
-    std::unique_ptr<DataNode> account_;
-    DataProc::StatusSnapshot status_{};
-    DataProc::SystemState state_{};
-    DataProc::DeviceSnapshot device_{};
-    std::function<void()> change_cb_;
+    void apply(const dp::Recorder::State& value);
+    void apply(const dp::Version::State& value);
+    template <class Domain> bool load() {
+        typename Domain::State value;
+        if (!Domain::subscribe(*this) || Domain::pull(*this, value) != RES_OK)
+            return false;
+        apply(value);
+        return true;
+    }
+    RequestFeedback feedback_{};
 };
 } // namespace page

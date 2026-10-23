@@ -1,7 +1,7 @@
 #pragma once
 
+#include <memory>
 #include "SaveConfigModel.h"
-
 #include "SaveConfigView.h"
 #include "PageBase.h"
 
@@ -21,11 +21,10 @@ class SaveConfig final : public PageBase {
     bool onBackRequest() override;
 
   private:
-    void apply_text();
     void cancel_timer();
     static void on_timeout(lv_timer_t* timer);
     SaveConfigView view_{};
-    SaveConfigModel model_;
+    std::unique_ptr<SaveConfigModel> model_;
     lv_timer_t* timer_ = nullptr;
 };
 } // namespace page
