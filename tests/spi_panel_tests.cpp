@@ -1,9 +1,9 @@
 #include <cassert>
+#include <delay.h>
 #include <iostream>
 #include <string>
 #include <vector>
 #include "board_display.h"
-#include <delay.h>
 #include "lv_port.h"
 #include "mcu_config.h"
 
@@ -33,6 +33,7 @@ static int dmaResult = LL_OK;
 static int irqResult = LL_OK;
 static int spiResult = LL_OK;
 static const uint8_t* dmaPixels;
+static bool completeDmaImmediately;
 
 extern "C" bool __real__ZN9SpiMaster13startDmaWriteEPKvm(SpiMaster*, const void*, size_t);
 
@@ -40,7 +41,12 @@ extern "C" bool __real__ZN9SpiMaster13startDmaWriteEPKvm(SpiMaster*, const void*
 extern "C" bool
 __wrap__ZN9SpiMaster13startDmaWriteEPKvm(SpiMaster* spi, const void* data, size_t size) {
     dmaPixels = static_cast<const uint8_t*>(data);
-    return __real__ZN9SpiMaster13startDmaWriteEPKvm(spi, data, size);
+    const bool started = __real__ZN9SpiMaster13startDmaWriteEPKvm(spi, data, size);
+    if (started && completeDmaImmediately) {
+        testSpi.SR &= ~SPI_FLAG_IDLE;
+        dmaIrq();
+    }
+    return started;
 }
 
 /** 追加硬件事件，不模拟发送耗时。 */
@@ -304,9 +310,18 @@ expectedPanelInit(bool dmaInit) {
     };
 
     const Command commands[] = {
-        {0x01, {}, 150},   {0xFE, {0x01}, 0}, {0x6A, {0x21}, 0}, {0xFE, {0x00}, 0},
-        {0xC4, {0x80}, 0}, {0x35, {0x00}, 0}, {0x51, {0xFF}, 0}, {0x3A, {0x05}, 0},
-        {0x20, {}, 0},     {0x11, {}, 500},   {0x29, {}, 500},   {0x36, {0x00}, 0},
+        {0x01, {}, 150},
+        {0xFE, {0x01}, 0},
+        {0x6A, {0x21}, 0},
+        {0xFE, {0x00}, 0},
+        {0xC4, {0x80}, 0},
+        {0x35, {0x00}, 0},
+        {0x51, {PRODUCT_DISPLAY_BRIGHTNESS_FADE ? 0x00 : 0xFF}, 0},
+        {0x3A, {0x05}, 0},
+        {0x20, {}, 0},
+        {0x11, {}, 500},
+        {0x29, {}, 500},
+        {0x36, {0x00}, 0},
     };
     bool first = true;
     for (const auto& command : commands) {
@@ -336,6 +351,27 @@ expectedPanelInit(bool dmaInit) {
     expected.push_back({"gpio", PB14, 1});
     return expected;
 }
+
+#if PRODUCT_DISPLAY_BRIGHTNESS_FADE
+/** @brief 当前 trace 中全部线上字节，供亮度命令断言使用。 */
+static std::vector<uint32_t>
+bytes() {
+    std::vector<uint32_t> result;
+    for (const auto& event : trace) {
+        if (event.op == "byte") {
+            result.push_back(event.a);
+        }
+    }
+    return result;
+}
+
+/** @brief 0x51 命令的完整事务；首字节发送前 SPI 已被 DMA 回收关闭。 */
+static std::vector<Event>
+brightnessTrace(uint8_t value) {
+    return {{"gpio", PB14, 0}, {"gpio", PB1, 0}, {"spi", ENABLE},  {"byte", 0x51},
+            {"gpio", PB1, 1},  {"byte", value},  {"gpio", PB14, 1}};
+}
+#endif
 
 /** 用真实 LVGL 注册的驱动执行 flush，验证窗口和 DMA，不运行 UI 定时器。 */
 static void
@@ -412,7 +448,12 @@ main() {
     assert(trace.empty());
     ++nowMs;
     lv_port_disp_poll();
-    expectTrace({{"channel", DISABLE}, {"spi", DISABLE}, {"gpio", PB14, 1}});
+    auto timeout_trace = std::vector<Event>{{"channel", DISABLE}, {"spi", DISABLE}, {"gpio", PB14, 1}};
+#if PRODUCT_DISPLAY_BRIGHTNESS_FADE
+    const auto full_brightness = brightnessTrace(0xFF);
+    timeout_trace.insert(timeout_trace.end(), full_brightness.begin(), full_brightness.end());
+#endif
+    expectTrace(timeout_trace);
     assert(display_dma_timeouts == 1);
 
     trace.clear();
@@ -437,6 +478,13 @@ main() {
     pollStep = 0;
     auto expected = expectedPanelInit(false);
     expected.insert(expected.begin(), {{"channel", DISABLE}, {"spi", DISABLE}, {"gpio", PB14, 1}});
+#if PRODUCT_DISPLAY_BRIGHTNESS_FADE
+    const auto reset_brightness = brightnessTrace(0xFF);
+    /** @brief fill 后 SPI 仍使能，亮度命令不重复使能。 */
+    auto reset_trace = reset_brightness;
+    reset_trace.erase(reset_trace.begin() + 2);
+    expected.insert(expected.end(), reset_trace.begin(), reset_trace.end());
+#endif
     expectTrace(expected);
     assert(display_dma_timeouts == 3);
 
@@ -450,6 +498,47 @@ main() {
     PanelRm690a0 withBacklight(board_display_spi, {PB14, PB1, PB2, PB4});
     withBacklight.enableBacklight();
     expectTrace({{"mode", PB4, GPIO_OUTPUT * 2}, {"gpio", PB4, 0}});
+
+#if PRODUCT_DISPLAY_BRIGHTNESS_FADE
+    /** @brief 首帧未发送时不亮；用实际 LVGL 三块刷新验证最后一块完成才启动。 */
+    lv_display_delete(display);
+    lv_port_disp_init();
+    display = lv_display_get_default();
+    trace.clear();
+    nowMs += 1500; /** @brief 模拟显示端口初始化后 App_Init 耗时 1.5 s。 */
+    lv_port_disp_poll();
+    assert(bytes().empty());
+    nowMs += 900; /** @brief 首帧较晚完成时，随后渐亮仍须完整运行 300 ms。 */
+    completeDmaImmediately = true;
+    lv_refr_now(display);
+    lv_port_disp_poll();
+    completeDmaImmediately = false;
+    trace.clear();
+    for (uint32_t elapsed = 16; elapsed <= 304; elapsed += 16) {
+        nowMs += 16;
+        lv_port_disp_poll();
+        const uint32_t value = elapsed >= 300 ? 255 : 255U * elapsed * (600U - elapsed) / 90000U;
+        assert((bytes() == std::vector<uint32_t>{0x51, value}));
+        assert(elapsed >= 300 || (value > 0 && value < 255));
+        trace.clear();
+    }
+    lv_port_disp_poll();
+    assert(trace.empty());
+    /** @brief 无任何刷新（也无动画/定时器）时，1 s 截止直接全亮。 */
+    lv_display_delete(display);
+    lv_port_disp_init();
+    display = lv_display_get_default();
+    trace.clear();
+    nowMs += 1500;
+    lv_port_disp_poll(); /** @brief 无刷新兜底从首次轮询起算，初始化后的等待不影响截止。 */
+    assert(bytes().empty());
+    nowMs += 999;
+    lv_port_disp_poll();
+    assert(bytes().empty());
+    ++nowMs;
+    lv_port_disp_poll();
+    assert((bytes() == std::vector<uint32_t>{0x51, 0xFF}));
+#endif
 
     trace.clear();
     uint8_t byte = 0;

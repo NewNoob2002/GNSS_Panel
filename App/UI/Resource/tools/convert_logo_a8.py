@@ -45,7 +45,8 @@ def blend565(foreground: int, background: int, alpha: int) -> int:
     return (value | (value >> 16)) & 0xffff
 
 
-def convert(source: codec.Image8, exclude_first_column: bool = False) -> Logo:
+def convert(source: codec.Image8, exclude_first_column: bool = False,
+            background: tuple | None = None, foreground: tuple | None = None) -> Logo:
     """估算单色遮罩并裁剪，拒绝非不透明或无前景的输入。"""
     if not source.opaque:
         raise codec.ConvertError("Logo 输入必须不透明")
@@ -53,8 +54,9 @@ def convert(source: codec.Image8, exclude_first_column: bool = False) -> Logo:
     retained = [p for n, p in enumerate(pixels) if not exclude_first_column or n % source.w]
     if not retained:
         raise codec.ConvertError("排除残留列后没有像素")
-    background = Counter(retained).most_common(1)[0][0]
-    foreground = max(retained, key=lambda p: sum((p[k] - background[k]) ** 2 for k in range(3)))
+    background = background if background is not None else Counter(retained).most_common(1)[0][0]
+    foreground = foreground if foreground is not None else max(
+        retained, key=lambda p: sum((p[k] - background[k]) ** 2 for k in range(3)))
     direction = [foreground[k] - background[k] for k in range(3)]
     denominator = sum(v * v for v in direction)
     if denominator == 0:

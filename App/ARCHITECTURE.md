@@ -55,7 +55,9 @@ Model 继承 DataNode，只订阅所需领域并立即 pull 首值；自有值�
 
 AppNavigator 是 UI 组装对象，其 20 ms LVGL 定时器消费 Power 边沿和 PageNavi 队列，繁忙切页后重试。页面点击仍同步调用 PageManager，以保留导航返回值、拒绝回滚和时序；PageNavi 仅供非 UI 请求。SystemLoading 期间只预加载 Dialplate 与 SaveConfig，每节拍最多新建一页。
 
-SystemLoading 的元数据从 Model 经 `dp::Init::info` 读取后交给 View，检查经 `dp::Init::poll` 执行。Logo 800 ms、50 ms 轮询、单步至少 300 ms、结果至少 150 ms、100% 停留 200 ms、Ready 停留 1000 ms 均保留；平台有界超时之外仍有 `kStepLimitMs = 35000` 兜底。失败记录为红色并继续后续步骤，Pending 不写入已完成结果，Begin 清除上次报告。
+SystemLoading 的元数据从 Model 经 `dp::Init::info` 读取后交给 View，检查经 `dp::Init::poll` 执行。Logo 1300 ms、50 ms 轮询、单步至少 300 ms、结果至少 150 ms、100% 停留 200 ms、Ready 停留 1000 ms 均保留；平台有界超时之外仍有 `kStepLimitMs = 35000` 兜底。失败记录为红色并继续后续步骤，Pending 不写入已完成结果，Begin 清除上次报告。
+
+Startup 与 SystemLoading 直接切页；冷启动首屏由 HC32 显示端口在完整首帧后用 DCS 0x51 渐亮 300 ms（产品开关控制），SDL 两后端用纹理亮度等效，Linux 不处理亮度、页面直接出现。SystemLoading 的静态零件表由 `UI/Resource/tools/split_logo_a8.py` 从 PNG 或 A8 C 资源生成，`UI/Common/LogoReveal` 单动画播放背景、逐组位移/透明度及窄高光，离页停止，根对象删除时清理。
 
 PageManager 拥有已注册页面；导航结果必须显式比较 `PageManager::RES_TYPE::OK`（值为 0）。各页保留 260 ms 缓出位移过渡，建页耗时不计入动画；根对象异步删除前清理动画、控件与外部样式引用。双键输入和 SDL 输入各用既有归一化路径，页面成员通过 getter 访问。
 

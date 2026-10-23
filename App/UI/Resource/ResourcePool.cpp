@@ -1,5 +1,6 @@
 #include "ResourcePool.h"
 #include "ResourceManager.h"
+#include "LogoParts.h"
 #include <cstring>
 
 extern "C" {
@@ -61,13 +62,6 @@ LV_IMAGE_DECLARE(img_src_system_dash_return);
 LV_IMAGE_DECLARE(img_src_ntrip);
 LV_IMAGE_DECLARE(img_src_NationalFlag_EN);
 LV_IMAGE_DECLARE(img_src_NationalFlag_RU);
-#if defined(RGK_LOGO_USE)
-LV_IMAGE_DECLARE(img_src_RGKLogo);
-#elif defined(MIDDLE_LOGO_USE)
-LV_IMAGE_DECLARE(img_src_MiddleLogo);
-#else
-LV_IMAGE_DECLARE(img_src_startupLogo);
-#endif // RGK_LOGO_USE
 }
 namespace {
 /** 静态资源名使用字符串内容比较，空名称按未找到处理。 */
@@ -137,11 +131,11 @@ Images::KEY_PAIR images[] = {
     {"NationalFlag_EN", &img_src_NationalFlag_EN},
     {"NationalFlag_RU", &img_src_NationalFlag_RU},
 #if defined(RGK_LOGO_USE)
-    {"RGKLogo", &img_src_RGKLogo},
+    {"RGKLogoParts", &img_src_RGKLogo_parts},
 #elif defined(MIDDLE_LOGO_USE)
-    {"MiddleLogo", &img_src_MiddleLogo},
+    {"MiddleLogoParts", &img_src_MiddleLogo_parts},
 #else
-    {"startupLogo", &img_src_startupLogo},
+    {"startupLogoParts", &img_src_startupLogo_parts},
 #endif // RGK_LOGO_USE
 };
 Fonts font_(fonts, sizeof(fonts) / sizeof(fonts[0]), same_name, LV_FONT_DEFAULT);

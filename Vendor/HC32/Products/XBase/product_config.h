@@ -21,6 +21,8 @@
 
 /* 画面在屏幕玻璃上的水平偏移（见 X1Pro）；XBase 外壳不遮挡。 */
 #define PRODUCT_DISPLAY_X_SHIFT             0
+/** @brief 首帧完成后渐亮；上板验证 DCS 0x51 后可按产品关闭。 */
+#define PRODUCT_DISPLAY_BRIGHTNESS_FADE     1
 
 // 2.4.5 关闭 MIDDLE_LOGO_USE
 // 2.4.6 注释外部供电变化后的复位逻辑

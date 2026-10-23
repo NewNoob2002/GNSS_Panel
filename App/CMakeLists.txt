@@ -62,6 +62,7 @@ add_subdirectory(../Frameworks/PageManager frameworks/pagemanager)
 file(GLOB APP_RESOURCES CONFIGURE_DEPENDS "UI/Resource/font/*.c" "UI/Resource/img/*.c" "UI/Resource/symbol/*.c")
 add_library(app_dialplate STATIC
     UI/Common/FocusHighlight.cpp
+    UI/Common/LogoReveal.cpp
     UI/Dialplate/DialplateView.cpp
     UI/Resource/ResourcePool.cpp
     Utils/lv_anim_label/numberFlow.cpp

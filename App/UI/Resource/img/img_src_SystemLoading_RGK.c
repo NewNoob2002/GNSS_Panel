@@ -2363,3 +2363,10 @@ const lv_image_dsc_t img_src_RGKLogo = {
 /* Logo 布局：底色、前景色及原画面中的裁剪偏移。 */
 #include "UI/Resource/LogoLayout.h"
 const system_loading_logo_layout_t img_src_RGKLogo_layout = {0xffffff, 0xde2821, 0, 0};
+
+#include "UI/Resource/LogoParts.h"
+/** @brief 彩色整屏资源保留原像素，仅整体入场，不着色且关闭白底高光。 */
+static const logo_part_t rgk_parts[] = {{&img_src_RGKLogo, 0, 0, 0}};
+const logo_parts_t img_src_RGKLogo_parts = {
+    rgk_parts, NULL, 1, 1, {0xffffff, 0xde2821, 0, 0}, 294, 126, false, false
+};

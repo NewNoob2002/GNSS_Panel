@@ -19,6 +19,8 @@ class PanelRm690a0 {
 
     /** 完整重复本地旧库的双复位、初始化表、rotation 2；SPI 初始化失败返回 false，不初始化 DMA。 */
     bool init();
+    /** @brief 主循环中同步写入 DCS 0x51（0..255）；调用者保证无 DMA 或 SPI 在途。 */
+    void setBrightness(uint8_t brightness);
     /** 设置含首尾坐标的物理窗口，调用者先 select；不操作 CS，末尾保持 DC 为数据模式。 */
     void setWindow(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2);
     /** 同步填充全屏，RGB565 高字节先发；函数自行选中与释放 CS。 */

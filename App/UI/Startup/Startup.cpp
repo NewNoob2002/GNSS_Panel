@@ -7,7 +7,7 @@
 using namespace page;
 
 void Startup::onInstalled() {
-    setLoadAnimType(PAGE_ANIM::OVER_BOTTOM);
+    setLoadAnimType(PAGE_ANIM::NONE);
     setLoadAnimTime(style::kPageTransitionMs);
     setLoadAnimPath(lv_anim_path_ease_out);
 }

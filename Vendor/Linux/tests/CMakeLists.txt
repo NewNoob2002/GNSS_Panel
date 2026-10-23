@@ -30,6 +30,13 @@ target_link_libraries(app_navigation_preview PRIVATE linux::demo_backend app::ha
 target_compile_options(app_navigation_preview PRIVATE -Wall -Wextra -Werror -UNDEBUG)
 add_test(NAME app_navigation_preview COMMAND app_navigation_preview)
 
+add_executable(app_logo_reveal_test app_logo_reveal_test.cpp)
+target_link_libraries(app_logo_reveal_test PRIVATE app::ui)
+target_compile_definitions(app_logo_reveal_test PRIVATE
+    LOGO_REFERENCE_DIR="${SHARED_APP_DIR}/UI/Resource/tools/logos")
+target_compile_options(app_logo_reveal_test PRIVATE -Wall -Wextra -Werror -UNDEBUG)
+add_test(NAME app_logo_reveal COMMAND app_logo_reveal_test)
+
 add_executable(app_spring_test app_spring_test.cpp)
 target_link_libraries(app_spring_test PRIVATE app::ui)
 target_compile_options(app_spring_test PRIVATE -Wall -Wextra -Werror -UNDEBUG)

@@ -12,6 +12,10 @@ void lv_port_disp_init();
 void lv_port_disp_poll();
 
 void lv_port_reset();
+#if defined(__CORE_DEBUG)
+/** @brief 仅 Debug：主线程/GDB 调用，等待 DMA 回收后写 0x51；value 为 0..255，禁止 ISR 调用。 */
+void lv_port_debug_brightness(uint8_t value);
+#endif
 #if defined(__CORE_DEBUG) && (defined(__arm__) || defined(__thumb__))
 /**
  * @brief 返回 MSP 栈涂色高水位字节数；涂色失败返回零。
