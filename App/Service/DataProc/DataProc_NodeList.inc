@@ -1,0 +1,13 @@
+// 十二个领域与编排节点；销毁时逆序执行。
+DP_DEF(Power)
+DP_DEF(Battery)
+DP_DEF(GNSS)
+DP_DEF(Clock)
+DP_DEF(Work)
+DP_DEF(Recorder)
+DP_DEF(WiFi)
+DP_DEF(Version)
+DP_DEF(Init)
+DP_DEF(Settings)
+DP_DEF(Button)
+DP_DEF(PageNavi)

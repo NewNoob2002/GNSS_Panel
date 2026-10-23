@@ -6,8 +6,10 @@
     ],
     "settings": {
         "terminal.integrated.shellIntegration.enabled": false,
+        "cmake.useCMakePresets": "always",
         "clangd.arguments": [
-            "--header-insertion=never"
+            "--header-insertion=never",
+            "--query-driver=**/arm-none-eabi-gcc*,**/arm-none-eabi-g++*"
         ],
         "files.autoGuessEncoding": true,
         "C_Cpp.errorSquiggles": "disabled",

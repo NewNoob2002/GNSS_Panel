@@ -1,0 +1,23 @@
+#pragma once
+
+#include <memory>
+#include "SystemInfosModel.h"
+#include "SystemInfosView.h"
+#include "PageBase.h"
+
+namespace page {
+class SystemInfos final : public PageBase {
+  public:
+    void onInstalled() override;
+    void onViewLoad() override;
+    void onViewWillAppear() override;
+    void onViewWillDisappear() override;
+    void onViewUnload() override;
+    void onLanguageChanged() override;
+
+  private:
+    static void clicked(lv_event_t* event);
+    SystemInfosView view_{};
+    std::unique_ptr<SystemInfosModel> model_;
+};
+} // namespace page

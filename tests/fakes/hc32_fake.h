@@ -1,13 +1,13 @@
 #pragma once
+#include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <string>
 
 using IRQn_Type = int;
 using en_int_src_t = int;
 using func_ptr_t = void (*)();
-using gpio_pin_t = int;
-using voidFuncPtrWithArg = void (*)(void*);
 using en_flag_status_t = int;
 
 struct CM_I2C_TypeDef {
@@ -21,6 +21,7 @@ struct FakeGpio {
 
 extern CM_I2C_TypeDef fake_i2c1, fake_i2c2;
 extern FakeGpio fake_gpio;
+
 #define CM_I2C1                     (&fake_i2c1)
 #define CM_I2C2                     (&fake_i2c2)
 #define CM_GPIO                     (&fake_gpio)
@@ -35,12 +36,12 @@ extern FakeGpio fake_gpio;
 #define GPIO_PORT_A                 0
 #define GPIO_PIN_03                 3
 #define GPIO_PIN_02                 2
+#define GPIO_PIN_08                 (1U << 8)
+#define GPIO_PIN_09                 (1U << 9)
 #define GPIO_FUNC_49                49
 #define GPIO_FUNC_48                48
 #define GPIO_FUNC_51                51
 #define GPIO_FUNC_50                50
-#define PA9                         9
-#define PA8                         8
 #define INT005_IRQn                 5
 #define INT006_IRQn                 6
 #define INT004_IRQn                 4
@@ -93,10 +94,17 @@ struct stc_irq_signin_config_t {
 extern func_ptr_t fake_irqs[16];
 extern uint32_t fake_ms, fake_primask, fake_slave_initializations, fake_master_resets;
 extern int fake_io_error, fake_receive_error, fake_slave_init_error;
+extern int fake_master_init_error;
+extern char fake_master_failure;
+extern std::string fake_master_trace;
+extern stc_i2c_init_t fake_master_config;
 extern uint8_t fake_address, fake_register;
 extern uint16_t fake_registers[128][256];
 extern uint32_t fake_master_writes;
 extern int fake_pins[32];
+inline uint32_t fake_fcg1_clock;
+inline int fake_mux_pin, fake_mux_function;
+inline CM_I2C_TypeDef* fake_master_regs;
 
 inline uint32_t
 __get_PRIMASK() {
@@ -132,9 +140,6 @@ millis() {
 }
 
 inline void
-lv_timer_handler() {}
-
-inline void
 GPIO_REG_Unlock() {
     fake_gpio.PWPR = 1;
 }
@@ -145,13 +150,28 @@ GPIO_REG_Lock() {
 }
 
 inline void
-GPIO_SetFunc(int, int, int) {}
+GPIO_SetFunc(int port, int pin, int function) {
+    if (pin == GPIO_PIN_09 || pin == GPIO_PIN_08) {
+        assert(port == GPIO_PORT_A);
+        assert(function == (pin == GPIO_PIN_09 ? GPIO_FUNC_51 : GPIO_FUNC_50));
+    }
+}
 
+/** 核对主板 I2C 复用配置；其他引脚由独立配置回归覆盖。 */
 inline void
-GPIO_SetFunction(int, int) {}
+GPIO_SetFunction(int pin, int function) {
+    fake_mux_pin = pin;
+    fake_mux_function = function;
+    if (pin == 9 || pin == 8) {
+        assert(function == (pin == 9 ? GPIO_FUNC_51 : GPIO_FUNC_50));
+    }
+}
 
+/** 记录使能的外设时钟，验证驱动使用调用方配置。 */
 inline void
-FCG_Fcg1PeriphClockCmd(int, int) {}
+FCG_Fcg1PeriphClockCmd(int clock, int) {
+    fake_fcg1_clock = clock;
+}
 
 inline void
 NVIC_DisableIRQ(int) {}
@@ -179,6 +199,7 @@ INTC_IrqSignIn(const stc_irq_signin_config_t* config) {
 
 inline int32_t
 I2C_DeInit(CM_I2C_TypeDef* unit) {
+    fake_master_regs = unit;
     unit->SR = 0;
     return LL_OK;
 }
@@ -190,12 +211,13 @@ I2C_StructInit(stc_i2c_init_t* config) {
 }
 
 inline int32_t
-I2C_Init(CM_I2C_TypeDef* unit, const stc_i2c_init_t*, float*) {
+I2C_Init(CM_I2C_TypeDef* unit, const stc_i2c_init_t* config, float*) {
     if (unit == CM_I2C1) {
         ++fake_slave_initializations;
         return fake_slave_init_error;
     }
-    return LL_OK;
+    fake_master_config = *config;
+    return fake_master_init_error;
 }
 
 inline void
@@ -205,16 +227,32 @@ inline void
 I2C_IntCmd(CM_I2C_TypeDef*, uint32_t, int) {}
 
 inline void
-I2C_Cmd(CM_I2C_TypeDef*, int) {}
+I2C_Cmd(CM_I2C_TypeDef* unit, int enabled) {
+    if (unit == CM_I2C2) {
+        fake_master_trace += enabled ? 'E' : 'e';
+    }
+}
 
 inline void
-I2C_BusWaitCmd(CM_I2C_TypeDef*, int) {}
+I2C_BusWaitCmd(CM_I2C_TypeDef* unit, int enabled) {
+    if (unit == CM_I2C2) {
+        assert(enabled == ENABLE);
+        fake_master_trace += 'B';
+    }
+}
 
 inline void
-I2C_AckConfig(CM_I2C_TypeDef*, int) {}
+I2C_AckConfig(CM_I2C_TypeDef* unit, int ack) {
+    if (unit == CM_I2C2) {
+        fake_master_trace += ack == I2C_ACK ? 'A' : 'N';
+    }
+}
 
 inline void
 I2C_SWResetCmd(CM_I2C_TypeDef* unit, int enabled) {
+    if (unit == CM_I2C2) {
+        fake_master_trace += enabled ? 'R' : 'r';
+    }
     if (enabled) {
         unit->SR = 0;
         ++fake_master_resets;
@@ -245,30 +283,40 @@ I2C_ReadData(CM_I2C_TypeDef* unit) {
 }
 
 inline int32_t
-I2C_Start(CM_I2C_TypeDef*, uint32_t) {
-    return fake_io_error;
+fake_master_step(char step, uint32_t timeout) {
+    assert(timeout == 0x40000UL);
+    fake_master_trace += step;
+    return fake_master_failure == step ? LL_ERR : fake_io_error;
+}
+
+/** 记录事务接收到的寄存器实例，验证无固定外设依赖。 */
+inline int32_t
+I2C_Start(CM_I2C_TypeDef* unit, uint32_t timeout) {
+    fake_master_regs = unit;
+    return fake_master_step('S', timeout);
 }
 
 inline int32_t
-I2C_Stop(CM_I2C_TypeDef*, uint32_t) {
-    return fake_io_error;
+I2C_Stop(CM_I2C_TypeDef*, uint32_t timeout) {
+    return fake_master_step('P', timeout);
 }
 
 inline int32_t
-I2C_Restart(CM_I2C_TypeDef*, uint32_t) {
-    return fake_io_error;
+I2C_Restart(CM_I2C_TypeDef*, uint32_t timeout) {
+    return fake_master_step('T', timeout);
 }
 
 inline int32_t
-I2C_TransAddr(CM_I2C_TypeDef*, uint8_t address, int, uint32_t) {
+I2C_TransAddr(CM_I2C_TypeDef*, uint8_t address, int direction, uint32_t timeout) {
     fake_address = address;
-    return fake_io_error;
+    return fake_master_step(direction == I2C_DIR_TX ? 'W' : 'V', timeout);
 }
 
 inline int32_t
-I2C_TransData(CM_I2C_TypeDef*, const uint8_t* data, size_t length, uint32_t) {
-    if (fake_io_error) {
-        return fake_io_error;
+I2C_TransData(CM_I2C_TypeDef*, const uint8_t* data, size_t length, uint32_t timeout) {
+    const int32_t result = fake_master_step('D', timeout);
+    if (result != LL_OK) {
+        return result;
     }
     fake_register = data[0];
     if (length == 2U) {
@@ -279,7 +327,11 @@ I2C_TransData(CM_I2C_TypeDef*, const uint8_t* data, size_t length, uint32_t) {
 }
 
 inline int32_t
-I2C_MasterReceiveDataAndStop(CM_I2C_TypeDef*, uint8_t* data, uint8_t length, uint32_t) {
+I2C_MasterReceiveDataAndStop(CM_I2C_TypeDef*, uint8_t* data, uint32_t length, uint32_t timeout) {
+    const int32_t result = fake_master_step('G', timeout);
+    if (result != LL_OK) {
+        return result;
+    }
     const uint16_t value = fake_registers[fake_address][fake_register];
     data[0] = value & 255U;
     if (fake_receive_error) {
@@ -291,8 +343,6 @@ I2C_MasterReceiveDataAndStop(CM_I2C_TypeDef*, uint8_t* data, uint8_t length, uin
     return LL_OK;
 }
 
-#define OUTPUT                                  1
-#define INPUT_PULLUP                            2
 #define HIGH                                    1
 #define LOW                                     0
 #define POWER_CONTROL_PIN                       0
@@ -313,30 +363,15 @@ I2C_MasterReceiveDataAndStop(CM_I2C_TypeDef*, uint8_t* data, uint8_t length, uin
 #define CM_VALUE_IN_RANGE(value, low, high)     ((value) >= (low) && (value) <= (high))
 #define CM_SET_VALUE_IN_RANGE(value, low, high) ((value) < (low) ? (low) : (value) > (high) ? (high) : (value))
 
+inline int fake_software_reset = RESET;
+
 inline int
 RMU_GetStatus(int) {
-    return RESET;
+    return fake_software_reset;
 }
 
+/** Consume the seeded reset reason after Power_Init reads it. */
 inline void
-RMU_ClearStatus() {}
-
-inline void
-pinMode(int pin, int, int value = 0) {
-    fake_pins[pin] = value;
-}
-
-inline int
-digitalRead(int pin) {
-    return fake_pins[pin];
-}
-
-inline void
-digitalWrite(int pin, int value) {
-    fake_pins[pin] = value;
-}
-
-inline void
-digitalToggle(int pin) {
-    fake_pins[pin] ^= 1;
+RMU_ClearStatus() {
+    fake_software_reset = RESET;
 }

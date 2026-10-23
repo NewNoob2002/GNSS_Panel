@@ -1,0 +1,7 @@
+if(HC32_CONFIG_ONLY)
+    include(${CMAKE_CURRENT_LIST_DIR}/../config.cmake)
+    return()
+endif()
+add_library(hc32_product_xbase INTERFACE)
+add_library(hc32::product_xbase ALIAS hc32_product_xbase)
+target_link_libraries(hc32_product_xbase INTERFACE hc32::display)

@@ -1,0 +1,7 @@
+add_library(hc32_ddl_headers INTERFACE)
+add_library(hc32::ddl_headers ALIAS hc32_ddl_headers)
+target_include_directories(hc32_ddl_headers INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/inc)
+file(GLOB DDL_SOURCES CONFIGURE_DEPENDS src/*.c)
+add_library(hc32_ddl OBJECT ${DDL_SOURCES})
+add_library(hc32::ddl ALIAS hc32_ddl)
+target_link_libraries(hc32_ddl PUBLIC hc32::cmsis hc32::ddl_headers hc32::hardware_port)

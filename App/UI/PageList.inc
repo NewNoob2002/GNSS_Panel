@@ -1,0 +1,10 @@
+// 顺序保持原 App::init 的安装顺序；路由名仍为 Pages/<Name>。
+PAGE_DEF(Dialplate, always_install)
+PAGE_DEF(WorkSettings, always_install)
+PAGE_DEF(RecordConfig, always_install)
+PAGE_DEF(SystemInfos, always_install)
+PAGE_DEF(SystemDash, always_install)
+PAGE_DEF(StarMap, has_star_map)
+PAGE_DEF(Startup, always_install)
+PAGE_DEF(SystemLoading, always_install)
+PAGE_DEF(SaveConfig, always_install)

@@ -1,0 +1,7 @@
+add_subdirectory(MillisTaskManager)
+add_subdirectory(Parser)
+add_subdirectory(SEGGER_RTT)
+add_subdirectory(easylogger)
+if(NOT PRODUCT_HAS_DISPLAY)
+    add_subdirectory(MultiButton)
+endif()

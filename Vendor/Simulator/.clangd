@@ -1,0 +1,6 @@
+CompileFlags:
+  # 使用模拟器自身的 SDL、虚拟 HAL 和共享应用编译参数。
+  CompilationDatabase: ../../build/simulator-x1pro
+  Compiler: /usr/bin/c++
+Index:
+  Background: Build

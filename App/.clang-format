@@ -1,0 +1,3 @@
+# 本目录与 Frameworks/ 以本仓库为唯一来源，保持既有格式配置。
+DisableFormat: true
+SortIncludes: Never

@@ -31,7 +31,7 @@ App Flash 范围已改为 `[0x8000, 0x7A000)`，与 Boot 的 32 KiB 分区、元
 - 电源控制独立于 LVGL 动画回调；开机长按由 HAL 时间判定，UI 显示和页面切换跟随状态。
 - 低电量计时从 LED 更新迁入电源策略，按实际连续时间判断；采样无效、充电或条件恢复时重置；包含 0% 电量。
 - BQ/MP 寄存器读取显式检查完整字节数，失败不发布部分结果；采样状态与最后成功时间分开记录；避免零容量除法。
-- I²C2 的错误出口统一 STOP、ACK 恢复及外设关闭；`endTransmission()` 按 Arduino 约定成功返回 0。
+- I²C2 的错误出口统一 STOP、ACK 恢复及外设关闭；`I2cMaster` 的 `write`/`writeRead`/`probe` 以 `bool` 返回事务是否完整成功。
 - 充电控制读失败时不继续读改写寄存器；GPIO 充电方案补充过温后的恢复路径，样本失效时禁止充电。
 - `_sbrk` 改用真正的堆起点与上限，检查扩展和回收越界；C++ 普通 `new` 失败终止，nothrow 路径显式返回空指针。
 - 堆栈段声明为可分配 NOBITS、链接为 NOLOAD 并 KEEP，构建报告计入全部 8 KiB 堆与 8 KiB 栈，断言防止预留被回收。
@@ -48,11 +48,11 @@ cmake --preset gcc-debug
 cmake --build --preset gcc-debug
 cmake --preset gcc-release
 cmake --build --preset gcc-release
-cmake -S Simulator -B build/simulator -DCMAKE_BUILD_TYPE=Debug
-cmake --build build/simulator -j4
+cmake --preset simulator-x1pro
+cmake --build --preset simulator-x1pro -j4
 cmake -S tests -B build/host-tests -G Ninja -DCMAKE_BUILD_TYPE=Debug \
   -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-  -DSIMULATOR_EXECUTABLE="$PWD/Simulator/build/bin/main"
+  -DSIMULATOR_EXECUTABLE="$PWD/build/simulator-x1pro/bin/main"
 cmake --build build/host-tests -j4
 ctest --test-dir build/host-tests --output-on-failure
 ```

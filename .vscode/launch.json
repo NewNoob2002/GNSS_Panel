@@ -12,7 +12,7 @@
             "servertype": "jlink",
             "device": "HC32F460xE",
             "interface": "swd",
-            "svdFile": "${workspaceFolder}/Platform/CMSIS/Device/HDSC/hc32f4xx/Source/GCC/svd/HC32F460.svd",
+            "svdFile": "${workspaceFolder}/Vendor/HC32/Platform/CMSIS/Device/HDSC/hc32f4xx/Source/GCC/svd/HC32F460.svd",
             "rttConfig": {
                 "enabled": true,
                 "address": "auto",

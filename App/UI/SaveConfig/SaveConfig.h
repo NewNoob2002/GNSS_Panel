@@ -1,0 +1,30 @@
+#pragma once
+
+#include <memory>
+#include "SaveConfigModel.h"
+#include "SaveConfigView.h"
+#include "PageBase.h"
+
+namespace page {
+/** Power-off progress. A user action is committed when the progress ends (cancellable before); a platform
+ * shutdown only shows its cause. Leaving for Startup follows the platform's standby report.
+ */
+class SaveConfig final : public PageBase {
+  public:
+    void onInstalled() override;
+    void onViewLoad() override;
+    void onViewWillAppear() override;
+    void onViewDidAppear() override;
+    void onViewWillDisappear() override;
+    void onViewUnload() override;
+    void onLanguageChanged() override;
+    bool onBackRequest() override;
+
+  private:
+    void cancel_timer();
+    static void on_timeout(lv_timer_t* timer);
+    SaveConfigView view_{};
+    std::unique_ptr<SaveConfigModel> model_;
+    lv_timer_t* timer_ = nullptr;
+};
+} // namespace page

@@ -1,0 +1,246 @@
+/*
+ * MIT License
+ * Copyright (c) 2018-2020 _VIFEXTech
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the follo18wing conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+#include "MillisTaskManager.h"
+
+#define TASK_NEW(task) do{task = new Task_t;                    \
+                        if(task == nullptr){return nullptr;}    \
+                        }while(0)                               \
+
+#define TASK_DEL(task) do{delete task;}while(0)
+
+/**
+  * @brief  初始化任务列表
+  * @param  priorityEnable:设定是否开启优先级
+  * @retval 无
+  */
+MillisTaskManager::MillisTaskManager(const  bool priorityEnable)
+{
+    PriorityEnable = priorityEnable;
+    Head = nullptr;
+    Tail = nullptr;
+}
+
+/**
+  * @brief  调度器析构，释放任务链表内存
+  * @param  无
+  * @retval 无
+  */
+MillisTaskManager::~MillisTaskManager()
+{
+    /*移动到链表头*/
+    const Task_t* now = Head;
+    while(true)
+    {
+        /*当前节点是否为空*/
+        if(now == nullptr)
+            break;
+
+        /*将当前节点缓存，等待删除*/
+        const Task_t* now_del = now;
+
+        /*移动到下一个节点*/
+        now = now->Next;
+
+        /*删除当前节点内存*/
+        TASK_DEL(now_del);
+    }
+}
+
+/**
+  * @brief  往任务链表添加一个任务，设定间隔执行时间
+  * @param  func:任务函数指针
+  * @param  timeMs:周期时间设定(毫秒)
+  * @param  userData: 用户数据指针
+  * @param  state:任务开关
+  * @retval 任务节点地址
+  */
+MillisTaskManager::Task_t* MillisTaskManager::Register(const TaskFunction_t func, const uint32_t timeMs, void *userData, const bool state)
+{
+    /*寻找当前函数*/
+    Task_t* task = Find(func);
+    
+    /*如果被注册*/
+    if(task != nullptr)
+    {
+        /*更新信息*/
+        task->Time = timeMs;
+        task->State = state;
+        return task;
+    }
+
+    /*为新任务申请内存*/
+    TASK_NEW(task);
+
+    task->Function = func;        //任务回调函数
+    task->userData = userData;    //用户数据指针
+    task->Time = timeMs;          //任务执行周期
+    task->State = state;          //任务状态
+    task->TimePrev = 0;           //上一次时间
+    task->TimeCost = 0;           //时间开销
+    task->TimeError = 0;          //误差时间
+    task->Next = nullptr;            //下一个节点
+    
+    /*如果任务链表为空*/
+    if(Head == nullptr)
+    {
+        /*将当前任务作为链表的头*/
+        Head = task;
+    }
+    else
+    {
+        /*从任务链表尾部添加任务*/
+        Tail->Next = task;
+    }
+    
+    /*将当前任务作为链表的尾*/
+    Tail = task;
+    return task;
+}
+
+/**
+  * @brief  寻找任务,返回任务节点
+  * @param  func:任务函数指针
+  * @retval 任务节点地址
+  */
+MillisTaskManager::Task_t* MillisTaskManager::Find(const TaskFunction_t func) const
+{
+    Task_t* now = Head;
+    Task_t* task = nullptr;
+    while(true)
+    {
+        if(now == nullptr)//当前节点是否为空
+            break;
+
+        if(now->Function == func)//判断函数地址是否相等
+        {
+            task = now;
+            break;
+        }
+
+        now = now->Next;//移动到下一个节点
+    }
+    return task;
+}
+
+#if (MTM_USE_CPU_USAGE == 1)
+#include <delay.h>                  // 需要使用 micros()
+static uint32_t UserFuncLoopUs = 0; //累计时间
+/**
+  * @brief  获取CPU占用率
+  * @param  无
+  * @retval CPU占用率，0~100%
+  */
+float MillisTaskManager::GetCPU_Usage()
+{
+    static uint32_t MtmStartUs;
+    float usage = (float)UserFuncLoopUs / (micros() - MtmStartUs) * 100.0f;
+
+    if(usage > 100.0f)
+        usage = 100.0f;
+
+    MtmStartUs = micros();
+    UserFuncLoopUs = 0;
+    return usage;
+}
+#endif
+
+/**
+  * @brief  时间差判定
+  * @param  nowTick:当前时间
+  * @param  prevTick:上一个时间
+  * @retval 时间差
+  */
+uint32_t MillisTaskManager::GetTickElaps(const uint32_t nowTick, uint32_t prevTick)
+{
+    if(const uint32_t actTime = nowTick; actTime >= prevTick)
+    {
+        prevTick = actTime - prevTick;
+    }
+    else
+    {
+        prevTick = /*UINT32_MAX*/0xFFFFFFFF - prevTick + 1;
+        prevTick += actTime;
+    }
+
+    return prevTick;
+}
+
+/**
+  * @brief  调度器(内核)
+  * @param  tick:提供一个精确到毫秒的系统时钟变量
+  * @retval 无
+  */
+void MillisTaskManager::Running(const uint32_t tick)
+{
+    Task_t* now = Head;
+    while(true)
+    {
+        /*当前节点是否为空*/
+        if(now == nullptr)
+        {
+            /*遍历结束*/
+            break;
+        }
+
+        if(now->Function != nullptr && now->State)
+        {
+            if(const uint32_t elapsTime = GetTickElaps(tick, now->TimePrev); elapsTime >= now->Time)
+            {
+                /*获取时间误差，误差越大实时性越差*/
+                now->TimeError = elapsTime - now->Time;
+                
+                /*记录时间点*/
+                now->TimePrev = tick;
+
+#if (MTM_USE_CPU_USAGE == 1)
+                /*记录开始时间*/
+                uint32_t start = micros();
+                
+                /*执行任务*/
+                now->Function();
+                
+                /*获取执行时间*/
+                uint32_t timeCost = micros() - start;
+                
+                /*记录执行时间*/
+                now->TimeCost = timeCost;
+                
+                /*总时间累加*/
+                UserFuncLoopUs += timeCost;
+#else
+                now->Function(now->userData);
+#endif
+                
+                /*判断是否开启优先级*/
+                if(PriorityEnable)
+                {
+                    /*遍历结束*/
+                    break;
+                }
+            }
+        }
+
+        /*移动到下一个节点*/
+        now = now->Next;
+    }
+}

@@ -37,7 +37,10 @@
                 "x1pro-debug",
                 "x1pro-release",
                 "xbase-debug",
-                "xbase-release"
+                "xbase-release",
+                "simulator-x1pro",
+                "simulator-xbase",
+                "linux-host"
             ],
             "default": "x1pro-debug"
         }
