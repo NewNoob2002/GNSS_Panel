@@ -88,7 +88,9 @@ add_library(app_ui STATIC
     UI/SystemLoading/SystemLoadingModel.cpp
     UI/SaveConfig/SaveConfigModel.cpp
     UI/StatusBar/StatusBar.cpp
+    UI/StatusBar/StatusBarModel.cpp
     UI/BatteryWarning/BatteryWarning.cpp
+    UI/BatteryWarning/BatteryWarningModel.cpp
     UI/Dialplate/Dialplate.cpp
     UI/WorkSettings/WorkSettings.cpp
     UI/WorkSettings/WorkSettingsView.cpp

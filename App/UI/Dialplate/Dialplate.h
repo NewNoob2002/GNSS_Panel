@@ -2,6 +2,7 @@
 
 #include "DialplateModel.h"
 
+#include <memory>
 #include <array>
 #include "DialplateView.h"
 #include "PageBase.h"
@@ -20,7 +21,7 @@ class Dialplate final : public PageBase {
     std::array<lv_obj_t*, 5> controls() const;
     static void clicked(lv_event_t* event);
     DialplateView view_{};
-    DialplateModel model_;
+    std::unique_ptr<DialplateModel> model_;
     lv_obj_t* last_focus_ = nullptr;
     bool entrance_pending_ = true; // Play the entrance once per load (boot), not on every return.
 };

@@ -3,30 +3,11 @@
 #include <memory>
 #include "Utils/lv_anim_label/numberFlow.h"
 #include "Utils/lv_anim_label/numberFlow_clock.h"
-#include "DataProc/DataProc.h"
+#include "StatusBarModel.h"
 
 namespace page {
 
-/** 状态由调用方提供；此 View 不读取板级或业务全局变量。数值仅在 LVGL 线程更新。 */
-struct StatusBarState {
-    unsigned satellites = 0;
-    bool satellites_valid = false;
-    const char* position = "DEMO";
-    lv_color_t position_color = lv_color_hex(0xf44336);
-    unsigned hour = 0;
-    unsigned minute = 0;
-    unsigned second = 0;
-    bool clock_valid = false;
-    bool recording = false;
-    bool wifi = false;
-    unsigned battery_percent = 0;
-    bool battery_valid = false;
-    bool charging = false;
-    float battery_voltage = 7.60f;
-    bool battery_temperature_valid = false;
-    float battery_temperature = 25.0f; // Celsius; drives the optional BatteryWarning banner.
-};
-
+/** @brief 自治状态栏 View；控件与动画仅由本对象在应用线程修改。 */
 class StatusBar {
   public:
     StatusBar() = default;
@@ -48,14 +29,15 @@ class StatusBar {
   private:
     static void set_y(void* obj, int32_t y);
     static bool on_presentation(void* owner, const DataProc::StatusBarPresentation& request);
-    static int on_event(DataNode* account, DataNode::EventParam_t* event);
+    static void on_state(lv_observer_t* observer, lv_subject_t* subject);
     /** SD 图标跟随录制状态：滑出状态栏 -> 换色 -> 滑回；录制中滑回后持续闪烁。目标变化可随时打断。 */
     void sd_show(bool recording);
     static void sd_slide(void* obj, int32_t y);
     static void sd_blink(void* obj, int32_t opa);
     static void sd_hidden(lv_anim_t* animation);
     static void sd_entered(lv_anim_t* animation);
-    std::unique_ptr<DataNode> account_;
+    std::unique_ptr<StatusBarModel> model_;
+    lv_observer_t* observer_ = nullptr;
     lv_obj_t* root_ = nullptr;
     bool visible_ = false;
     lv_obj_t* position_icon_ = nullptr;

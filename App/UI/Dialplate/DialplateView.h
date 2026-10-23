@@ -1,7 +1,8 @@
 #ifndef DIALPLATE_VIEW_H
 #define DIALPLATE_VIEW_H
 
-#include "DataProc/DataProc_Def.h"
+#include <array>
+#include "DialplateModel.h"
 #include "Utils/lv_anim_label/numberFlow.h"
 #include "lvgl.h"
 
@@ -15,7 +16,7 @@ class DialplateView {
         int32_t transform_height;
     } TransformInfo_t;
 
-  public:
+  private:
     struct {
         struct {
             lv_obj_t* cont;
@@ -45,6 +46,17 @@ class DialplateView {
         lv_anim_timeline_t* anim_timeline;
     } ui;
 
+  public:
+    /** @brief 控件只读引用用于布局验证；Presenter 通过语义控件接口转发输入。 */
+    const auto& widgets() const { return ui; }
+    enum class Control { Work, Record, Menu, Power, Satellite, None };
+    std::array<lv_obj_t*, 5> controls(bool star_map) const;
+    lv_obj_t* default_focus() const { return ui.btn_cont.btn_menu; }
+    Control control(const lv_obj_t* object) const;
+    /** @brief 绑定时立即渲染 Model 自有值；离页先解绑，卸载后不再触碰控件。 */
+    bool bind(lv_subject_t* subject);
+    void unbind();
+
     /** 在已初始化的 LVGL 中创建主界面；LVGL 子对象由 root 持有。 */
     void create(lv_obj_t* root);
 
@@ -57,7 +69,7 @@ class DialplateView {
     void anim_stop();
 
     /** 卫星数、电台与工作模式状态及录制按钮更新。 */
-    void update(const DataProc::DeviceSnapshot& device);
+    void update(const DialplateState& device);
 
   private:
     void top_info_create(lv_obj_t* par);
@@ -82,7 +94,9 @@ class DialplateView {
     bool anim_enabled_ = false;
     bool anim_running_ = false;
     lv_anim_t anim_loop_{};
-    DataProc::DeviceSnapshot last_device_{};
+    static void on_state(lv_observer_t* observer, lv_subject_t* subject);
+    lv_observer_t* observer_ = nullptr;
+    DialplateState last_device_{};
 };
 
 } // namespace page

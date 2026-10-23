@@ -44,10 +44,9 @@ void start(lv_obj_t* obj, lv_anim_exec_xcb_t exec, int32_t from, int32_t to, uin
 bool BatteryWarning::create(lv_obj_t* parent) {
     if (banner_ || !parent)
         return false;
-    account_ = std::make_unique<DataNode>("BatteryWarning", DataProc::Broker(), this);
-    account_->setEventCallback(on_event);
-    if (!account_->isRegistered() || !account_->subscribe("Status")) {
-        account_.reset();
+    model_ = std::make_unique<BatteryWarningModel>();
+    if (!model_->init()) {
+        model_.reset();
         return false;
     }
     banner_ = lv_obj_create(parent);
@@ -92,14 +91,19 @@ bool BatteryWarning::create(lv_obj_t* parent) {
     lv_obj_set_style_bg_opa(shine_, LV_OPA_80, 0);
 
     lv_obj_set_hidden(banner_, true);
-    DataProc::StatusSnapshot status;
-    if (account_->pull("Status", &status, sizeof(status)) == DataNode::RES_OK)
-        update(status.battery_temperature_valid, status.battery_temperature);
+    observer_ = lv_subject_add_observer(model_->subject(), on_state, this);
+    if (!observer_) {
+        destroy();
+        return false;
+    }
     return true;
 }
 
 void BatteryWarning::destroy() {
-    account_.reset(); // Unregister before deleting the objects its callback touches.
+    /** @brief 先解除 observer，再注销节点，避免控件释放后收到同步通知。 */
+    lv_observer_delete(observer_);
+    observer_ = nullptr;
+    model_.reset();
     if (banner_) {
         stop_effects();
         lv_obj_delete(banner_);
@@ -113,15 +117,10 @@ void BatteryWarning::apply_language() {
         update_text();
 }
 
-int BatteryWarning::on_event(DataNode* account, DataNode::EventParam_t* event) {
-    if (!event || event->event != DataNode::EVENT_PUBLISH)
-        return DataNode::RES_UNSUPPORTED_REQUEST;
-    DataProc::StatusSnapshot status;
-    const int result = DataProc::ReadPayload(event, status);
-    if (result == DataNode::RES_OK)
-        static_cast<BatteryWarning*>(account->getUserData())
-            ->update(status.battery_temperature_valid, status.battery_temperature);
-    return result;
+void BatteryWarning::on_state(lv_observer_t* observer, lv_subject_t* subject) {
+    auto* self = static_cast<BatteryWarning*>(lv_observer_get_user_data(observer));
+    const auto& state = *static_cast<const BatteryWarningState*>(lv_subject_get_pointer(subject));
+    self->update(state.valid, state.temperature);
 }
 
 void BatteryWarning::update(bool valid, float temperature) {

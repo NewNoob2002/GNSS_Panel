@@ -19,7 +19,7 @@
 #define LV_CACHE_DEF_SIZE 0
 #define LV_IMAGE_HEADER_CACHE_DEF_CNT 0
 #define LV_BIN_DECODER_RAM_LOAD 0
-#define LV_USE_OBSERVER 0
+#define LV_USE_OBSERVER 1
 #define LV_USE_OBJ_ID 0
 #define LV_USE_OBJ_NAME 0
 #define LV_USE_OBJ_PROPERTY 0
@@ -107,9 +107,6 @@
 
 /* 监控仅在调试固件启用，不改变发布版界面。 */
 #ifdef __CORE_DEBUG
-/* v9.6 SYSMON 显式依赖 observer，仅调试构建启用。 */
-#undef LV_USE_OBSERVER
-#define LV_USE_OBSERVER 1
 #define LV_USE_LOG 1
 #define LV_LOG_USE_FILE_LINE 0
 #define LV_USE_SYSMON 1

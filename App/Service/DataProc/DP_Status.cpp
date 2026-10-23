@@ -20,7 +20,7 @@ public:
     }
     int onEvent(EventParam_t* event) override {
         if (event && event->event == EVENT_TIMER) {
-            // 过渡兼容：旧 StatusBar 不 pull，沿用三端原 200 ms 无条件推送节拍；3.7f 删除聚合层。
+            /** @brief 其余八页仍经 model_utils 读取聚合快照；3.7f 前保留 200 ms 兼容重发。 */
             const auto snapshot = state_;
             (void)publish(&snapshot, sizeof(snapshot));
             return RES_OK;

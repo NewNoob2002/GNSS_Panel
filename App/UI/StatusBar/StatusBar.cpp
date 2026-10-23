@@ -55,10 +55,9 @@ void compact(const NumberFlow* number) {
 bool StatusBar::create(lv_obj_t* parent) {
     if (root_ || !parent)
         return false;
-    account_ = std::make_unique<DataNode>("StatusBar", DataProc::Broker(), this);
-    account_->setEventCallback(on_event);
-    if (!account_->isRegistered() || !account_->subscribe("Status")) {
-        account_.reset();
+    model_ = std::make_unique<StatusBarModel>(this, on_presentation);
+    if (!model_->init()) {
+        model_.reset();
         return false;
     }
     root_ = lv_obj_create(parent);
@@ -102,7 +101,11 @@ bool StatusBar::create(lv_obj_t* parent) {
     compact(battery_percent_);
     lv_obj_set_style_pad_left(battery_percent_->get_cont(), kGap, 0); // 电池正极凸出 1 px，数字再让开一点。
 
-    update({});
+    observer_ = lv_subject_add_observer(model_->subject(), on_state, this);
+    if (!observer_) {
+        destroy();
+        return false;
+    }
     lv_obj_update_layout(root_); // 创建后坐标即有效，调用方可立即读取滑入起点。
     return true;
 }
@@ -144,44 +147,13 @@ bool StatusBar::on_presentation(void* owner, const DataProc::StatusBarPresentati
     return true;
 }
 
-int StatusBar::on_event(DataNode* account, DataNode::EventParam_t* event) {
-    auto* self = static_cast<StatusBar*>(account->getUserData());
-    if (!event)
-        return DataNode::RES_PARAM_ERROR;
-    if (event->event == DataNode::EVENT_NOTIFY) {
-        DataProc::StatusBarPresentation request;
-        const int result = DataProc::ReadPayload(event, request);
-        if (result != DataNode::RES_OK)
-            return result;
-        return on_presentation(self, request) ? DataNode::RES_OK : DataNode::RES_PARAM_ERROR;
-    }
-    if (event->event != DataNode::EVENT_PUBLISH || !event->tran || std::strcmp(event->tran->getID(), "Status") != 0)
-        return DataNode::RES_UNSUPPORTED_REQUEST;
-    DataProc::StatusSnapshot snapshot;
-    const int result = DataProc::ReadPayload(event, snapshot);
-    if (result != DataNode::RES_OK)
-        return result;
-    StatusBarState state;
-    state.position = snapshot.position.data();
-    state.position_color = lv_color_hex(snapshot.position_color_rgb);
-    state.satellites = snapshot.satellites;
-    state.satellites_valid = snapshot.satellites_valid;
-    state.battery_percent = snapshot.battery_percent;
-    state.battery_valid = snapshot.battery_valid;
-    state.charging = snapshot.charging;
-    state.battery_voltage = snapshot.battery_voltage;
-    state.hour = snapshot.hour;
-    state.minute = snapshot.minute;
-    state.second = snapshot.second;
-    state.clock_valid = snapshot.clock_valid;
-    state.wifi = snapshot.wifi;
-    state.recording = snapshot.recording;
-    self->update(state);
-    return DataNode::RES_OK;
+void StatusBar::on_state(lv_observer_t* observer, lv_subject_t* subject) {
+    auto* self = static_cast<StatusBar*>(lv_observer_get_user_data(observer));
+    self->update(*static_cast<const StatusBarState*>(lv_subject_get_pointer(subject)));
 }
 
 void StatusBar::update(const StatusBarState& state) {
-    // 状态约 5 Hz 发布：只在显示内容变化时触碰 LVGL，避免状态栏持续重绘。
+    /** @brief 领域显示值变化才调用；动画仍由原有控件逻辑维护。 */
     if (state.satellites_valid)
         satellites_->set_value(state.satellites > 99 ? 99 : state.satellites);
     settings_style::set_visible(satellites_->get_cont(), state.satellites_valid);
@@ -265,7 +237,10 @@ void StatusBar::sd_entered(lv_anim_t* animation) {
 }
 
 void StatusBar::destroy() {
-    account_.reset(); // Unregister callbacks before deleting any LVGL objects.
+    /** @brief 先解除 observer，再注销 Model，最后释放动画与控件。 */
+    lv_observer_delete(observer_);
+    observer_ = nullptr;
+    model_.reset();
     battery::stop(battery_fill_);
     battery_fill_ = nullptr;
     if (root_)

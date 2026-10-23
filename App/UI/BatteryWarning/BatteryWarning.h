@@ -1,11 +1,11 @@
 #pragma once
 #include <memory>
-#include "DataProc/DataProc.h"
+#include "BatteryWarningModel.h"
 #include "lvgl.h"
 
 namespace page {
-/** Battery over-temperature banner below the StatusBar (top layer). Appears at 65 C and clears below 60 C;
- * invalid temperature hides it. Subscribes to Status; create/destroy and updates on the LVGL thread only.
+/** @brief 顶层电池过温告警：65°C 出现、低于 60°C 消除，无效温度隐藏。
+ * 仅订阅 Battery/Settings；控件、observer 和动画均在应用线程创建、更新与销毁。
  */
 class BatteryWarning {
   public:
@@ -25,12 +25,13 @@ class BatteryWarning {
     }
 
   private:
-    static int on_event(DataNode* account, DataNode::EventParam_t* event);
+    static void on_state(lv_observer_t* observer, lv_subject_t* subject);
     void update(bool valid, float temperature);
     void update_text();
     void start_effects();
     void stop_effects();
-    std::unique_ptr<DataNode> account_;
+    std::unique_ptr<BatteryWarningModel> model_;
+    lv_observer_t* observer_ = nullptr;
     lv_obj_t *banner_ = nullptr, *label_ = nullptr, *marker_ = nullptr, *shine_ = nullptr;
     bool active_ = false;
     float temperature_ = 0.0f;

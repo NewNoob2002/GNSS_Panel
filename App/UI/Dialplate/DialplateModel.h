@@ -1,35 +1,41 @@
 #pragma once
-#include <functional>
-#include <memory>
-#include "DataProc/DataProc.h"
+
+#include "UI/Common/Model.h"
+#include "Def/DP_GNSS.h"
+#include "Def/DP_Recorder.h"
+#include "Def/DP_Version.h"
+#include "Def/DP_Work.h"
 
 namespace page {
-/** Page-owned DataNode and received data. Init on view load, Deinit on unload, LVGL thread only. */
-class DialplateModel {
+/** @brief 首页实际显示的值；不包含聚合快照或借用的回调指针。 */
+struct DialplateState {
+    bool satellites_valid = false;
+    unsigned satellites_used = 0, satellites_tracked = 0;
+    bool work_valid = false, radio_on = false;
+    hal::WorkMode work_mode{};
+    bool record_valid = false, recording = false;
+    bool star_map = false;
+};
+
+/** @brief 随页面加载创建、卸载销毁；只订阅 GNSS、Work、Recorder、Version。 */
+class DialplateModel final : public Model<DialplateState> {
   public:
+    DialplateModel() : Model("DialplateModel") {}
     bool init();
-    void deinit();
-    bool set_status_bar(bool visible, DataProc::StatusBarStyle style = {}) const;
-    const DataProc::StatusSnapshot& status() const {
-        return status_;
-    }
-    const DataProc::SystemState& settings() const {
-        return state_;
-    }
-    const DataProc::DeviceSnapshot& device() const {
-        return device_;
-    }
-    /** Called on the LVGL thread after published System or Device data was received. */
-    void set_change_callback(std::function<void()> callback) {
-        change_cb_ = std::move(callback);
-    }
+    bool set_status_bar(bool visible, DataProc::StatusBarStyle style = {});
+    int onEvent(EventParam_t* event) override;
 
   private:
-    static int on_event(DataNode* account, DataNode::EventParam_t* event);
-    std::unique_ptr<DataNode> account_;
-    DataProc::StatusSnapshot status_{};
-    DataProc::SystemState state_{};
-    DataProc::DeviceSnapshot device_{};
-    std::function<void()> change_cb_;
+    void apply(const dp::GNSS::State& value);
+    void apply(const dp::Work::State& value);
+    void apply(const dp::Recorder::State& value);
+    void apply(const dp::Version::State& value);
+    template <class Domain> bool load() {
+        typename Domain::State value;
+        if (!Domain::subscribe(*this) || Domain::pull(*this, value) != RES_OK)
+            return false;
+        apply(value);
+        return true;
+    }
 };
 } // namespace page

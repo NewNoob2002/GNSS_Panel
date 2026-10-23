@@ -1,6 +1,7 @@
 #include "Dialplate.h"
 #include "Log.h"
 #include "PageManager.h"
+#include "UI/PageId.h"
 #include "UI/Common/PageUtils.h"
 #include "UI/Common/PageStyle.h"
 
@@ -13,13 +14,12 @@ void Dialplate::onInstalled() {
 }
 
 std::array<lv_obj_t*, 5> Dialplate::controls() const {
-    // The satellite icon only opens StarMap on products that have it; otherwise it is display only.
-    return {view_.ui.btn_cont.btn_map, view_.ui.btn_cont.btn_rec, view_.ui.btn_cont.btn_menu,
-            view_.ui.btn_cont.btn_shutdown, model_.settings().star_map ? view_.ui.top_info.icon_satellite : nullptr};
+    return view_.controls(model_->state().star_map);
 }
 
 void Dialplate::onViewLoad() {
-    if (!model_.init())
+    model_ = std::make_unique<DialplateModel>();
+    if (!model_->init())
         app_fatal("Dialplate", "Model initialization failed");
     view_.create(getRoot());
     utils::attach_controls(controls(), clicked, this);
@@ -27,12 +27,10 @@ void Dialplate::onViewLoad() {
 }
 
 void Dialplate::onViewWillAppear() {
-    model_.set_status_bar(true);
-    view_.update(model_.device());
-    model_.set_change_callback([this] {
-        view_.update(model_.device());
-    });
-    utils::focus_controls(controls(), last_focus_ ? last_focus_ : view_.ui.btn_cont.btn_menu);
+    model_->set_status_bar(true);
+    if (!view_.bind(model_->subject()))
+        app_fatal("Dialplate", "View binding failed");
+    utils::focus_controls(controls(), last_focus_ ? last_focus_ : view_.default_focus());
     if (entrance_pending_) {
         // Returning from a child slides the page back already; replaying the entrance would double the work.
         entrance_pending_ = false;
@@ -43,30 +41,29 @@ void Dialplate::onViewWillAppear() {
 
 void Dialplate::onViewWillDisappear() {
     view_.anim_stop();
-    model_.set_change_callback({});
+    view_.unbind();
     last_focus_ = utils::leave_focus_group();
 }
 
 void Dialplate::onViewUnload() {
-    model_.deinit();
     view_.destroy();
+    model_.reset();
     last_focus_ = nullptr;
 }
 
 void Dialplate::clicked(lv_event_t* event) {
     auto* self = static_cast<Dialplate*>(lv_event_get_user_data(event));
     auto* button = lv_event_get_current_target_obj(event);
-    const char* destination = nullptr;
-    if (button == self->view_.ui.btn_cont.btn_map)
-        destination = "Pages/WorkSettings";
-    else if (button == self->view_.ui.btn_cont.btn_rec)
-        destination = "Pages/RecordConfig";
-    else if (button == self->view_.ui.btn_cont.btn_menu)
-        destination = "Pages/SystemInfos";
-    else if (button == self->view_.ui.btn_cont.btn_shutdown)
-        destination = "Pages/SystemDash";
-    else if (button == self->view_.ui.top_info.icon_satellite)
-        destination = "Pages/StarMap";
-    if (destination)
-        self->getManager()->push(destination);
+    PageId destination = PageId::Invalid;
+    switch (self->view_.control(button)) {
+    case DialplateView::Control::Work: destination = PageId::WorkSettings; break;
+    case DialplateView::Control::Record: destination = PageId::RecordConfig; break;
+    case DialplateView::Control::Menu: destination = PageId::SystemInfos; break;
+    case DialplateView::Control::Power: destination = PageId::SystemDash; break;
+    case DialplateView::Control::Satellite: destination = PageId::StarMap; break;
+    case DialplateView::Control::None: break;
+    }
+    if (destination != PageId::Invalid
+        && self->getManager()->push(page::name(destination)) != PageManager::RES_TYPE::OK)
+        APP_LOG_W("Dialplate", "navigation rejected");
 }

@@ -14,7 +14,7 @@ static void animate_translate_y(void* object, int32_t value) {
 void DialplateView::create(lv_obj_t* root) {
     top_info_create(root);
     btn_cont_create(root);
-    update(DataProc::DeviceSnapshot{});
+    update(DialplateState{});
 
     ui.anim_timeline = lv_anim_timeline_create();
 
@@ -34,6 +34,7 @@ void DialplateView::create(lv_obj_t* root) {
 }
 
 void DialplateView::destroy() {
+    unbind();
     anim_stop();
     if (ui.anim_timeline) {
         lv_anim_timeline_delete(ui.anim_timeline);
@@ -43,6 +44,35 @@ void DialplateView::destroy() {
     ui.top_info.satellite_used = nullptr;
     delete ui.top_info.satellite_tracked;
     ui.top_info.satellite_tracked = nullptr;
+}
+
+std::array<lv_obj_t*, 5> DialplateView::controls(bool star_map) const {
+    return {ui.btn_cont.btn_map, ui.btn_cont.btn_rec, ui.btn_cont.btn_menu, ui.btn_cont.btn_shutdown,
+            star_map ? ui.top_info.icon_satellite : nullptr};
+}
+
+DialplateView::Control DialplateView::control(const lv_obj_t* object) const {
+    const auto buttons = controls(true);
+    for (size_t i = 0; i < buttons.size(); ++i)
+        if (object == buttons[i])
+            return static_cast<Control>(i);
+    return Control::None;
+}
+
+bool DialplateView::bind(lv_subject_t* subject) {
+    unbind();
+    observer_ = lv_subject_add_observer(subject, on_state, this);
+    return observer_ != nullptr;
+}
+
+void DialplateView::unbind() {
+    lv_observer_delete(observer_);
+    observer_ = nullptr;
+}
+
+void DialplateView::on_state(lv_observer_t* observer, lv_subject_t* subject) {
+    auto* self = static_cast<DialplateView*>(lv_observer_get_user_data(observer));
+    self->update(*static_cast<const DialplateState*>(lv_subject_get_pointer(subject)));
 }
 
 void DialplateView::anim_start() {
@@ -237,8 +267,8 @@ void DialplateView::appear_anim_start(const bool reverse) const {
     lv_anim_timeline_start(ui.anim_timeline);
 }
 
-void DialplateView::update(const DataProc::DeviceSnapshot& device) {
-    // 设备快照约每秒发布一次（含运行时长），只在显示内容变化时触碰 LVGL，避免首页每秒整块重绘。
+void DialplateView::update(const DialplateState& device) {
+    /** @brief 只在实际显示字段变化时触碰控件，领域节点的其他字段不驱动刷新。 */
     const bool cards_changed = device.work_valid != last_device_.work_valid
                                || device.work_mode != last_device_.work_mode
                                || device.radio_on != last_device_.radio_on;
@@ -251,7 +281,7 @@ void DialplateView::update(const DataProc::DeviceSnapshot& device) {
         settings_style::set_visible(count, device.satellites_valid);
     settings_style::set_visible(ui.top_info.satellite_missing, !device.satellites_valid);
 
-    const bool rover = device.work_valid && device.work_mode == DataProc::WorkMode::Rover;
+    const bool rover = device.work_valid && device.work_mode == hal::WorkMode::Rover;
     const bool radio_on = device.work_valid && device.radio_on;
 
     // 工作模式与电台共用状态色；无有效数据时明确显示未知。
@@ -326,7 +356,7 @@ void DialplateView::radio_draw_event_cb(lv_event_t* e) {
     // 波形以天线顶端为圆心，仅画左右两侧 ±22° 的短弧；最内弧半径大于天线顶端宽度，不压到图标。
     const lv_point_t tip = {static_cast<int32_t>(coords.x1 + kIconX + 8),
                             static_cast<int32_t>(coords.y1 + kIconY + 4)};
-    const bool rover = device.work_mode == DataProc::WorkMode::Rover;
+    const bool rover = device.work_mode == hal::WorkMode::Rover;
     constexpr uint16_t radii[] = {9, 13, 17};
 
     lv_draw_arc_dsc_t arc;
@@ -357,7 +387,7 @@ void DialplateView::mode_draw_event_cb(lv_event_t* e) {
     const int32_t cx = coords.x1 + kIconX + 8;
     const int32_t dome_base = coords.y1 + kIconY + 5, pole_tip = coords.y1 + kIconY + 15;
 
-    if (device.work_mode != DataProc::WorkMode::Rover) {
+    if (device.work_mode != hal::WorkMode::Rover) {
         // 基准站：天线罩上方三道弧由内向外依次亮起，表示持续播发差分改正数。
         lv_draw_arc_dsc_t arc;
         lv_draw_arc_dsc_init(&arc);
