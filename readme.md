@@ -42,7 +42,9 @@
 
 ## 😄 实物演示
 
-![main page](Images/Image_mainPage.png)
+当前界面（Demo 后端模拟器渲染，294×126 原尺寸放大 2 倍）：Startup 待机、SystemLoading Logo、Dialplate 主页、StarMap 星图、WorkSettings、RecordConfig、SystemInfos、SystemDash。
+
+![UI pages](docs/images/ui-pages.png)
 
 ## 📂 项目结构说明
 
