@@ -1,4 +1,5 @@
 #include "I18n.h"
+#include "oem_config.h"
 #include <cstdio>
 #include <cstring>
 
@@ -42,6 +43,10 @@ bool set_language(const Language language) {
 #else
     return false;
 #endif
+}
+
+const char* device_name() {
+    return current_language == Language::Russian ? OEM_DEVICE_RU : OEM_DEVICE_EN;
 }
 
 const char* text(const TextId id) {

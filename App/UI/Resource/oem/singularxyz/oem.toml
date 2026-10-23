@@ -1,0 +1,22 @@
+name = "SingularXYZ"
+
+[colors]
+background = "8ccf9c"
+logo = "ffffff"
+text = "f2f4f5"
+# 旧版页脚独立使用 muted 色，保留默认外观。
+footer_text = "a4adb5"
+
+[logo]
+# 迁移保留的原始 A8，避免 PNG 反投影造成 alpha 舍入。
+image = "logo.c"
+timings = "8:400:300|9:550:200"
+
+[device_name]
+en = "GNSS RTK"
+ru = "GNSS RTK"
+footer_en = "GNSS RTK Receiver"
+footer_ru = "Приёмник GNSS RTK"
+
+[effect]
+preset = "cascade"

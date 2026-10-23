@@ -4,6 +4,8 @@
 #include <initializer_list>
 #include "UI/Common/PageStyle.h"
 #include "UI/Resource/LogoParts.h"
+#include "UI/Resource/DeviceNameLayout.h"
+#include "oem_config.h"
 
 using namespace page;
 
@@ -139,18 +141,10 @@ void SystemLoadingView::create(lv_obj_t* root, const std::array<i18n::TextId, kS
             lv_obj_set_style_bg_opa(ui_.links[i], LV_OPA_COVER, 0);
         }
     }
-    ui_.footer = style::label(ui_.cont, small_font, 16, 105, 116);
-    lv_obj_set_style_text_color(ui_.footer, kGrey, 0);
-#if defined(RGK_LOGO_USE)
-    const auto* logo_parts = static_cast<const logo_parts_t*>(resource_pool::get_image("RGKLogoParts"));
-#elif defined(MIDDLE_LOGO_USE)
-    const auto* logo_parts = static_cast<const logo_parts_t*>(resource_pool::get_image("MiddleLogoParts"));
-#else
-    const auto* logo_parts = static_cast<const logo_parts_t*>(resource_pool::get_image("startupLogoParts"));
-#endif
-    app::LogoReveal::Timeline timeline;
-    timeline.total_ms = kLogoMs;
-    logo_.create(root, *logo_parts, timeline);
+    ui_.footer = style::label(ui_.cont, small_font, 16, 105, OEM_LOADING_FOOTER_WIDTH);
+    lv_obj_set_style_text_color(ui_.footer, lv_color_hex(OEM_FOOTER_COLOR), 0);
+    const auto* logo_parts = static_cast<const logo_parts_t*>(resource_pool::get_image("oemLogoParts"));
+    logo_.create(root, *logo_parts);
     ui_.logo_container = logo_.container();
     update_text();
     show_logo();

@@ -1,11 +1,12 @@
 #include "I18n.h"
+#include "oem_config.h"
 
 namespace {
 
 const char* const texts[] = {
     "PRESS",
     "Keep Press Shutdown\nShort Press Return",
-    "GNSS RTK Receiver",
+    OEM_DEVICE_FOOTER_EN,
     "System Initialization",
     "System Ready",
     "Preparing system modules",

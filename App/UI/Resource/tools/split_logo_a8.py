@@ -4,7 +4,7 @@
 用法：python3 split_logo_a8.py 输入.c或.png 输出.c [--groups '0,1|2|3']
 PNG 示例：python3 split_logo_a8.py designer.png ../img/img_src_NewLogo.c --symbol img_src_NewLogo --fit
 分组示例：python3 split_logo_a8.py designer.png ../img/img_src_NewLogo.c --groups '0,1|2' --background 000000 --foreground ffffff
-注册 NewLogoParts 后，SystemLoadingView 的选择行改为 resource_pool::get_image("NewLogoParts")。
+注册与配置请使用 oem_build.py：每客户目录保存 oem.toml 与生成物，CMake 用 -DOEM=目录名 选择。
 PNG 支持非隔行 Gray/GrayAlpha/RGB/RGBA 的 8/16 位及索引色 1/2/4/8 位（PLTE/tRNS）。
 --fit 显式等比缩小超屏图片；16 位取高字节降至 8 位，隔行输入清晰报错。
 扫描/压缩过的近似单色 Logo 可加 --max-error N（0..255，默认 20）；工具打印实际最大/平均误差，
@@ -14,9 +14,9 @@ PNG 支持非隔行 Gray/GrayAlpha/RGB/RGBA 的 8/16 位及索引色 1/2/4/8 位
 弱 alpha 像素归到欧氏距离最近的强像素分量，平距时按左→右顺序选择。
 
 新增 Logo：
-1. 将设计师 PNG 或带颜色和位置 layout 的 A8 .c 放进 tools/logos（彩色图保留原格式）。
-2. 运行本脚本生成 img/ 下的零件表，必要时传 --groups 和 --timings。
-3. 在 ResourcePool 静态表中注册零件表名称；在 View 的宏分支选择它。
+1. 将设计师 PNG 或带颜色和位置 layout 的 A8 .c 放进 oem/<客户>/。
+2. 编写 oem.toml（字段见 oem_build.py docstring），必要时指定 groups 和 timings。
+3. 用 oem_build.py 生成客户目录中的 generated/，构建传 -DOEM=<客户>。
 4. 运行 test_convert_images_v9.py 和 Linux app_logo_reveal_test 校验还原及终态。
 """
 from __future__ import annotations
@@ -126,7 +126,9 @@ def layout_from(text: str, symbol: str) -> tuple[int, int, int, int]:
 
 
 def render(source: codec.Parsed9, layout: tuple, parts: list[Part], timings: str = '',
-           highlight: bool = True) -> str:
+           highlight: bool = True,
+           effect: str = '{150, 50, 250, 6, true, 900, 300, 1300, LOGO_EFFECT_CASCADE}',
+           recolor: bool = True) -> str:
     """生成 v9 零件、组时间覆盖及公开静态表，不编译原整图。"""
     bg, fg, x, y = layout
     count = max(p.group for p in parts) + 1
@@ -148,7 +150,8 @@ def render(source: codec.Parsed9, layout: tuple, parts: list[Part], timings: str
     text += '};\n'
     text += f'const logo_parts_t {source.symbol}_parts = {{\n'
     text += f'    {source.symbol}_pieces, {source.symbol}_groups, {len(parts)}, {count},\n'
-    text += f'    {{0x{bg:06x}, 0x{fg:06x}, {x}, {y}}}, {source.w}, {source.h}, true, {str(highlight).lower()}\n}};\n'
+    text += (f'    {{0x{bg:06x}, 0x{fg:06x}, {x}, {y}}}, {source.w}, {source.h}, '
+             f'{str(recolor).lower()}, {str(highlight).lower()}, {effect}\n}};\n')
     return text
 
 

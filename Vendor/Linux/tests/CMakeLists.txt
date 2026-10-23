@@ -33,7 +33,7 @@ add_test(NAME app_navigation_preview COMMAND app_navigation_preview)
 add_executable(app_logo_reveal_test app_logo_reveal_test.cpp)
 target_link_libraries(app_logo_reveal_test PRIVATE app::ui)
 target_compile_definitions(app_logo_reveal_test PRIVATE
-    LOGO_REFERENCE_DIR="${SHARED_APP_DIR}/UI/Resource/tools/logos")
+    LOGO_REFERENCE_FILE="${APP_OEM_DIR}/logo.c")
 target_compile_options(app_logo_reveal_test PRIVATE -Wall -Wextra -Werror -UNDEBUG)
 add_test(NAME app_logo_reveal COMMAND app_logo_reveal_test)
 

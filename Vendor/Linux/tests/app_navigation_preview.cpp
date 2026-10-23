@@ -226,13 +226,7 @@ int main(int argc, char** argv) {
             app.on_input(Input::Press); // Repeated keydown cannot restart the timer.
             advance(1100);
             assert(std::strcmp(app.current_page(), "Pages/SystemLoading") == 0);
-#if defined(RGK_LOGO_USE)
-            const auto* loading_logo = resource_pool::get_image("RGKLogoParts");
-#elif defined(MIDDLE_LOGO_USE)
-            const auto* loading_logo = resource_pool::get_image("MiddleLogoParts");
-#else
-            const auto* loading_logo = resource_pool::get_image("startupLogoParts");
-#endif
+            const auto* loading_logo = resource_pool::get_image("oemLogoParts");
             assert(loading_logo);
             loading_logo = static_cast<const logo_parts_t*>(loading_logo)->parts[0].image;
             assert(find_image(lv_screen_active(), loading_logo));

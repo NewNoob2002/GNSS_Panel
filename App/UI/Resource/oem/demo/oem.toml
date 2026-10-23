@@ -1,0 +1,23 @@
+# 虚构演示字标，仅用于展示 OEM 配置能力。
+name = "Demo"
+
+[colors]
+background = "101820"
+logo = "f2aa4c"
+text = "e8e8e8"
+
+[logo]
+text = "NOVA RTK"
+font = "../../font/Oswald-Bold.ttf"
+size = 40
+groups = "NOVA|RTK"
+
+[device_name]
+en = "NOVA RTK"
+ru = "НОВА RTK"
+footer_en = "NOVA GNSS Receiver"
+footer_ru = "Приёмник NOVA GNSS"
+
+[effect]
+preset = "sweep"
+total_ms = 1300

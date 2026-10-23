@@ -130,13 +130,7 @@ Images::KEY_PAIR images[] = {
     {"ntrip", &img_src_ntrip},
     {"NationalFlag_EN", &img_src_NationalFlag_EN},
     {"NationalFlag_RU", &img_src_NationalFlag_RU},
-#if defined(RGK_LOGO_USE)
-    {"RGKLogoParts", &img_src_RGKLogo_parts},
-#elif defined(MIDDLE_LOGO_USE)
-    {"MiddleLogoParts", &img_src_MiddleLogo_parts},
-#else
-    {"startupLogoParts", &img_src_startupLogo_parts},
-#endif // RGK_LOGO_USE
+    {"oemLogoParts", &oem_logo_parts},
 };
 Fonts font_(fonts, sizeof(fonts) / sizeof(fonts[0]), same_name, LV_FONT_DEFAULT);
 Images image_(images, sizeof(images) / sizeof(images[0]), same_name, nullptr);

@@ -12,7 +12,7 @@
 #elif defined(LV_LVGL_H_INCLUDE_SYSTEM)
 #include <lvgl.h>
 #elif defined(LV_BUILD_TEST)
-#include "../lvgl.h"
+#include "lvgl.h"
 #else
 #include "lvgl/lvgl.h"
 #endif
@@ -21,11 +21,11 @@
 #define LV_ATTRIBUTE_MEM_ALIGN
 #endif
 
-#ifndef LV_ATTRIBUTE_IMG_SRC_STARTUPLOGO_PART0
-#define LV_ATTRIBUTE_IMG_SRC_STARTUPLOGO_PART0
+#ifndef LV_ATTRIBUTE_OEM_LOGO_PART0
+#define LV_ATTRIBUTE_OEM_LOGO_PART0
 #endif
 
-static const LV_ATTRIBUTE_MEM_ALIGN LV_ATTRIBUTE_LARGE_CONST LV_ATTRIBUTE_IMG_SRC_STARTUPLOGO_PART0 uint8_t img_src_startupLogo_part0_map[] = {
+static const LV_ATTRIBUTE_MEM_ALIGN LV_ATTRIBUTE_LARGE_CONST LV_ATTRIBUTE_OEM_LOGO_PART0 uint8_t oem_logo_part0_map[] = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1d, 0x77, 0xa7, 0xb0, 0xb0, 0xb2, 0xb0, 0xb0, 0xb0, 0xb0, 0xb9, 0xb0, 0xb9, 0xb0, 0xb0, 0xb9, 0xb0, 0x96, 0x09,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x94, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xd7, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x28, 0xd9, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x94, 0x00,
@@ -59,7 +59,7 @@ static const LV_ATTRIBUTE_MEM_ALIGN LV_ATTRIBUTE_LARGE_CONST LV_ATTRIBUTE_IMG_SR
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 };
 
-const lv_image_dsc_t img_src_startupLogo_part0 = {
+const lv_image_dsc_t oem_logo_part0 = {
   .header = {
     .magic = LV_IMAGE_HEADER_MAGIC,
     .cf = LV_COLOR_FORMAT_A8,
@@ -69,17 +69,17 @@ const lv_image_dsc_t img_src_startupLogo_part0 = {
     .stride = 28,
     .reserved_2 = 0,
   },
-  .data_size = sizeof(img_src_startupLogo_part0_map),
-  .data = img_src_startupLogo_part0_map,
+  .data_size = sizeof(oem_logo_part0_map),
+  .data = oem_logo_part0_map,
   .reserved = NULL,
   .reserved_2 = NULL,
 };
 
-#ifndef LV_ATTRIBUTE_IMG_SRC_STARTUPLOGO_PART1
-#define LV_ATTRIBUTE_IMG_SRC_STARTUPLOGO_PART1
+#ifndef LV_ATTRIBUTE_OEM_LOGO_PART1
+#define LV_ATTRIBUTE_OEM_LOGO_PART1
 #endif
 
-static const LV_ATTRIBUTE_MEM_ALIGN LV_ATTRIBUTE_LARGE_CONST LV_ATTRIBUTE_IMG_SRC_STARTUPLOGO_PART1 uint8_t img_src_startupLogo_part1_map[] = {
+static const LV_ATTRIBUTE_MEM_ALIGN LV_ATTRIBUTE_LARGE_CONST LV_ATTRIBUTE_OEM_LOGO_PART1 uint8_t oem_logo_part1_map[] = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x32, 0xa7, 0xa7, 0xb0, 0xa7, 0xa7, 0xa7, 0x81,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x81, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xa7,
     0x00, 0x00, 0x00, 0x00, 0x00, 0xb0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x58,
@@ -110,7 +110,7 @@ static const LV_ATTRIBUTE_MEM_ALIGN LV_ATTRIBUTE_LARGE_CONST LV_ATTRIBUTE_IMG_SR
     0x09, 0x00, 0x09, 0x00, 0x00, 0x00, 0x09, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 };
 
-const lv_image_dsc_t img_src_startupLogo_part1 = {
+const lv_image_dsc_t oem_logo_part1 = {
   .header = {
     .magic = LV_IMAGE_HEADER_MAGIC,
     .cf = LV_COLOR_FORMAT_A8,
@@ -120,17 +120,17 @@ const lv_image_dsc_t img_src_startupLogo_part1 = {
     .stride = 13,
     .reserved_2 = 0,
   },
-  .data_size = sizeof(img_src_startupLogo_part1_map),
-  .data = img_src_startupLogo_part1_map,
+  .data_size = sizeof(oem_logo_part1_map),
+  .data = oem_logo_part1_map,
   .reserved = NULL,
   .reserved_2 = NULL,
 };
 
-#ifndef LV_ATTRIBUTE_IMG_SRC_STARTUPLOGO_PART2
-#define LV_ATTRIBUTE_IMG_SRC_STARTUPLOGO_PART2
+#ifndef LV_ATTRIBUTE_OEM_LOGO_PART2
+#define LV_ATTRIBUTE_OEM_LOGO_PART2
 #endif
 
-static const LV_ATTRIBUTE_MEM_ALIGN LV_ATTRIBUTE_LARGE_CONST LV_ATTRIBUTE_IMG_SRC_STARTUPLOGO_PART2 uint8_t img_src_startupLogo_part2_map[] = {
+static const LV_ATTRIBUTE_MEM_ALIGN LV_ATTRIBUTE_LARGE_CONST LV_ATTRIBUTE_OEM_LOGO_PART2 uint8_t oem_logo_part2_map[] = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1f, 0x1d, 0x1d, 0x1d, 0x1f, 0x1f, 0x1d, 0x1d, 0x1d, 0x1d, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x6c, 0xd7, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xc7, 0x45, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x27, 0xd9, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x4e, 0x00,
@@ -156,7 +156,7 @@ static const LV_ATTRIBUTE_MEM_ALIGN LV_ATTRIBUTE_LARGE_CONST LV_ATTRIBUTE_IMG_SR
     0x00, 0x00, 0x00, 0x00, 0x09, 0x00, 0x00, 0x09, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x09, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 };
 
-const lv_image_dsc_t img_src_startupLogo_part2 = {
+const lv_image_dsc_t oem_logo_part2 = {
   .header = {
     .magic = LV_IMAGE_HEADER_MAGIC,
     .cf = LV_COLOR_FORMAT_A8,
@@ -166,17 +166,17 @@ const lv_image_dsc_t img_src_startupLogo_part2 = {
     .stride = 24,
     .reserved_2 = 0,
   },
-  .data_size = sizeof(img_src_startupLogo_part2_map),
-  .data = img_src_startupLogo_part2_map,
+  .data_size = sizeof(oem_logo_part2_map),
+  .data = oem_logo_part2_map,
   .reserved = NULL,
   .reserved_2 = NULL,
 };
 
-#ifndef LV_ATTRIBUTE_IMG_SRC_STARTUPLOGO_PART3
-#define LV_ATTRIBUTE_IMG_SRC_STARTUPLOGO_PART3
+#ifndef LV_ATTRIBUTE_OEM_LOGO_PART3
+#define LV_ATTRIBUTE_OEM_LOGO_PART3
 #endif
 
-static const LV_ATTRIBUTE_MEM_ALIGN LV_ATTRIBUTE_LARGE_CONST LV_ATTRIBUTE_IMG_SRC_STARTUPLOGO_PART3 uint8_t img_src_startupLogo_part3_map[] = {
+static const LV_ATTRIBUTE_MEM_ALIGN LV_ATTRIBUTE_LARGE_CONST LV_ATTRIBUTE_OEM_LOGO_PART3 uint8_t oem_logo_part3_map[] = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x09, 0x1d, 0x1d, 0x1d, 0x1d, 0x1d, 0x1d, 0x1d, 0x00, 0x00, 0x00, 0x1d, 0x1d, 0x1d, 0x1d, 0x1d, 0x1d, 0x25, 0x00,
@@ -213,7 +213,7 @@ static const LV_ATTRIBUTE_MEM_ALIGN LV_ATTRIBUTE_LARGE_CONST LV_ATTRIBUTE_IMG_SR
     0x00, 0x09, 0x0b, 0x0b, 0x09, 0x09, 0x09, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 };
 
-const lv_image_dsc_t img_src_startupLogo_part3 = {
+const lv_image_dsc_t oem_logo_part3 = {
   .header = {
     .magic = LV_IMAGE_HEADER_MAGIC,
     .cf = LV_COLOR_FORMAT_A8,
@@ -223,17 +223,17 @@ const lv_image_dsc_t img_src_startupLogo_part3 = {
     .stride = 31,
     .reserved_2 = 0,
   },
-  .data_size = sizeof(img_src_startupLogo_part3_map),
-  .data = img_src_startupLogo_part3_map,
+  .data_size = sizeof(oem_logo_part3_map),
+  .data = oem_logo_part3_map,
   .reserved = NULL,
   .reserved_2 = NULL,
 };
 
-#ifndef LV_ATTRIBUTE_IMG_SRC_STARTUPLOGO_PART4
-#define LV_ATTRIBUTE_IMG_SRC_STARTUPLOGO_PART4
+#ifndef LV_ATTRIBUTE_OEM_LOGO_PART4
+#define LV_ATTRIBUTE_OEM_LOGO_PART4
 #endif
 
-static const LV_ATTRIBUTE_MEM_ALIGN LV_ATTRIBUTE_LARGE_CONST LV_ATTRIBUTE_IMG_SRC_STARTUPLOGO_PART4 uint8_t img_src_startupLogo_part4_map[] = {
+static const LV_ATTRIBUTE_MEM_ALIGN LV_ATTRIBUTE_LARGE_CONST LV_ATTRIBUTE_OEM_LOGO_PART4 uint8_t oem_logo_part4_map[] = {
     0x00, 0x00, 0x00, 0x1b, 0x1d, 0x1f, 0x1d, 0x1d, 0x1d, 0x25, 0x09, 0x00, 0x00, 0x00, 0x00, 0x09, 0x1d, 0x1f, 0x1d, 0x1d, 0x1d, 0x25, 0x14,
     0x00, 0x00, 0x00, 0xcf, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x34, 0x00, 0x00, 0x00, 0x00, 0x81, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x94,
     0x00, 0x00, 0x14, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x14, 0x00, 0x00, 0x00, 0x00, 0xb2, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x58,
@@ -259,7 +259,7 @@ static const LV_ATTRIBUTE_MEM_ALIGN LV_ATTRIBUTE_LARGE_CONST LV_ATTRIBUTE_IMG_SR
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x09, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 };
 
-const lv_image_dsc_t img_src_startupLogo_part4 = {
+const lv_image_dsc_t oem_logo_part4 = {
   .header = {
     .magic = LV_IMAGE_HEADER_MAGIC,
     .cf = LV_COLOR_FORMAT_A8,
@@ -269,17 +269,17 @@ const lv_image_dsc_t img_src_startupLogo_part4 = {
     .stride = 23,
     .reserved_2 = 0,
   },
-  .data_size = sizeof(img_src_startupLogo_part4_map),
-  .data = img_src_startupLogo_part4_map,
+  .data_size = sizeof(oem_logo_part4_map),
+  .data = oem_logo_part4_map,
   .reserved = NULL,
   .reserved_2 = NULL,
 };
 
-#ifndef LV_ATTRIBUTE_IMG_SRC_STARTUPLOGO_PART5
-#define LV_ATTRIBUTE_IMG_SRC_STARTUPLOGO_PART5
+#ifndef LV_ATTRIBUTE_OEM_LOGO_PART5
+#define LV_ATTRIBUTE_OEM_LOGO_PART5
 #endif
 
-static const LV_ATTRIBUTE_MEM_ALIGN LV_ATTRIBUTE_LARGE_CONST LV_ATTRIBUTE_IMG_SRC_STARTUPLOGO_PART5 uint8_t img_src_startupLogo_part5_map[] = {
+static const LV_ATTRIBUTE_MEM_ALIGN LV_ATTRIBUTE_LARGE_CONST LV_ATTRIBUTE_OEM_LOGO_PART5 uint8_t oem_logo_part5_map[] = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x58, 0xa7, 0xa7, 0xb0, 0xb0, 0xae, 0xae, 0x51,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc5, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x6c,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x09, 0xec, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x32,
@@ -310,7 +310,7 @@ static const LV_ATTRIBUTE_MEM_ALIGN LV_ATTRIBUTE_LARGE_CONST LV_ATTRIBUTE_IMG_SR
     0x00, 0x00, 0x00, 0x09, 0x00, 0x09, 0x00, 0x09, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 };
 
-const lv_image_dsc_t img_src_startupLogo_part5 = {
+const lv_image_dsc_t oem_logo_part5 = {
   .header = {
     .magic = LV_IMAGE_HEADER_MAGIC,
     .cf = LV_COLOR_FORMAT_A8,
@@ -320,17 +320,17 @@ const lv_image_dsc_t img_src_startupLogo_part5 = {
     .stride = 14,
     .reserved_2 = 0,
   },
-  .data_size = sizeof(img_src_startupLogo_part5_map),
-  .data = img_src_startupLogo_part5_map,
+  .data_size = sizeof(oem_logo_part5_map),
+  .data = oem_logo_part5_map,
   .reserved = NULL,
   .reserved_2 = NULL,
 };
 
-#ifndef LV_ATTRIBUTE_IMG_SRC_STARTUPLOGO_PART6
-#define LV_ATTRIBUTE_IMG_SRC_STARTUPLOGO_PART6
+#ifndef LV_ATTRIBUTE_OEM_LOGO_PART6
+#define LV_ATTRIBUTE_OEM_LOGO_PART6
 #endif
 
-static const LV_ATTRIBUTE_MEM_ALIGN LV_ATTRIBUTE_LARGE_CONST LV_ATTRIBUTE_IMG_SRC_STARTUPLOGO_PART6 uint8_t img_src_startupLogo_part6_map[] = {
+static const LV_ATTRIBUTE_MEM_ALIGN LV_ATTRIBUTE_LARGE_CONST LV_ATTRIBUTE_OEM_LOGO_PART6 uint8_t oem_logo_part6_map[] = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1d, 0x1f, 0x1d, 0x1d, 0x1d, 0x1f, 0x1f, 0x1d, 0x09, 0x00, 0x0b, 0x1d, 0x1d, 0x1d, 0x1d, 0x1f, 0x25, 0x09,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x5a, 0xd9, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xec, 0xc4, 0xec, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x2a,
     0x00, 0x00, 0x00, 0x00, 0x00, 0xa9, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xec, 0x00,
@@ -356,7 +356,7 @@ static const LV_ATTRIBUTE_MEM_ALIGN LV_ATTRIBUTE_LARGE_CONST LV_ATTRIBUTE_IMG_SR
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x09, 0x09, 0x09, 0x09, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x09, 0x09, 0x09, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 };
 
-const lv_image_dsc_t img_src_startupLogo_part6 = {
+const lv_image_dsc_t oem_logo_part6 = {
   .header = {
     .magic = LV_IMAGE_HEADER_MAGIC,
     .cf = LV_COLOR_FORMAT_A8,
@@ -366,17 +366,17 @@ const lv_image_dsc_t img_src_startupLogo_part6 = {
     .stride = 26,
     .reserved_2 = 0,
   },
-  .data_size = sizeof(img_src_startupLogo_part6_map),
-  .data = img_src_startupLogo_part6_map,
+  .data_size = sizeof(oem_logo_part6_map),
+  .data = oem_logo_part6_map,
   .reserved = NULL,
   .reserved_2 = NULL,
 };
 
-#ifndef LV_ATTRIBUTE_IMG_SRC_STARTUPLOGO_PART7
-#define LV_ATTRIBUTE_IMG_SRC_STARTUPLOGO_PART7
+#ifndef LV_ATTRIBUTE_OEM_LOGO_PART7
+#define LV_ATTRIBUTE_OEM_LOGO_PART7
 #endif
 
-static const LV_ATTRIBUTE_MEM_ALIGN LV_ATTRIBUTE_LARGE_CONST LV_ATTRIBUTE_IMG_SRC_STARTUPLOGO_PART7 uint8_t img_src_startupLogo_part7_map[] = {
+static const LV_ATTRIBUTE_MEM_ALIGN LV_ATTRIBUTE_LARGE_CONST LV_ATTRIBUTE_OEM_LOGO_PART7 uint8_t oem_logo_part7_map[] = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1d, 0x1f, 0x1d, 0x1d, 0x1f, 0x1d, 0x1d, 0x1d, 0x1d, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x5a, 0xc5, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xdb, 0x07,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x12, 0xbb, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xb9, 0x00,
@@ -402,7 +402,7 @@ static const LV_ATTRIBUTE_MEM_ALIGN LV_ATTRIBUTE_LARGE_CONST LV_ATTRIBUTE_IMG_SR
     0x00, 0x09, 0x00, 0x09, 0x09, 0x00, 0x09, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 };
 
-const lv_image_dsc_t img_src_startupLogo_part7 = {
+const lv_image_dsc_t oem_logo_part7 = {
   .header = {
     .magic = LV_IMAGE_HEADER_MAGIC,
     .cf = LV_COLOR_FORMAT_A8,
@@ -412,17 +412,17 @@ const lv_image_dsc_t img_src_startupLogo_part7 = {
     .stride = 20,
     .reserved_2 = 0,
   },
-  .data_size = sizeof(img_src_startupLogo_part7_map),
-  .data = img_src_startupLogo_part7_map,
+  .data_size = sizeof(oem_logo_part7_map),
+  .data = oem_logo_part7_map,
   .reserved = NULL,
   .reserved_2 = NULL,
 };
 
-#ifndef LV_ATTRIBUTE_IMG_SRC_STARTUPLOGO_PART8
-#define LV_ATTRIBUTE_IMG_SRC_STARTUPLOGO_PART8
+#ifndef LV_ATTRIBUTE_OEM_LOGO_PART8
+#define LV_ATTRIBUTE_OEM_LOGO_PART8
 #endif
 
-static const LV_ATTRIBUTE_MEM_ALIGN LV_ATTRIBUTE_LARGE_CONST LV_ATTRIBUTE_IMG_SRC_STARTUPLOGO_PART8 uint8_t img_src_startupLogo_part8_map[] = {
+static const LV_ATTRIBUTE_MEM_ALIGN LV_ATTRIBUTE_LARGE_CONST LV_ATTRIBUTE_OEM_LOGO_PART8 uint8_t oem_logo_part8_map[] = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x13, 0x81, 0x81, 0x81, 0x81, 0x81, 0x81, 0x81, 0x89, 0x6e, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x14, 0x81, 0x81, 0x81, 0x81, 0x81, 0x81, 0x81,
     0x83, 0x6c, 0x1d, 0x89, 0x81, 0x81, 0x83, 0x81, 0x81, 0x81, 0x83, 0x6c, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x6c, 0x92, 0x83, 0x81, 0x81, 0x81, 0x8a, 0x81, 0x94, 0x1d,
     0x3d, 0x8a, 0x81, 0x81, 0x81, 0x81, 0x81, 0x81, 0x81, 0x81, 0x81, 0x81, 0x81, 0x81, 0x81, 0x81, 0x81, 0x81, 0x81, 0x81, 0x8a, 0x81, 0x89, 0x58, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xd9,
@@ -502,7 +502,7 @@ static const LV_ATTRIBUTE_MEM_ALIGN LV_ATTRIBUTE_LARGE_CONST LV_ATTRIBUTE_IMG_SR
     0x00, 0x09, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x09, 0x0b, 0x0b, 0x0b, 0x09, 0x0b, 0x09, 0x00, 0x00, 0x00, 0x00, 0x00,
 };
 
-const lv_image_dsc_t img_src_startupLogo_part8 = {
+const lv_image_dsc_t oem_logo_part8 = {
   .header = {
     .magic = LV_IMAGE_HEADER_MAGIC,
     .cf = LV_COLOR_FORMAT_A8,
@@ -512,17 +512,17 @@ const lv_image_dsc_t img_src_startupLogo_part8 = {
     .stride = 88,
     .reserved_2 = 0,
   },
-  .data_size = sizeof(img_src_startupLogo_part8_map),
-  .data = img_src_startupLogo_part8_map,
+  .data_size = sizeof(oem_logo_part8_map),
+  .data = oem_logo_part8_map,
   .reserved = NULL,
   .reserved_2 = NULL,
 };
 
-#ifndef LV_ATTRIBUTE_IMG_SRC_STARTUPLOGO_PART9
-#define LV_ATTRIBUTE_IMG_SRC_STARTUPLOGO_PART9
+#ifndef LV_ATTRIBUTE_OEM_LOGO_PART9
+#define LV_ATTRIBUTE_OEM_LOGO_PART9
 #endif
 
-static const LV_ATTRIBUTE_MEM_ALIGN LV_ATTRIBUTE_LARGE_CONST LV_ATTRIBUTE_IMG_SRC_STARTUPLOGO_PART9 uint8_t img_src_startupLogo_part9_map[] = {
+static const LV_ATTRIBUTE_MEM_ALIGN LV_ATTRIBUTE_LARGE_CONST LV_ATTRIBUTE_OEM_LOGO_PART9 uint8_t oem_logo_part9_map[] = {
     0x00, 0x00, 0x00, 0x00, 0x09, 0x45, 0x4e, 0x32, 0x09, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x76, 0xd9, 0xbb, 0xa7, 0xc5, 0xcf, 0x6c, 0x00, 0x00, 0x00,
     0x00, 0x00, 0xa7, 0xcf, 0x1d, 0x00, 0x00, 0x00, 0x27, 0xd9, 0x9d, 0x00, 0x00,
@@ -538,7 +538,7 @@ static const LV_ATTRIBUTE_MEM_ALIGN LV_ATTRIBUTE_LARGE_CONST LV_ATTRIBUTE_IMG_SR
     0x00, 0x00, 0x00, 0x00, 0x00, 0x32, 0x45, 0x32, 0x00, 0x00, 0x00, 0x00, 0x00,
 };
 
-const lv_image_dsc_t img_src_startupLogo_part9 = {
+const lv_image_dsc_t oem_logo_part9 = {
   .header = {
     .magic = LV_IMAGE_HEADER_MAGIC,
     .cf = LV_COLOR_FORMAT_A8,
@@ -548,27 +548,27 @@ const lv_image_dsc_t img_src_startupLogo_part9 = {
     .stride = 13,
     .reserved_2 = 0,
   },
-  .data_size = sizeof(img_src_startupLogo_part9_map),
-  .data = img_src_startupLogo_part9_map,
+  .data_size = sizeof(oem_logo_part9_map),
+  .data = oem_logo_part9_map,
   .reserved = NULL,
   .reserved_2 = NULL,
 };
 
 #include "UI/Resource/LogoParts.h"
-const system_loading_logo_layout_t img_src_startupLogo_layout = {0x8ccf9c, 0xffffff, 19, 40};
-static const logo_part_t img_src_startupLogo_pieces[] = {
-    {&img_src_startupLogo_part0, 2, 8, 0},
-    {&img_src_startupLogo_part1, 27, 8, 1},
-    {&img_src_startupLogo_part2, 36, 13, 2},
-    {&img_src_startupLogo_part3, 54, 11, 3},
-    {&img_src_startupLogo_part4, 83, 13, 4},
-    {&img_src_startupLogo_part5, 103, 8, 5},
-    {&img_src_startupLogo_part6, 114, 13, 6},
-    {&img_src_startupLogo_part7, 136, 13, 7},
-    {&img_src_startupLogo_part8, 154, 8, 8},
-    {&img_src_startupLogo_part9, 248, 2, 9},
+const system_loading_logo_layout_t oem_logo_layout = {0x8ccf9c, 0xffffff, 19, 40};
+static const logo_part_t oem_logo_pieces[] = {
+    {&oem_logo_part0, 2, 8, 0},
+    {&oem_logo_part1, 27, 8, 1},
+    {&oem_logo_part2, 36, 13, 2},
+    {&oem_logo_part3, 54, 11, 3},
+    {&oem_logo_part4, 83, 13, 4},
+    {&oem_logo_part5, 103, 8, 5},
+    {&oem_logo_part6, 114, 13, 6},
+    {&oem_logo_part7, 136, 13, 7},
+    {&oem_logo_part8, 154, 8, 8},
+    {&oem_logo_part9, 248, 2, 9},
 };
-static const logo_group_t img_src_startupLogo_groups[] = {
+static const logo_group_t oem_logo_groups[] = {
     {-1, 0},
     {-1, 0},
     {-1, 0},
@@ -580,7 +580,7 @@ static const logo_group_t img_src_startupLogo_groups[] = {
     {400, 300},
     {550, 200},
 };
-const logo_parts_t img_src_startupLogo_parts = {
-    img_src_startupLogo_pieces, img_src_startupLogo_groups, 10, 10,
-    {0x8ccf9c, 0xffffff, 19, 40}, 263, 46, true, true
+const logo_parts_t oem_logo_parts = {
+    oem_logo_pieces, oem_logo_groups, 10, 10,
+    {0x8ccf9c, 0xffffff, 19, 40}, 263, 46, true, true, {150, 50, 250, 6, true, 900, 300, 1300, LOGO_EFFECT_CASCADE}
 };

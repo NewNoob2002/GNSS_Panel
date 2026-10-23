@@ -12,7 +12,7 @@
 #elif defined(LV_LVGL_H_INCLUDE_SYSTEM)
 #include <lvgl.h>
 #elif defined(LV_BUILD_TEST)
-#include "../lvgl.h"
+#include "lvgl.h"
 #else
 #include "lvgl/lvgl.h"
 #endif
@@ -21,11 +21,11 @@
 #define LV_ATTRIBUTE_MEM_ALIGN
 #endif
 
-#ifndef LV_ATTRIBUTE_IMG_SRC_MIDDLELOGO_PART0
-#define LV_ATTRIBUTE_IMG_SRC_MIDDLELOGO_PART0
+#ifndef LV_ATTRIBUTE_OEM_LOGO_PART0
+#define LV_ATTRIBUTE_OEM_LOGO_PART0
 #endif
 
-static const LV_ATTRIBUTE_MEM_ALIGN LV_ATTRIBUTE_LARGE_CONST LV_ATTRIBUTE_IMG_SRC_MIDDLELOGO_PART0 uint8_t img_src_MiddleLogo_part0_map[] = {
+static const LV_ATTRIBUTE_MEM_ALIGN LV_ATTRIBUTE_LARGE_CONST LV_ATTRIBUTE_OEM_LOGO_PART0 uint8_t oem_logo_part0_map[] = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x08, 0x08, 0x08, 0x08, 0x10, 0x11, 0x11, 0x10, 0x10, 0x10, 0x11, 0x1f, 0x21, 0x1f, 0x21, 0x21, 0x1f, 0x21, 0x1f, 0x21,
     0x2a, 0x31, 0x2f, 0x2f, 0x2f, 0x2f, 0x2f, 0x2f, 0x2f, 0x2f, 0x2f, 0x2f, 0x2f, 0x2f, 0x2f, 0x2f, 0x2f, 0x2f, 0x31, 0x2f, 0x2f, 0x2f, 0x2f, 0x2f, 0x31, 0x2f, 0x2f, 0x2f, 0x31, 0x2f, 0x2f, 0x2a,
@@ -413,7 +413,7 @@ static const LV_ATTRIBUTE_MEM_ALIGN LV_ATTRIBUTE_LARGE_CONST LV_ATTRIBUTE_IMG_SR
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 };
 
-const lv_image_dsc_t img_src_MiddleLogo_part0 = {
+const lv_image_dsc_t oem_logo_part0 = {
   .header = {
     .magic = LV_IMAGE_HEADER_MAGIC,
     .cf = LV_COLOR_FORMAT_A8,
@@ -423,21 +423,21 @@ const lv_image_dsc_t img_src_MiddleLogo_part0 = {
     .stride = 152,
     .reserved_2 = 0,
   },
-  .data_size = sizeof(img_src_MiddleLogo_part0_map),
-  .data = img_src_MiddleLogo_part0_map,
+  .data_size = sizeof(oem_logo_part0_map),
+  .data = oem_logo_part0_map,
   .reserved = NULL,
   .reserved_2 = NULL,
 };
 
 #include "UI/Resource/LogoParts.h"
-const system_loading_logo_layout_t img_src_MiddleLogo_layout = {0x000000, 0xffffff, 69, 23};
-static const logo_part_t img_src_MiddleLogo_pieces[] = {
-    {&img_src_MiddleLogo_part0, 2, 2, 0},
+const system_loading_logo_layout_t oem_logo_layout = {0x000000, 0xffffff, 69, 23};
+static const logo_part_t oem_logo_pieces[] = {
+    {&oem_logo_part0, 2, 2, 0},
 };
-static const logo_group_t img_src_MiddleLogo_groups[] = {
+static const logo_group_t oem_logo_groups[] = {
     {-1, 0},
 };
-const logo_parts_t img_src_MiddleLogo_parts = {
-    img_src_MiddleLogo_pieces, img_src_MiddleLogo_groups, 1, 1,
-    {0x000000, 0xffffff, 69, 23}, 156, 84, true, true
+const logo_parts_t oem_logo_parts = {
+    oem_logo_pieces, oem_logo_groups, 1, 1,
+    {0x000000, 0xffffff, 69, 23}, 156, 84, true, true, {150, 50, 250, 6, true, 900, 300, 1300, LOGO_EFFECT_CASCADE}
 };

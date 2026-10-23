@@ -1,4 +1,5 @@
 # 共享应用只消费显式的 L0 选项与 LVGL 目标。
+include(${CMAKE_CURRENT_LIST_DIR}/oem.cmake)
 if(NOT TARGET proj::options)
     include(${CMAKE_CURRENT_LIST_DIR}/../cmake/options.cmake)
 endif()
@@ -41,7 +42,8 @@ add_library(app::framework ALIAS app_framework)
 add_library(app::i18n ALIAS app_i18n)
 add_library(app::core ALIAS app_core)
 target_include_directories(app_log PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/Utils/Log")
-target_include_directories(app_i18n PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/Service/i18n")
+target_include_directories(app_i18n PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/Service/i18n"
+    "${APP_OEM_DIR}/generated")
 target_include_directories(app_core PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}/Service"
     "${CMAKE_CURRENT_SOURCE_DIR}/Service/DataProc"
@@ -68,7 +70,8 @@ add_library(app_dialplate STATIC
     Utils/lv_anim_label/numberFlow.cpp
     Utils/lv_anim_label/numberFlow_clock.cpp
     Utils/lv_ext/lv_anim_timeline_wrapper.c
-    ${APP_RESOURCES})
+    ${APP_RESOURCES}
+    "${APP_OEM_DIR}/generated/oem_logo.c")
 target_include_directories(app_dialplate PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 add_library(app::dialplate ALIAS app_dialplate)
 target_link_libraries(app_dialplate PUBLIC lvgl::lvgl app::i18n proj::options fw::resourcemanager app::core app::lv_spring)

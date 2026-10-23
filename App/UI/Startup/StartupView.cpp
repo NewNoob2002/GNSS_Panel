@@ -3,6 +3,8 @@
 #include "StartupView.h"
 #include "UI/Common/BatteryStyle.h"
 #include "UI/Common/SettingsStyle.h"
+#include "UI/Resource/DeviceNameLayout.h"
+#include "oem_config.h"
 
 using namespace page;
 
@@ -19,8 +21,8 @@ void StartupView::create(lv_obj_t* root) {
     lv_obj_set_style_bg_opa(root, LV_OPA_COVER, 0);
 
     // Reserve the header band for the status bar that appears after the idle delay.
-    auto* heading = style::label(root, font_main, 8, 0, 224);
-    lv_label_set_text(heading, "GNSS RTK");
+    ui.heading = style::label(root, font_main, 8, 0, OEM_STARTUP_TITLE_WIDTH);
+    lv_obj_set_style_text_color(ui.heading, lv_color_hex(OEM_TEXT_COLOR), 0);
     auto* badge = style::mark_demo(style::box(root, 244, 4, 42, 18));
     style::card(badge);
     auto* demo = style::label(badge, font_small, 0, 0, 40);
@@ -185,6 +187,7 @@ void StartupView::update(const StartupState& state) {
 }
 
 void StartupView::apply_language() const {
+    settings_style::set_text(ui.heading, i18n::device_name());
     settings_style::set_text(ui.btn_label, i18n::text(i18n::TextId::StartupStart));
     settings_style::set_text(ui.hold_hint, i18n::text(i18n::TextId::StartupHoldHint));
 }

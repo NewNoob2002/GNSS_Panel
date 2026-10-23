@@ -15,6 +15,13 @@ import convert_images_v9 as converter
 import convert_logo_a8 as logo_converter
 import png_logo
 import split_logo_a8 as splitter
+import test_oem_build
+
+
+def load_tests(loader, tests, pattern):
+    """资源工具统一执行 OEM 校验；Pillow 缺失仅跳过文字项并明确报告。"""
+    tests.addTests(loader.loadTestsFromModule(test_oem_build))
+    return tests
 
 
 class ConversionTests(unittest.TestCase):
@@ -267,12 +274,12 @@ class ConversionTests(unittest.TestCase):
 
     def test_logo_parts_exact_reconstruction(self):
         """部署零件从 C 独立回读，max 与相加重建都逐字节等于旧数组。"""
-        for name, count in (('XYZ', 10), ('Neutral', 1)):
-            original_path = converter.HERE / 'logos' / f'img_src_SystemLoading_{name}.c'
+        for customer, count in (('singularxyz', 10), ('neutral', 1)):
+            original_path = converter.HERE.parent / 'oem' / customer / 'logo.c'
             original, = converter.parse_v9_text(original_path.read_text())
             parts = splitter.split(original)
             self.assertEqual(len(parts), count)
-            deployed = converter.HERE.parent / 'img' / original_path.name
+            deployed = original_path.parent / 'generated' / 'oem_logo.c'
             deployed_text = deployed.read_text()
             images = {p.symbol: p for p in converter.parse_v9_text(deployed_text)}
             rows = re.findall(r'\{&(\w+),\s*(-?\d+),\s*(-?\d+),\s*(\d+)\}', deployed_text)
@@ -284,7 +291,7 @@ class ConversionTests(unittest.TestCase):
                                                int(x), int(y), int(group)))
             self.assertEqual([p.image.data for p in parts], [p.image.data for p in restored])
             splitter.verify(original, restored)
-            if name == 'XYZ':
+            if count == 10:
                 bounds = [(p.x + min(n % p.image.w for n, a in enumerate(p.image.data) if a > 24),
                            p.x + max(n % p.image.w for n, a in enumerate(p.image.data) if a > 24)) for p in restored]
                 self.assertEqual(bounds, [(2, 28), (27, 39), (36, 59), (54, 83), (83, 105),

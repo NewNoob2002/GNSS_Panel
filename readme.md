@@ -80,6 +80,8 @@ cmake --build --preset <product>-debug
 
 产物位于 `build/<preset>/`（`.elf`、`.map`）和 `build/<preset>/generated/`（`.hex`、`.bin`）。
 
+OEM/白牌通过配置命令追加 `-DOEM=<name>` 选择，例如 `cmake --preset x1pro-release -DOEM=demo`（默认 `singularxyz`；也支持 `rgk`、`neutral`）；客户配置与已生成资源位于 `App/UI/Resource/oem/`，固件构建不运行 Python。
+
 ```bash
 # PC 模拟器（HC32 Board 后端：X1Pro 或 XBase）
 cmake --preset simulator-x1pro        # 或 simulator-xbase

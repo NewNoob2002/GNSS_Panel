@@ -4,6 +4,7 @@
 #include "UI/Resource/ResourcePool.h"
 #include "I18n.h"
 #include "UI/Common/LogoReveal.h"
+#include "oem_config.h"
 #include <array>
 #include "lvgl.h"
 
@@ -11,7 +12,7 @@ namespace page {
 /** Simulated boot presentation; Ready is not evidence of initialized hardware. */
 class SystemLoadingView {
   public:
-    static constexpr uint32_t kLogoMs = 1300;
+    static constexpr uint32_t kLogoMs = OEM_LOGO_TOTAL_MS;
     static constexpr uint32_t kTransitionMs = 220;
     static constexpr unsigned kStepCount = 5;
     static constexpr uint32_t kProgressMs = 240; // Bar animation after a step finishes; steps themselves are not timed.

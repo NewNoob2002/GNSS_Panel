@@ -25,6 +25,8 @@ Language get_language();
 bool set_language(Language language);
 const char* text(TextId id);
 const char* text(Language language, TextId id);
+/** @brief 当前 OEM 的 Startup 设备名称；缺失语言由生成器回退英语。 */
+const char* device_name();
 void option_text(TextId id, unsigned index, char* buffer, std::size_t size);
 
 const LanguagePack& english_pack();
