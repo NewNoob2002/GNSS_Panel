@@ -111,10 +111,13 @@
 #define LV_LOG_USE_FILE_LINE 0
 #define LV_USE_SYSMON 1
 #define LV_USE_PERF_MONITOR 1
+/* 左下角显示 LV_MEM_SIZE 池的当前占用、峰值与碎片率；与右下角帧率标签不重叠，仅用整数格式化。 */
+#define LV_USE_MEM_MONITOR 1
 #else
 #define LV_USE_LOG 0
 #define LV_USE_SYSMON 0
 #define LV_USE_PERF_MONITOR 0
+#define LV_USE_MEM_MONITOR 0
 #endif
 
 #endif
