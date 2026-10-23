@@ -11,6 +11,7 @@
 #include "Def/DP_Init.h"
 #include "Def/DP_Settings.h"
 #include <cassert>
+#include <cstdint>
 #include <cstdio>
 #include <map>
 #include <string>
@@ -39,7 +40,7 @@ int main() {
     s.work.valid = s.recorder.valid = true; s.work.channel = 1;
     s.execute_power = power;
     assert(DataProc_Init(clock_ms));
-    assert(DataProc::Broker()->getNodeNumber() == 13);
+    assert(DataProc::Broker()->getNodeNumber() == 15);
     {
         DataNode arbitrary("AnyCaller",DataProc::Broker());
         arbitrary.setEventCallback(receive);
@@ -153,5 +154,5 @@ int main() {
     assert(DataProc_Init(clock_ms));
     assert(SystemService::snapshot().power_token == 0 && SystemService::snapshot().power_calls == 0);
     assert(DataProc_Deinit());
-    std::puts("领域节点：变化发布、语义命令、聚合转发与重建通过；13 节点、9 定时器。");
+    std::puts("领域节点：变化发布、语义命令、聚合转发与重建通过；15 节点、9 定时器。");
 }

@@ -1,4 +1,6 @@
 #include "AppFactory.h"
+#include "PageId.h"
+#include <cstring>
 #include "Page.h"
 #include "SystemService.h"
 
@@ -31,9 +33,29 @@ bool install(PageManager& manager, PageBase* page, const char* name) {
 }
 } // namespace
 
+const char* page::name(PageId id) {
+    static constexpr const char* names[] = {
+#define PAGE_DEF(Name, InstallPredicate) "Pages/" #Name,
+#include "PageList.inc"
+#undef PAGE_DEF
+    };
+    return id < PageId::Count ? names[static_cast<uint16_t>(id)] : nullptr;
+}
+
+page::PageId page::id(const char* route) {
+    if (route) {
+        for (uint16_t i = 0; i < static_cast<uint16_t>(PageId::Count); ++i) {
+            const auto id = static_cast<PageId>(i);
+            if (std::strcmp(route, name(id)) == 0)
+                return id;
+        }
+    }
+    return PageId::Invalid;
+}
+
 bool AppFactory::installAll(PageManager& manager) {
 #define PAGE_DEF(Name, InstallPredicate) \
-    if (InstallPredicate() && !install(manager, new page::Name, "Pages/" #Name)) \
+    if (InstallPredicate() && !install(manager, new page::Name, page::name(page::PageId::Name))) \
         return false;
 #include "PageList.inc"
 #undef PAGE_DEF

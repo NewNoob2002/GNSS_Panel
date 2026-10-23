@@ -1,15 +1,17 @@
 #pragma once
 
-#include "ButtonGesture.h"
 #include "UI/BatteryWarning/BatteryWarning.h"
 #include "UI/StatusBar/StatusBar.h"
 #include "PageManager.h"
 
 #include <memory>
 
-/** 应用页面组合：业务状态尚未迁入，状态栏只显示调用方传入的数据。 */
+namespace page { class AppNavigator; }
+
+/** @brief 应用上下文：组装服务与 UI，管理平台公开接口及销毁顺序。 */
 class App {
   public:
+    App();
     /** Product options; defaults match the RK3506 build. */
     struct Options {
         bool battery_warning = false; // Over-temperature banner (needs battery_temperature in the status).
@@ -53,27 +55,8 @@ class App {
     lv_style_t root_style_{};
     bool style_ready_ = false;
     bool data_ready_ = false;
-    i18n::Language language_{};
-    std::unique_ptr<DataNode> account_;
-    static int on_system_event(DataNode* account, DataNode::EventParam_t* event);
-    // Platform power events (System publications) are applied by navigation_timer_, outside the DataNode
-    // callback chain: a page must not be unloaded while its own notify is still running.
-    static void on_navigation(lv_timer_t* timer);
-    lv_timer_t* navigation_timer_ = nullptr;
-    bool powered_on_ = false, shutting_down_ = false, standby_ = false;
-    bool pending_power_on_ = false, pending_shutdown_ = false, pending_standby_ = false;
+    std::unique_ptr<page::AppNavigator> navigator_;
     page::StatusBar status_bar_;
     page::BatteryWarning battery_warning_;
     std::unique_ptr<PageManager> manager_;
-    bool power_down_ = false, function_down_ = false;
-    ButtonGesture power_gesture_, function_gesture_;
-    bool power_hold_ = false; // The current page took the raw Power hold at the last poll.
-    unsigned preload_index_ = 0;
-    void preload_next();
-    std::uint64_t last_poll_ms_ = 0;
-    const char* key_page_ = nullptr;
-    void cancel_keys();
-    void dispatch_input(InputAction action);
-    lv_obj_t* pressed_ = nullptr; // 按键按住期间的焦点；页面切换后绝不解引用
-    const char* pressed_page_ = nullptr;
 };

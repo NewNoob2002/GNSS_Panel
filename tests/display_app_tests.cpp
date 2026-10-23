@@ -2,6 +2,7 @@
 // 使用固件 lv_conf.h（96 KB LVGL 内存池）并让 C++ new 走 LVGL 池（lvgl_new.cpp），检查内存峰值余量；
 // 主机指针为 8 字节，测得峰值高于 32 位单片机，结论偏保守。
 #include <cassert>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -33,7 +34,12 @@ int standby_calls = 0, charger_power_on_calls = 0;
 bool probe_battery_gauge = true, probe_charger = true; // SystemLoading 重新探测 I2C 时的应答
 uint16_t draw_pixels[kWidth * 20];
 uint32_t peak_used = 0;
-size_t peak_nodes = 0;
+size_t peak_nodes = 0, peak_service_timers = 0, peak_ui_timers = 0;
+constexpr size_t provider_count = 0
+#define DP_DEF(Name) +1
+#include "DataProc_NodeList.inc"
+#undef DP_DEF
+    ;
 
 void
 flush(lv_display_t* driver, const lv_area_t*, uint8_t*) {
@@ -54,6 +60,19 @@ run(uint32_t ms, bool update_power = true) {
             peak_nodes = nodes;
         }
         lv_timer_handler();
+        size_t service_timers = 0, ui_timers = 0;
+#define DP_DEF(Name) service_timers += DataProc::Broker()->search(#Name)->hasTimer() ? 1U : 0U;
+#include "DataProc_NodeList.inc"
+#undef DP_DEF
+        for (auto* timer = lv_timer_get_next(nullptr); timer; timer = lv_timer_get_next(timer)) {
+            ++ui_timers;
+        }
+        if (service_timers > peak_service_timers) {
+            peak_service_timers = service_timers;
+        }
+        if (ui_timers > peak_ui_timers) {
+            peak_ui_timers = ui_timers;
+        }
     }
     lv_mem_monitor_t monitor;
     lv_mem_monitor(&monitor);
@@ -678,8 +697,10 @@ main() {
     run(7000);
     assert(on_page("Pages/Dialplate") && power_on_requests == before_reset);
 
-    std::printf("%s: DataNode peak %zu (providers 13, DataBroker capacity %zu)\n", PRODUCT_NAME, peak_nodes,
-                DataBroker::MaxNodes);
+    std::printf("%s: DataNode peak %zu (providers %zu, DataBroker capacity %zu)\n", PRODUCT_NAME, peak_nodes,
+                provider_count, DataBroker::MaxNodes);
+    std::printf("%s: timer peaks service %zu / %zu, LVGL %zu\n", PRODUCT_NAME, peak_service_timers,
+                DataTimerManager::kMaxTimers, peak_ui_timers);
     std::printf("%s: LVGL pool peak %lu / %lu bytes (free margin %lu)\n", PRODUCT_NAME,
                 static_cast<unsigned long>(peak_used), static_cast<unsigned long>(LV_MEM_SIZE),
                 static_cast<unsigned long>(LV_MEM_SIZE - peak_used));

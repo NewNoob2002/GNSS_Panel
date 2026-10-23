@@ -16,6 +16,8 @@ add_library(app_core STATIC
     Service/DataProc/DataProc.cpp
     Service/DataProc/DP_Status.cpp
     Service/DataProc/DP_Power.cpp
+    Service/DataProc/DP_Button.cpp
+    Service/DataProc/DP_PageNavi.cpp
     Service/DataProc/DP_Battery.cpp
     Service/DataProc/DP_GNSS.cpp
     Service/DataProc/DP_Clock.cpp
@@ -28,6 +30,7 @@ add_library(app_core STATIC
     Service/DataProc/DP_Device.cpp
     Service/DataProc/SystemService.cpp
     Service/HAL/SystemBackend.cpp
+    Utils/ButtonGesture/ButtonGesture.cpp
     Utils/FixedFormat/FixedFormat.cpp)
 foreach(target app_log app_framework app_i18n app_core)
     target_link_libraries(${target} PUBLIC proj::options)
@@ -44,7 +47,8 @@ target_include_directories(app_core PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}/Service"
     "${CMAKE_CURRENT_SOURCE_DIR}/Service/DataProc"
     "${CMAKE_CURRENT_SOURCE_DIR}/Service/HAL"
-    "${CMAKE_CURRENT_SOURCE_DIR}/Utils/FixedFormat")
+    "${CMAKE_CURRENT_SOURCE_DIR}/Utils/FixedFormat"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Utils/ButtonGesture")
 target_link_libraries(app_framework PRIVATE app::log)
 target_link_libraries(app_core PUBLIC app::framework app::i18n app::log)
 # 平台继承核心设备接口，必须与核心保持一致的 RTTI 设置。
@@ -70,9 +74,10 @@ target_link_libraries(app_dialplate PUBLIC lvgl::lvgl app::i18n proj::options fw
 target_compile_options(app_dialplate PRIVATE -Wall -Wextra)
 
 add_library(app_ui STATIC
-    Utils/ButtonGesture/ButtonGesture.cpp
     App.cpp
     UI/AppFactory.cpp
+    UI/AppNavigator.cpp
+    UI/InputRouter.cpp
     UI/Dialplate/DialplateModel.cpp
     UI/WorkSettings/WorkSettingsModel.cpp
     UI/RecordConfig/RecordConfigModel.cpp

@@ -30,6 +30,11 @@ target_link_libraries(app_navigation_preview PRIVATE linux::demo_backend)
 target_compile_options(app_navigation_preview PRIVATE -Wall -Wextra -Werror -UNDEBUG)
 add_test(NAME app_navigation_preview COMMAND app_navigation_preview)
 
+add_executable(app_deferred_navigation_test app_deferred_navigation_test.cpp)
+target_link_libraries(app_deferred_navigation_test PRIVATE linux::demo_backend)
+target_compile_options(app_deferred_navigation_test PRIVATE -Wall -Wextra -Werror -UNDEBUG)
+add_test(NAME app_deferred_navigation COMMAND app_deferred_navigation_test)
+
 add_executable(app_status_test app_status_test.cpp)
 target_link_libraries(app_status_test PRIVATE linux::demo_backend)
 target_compile_options(app_status_test PRIVATE -Wall -Wextra -Werror -UNDEBUG)

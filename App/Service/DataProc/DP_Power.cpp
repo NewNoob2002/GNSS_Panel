@@ -17,6 +17,12 @@ public:
         auto next = state_;
         auto* device = system_backend::devices().getDevice(hal::names::Power);
         switch (command.operation) {
+        case dp::PowerOperation::AcknowledgeNavigation:
+            if (command.navigation.standby) next.navigation.standby = false;
+            if (command.navigation.shutdown) next.navigation.shutdown = false;
+            if (command.navigation.power_on) next.navigation.power_on = false;
+            commit(next);
+            return RES_OK;
         case dp::PowerOperation::Prepare: {
             hal::BoardState board;
             if (next.pending || (command.action != hal::PowerCommand::Off && command.action != hal::PowerCommand::Reboot)
@@ -59,6 +65,18 @@ public:
     }
 private:
     uint64_t executed_token_ = 0;
+    /** @brief 所有电源写入统一记录上升沿，重复值及确认消费不会再次触发。 */
+    void commit(dp::PowerState next) {
+        if (next.platform.standby && !state_.platform.standby) {
+            next.navigation.standby = true;
+            next.navigation.shutdown = next.navigation.power_on = false;
+        }
+        if (next.platform.shutting_down && !state_.platform.shutting_down)
+            next.navigation.shutdown = true;
+        if (next.platform.powered_on && !state_.platform.powered_on)
+            next.navigation.power_on = true;
+        ValueNode::commit(next);
+    }
     void refresh() {
         hal::PowerState report;
         if (hal::read(system_backend::devices().getDevice(hal::names::Power), report) != DeviceObject::RES_OK) return;
