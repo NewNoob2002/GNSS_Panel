@@ -7,8 +7,15 @@ namespace page::style {
 
 /** Page transitions slide whole opaque roots (no page-level opacity): a page fade renders the page into an alpha
  * layer chunk by chunk, the most expensive transition on an MCU, and LVGL 8.3 draws pages with a full-screen child
- * wrongly inside such a layer. Ease-out spends most of the short time on the first frames. */
-inline constexpr uint16_t kPageTransitionMs = 260;
+ * wrongly inside such a layer. */
+inline constexpr uint16_t kPageTransitionMs = 350;
+
+/** @brief 页面切换曲线 cubic-bezier(0.2, 0, 0, 1)：起步柔和、长减速收尾，替代起步即最快的 ease-out。 */
+inline int32_t page_transition_path(const lv_anim_t* a) {
+    const auto t = static_cast<int32_t>(lv_map(a->act_time, 0, a->duration, 0, LV_BEZIER_VAL_MAX));
+    const int32_t step = lv_cubic_bezier(t, LV_BEZIER_VAL_FLOAT(0.2), 0, 0, LV_BEZIER_VAL_MAX);
+    return a->start_value + ((step * (a->end_value - a->start_value)) >> LV_BEZIER_VAL_SHIFT);
+}
 
 inline constexpr lv_color_t kBackground = LV_COLOR_MAKE(0x10, 0x12, 0x14);
 inline constexpr lv_color_t kPanel = LV_COLOR_MAKE(0x20, 0x24, 0x28);

@@ -577,10 +577,10 @@ static const logo_group_t oem_logo_groups[] = {
     {-1, 0},
     {-1, 0},
     {-1, 0},
-    {400, 300},
-    {550, 200},
+    {560, 450},
+    {760, 300},
 };
 const logo_parts_t oem_logo_parts = {
     oem_logo_pieces, oem_logo_groups, 10, 10,
-    {0x8ccf9c, 0xffffff, 19, 40}, 263, 46, true, true, {150, 50, 250, 6, true, 900, 300, 1300, LOGO_EFFECT_CASCADE}
+    {0x8ccf9c, 0xffffff, 19, 40}, 263, 46, true, true, {200, 70, 380, 6, true, 1300, 350, 1900, LOGO_EFFECT_CASCADE}
 };

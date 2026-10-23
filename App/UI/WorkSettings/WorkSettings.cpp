@@ -8,7 +8,7 @@ using namespace page;
 void WorkSettings::onInstalled() {
     setLoadAnimType(PAGE_ANIM::MOVE_LEFT);
     setLoadAnimTime(style::kPageTransitionMs);
-    setLoadAnimPath(lv_anim_path_ease_out);
+    setLoadAnimPath(style::page_transition_path);
 }
 
 void WorkSettings::onViewLoad() {

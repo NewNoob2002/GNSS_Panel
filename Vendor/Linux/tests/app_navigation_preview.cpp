@@ -13,6 +13,7 @@
 #include "PageManager.h"
 #include "UI/Resource/LogoParts.h"
 #include "UI/Resource/ResourcePool.h"
+#include "UI/SystemLoading/SystemLoadingView.h"
 #include "hal_device_checks.h"
 
 /** @brief 通过公开 API 读取对象的屏幕绝对坐标供布局断言使用。 */
@@ -436,7 +437,8 @@ int main(int argc, char** argv) {
                 assert(lv_group_get_focus_cb(lv_group_get_default()) == nullptr);
             }
             // Cancelling Logo, Initialization or Ready must remove timers/animations, not navigate later.
-            for (const auto phase_ms : {400u, 1600u, 4450u}) {
+            constexpr uint32_t kLogoMs = page::SystemLoadingView::kLogoMs;
+            for (const auto phase_ms : {400u, kLogoMs + 300, kLogoMs + 3150}) {
                 advance(300);
                 assert(app.show_page("Pages/SystemLoading"));
                 advance(phase_ms);
@@ -445,7 +447,7 @@ int main(int argc, char** argv) {
                 assert(app.back());
                 advance(400);
                 assert(std::strcmp(app.current_page(), "Pages/SystemLoading") == 0);
-                advance(1400); /** @brief 1300 ms Logo 结束后，首步淡入已完成且尚未跳过最短展示窗口。 */
+                advance(kLogoMs + 200); /** @brief OEM Logo 结束后，首步淡入已完成且尚未跳过最短展示窗口。 */
                 auto* restarted = find_label(lv_screen_active(), i18n::text(i18n::TextId::LoadingConfiguration));
                 assert(restarted && lv_obj_get_style_opa(restarted, LV_PART_MAIN) == LV_OPA_COVER);
                 assert(!find_label(lv_screen_active(), i18n::text(i18n::TextId::ReadyWithWarnings)));

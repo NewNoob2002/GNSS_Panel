@@ -11,7 +11,7 @@ using namespace page;
 void SystemLoading::onInstalled() {
     setLoadAnimType(PAGE_ANIM::NONE);
     setLoadAnimTime(style::kPageTransitionMs);
-    setLoadAnimPath(lv_anim_path_ease_out);
+    setLoadAnimPath(style::page_transition_path);
 }
 
 void SystemLoading::onViewLoad() {

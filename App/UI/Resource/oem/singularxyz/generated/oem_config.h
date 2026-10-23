@@ -12,6 +12,6 @@
 #define OEM_DEVICE_FOOTER_RU_WIDTH 101
 #define OEM_TEXT_COLOR 0xf2f4f5
 #define OEM_FOOTER_COLOR 0xa4adb5
-#define OEM_LOGO_TOTAL_MS 1300
+#define OEM_LOGO_TOTAL_MS 1900
 
 #endif

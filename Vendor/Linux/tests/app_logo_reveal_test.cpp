@@ -161,7 +161,7 @@ loading(lv_obj_t* root, const std::string& directory) {
         view.create(root, titles);
         for (unsigned ms = 0; ms <= page::SystemLoadingView::kLogoMs; ms += 20) {
             const auto before_flushes = flush_count, before_invalidations = invalidation_count;
-            partial_only = oem_logo_parts.recolor && ms >= 180 && ms < 900;
+            partial_only = oem_logo_parts.recolor && ms >= 240 && ms < 900;
             partial_pixels = 0;
             if (ms) {
                 advance(20);
@@ -225,17 +225,18 @@ presets(lv_obj_t* root, const std::string& directory) {
         app::LogoReveal reveal;
         reveal.create(root, logo);
         reveal.play();
-        for (unsigned ms = 0; ms <= 1400; ms += 20) {
+        const unsigned quiet_ms = last_change(logo) + 20;
+        for (unsigned ms = 0; ms <= quiet_ms + 180; ms += 20) {
             const auto before_flushes = flush_count, before_invalidations = invalidation_count;
             if (ms) {
                 advance(20);
             } else {
                 lv_refr_now(nullptr);
             }
-            if (ms >= 1220) {
+            if (ms > quiet_ms) {
                 assert(flush_count == before_flushes && invalidation_count == before_invalidations);
             }
-            if (!path.empty() && ms <= 1300) {
+            if (!path.empty() && ms <= logo.effect.total_ms) {
                 ppm(path + "/logo-" + std::to_string(10000 + ms) + ".ppm");
             }
         }
@@ -254,8 +255,8 @@ presets(lv_obj_t* root, const std::string& directory) {
         reveal.play();
         lv_obj_clean(root);
         assert(!lv_anim_count_running() && timers() == baseline_timers);
-        std::printf("%s: exact endpoint, 1220-1400 ms zero invalidations/flushes, all cancellation phases clean\n",
-                    names[preset]);
+        std::printf("%s: exact endpoint, %u-%u ms zero invalidations/flushes, all cancellation phases clean\n",
+                    names[preset], quiet_ms + 20, quiet_ms + 180);
     }
 }
 

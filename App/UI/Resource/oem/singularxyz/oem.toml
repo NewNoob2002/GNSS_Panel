@@ -10,7 +10,7 @@ footer_text = "a4adb5"
 [logo]
 # 迁移保留的原始 A8，避免 PNG 反投影造成 alpha 舍入。
 image = "logo.c"
-timings = "8:400:300|9:550:200"
+timings = "8:560:450|9:760:300"
 
 [device_name]
 en = "GNSS RTK"
@@ -20,3 +20,10 @@ footer_ru = "Приёмник GNSS RTK"
 
 [effect]
 preset = "cascade"
+# 节奏放慢约 1.5 倍：完整停留 1.9 s。
+total_ms = 1900
+background_ms = 200
+interval_ms = 70
+duration_ms = 380
+highlight_start_ms = 1300
+highlight_duration_ms = 350
