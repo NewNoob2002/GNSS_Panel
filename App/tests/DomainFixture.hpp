@@ -1,5 +1,7 @@
 #pragma once
-#include "SystemBackend.h"
+#include "HAL_Manager.h"
+#include "PowerObject.h"
+#include "Def/HAL_Board.h"
 #include "Def/HAL_Battery.h"
 #include "Def/HAL_GNSS.h"
 #include "Def/HAL_Clock.h"
@@ -20,10 +22,11 @@ struct State {
     hal::WifiState wifi{};
     hal::BoardState board{};
     bool (*request_on)() = nullptr;
-    bool (*execute_power)(DataProc::PowerAction) = nullptr;
-    bool (*execute_device)(const DataProc::DeviceRequest&) = nullptr;
+    bool (*execute_power)(hal::PowerCommand) = nullptr;
+    bool (*execute_work)(const hal::WorkCommand&) = nullptr;
+    bool (*execute_record)(const hal::RecorderCommand&) = nullptr;
     bool (*request_wifi)(bool) = nullptr;
-    DataProc::InitializationStatus (*poll)(unsigned,uint32_t,char*,size_t) = nullptr;
+    hal::InitStatus (*poll)(unsigned,uint32_t,char*,size_t) = nullptr;
     const char* (*name)(unsigned) = nullptr;
 };
 inline State source;
@@ -33,14 +36,14 @@ public:
     Read(const char* name, S& value) : hal::ReadObject<S>(name), value_(value) {}
     S state() override { return value_; }
 };
-class Power final : public system_backend::PowerObject {
+class Power final : public hal::PowerObject {
 public:
-    system_backend::PowerReport power_report() override { return source.power; }
+    hal::PowerState power_report() override { return source.power; }
     bool request_power_on() override {
         if (source.request_on) return source.request_on();
         source.power = {true,false,false,hal::PowerCause::User}; return true;
     }
-    bool execute_power(DataProc::PowerAction c) override { return !source.execute_power || source.execute_power(c); }
+    bool execute_power(hal::PowerCommand c) override { return !source.execute_power || source.execute_power(c); }
 };
 class Work final : public hal::WriteObject<hal::WorkState,hal::WorkCommand> {
 public:
@@ -50,9 +53,7 @@ public:
         if ((c.target != hal::WorkTarget::Rover && c.target != hal::WorkTarget::Base && c.target != hal::WorkTarget::Ntrip)
             || c.protocol >= hal::kRadioProtocolCount || c.channel >= hal::kRadioChannelCount
             || (c.target != hal::WorkTarget::Ntrip && !c.channel)) return RES_PARAM_ERROR;
-        DataProc::DeviceRequest r;
-        r.target = static_cast<DataProc::WorkTarget>(c.target); r.radio_protocol = c.protocol; r.radio_channel = c.channel;
-        if (source.execute_device) return source.execute_device(r) ? RES_OK : RES_UNKNOWN;
+        if (source.execute_work) return source.execute_work(c) ? RES_OK : RES_UNKNOWN;
         source.work.mode = c.target == hal::WorkTarget::Rover ? hal::WorkMode::Rover : hal::WorkMode::Base;
         source.work.protocol = c.protocol; source.work.channel = c.channel;
         return RES_OK;
@@ -65,10 +66,7 @@ public:
     int execute(const hal::RecorderCommand& c) override {
         if (c.action != hal::RecordAction::Start && c.action != hal::RecordAction::Stop) return RES_PARAM_ERROR;
         if (c.action == hal::RecordAction::Start && (c.type >= hal::kRecordTypeCount || c.interval >= hal::kRecordIntervalCount)) return RES_PARAM_ERROR;
-        DataProc::DeviceRequest r;
-        r.command = c.action == hal::RecordAction::Start ? DataProc::DeviceCommand::StartRecord : DataProc::DeviceCommand::StopRecord;
-        r.record_type = c.type; r.record_interval = c.interval;
-        if (source.execute_device) return source.execute_device(r) ? RES_OK : RES_UNKNOWN;
+        if (source.execute_record) return source.execute_record(c) ? RES_OK : RES_UNKNOWN;
         source.recorder.recording = source.recorder.reported_recording = c.action == hal::RecordAction::Start;
         source.recorder.type = c.type; source.recorder.interval = c.interval;
         return RES_OK;
@@ -105,17 +103,18 @@ inline DeviceManager& devices() {
     static const bool initialized = (manager.init(),true); (void)initialized;
     return manager;
 }
-/** @brief 将既有测试样例映射为细设备状态，不向 DataProc 发布。 */
-inline bool set_device(const DataProc::DeviceSnapshot& d) {
-    if (d.record_name.back() || d.wifi_ssid.back() || d.firmware.back() || d.hardware.back() || d.build.back()) return false;
-    source.battery = {d.power_valid, static_cast<unsigned>(d.battery_percent),d.battery_percent,d.battery_voltage,
-        d.power_valid,d.battery_temperature,static_cast<hal::ChargeState>(d.charge),d.external_power};
-    source.gnss = {d.position_valid,d.latitude,d.longitude,d.altitude,d.satellites_valid,d.satellites_used,
-        d.satellites_tracked,d.constellations_valid,d.constellations,d.position_valid ? hal::FixStatus::Fixed : hal::FixStatus::None};
-    source.work = {d.work_valid,d.work_pending,static_cast<hal::WorkMode>(d.work_mode),d.radio_on,d.radio_protocol,d.radio_channel,static_cast<hal::NtripRole>(d.ntrip)};
-    source.recorder = {d.record_valid,d.recording,d.record_pending,d.record_type,d.record_interval,d.record_name,d.record_space_mb,d.recording};
-    source.wifi.valid = d.wifi_valid; source.wifi.station = d.wifi_station; source.wifi.ssid = d.wifi_ssid; source.wifi.ip = d.wifi_ip;
-    source.board.firmware = d.firmware; source.board.hardware = d.hardware; source.board.build = d.build; source.board.uptime_s = d.uptime_s;
+/** @brief 替换细设备值而保留平台能力、回调与异步 Wi-Fi 状态。 */
+inline bool set_domains(const State& d) {
+    if (d.recorder.name.back() || d.wifi.ssid.back() || d.board.firmware.back()
+        || d.board.hardware.back() || d.board.build.back()) return false;
+    source.battery = d.battery;
+    source.gnss = d.gnss;
+    source.work = d.work;
+    source.recorder = d.recorder;
+    source.wifi.valid = d.wifi.valid; source.wifi.station = d.wifi.station;
+    source.wifi.ssid = d.wifi.ssid; source.wifi.ip = d.wifi.ip;
+    source.board.firmware = d.board.firmware; source.board.hardware = d.board.hardware;
+    source.board.build = d.board.build; source.board.uptime_s = d.board.uptime_s;
     return true;
 }
 }

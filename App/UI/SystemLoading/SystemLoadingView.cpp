@@ -2,7 +2,6 @@
 #include <cstdio>
 #include <cstring>
 #include <initializer_list>
-#include "SystemBackend.h"
 #include "UI/Common/PageStyle.h"
 #include "UI/Resource/LogoLayout.h"
 
@@ -73,7 +72,8 @@ void animate(lv_obj_t* obj, lv_anim_exec_xcb_t exec, int32_t from, int32_t to, u
 }
 } // namespace
 
-void SystemLoadingView::create(lv_obj_t* root) {
+void SystemLoadingView::create(lv_obj_t* root, const std::array<i18n::TextId, kStepCount>& titles) {
+    titles_ = titles;
     lv_obj_set_style_bg_color(root, style::kBackground, 0);
     ui_.cont = style::box(root, 8, 2, 278, 122);
     lv_obj_set_style_bg_color(ui_.cont, style::kBackground, 0);
@@ -287,7 +287,7 @@ void SystemLoadingView::set_accent(lv_color_t color) {
 void SystemLoadingView::update_text() const {
     const bool failed = failed_steps_ & (1u << (step_ - 1));
     const auto headline = ready_ ? (has_failures() ? i18n::TextId::ReadyWithWarnings : i18n::TextId::SystemReady)
-                                 : system_backend::initialization_title(step_ - 1);
+                                 : titles_[step_ - 1];
     const auto subtitle = ready_   ? (has_failures() ? i18n::TextId::ServicesLimited : i18n::TextId::ServicesAvailable)
                           : failed ? i18n::TextId::InitializationFailedContinue
                                    : i18n::TextId::PreparingModules;

@@ -18,7 +18,10 @@ void SystemLoading::onViewLoad() {
     model_ = std::make_unique<SystemLoadingModel>();
     if (!model_->init())
         app_fatal("SystemLoading", "Model initialization failed");
-    view_.create(getRoot());
+    std::array<i18n::TextId, SystemLoadingView::kStepCount> titles;
+    for (unsigned step = 0; step < titles.size(); ++step)
+        titles[step] = model_->step_info(step).title;
+    view_.create(getRoot(), titles);
     style::show_demo(getRoot(), model_->state().simulated);
 }
 

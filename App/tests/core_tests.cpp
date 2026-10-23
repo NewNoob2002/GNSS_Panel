@@ -8,8 +8,8 @@
 #include <array>
 #include <new>
 #include <cstdio>
-#include "SystemBackend.h"
-#include "SystemService.h"
+#include "HAL_Manager.h"
+#include "hal_device_checks.h"
 #include "DataTimer.h"
 
 namespace {
@@ -153,18 +153,18 @@ void test_node_capacity() {
 } // namespace
 
 // 无屏测试使用九个可变细设备，全部值由 DataProc 定时器读取。
-DeviceManager& system_backend::devices() { return fixture::devices(); }
+DeviceManager& hal::manager() { return fixture::devices(); }
 void test_device_contract() {
     hal_test::shapes();
     hal_test::equality();
-    assert(!system_backend::devices().getDevice("Device") && !system_backend::devices().getDevice("Status"));
+    assert(!hal::manager().getDevice("Device") && !hal::manager().getDevice("Status"));
     DeviceObject uninitialized("Uninitialized");
     unsigned value = 0;
     assert(uninitialized.read(&value,sizeof(value)) == DeviceObject::RES_INIT_FAILED);
     assert(uninitialized.write(&value,sizeof(value)) == DeviceObject::RES_INIT_FAILED);
     assert(uninitialized.ioctl(0) == DeviceObject::RES_INIT_FAILED);
     std::array<unsigned char,sizeof(hal::WorkState)+1> bytes{};
-    auto* work = system_backend::devices().getDevice(hal::names::Work);
+    auto* work = hal::manager().getDevice(hal::names::Work);
     assert(work->read(bytes.data()+1,sizeof(hal::WorkState)) == DeviceObject::RES_OK);
     assert(work->read(bytes.data()+1,sizeof(hal::WorkState)-1) == DeviceObject::RES_PARAM_ERROR);
     hal::WorkCommand invalid{hal::WorkTarget::Rover,hal::kRadioProtocolCount,1};
@@ -173,7 +173,7 @@ void test_device_contract() {
     std::array<unsigned char,sizeof(hal::InitInfo)+1> information{};
     hal::InitInfo info;
     std::memcpy(information.data()+1,&info,sizeof(info));
-    assert(system_backend::devices().getDevice(hal::names::Init)->ioctl(hal::kInitializationInfo,
+    assert(hal::manager().getDevice(hal::names::Init)->ioctl(hal::kInitializationInfo,
         information.data()+1,sizeof(info)) == DeviceObject::RES_OK);
 }
 
@@ -249,11 +249,9 @@ int main() {
     assert(!DataProc_Init(clock_ms));
     {
         DataNode startup("StartupModel", DataProc::Broker());
-        assert(startup.subscribe("System"));
-        DataProc::SystemRequest request{};
-        request.command = DataProc::SystemCommand::RequestPowerOn;
-        assert(startup.notify("System", &request, sizeof(request)) == DataNode::RES_OK);
-        assert(SystemService::snapshot().powered_on);
+        assert(dp::Power::subscribe(startup));
+        assert(dp::Power::notify(startup, {dp::PowerOperation::RequestOn}) == DataNode::RES_OK);
+        assert(hal_test::snapshot<dp::Power>().platform.powered_on);
         assert(!DataProc_Deinit());
         DataBroker timer_broker("TimerBroker");
         assert(timer_broker.initTimerManager(clock_ms));

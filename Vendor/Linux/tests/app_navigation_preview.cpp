@@ -11,7 +11,7 @@
 #include "DomainTestInput.hpp"
 #include "I18n.h"
 #include "PageManager.h"
-#include "SystemService.h"
+#include "hal_device_checks.h"
 #include "UI/Resource/ResourcePool.h"
 
 /** @brief 通过公开 API 读取对象的屏幕绝对坐标供布局断言使用。 */
@@ -376,16 +376,16 @@ int main(int argc, char** argv) {
                         assert(find_label(app.focused(), i18n::text(i18n::TextId::StartupStart)));
                         // 开始与停止一致：单击即切换，双击（Commit）同样有效。
                         app.on_input(Input::Confirm);
-                        assert(DeviceService::snapshot().recording);
+                        assert(hal_test::snapshot<dp::Recorder>().recording);
                         assert(find_label(lv_screen_active(), i18n::text(i18n::TextId::RequestReceived)));
                         assert(lv_group_get_obj_count(lv_group_get_default()) == 2);
                         app.on_input(Input::Confirm);
-                        assert(!DeviceService::snapshot().recording);
+                        assert(!hal_test::snapshot<dp::Recorder>().recording);
                         assert(lv_group_get_obj_count(lv_group_get_default()) == 4);
                         app.on_input(Input::Commit);
-                        assert(DeviceService::snapshot().recording);
+                        assert(hal_test::snapshot<dp::Recorder>().recording);
                         app.on_input(Input::Commit);
-                        assert(!DeviceService::snapshot().recording);
+                        assert(!hal_test::snapshot<dp::Recorder>().recording);
                     }
                     if (work) {
                         assert(find_label(app.focused(), "TRIMTALK"));

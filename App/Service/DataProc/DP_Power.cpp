@@ -15,7 +15,7 @@ public:
         const int decoded = DataProc::ReadPayload(event, command);
         if (decoded != RES_OK) return decoded;
         auto next = state_;
-        auto* device = system_backend::devices().getDevice(hal::names::Power);
+        auto* device = hal::manager().getDevice(hal::names::Power);
         switch (command.operation) {
         case dp::PowerOperation::AcknowledgeNavigation:
             if (command.navigation.standby) next.navigation.standby = false;
@@ -28,7 +28,7 @@ public:
             if (next.pending || (command.action != hal::PowerCommand::Off && command.action != hal::PowerCommand::Reboot)
                 || next.token == std::numeric_limits<uint64_t>::max()) return RES_PARAM_ERROR;
             if (command.action == hal::PowerCommand::Reboot
-                && (hal::read(system_backend::devices().getDevice(hal::names::Board), board) != DeviceObject::RES_OK
+                && (hal::read(hal::manager().getDevice(hal::names::Board), board) != DeviceObject::RES_OK
                     || !board.capabilities.reboot_available)) return RES_PARAM_ERROR;
             ++next.token;
             next.action = command.action;
@@ -79,7 +79,7 @@ private:
     }
     void refresh() {
         hal::PowerState report;
-        if (hal::read(system_backend::devices().getDevice(hal::names::Power), report) != DeviceObject::RES_OK) return;
+        if (hal::read(hal::manager().getDevice(hal::names::Power), report) != DeviceObject::RES_OK) return;
         auto next = state_;
         if (report.powered_on && !last_.powered_on) {
             next.platform.powered_on = true;

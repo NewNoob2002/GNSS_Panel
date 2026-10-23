@@ -5,25 +5,25 @@
 
 namespace {
 
-DataProc::PowerCause
+hal::PowerCause
 shutdown_cause() {
     const Power_Monitor_t& power = systemInfo.power;
     if (power.LinuxPowerOff) {
-        return DataProc::PowerCause::Host;
+        return hal::PowerCause::Host;
     }
     if (power.LowBatteryPowerOff) {
-        return DataProc::PowerCause::LowBattery;
+        return hal::PowerCause::LowBattery;
     }
     if (power.Force_ShutDown) {
-        return DataProc::PowerCause::Forced;
+        return hal::PowerCause::Forced;
     }
-    return DataProc::PowerCause::User;
+    return hal::PowerCause::User;
 }
 
 } // namespace
 
 /** 仅采样电源状态；revision/确认仍只属于显示协议。 */
-system_backend::PowerReport
+hal::PowerState
 PowerDevice::power_report() {
     const auto& p = systemInfo.power;
     return {p.panel_power_on,
@@ -39,8 +39,8 @@ PowerDevice::request_power_on() {
 
 /** 只提交关机请求，确认与延时断电仍由 HAL 处理。 */
 bool
-PowerDevice::execute_power(DataProc::PowerAction action) {
-    if (action != DataProc::PowerAction::Off) {
+PowerDevice::execute_power(hal::PowerCommand action) {
+    if (action != hal::PowerCommand::Off) {
         return false;
     }
     HAL::Power_Shutdown(false);

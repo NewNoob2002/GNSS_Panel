@@ -198,6 +198,34 @@ def check_parent_includes(repo_root: str) -> list[str]:
     return errors
 
 
+def check_ui_hal_includes(repo_root: str) -> list[str]:
+    """检查 UI 的直接 HAL 包含，覆盖完整路径、HAL/Def、Def 与裸头文件名。"""
+    hal_root = os.path.join(repo_root, "App", "Service", "HAL")
+    headers = set()
+    for root, _, files in os.walk(hal_root):
+        for name in files:
+            if name.endswith((".h", ".hpp", ".hh", ".hxx", ".inc")):
+                rel = os.path.relpath(os.path.join(root, name), hal_root).replace(os.sep, "/")
+                headers.update((rel, name))
+    errors = []
+    for root, dirs, files in os.walk(os.path.join(repo_root, "App", "UI")):
+        dirs[:] = sorted(d for d in dirs if d not in ("build", ".git"))
+        for name in sorted(files):
+            if not name.endswith((".c", ".h", ".cpp", ".hpp", ".cc", ".hh", ".cxx", ".hxx", ".inc")):
+                continue
+            filepath = os.path.join(root, name)
+            with open(filepath, encoding="utf-8", errors="replace") as fp:
+                content = fp.read()
+            for match in re.finditer(r'^[ \t]*#[ \t]*include[ \t]*["<]([^">\n]+)[">]', content, flags=re.M):
+                include = os.path.normpath(match.group(1).replace("\\", "/")).replace(os.sep, "/")
+                if (include in headers or include.startswith(("HAL/", "Service/HAL/", "App/Service/HAL/"))
+                        or "/Service/HAL/" in include):
+                    rel = os.path.relpath(filepath, repo_root).replace(os.sep, "/")
+                    line = content.count("\n", 0, match.start()) + 1
+                    errors.append(f'{rel}:{line}: 违规 (UI → DataProc → HAL): UI 禁止直接包含 HAL 头文件 "{include}"')
+    return errors
+
+
 def check_static_rules(repo_root: str) -> List[str]:
     """
     静态检查全局 include_directories() 与源码父目录包含。
@@ -205,7 +233,7 @@ def check_static_rules(repo_root: str) -> List[str]:
     @param repo_root Absolute path to repository root.
     @return List of error message strings.
     """
-    errors = check_parent_includes(repo_root)
+    errors = check_parent_includes(repo_root) + check_ui_hal_includes(repo_root)
     for root, _, files in os.walk(repo_root):
         if any(ignored in root for ignored in ("External", "build", ".git")):
             continue
@@ -388,6 +416,8 @@ def check_build_directory(bdir: str, repo_root: str) -> List[str]:
             if dst_id not in tgt_classification:
                 continue
             dst_layer, dst_sub = tgt_classification[dst_id]
+            if src_layer is None or dst_layer is None:
+                continue
 
             # 强规则：app::core 不得依赖 lvgl 或 fw::pagemanager
             if src_name in ("app_core", "app::core"):
@@ -499,7 +529,7 @@ def main():
             print(f"  [ERROR] {err}")
         all_errors.extend(static_errors)
     else:
-        print("  [PASS] 静态源码规则 2 全局包含与父目录包含校验通过 (0 违规)")
+        print("  [PASS] 静态包含规则通过：全局/父目录包含、UI → DataProc → HAL (0 违规)")
 
     print("\n=== 开始 CMake File API 目标与依赖模型校验 (codemodel-v2) ===")
     build_dirs = []

@@ -52,25 +52,28 @@ main() {
         assert(hal::write(hal_test::device(hal::names::WiFi), hal::WifiCommand{on}) == DeviceObject::RES_UNSUPPORT);
         hal_test::equivalent();
     }
+    assert(DataProc_Init(lv_tick_get));
     constexpr hal::InitStage stages[] = {hal::InitStage::Configuration, hal::InitStage::Services, hal::InitStage::GNSS,
                                          hal::InitStage::Network, hal::InitStage::Finalization};
     for (unsigned step = 0; step < hal::kInitializationStepCount; ++step) {
         hal::InitInfo info;
         info.step = step;
         assert(hal::ioctl(hal_test::device(hal::names::Init), hal::kInitializationInfo, info) == DeviceObject::RES_OK);
-        assert(info.stage == stages[step] && std::strcmp(info.name, system_backend::initialization_name(step)) == 0);
+        dp::InitStepInfo meta;
+        assert(dp::Init::info(*DataProc::Broker()->mainNode(), step, meta) == DataNode::RES_OK);
+        assert(info.stage == stages[step] && std::strcmp(info.name, meta.name) == 0);
         for (uint32_t elapsed : {0U, 400U, 700U, 1200U, 30000U}) {
             hal::InitPoll poll;
             poll.step = step;
             poll.elapsed_ms = elapsed;
-            char detail[96]{};
-            const auto old = system_backend::poll_initialization_step(step, elapsed, detail, sizeof(detail));
+            DataProc::InitializationResult result;
+            assert(dp::Init::poll(*DataProc::Broker()->mainNode(), step, elapsed, result) == DataNode::RES_OK);
             assert(hal::ioctl(hal_test::device(hal::names::Init), hal::kPollInitialization, poll)
                    == DeviceObject::RES_OK);
-            assert(static_cast<int>(poll.status) == static_cast<int>(old)
-                   && std::strcmp(poll.detail.data(), detail) == 0);
+            assert(static_cast<int>(poll.status) == static_cast<int>(result.status) && poll.detail == result.detail);
         }
     }
+    assert(DataProc_Deinit());
     assert(hal::ioctl(hal_test::device(hal::names::Power), hal::kRequestPowerOn) == DeviceObject::RES_OK);
     assert(hal::write(hal_test::device(hal::names::Power), hal::PowerCommand::Reboot) == DeviceObject::RES_OK);
     assert(hal::write(hal_test::device(hal::names::Power), hal::PowerCommand::Off) == DeviceObject::RES_OK);

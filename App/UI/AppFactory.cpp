@@ -2,7 +2,7 @@
 #include "PageId.h"
 #include <cstring>
 #include "Page.h"
-#include "SystemService.h"
+#include "Def/DP_Version.h"
 
 #include "UI/Dialplate/Dialplate.h"
 #include "UI/RecordConfig/RecordConfig.h"
@@ -20,7 +20,9 @@ bool always_install() {
 }
 
 bool has_star_map() {
-    return SystemService::snapshot().star_map;
+    dp::Version::State version;
+    return dp::Version::pull(*DataProc::Broker()->mainNode(), version) == DataNode::RES_OK
+        && version.capabilities.star_map;
 }
 
 bool install(PageManager& manager, PageBase* page, const char* name) {

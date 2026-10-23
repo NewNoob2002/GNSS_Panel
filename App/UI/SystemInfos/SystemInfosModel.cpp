@@ -19,13 +19,6 @@ bool SystemInfosModel::set_status_bar(bool visible, DataProc::StatusBarStyle sty
 int SystemInfosModel::onEvent(EventParam_t* event) {
     if (!event)
         return RES_PARAM_ERROR;
-    if (event->event == EVENT_PULL && event->size == sizeof(DataProc::StatusSnapshot)) {
-        DataProc::StatusSnapshot pulled{};
-        std::strcpy(pulled.position.data(), state_.version.capabilities.simulated ? "DEMO" : "");
-        pulled.battery_percent = state_.battery.level_percent;
-        std::memcpy(event->data_p, &pulled, sizeof(pulled));
-        return RES_OK;
-    }
     int result = RES_UNSUPPORTED_REQUEST;
     dp::Work::State work;
     dp::GNSS::State gnss;

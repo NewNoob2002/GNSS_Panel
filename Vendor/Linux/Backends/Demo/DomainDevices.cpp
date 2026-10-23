@@ -1,12 +1,13 @@
 #include <cstdio>
 #include "Def/HAL_Init.h"
 #include "DemoModel.h"
-#include "SystemBackend.h"
+#include "HAL_Manager.h"
+#include "PowerObject.h"
 
 namespace {
-class DemoPower final : public system_backend::PowerObject {
+class DemoPower final : public hal::PowerObject {
   public:
-    system_backend::PowerReport
+    hal::PowerState
     power_report() override {
         return demo::model().power;
     }
@@ -18,7 +19,7 @@ class DemoPower final : public system_backend::PowerObject {
     }
 
     bool
-    execute_power(DataProc::PowerAction action) override {
+    execute_power(hal::PowerCommand action) override {
         if (action == hal::PowerCommand::Off) {
             demo::model().power = {false, false, true, hal::PowerCause::User};
         }
@@ -142,7 +143,7 @@ class DemoInit final : public hal::InitObject {
 } // namespace
 
 DeviceManager&
-system_backend::devices() {
+hal::manager() {
     static DemoPower power;
     static DemoRead<hal::BatteryState, &demo::Model::battery> battery(hal::names::Battery);
     static DemoRead<hal::GNSSState, &demo::Model::gnss> gnss(hal::names::GNSS);

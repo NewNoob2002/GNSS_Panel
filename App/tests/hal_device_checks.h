@@ -1,8 +1,18 @@
 #pragma once
 #include <cassert>
 #include <cstring>
-#include "SystemBackend.h"
-#include "SystemService.h"
+#include "DataProc.h"
+#include "HAL_Manager.h"
+#include "Def/DP_Power.h"
+#include "Def/DP_Battery.h"
+#include "Def/DP_GNSS.h"
+#include "Def/DP_Clock.h"
+#include "Def/DP_Work.h"
+#include "Def/DP_Recorder.h"
+#include "Def/DP_WiFi.h"
+#include "Def/DP_Version.h"
+#include "Def/DP_Init.h"
+#include "Def/DP_Settings.h"
 #include "Helper/NodeHelper.h"
 #include "Def/HAL_Battery.h"
 #include "Def/HAL_GNSS.h"
@@ -13,8 +23,14 @@
 #include "Def/HAL_Init.h"
 
 namespace hal_test {
+/** @brief 从真实领域节点同步读取，避免测试重新组成聚合快照。 */
+template<class Domain> typename Domain::State snapshot() {
+    typename Domain::State value;
+    assert(Domain::pull(*DataProc::Broker()->mainNode(), value) == DataNode::RES_OK);
+    return value;
+}
 inline DeviceObject* device(const char* name) {
-    auto* d = system_backend::devices().getDevice(name);
+    auto* d = hal::manager().getDevice(name);
     assert(d);
     return d;
 }
@@ -86,44 +102,22 @@ inline void shapes() {
     for (const auto& command : invalid_record)
         assert(hal::write(device(hal::names::Recorder), command) == DeviceObject::RES_PARAM_ERROR);
 }
-/** 所有可对应字段逐项比较，避免只检查少数代表字段。 */
+/** @brief HAL 与领域逐字段比较（含全部数组、有效位与 pending），不经过聚合转换。 */
+inline uint32_t frozen_tick() { return 0; }
 inline void equivalent() {
-    assert(DataProc_Init(+[]() -> uint32_t { return 0; }));
-    const auto d = DeviceService::snapshot();
-    DataProc::StatusSnapshot s;
-    assert(DataProc::Broker()->mainNode()->pull(dp::names::Status, &s, sizeof(s)) == DataNode::RES_OK);
-    const auto system = SystemService::snapshot();
-    const auto battery = read<hal::BatteryState>(hal::names::Battery);
-    assert(battery.valid == d.power_valid && battery.level_percent == s.battery_percent);
-    assert(battery.gauge_percent == d.battery_percent && battery.voltage == d.battery_voltage);
-    assert(battery.temperature_valid == s.battery_temperature_valid && battery.temperature == d.battery_temperature);
-    assert(static_cast<int>(battery.charge) == static_cast<int>(d.charge) && battery.external_power == d.external_power);
-    const auto gnss = read<hal::GNSSState>(hal::names::GNSS);
-    assert(gnss.position_valid == d.position_valid && gnss.latitude == d.latitude && gnss.longitude == d.longitude);
-    assert(gnss.altitude == d.altitude && gnss.satellites_valid == d.satellites_valid);
-    assert(gnss.satellites_used == d.satellites_used && gnss.satellites_tracked == d.satellites_tracked);
-    assert(gnss.constellations_valid == d.constellations_valid && gnss.constellations == d.constellations);
-    const auto clock = read<hal::ClockState>(hal::names::Clock);
-    assert(clock.time_valid == s.clock_valid && clock.hour == s.hour && clock.minute == s.minute && clock.second == s.second);
-    assert(clock.source == hal::ClockSource::Uptime);
-    const auto work = read<hal::WorkState>(hal::names::Work);
-    assert(work.valid == d.work_valid && work.pending == d.work_pending && work.radio_on == d.radio_on);
-    assert(static_cast<int>(work.mode) == static_cast<int>(d.work_mode));
-    assert(work.protocol == d.radio_protocol && work.channel == d.radio_channel);
-    assert(static_cast<int>(work.ntrip) == static_cast<int>(d.ntrip));
-    const auto record = read<hal::RecorderState>(hal::names::Recorder);
-    assert(record.valid == d.record_valid && record.recording == d.recording && record.pending == d.record_pending);
-    assert(record.type == d.record_type && record.interval == d.record_interval && record.name == d.record_name);
-    assert(record.space_mb == d.record_space_mb);
-    const auto wifi = read<hal::WifiState>(hal::names::WiFi);
-    assert(wifi.valid == d.wifi_valid && wifi.station == d.wifi_station && wifi.ssid == d.wifi_ssid && wifi.ip == d.wifi_ip);
-    assert(wifi.on == system.wifi_on && wifi.pending == system.wifi_pending);
-    const auto board = read<hal::BoardState>(hal::names::Board);
-    assert(board.firmware == d.firmware && board.hardware == d.hardware && board.build == d.build && board.uptime_s == d.uptime_s);
-    assert(board.capabilities.simulated == system.simulated && board.capabilities.reboot_available == system.reboot_available
-        && board.capabilities.star_map == system.star_map && board.capabilities.record_settings == system.record_settings);
-    assert(wifi.available == board.capabilities.wifi_available);
-    assert(record.reported_recording == s.recording);
+    assert(DataProc_Init(frozen_tick));
+    assert(!snapshot<dp::Power>().pending && snapshot<dp::Power>().calls == 0);
+    assert(!snapshot<dp::Init>().started);
+    assert(snapshot<dp::Settings>().language == i18n::get_language());
+    assert(snapshot<dp::Battery>() == read<hal::BatteryState>(hal::names::Battery));
+    assert(snapshot<dp::GNSS>() == read<hal::GNSSState>(hal::names::GNSS));
+    assert(snapshot<dp::Clock>().clock == read<hal::ClockState>(hal::names::Clock));
+    assert(snapshot<dp::Clock>().clock.source == hal::ClockSource::Uptime);
+    assert(snapshot<dp::Work>() == read<hal::WorkState>(hal::names::Work));
+    assert(snapshot<dp::Recorder>() == read<hal::RecorderState>(hal::names::Recorder));
+    assert(snapshot<dp::WiFi>() == read<hal::WifiState>(hal::names::WiFi));
+    assert(snapshot<dp::Version>() == read<hal::BoardState>(hal::names::Board));
+    assert(snapshot<dp::WiFi>().available == snapshot<dp::Version>().capabilities.wifi_available);
     assert(DataProc_Deinit());
 }
 /** 逐字段扰动：相等运算不能漏掉成员，也不能比较结构体填充字节。 */

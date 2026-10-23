@@ -21,18 +21,20 @@ Oswald 字体只增加俄语 ё 对已有同形 ë 字形的 cmap 映射；v8 �
 - `SaveConfig` 保留 26px 状态栏：左侧主卡显示 32px 电源图标与关机/重启动作，右侧圆角卡显示实时原因、取消或保留供电提示、8px 橙色进度条及百分比；仅位移入场，进度仍为 8 秒。
 - 工作页提供电台移动站、电台基站、网络基站三种预设；选择预设/协议/信道只改草稿，点击 Apply 才发送，CUSTOM 拒绝时留页提示。网络预设隐藏电台字段。
 - 页面切换全部为滑动（`style::kPageTransitionMs` 260 ms、缓出），不用整页淡入：整页透明度图层在 MCU 上最慢，且 LVGL 8.3 对含全屏子对象的页面在该图层中绘制错位（SaveConfig 花屏）。`PageManager::switchTo()` 先创建页面再 `lv_anim_refr_now()`，创建耗时不计入切换动画；SystemLoading 期间 App 预加载 Dialplate 与 SaveConfig（`PageManager::preload()`）。缓存/预加载页面在 `onViewWillAppear()` 前已取消隐藏，页面可以聚焦自身根对象。屏幕对象关闭滚动条。冷启动时 Power 键在 UI 开始轮询前已按下，长按模式按去抖电平 `ButtonGesture::held()` 计时（单击判定仍被取消），待机页开机进度从这次按压开始。
-- SystemLoading 按实际检查推进：控制器每 50 ms 轮询 `system_backend::poll_initialization_step()`（返回 Pending/Ok/Failed，平台自带超时，页面另有 `kStepLimitMs` 兜底），每步至少显示 300 ms、结果再停留 150 ms；进度条只在步骤完成时前进，齿轮持续旋转，单步超过 1 s 显示已等待秒数。失败只标红、不阻止进入 Dialplate。
+- SystemLoading 按实际检查推进：控制器每 50 ms 经 Model 调用 `dp::Init::poll()`（返回 Pending/Ok/Failed，平台自带超时，页面另有 `kStepLimitMs` 兜底），步骤名称和本地化标题由 `dp::Init::info()` 读取后交给 View，每步至少显示 300 ms、结果再停留 150 ms；进度条只在步骤完成时前进，齿轮持续旋转，单步超过 1 s 显示已等待秒数。失败只标红、不阻止进入 Dialplate。
 - 记录页默认聚焦启停，开始与停止都是单击（双击同样有效），等待主控确认期间不重复发送。状态栏 SD 图标跟随平台上报的录制状态：变化时先滑出状态栏、换色后滑回，录制中蓝色闪烁，未录制为静止白色。固定参数产品显示只读参数，参数在记录或等待期间锁定。
-- `DeviceSnapshot` 的 `work_pending/record_pending` 表达主控接收等待，通用反馈区分等待、收到、拒绝与 15 秒超时；超时不取消平台请求，返回不隐式撤销请求。已接收不代表物理操作完成。
+- Work/Recorder 领域的 `pending` 表达主控接收等待，通用反馈区分等待、收到、拒绝与 15 秒超时；超时不取消平台请求，返回不隐式撤销请求。已接收不代表物理操作完成。
 - 设备信息恢复全屏浏览：每次进入默认聚焦根页面，滚轮/方向键切到 Work/GPS/Wi-Fi/Battery/Storage/System，根页或信息项点击即返回；不保留上次查看项、不显示新增浏览提示。卫星页可见名称为 Satellites/Спутники，内部路由不变。
 - 工作/记录/系统设置使用图形主卡、原生尺寸参数图标和渐变，控件按 40 ms 间隔上移 6 px 进入（只做位移，不做逐控件透明度）；值变化短淡入，只有主控等待或记录进行时状态点呼吸，离页停止。正常状态不显示新增操作说明，业务错误和确认反馈保留。
 - 下面记录了早期迁移过程；其中十页、三卡系统菜单、设置子页与信息卡点击返回等布局描述已由上述结构替代。
 
-## 迁移历史与平台边界
+## 平台边界与迁移历史
+
+- 当前平台边界：`Service/HAL/HAL_Manager.h` 的 `hal::manager()` 返回九个细设备，平台实现位于 `Vendor/<Platform>`；`PowerObject` 与各 `HAL_Def` 解码层检查尺寸、方向及命令范围。HC32 和 Board 模拟器共用 AppPlatform，Linux、Demo 模拟器与页面测试共用 `Backends/Demo`。Power 节点持有电源状态、token 与导航边沿，AppNavigator 在 20 ms UI 定时器消费边沿；页面操作仍同步导航，PageNavi 只处理非 UI 请求。Init 节点保留最近结果并提供 info/poll，Clock 节点保留 RAM 日期与校验；StatusBar/BatteryWarning 独立订阅领域值。聚合节点、SystemBackend/SystemService/ModelUtils 和粗快照在 3.7f 删除。下列早期迁移记录仅为历史，不代表当前接口。
 
 - 原 View/资源/工具来源：`HC32F460xE_Arduino/Simulator/App`，提交 `37b069a0e76061dbac07e9345e653d1796945bac`；保留许可说明。PageManager 后续已加固路由、卸载和边界，不再是仅头文件适配。
 - 本分支最初移植 FASTSHIFT/X-TRACK 的旧版消息框架（MIT），源提交 `c42b8e5605e50838f4c0c9828385948fa33ab485`。旧移植已由当前 Frameworks/DataBroker 取代，其注册、销毁和参数边界加固延续到新实现；未引入 X-TRACK HAL。
-- 每个路由页在自身目录拥有 Controller、View、Model。Model 独占 DataNode 并订阅/拉取/接收数据、通知服务和 StatusBar；构造函数不注入 DataProc，已删除共享 PageModel。`Service/DataProc` 仅初始化处理 DataNodes 并提供 `DataProc::Broker()`；路由在 Frameworks/DataBroker，行为在处理模块/SystemService。
+- 每个路由页在自身目录拥有 Page（Presenter）、View、Model。Model 继承 DataNode，只订阅所需领域、pull 初值并通过类型化 Helper 发命令；自有状态经 LVGL subject/observer 通知 View。`Service/DataProc` 创建十个领域节点及 Button/PageNavi，支持逆序销毁；状态和命令分离，不再保留聚合服务或 Model 兼容便捷接口。
 - `App` 组合十页、StatusBar 与通用输入。原 Shutdown 路由更名为 SystemDash，不保留旧路由别名；新增 SystemSettings。SystemDash/SystemInfos/SystemSettings 通过各自 Model 通知将状态栏移至屏外，SystemDash 及其 Settings 子页统一使用全屏；StatusBar 仅在工作页等明确需要的页面显示。沿用 HC32 的 500ms y=−26↔0 动画（显示 ease-out、隐藏 overshoot），不切换根对象 hidden flag；反向从当前位置继续，同向不重启。只有页面展示请求控制移动，数据刷新不擅自改变位置。
 - RK3506J 真正产品输入是两路 GPIO HIGH/LOW 电平，不是键盘 F/P 或 evdev/ADC 按键；Function/Power 只是逻辑职责名。Function GPIO 单击 NEXT/+1、双击 BACK/CANCEL；Power GPIO 单击 ENTER/选择、双击 COMMIT。主机 SDL 与 UI 测试不使用该绑定或双击等待：方向键/滚轮换焦点，Enter/中键按下与松开（Startup 长按 2 秒启动，其余页面短按选择），Esc/右键返回，Ctrl+Enter 提交，左键指针交互和 Q 退出恢复。当前测试板用 V− 代替 Function、V+ 代替 Power，按下/松开经 on_key()/poll_keys() 复用两键逻辑；V− 单击切焦点、双击返回，V+ 单击选择、双击提交，Startup 长按 V+ 约 2 秒启动演示；MENU/ESC 不再参与。旧四键适配仅 KEY_ENTER 能触发 Commit，测试板没有该键，因而无法确认关机/重启。量产 GPIO chip/line、有效 HIGH/LOW、输入/pull 配置与时序尚未验证，不默认映射。平台读取电平后按确认的有效电平归一化 pressed，再在 UI 线程调用 on_key()/poll_keys()；读取失败应取消输入并报错。linux_button_read_keys() 用于当前 evdev 测试适配，不能替代 GPIO 产品接入。rk3506_app 每轮主循环读空 evdev 队列（读取函数跳过 EV_SYN 等记录，NONE 表示队列已空），并以 EVIOCSCLOCKID 选定的 CLOCK_MONOTONIC 事件时间戳调用 App::on_key_at()：先按旧电平采样到该时刻，再应用新电平，避免慢帧期间排队的按下/松开被合并或丢失；poll_keys() 对早于上次采样的时间按上次处理。界面不添加测试键提示。
 - SystemDash 为 Power/Settings/Return 三卡；其 Settings 子页同样保持 StatusBar 隐藏（88px 宽、7px 间隔），Function 单击循环三项、Power 单击选 Return 使用 PageManager::pop() 返回上页，主机 Enter/指针同样有效；StarMap 隐藏根页黄色焦点外框，保留焦点与点击返回能力；电源弹窗默认 Cancel，Shutdown/Reboot 仅产品 Power GPIO 双击（主机直接 Commit）进入 SaveConfig 后调用模拟 SystemService，重复执行被 token 拦截，提前返回取消事务。按用户确认移除手动日期入口与编辑器及页面草稿逻辑；SystemSettings 仅语言内联切换、禁用 Wi-Fi 与可见 Back，Function 单击循环语言/Back、Power 单击选择，不要求 Up/Down；双击 Function 仍可返回。原 RAM 日期服务/校验契约保留但无手动 UI 入口。没有系统时钟写入、持久化或 Linux/设备关机重启命令。
@@ -51,10 +53,10 @@ Oswald 字体只增加俄语 ё 对已有同形 ë 字形的 cmap 映射；v8 �
 保留 `Frameworks/DataBroker`、`DeviceManager`、`ResourceManager` 各源码文件的 X-TRACK MIT 许可和版权。本节记录 LVGL 8 阶段三个无图形依赖框架的适配；当前 LVGL 与页面管理状态见上文及下节。
 
 - DataTimer 移植本仓库原调度器的 32 项定长表、递增序号与回调快照，避免回调中删除自己/其他定时器后访问已释放对象；当前 tick 初始化起始时刻，无时钟安全返回，支持回绕、暂停/重置/恢复，不追赶遗漏周期。逐个回调前重新取时钟，避免前一回调推进时间并重置后续定时器后误触发。保留 DataBroker 的方法命名，新增注册结果查询；零周期暂停或删除节点定时器。
-- DataBroker 的节点池和订阅关系使用定长值成员，外部节点上限 16；主节点也改为值成员，不再使用异常分配。重复/空名称注册失败，通过 DataNode::isRegistered() 查询；重复订阅返回 nullptr。DataNode 定时器使用 nothrow 分配并检查失败。
+- DataBroker 的节点池和订阅关系使用定长值成员，外部节点上限在 3.7c 提高到 32；主节点也改为值成员，不再使用异常分配。重复/空名称注册失败，通过 DataNode::isRegistered() 查询；重复订阅返回 nullptr。DataNode 定时器使用 nothrow 分配并检查失败。
 - DataNode 发布使用地址加注册序号的快照和存活/订阅校验，允许回调删除订阅者或原址重建，禁止回调中销毁当前发布者及路由器。销毁时清理双向关系；subscribe/pull/notify/publish 校验注册状态、目标、指针及长度。默认事件掩码支持派生 onEvent；resetTimer 只重置时间，不隐式恢复。
 - DataBroker 日志宏接到现有 `App/Utils/Log`，例行分发使用 DEBUG；主节点默认接收成功，无业务订阅者时发布仍成功。应用服务保留各自值快照，原 Commit+Publish 改为 publish(data, size)，接收方继续按值拷贝。
-- DeviceObject 的默认虚函数省略未使用形参，消除 -Wextra/-Werror 告警；ioctl 按整数位域值解码，移除严格别名强转，并校验精确尺寸及非零尺寸空指针。SystemBackend 公共设备解码层统一按值拷贝，三端通过 DeviceManager 注册 Power/Device/Status；HC32 保留原 HAL 时序、协议索引映射与单写者约束。
+- DeviceObject 的默认虚函数省略未使用形参，消除 -Wextra/-Werror 告警；ioctl 按整数位域值解码，移除严格别名强转，并校验精确尺寸及非零尺寸空指针。HAL 公共设备解码层统一按值拷贝，三端通过 `hal::manager()` 注册九个细设备；HC32 保留原 HAL 时序、协议索引映射与单写者约束。
 - ResourcePool 改用 ResourceManager.h 静态数组模板，保留公开接口、默认字体及缺失图片行为，不再动态注册资源；移除未使用的 ResourceManagerStatic 实现、本仓库旧消息缓冲框架和旧资源管理器。
 
 ## X-TRACK PageManager 适配（LVGL 9.6）

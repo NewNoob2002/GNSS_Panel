@@ -17,15 +17,6 @@ class SaveConfigView {
     void unbind();
 
     void update(const SaveConfigState& state);
-    void update(const DataProc::SystemState& state) {
-        SaveConfigState s{};
-        s.shutting_down = state.shutting_down;
-        s.power_cause = state.power_cause;
-        s.power_action = state.power_action;
-        s.power_pending = state.power_pending;
-        s.power_token = state.power_token;
-        update(s);
-    }
 
     lv_anim_t* progress_animation() {
         return &progress_animation_;

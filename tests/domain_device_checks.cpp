@@ -85,13 +85,9 @@ check_domain_devices() {
     for (hal::WorkTarget target : {hal::WorkTarget::Rover, hal::WorkTarget::Base, hal::WorkTarget::Ntrip}) {
         for (unsigned protocol = 0; protocol < hal::kRadioProtocolCount; ++protocol) {
             State::Reset();
-            DataProc::DeviceRequest old;
-            old.command = DataProc::DeviceCommand::ApplyWork;
-            old.target = static_cast<DataProc::WorkTarget>(target);
-            old.radio_protocol = protocol;
-            old.radio_channel = 9;
+            const hal::WorkCommand command{target, protocol, 9};
             BusinessDevice original;
-            assert(original.execute_device(old));
+            assert(original.execute(command));
             const WorkConfig_t previous = State::Effective_Work();
             const auto revision = State::Work_Revision();
             State::Reset();
@@ -107,13 +103,9 @@ check_domain_devices() {
         for (unsigned type = 0; type < hal::kRecordTypeCount; ++type) {
             for (unsigned interval = 0; interval < hal::kRecordIntervalCount; ++interval) {
                 State::Reset();
-                DataProc::DeviceRequest old;
-                old.command = action == hal::RecordAction::Start ? DataProc::DeviceCommand::StartRecord
-                                                                 : DataProc::DeviceCommand::StopRecord;
-                old.record_type = type;
-                old.record_interval = interval;
+                const hal::RecorderCommand command{action, type, interval};
                 BusinessDevice original;
-                assert(original.execute_device(old));
+                assert(original.execute(command));
                 const RecordInfo_t previous = State::Effective_Record();
                 const auto revision = State::Record_Revision();
                 State::Reset();
@@ -136,25 +128,28 @@ check_domain_devices() {
         assert(result == (PRODUCT_SHUTDOWN_WIFI_BUTTON ? DeviceObject::RES_OK : DeviceObject::RES_UNSUPPORT));
         hal_test::equivalent();
     }
+    assert(DataProc_Init(hal_test::frozen_tick));
     constexpr hal::InitStage stages[] = {hal::InitStage::Configuration, hal::InitStage::BatteryGauge,
                                          hal::InitStage::Charger, hal::InitStage::HostPower, hal::InitStage::HostLink};
     for (unsigned step = 0; step < hal::kInitializationStepCount; ++step) {
         hal::InitInfo info;
         info.step = step;
         assert(hal::ioctl(hal_test::device(hal::names::Init), hal::kInitializationInfo, info) == DeviceObject::RES_OK);
-        assert(info.stage == stages[step] && std::strcmp(info.name, system_backend::initialization_name(step)) == 0);
+        dp::InitStepInfo meta;
+        assert(dp::Init::info(*DataProc::Broker()->mainNode(), step, meta) == DataNode::RES_OK);
+        assert(info.stage == stages[step] && std::strcmp(info.name, meta.name) == 0);
         for (uint32_t elapsed : {0U, 30000U}) {
             hal::InitPoll poll;
             poll.step = step;
             poll.elapsed_ms = elapsed;
-            char detail[96]{};
-            const auto old = system_backend::poll_initialization_step(step, elapsed, detail, sizeof(detail));
+            DataProc::InitializationResult result;
+            assert(dp::Init::poll(*DataProc::Broker()->mainNode(), step, elapsed, result) == DataNode::RES_OK);
             assert(hal::ioctl(hal_test::device(hal::names::Init), hal::kPollInitialization, poll)
                    == DeviceObject::RES_OK);
-            assert(static_cast<int>(poll.status) == static_cast<int>(old)
-                   && std::strcmp(poll.detail.data(), detail) == 0);
+            assert(static_cast<int>(poll.status) == static_cast<int>(result.status) && poll.detail == result.detail);
         }
     }
+    assert(DataProc_Deinit());
     // HC32 无重启能力；非法命令不得触发关机，开机 ioctl 的编码/尺寸必须严格匹配。
     State::Reset();
     assert(hal::write(hal_test::device(hal::names::Power), hal::PowerCommand::Reboot) == DeviceObject::RES_UNKNOWN);

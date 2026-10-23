@@ -1,5 +1,5 @@
 // HC32 带屏产品：共享 LVGL 应用 + AppPlatform（固件路径）的主机回归。
-// 使用固件 lv_conf.h（96 KB LVGL 内存池）并让 C++ new 走 LVGL 池（lvgl_new.cpp），检查内存峰值余量；
+// 使用固件 lv_conf.h（96 KB LVGL 内存池）并让 C++ new 走 LVGL 池（lvgl_new.cpp），核对领域状态与内存峰值；
 // 主机指针为 8 字节，测得峰值高于 32 位单片机，结论偏保守。
 #include <cassert>
 #include <cstdint>
@@ -14,11 +14,10 @@
 #include "AppPlatform.h"
 #include "Charger.h"
 #include "I18n.h"
-#include "SystemService.h"
 #include "SystemState.h"
 #include "UI/Common/PageStyle.h"
 #include "UI/Resource/ResourcePool.h"
-#include "mcu_config.h"
+#include "hal_device_checks.h"
 void check_domain_devices();
 
 namespace {
@@ -211,7 +210,7 @@ cold_boot_idle() {
     assert(now < 6000);
     assert(gpio_read(POWER_CONTROL_PIN) == GPIO_LOW);
     if (systemInfo.power.panel_power_on) {
-        assert(SystemService::snapshot().powered_on);
+        assert(hal_test::snapshot<dp::Power>().platform.powered_on);
     }
 }
 
@@ -367,7 +366,7 @@ main() {
     run(100);
     assert(on_page("Pages/Startup") && startup_progress(lv_screen_active()) > 0);
     assert(power_on_requests == 0 && !systemInfo.power.panel_power_on);
-    assert(!SystemService::snapshot().powered_on && gpio_read(POWER_CONTROL_PIN) == GPIO_LOW);
+    assert(!hal_test::snapshot<dp::Power>().platform.powered_on && gpio_read(POWER_CONTROL_PIN) == GPIO_LOW);
     power_key = true;
     run(1995);
     assert(power_on_requests == 0 && !systemInfo.power.panel_power_on);
@@ -421,14 +420,17 @@ main() {
     std::snprintf(State::Board().hardware_version, sizeof(systemInfo.board.hardware_version), "V1.5");
     run(1000); // Version 节点按 1000 ms 拉取版本信息。
     {
-        const auto device = DeviceService::snapshot();
-        assert(device.work_mode == DataProc::WorkMode::Rover && device.radio_on);
-        assert(device.radio_protocol == 3 && device.radio_channel == 5);
-        assert(device.ntrip == DataProc::NtripRole::None);
-        assert(device.record_type == 1 && device.record_interval == 2 && !device.recording);
-        assert(std::strcmp(device.record_name.data(), "ABCDEFGHIJKLMNOP") == 0);
-        assert(std::strcmp(device.hardware.data(), "V1.5") == 0);
-        assert(device.power_valid && device.battery_voltage == 7.8f);
+        const auto work = hal_test::snapshot<dp::Work>();
+        const auto record = hal_test::snapshot<dp::Recorder>();
+        const auto board = hal_test::snapshot<dp::Version>();
+        const auto battery = hal_test::snapshot<dp::Battery>();
+        assert(work.mode == hal::WorkMode::Rover && work.radio_on);
+        assert(work.protocol == 3 && work.channel == 5);
+        assert(work.ntrip == hal::NtripRole::None);
+        assert(record.type == 1 && record.interval == 2 && !record.recording);
+        assert(std::strcmp(record.name.data(), "ABCDEFGHIJKLMNOP") == 0);
+        assert(std::strcmp(board.hardware.data(), "V1.5") == 0);
+        assert(battery.valid && battery.voltage == 7.8f);
     }
 
     // 选择预设仅改草稿，点击 Apply 才下发；发出后留页等待主控读走。
@@ -446,11 +448,11 @@ main() {
         assert(work.radio_protocol == 5 && work.radio_channel == 5 && work.gprs_status == On_Off_Status_OFF);
     }
     assert(host.work.work_mode == rover_mode);
-    assert(DeviceService::snapshot().work_pending);
+    assert(hal_test::snapshot<dp::Work>().pending);
     assert(find_text(lv_screen_active(), i18n::text(i18n::TextId::RequestWaiting)));
     State::Confirm_Work(State::Work_Revision());
     run(600);
-    assert(!DeviceService::snapshot().work_pending && host.work.work_mode == autobase_mode);
+    assert(!hal_test::snapshot<dp::Work>().pending && host.work.work_mode == autobase_mode);
     assert(find_text(lv_screen_active(), i18n::text(i18n::TextId::RequestReceived)));
     assert(App_Get()->back());
     run(800);
@@ -468,7 +470,7 @@ main() {
         assert(request.work_pending && work.radio_status == On_Off_Status_OFF);
         assert(work.gprs_status == On_Off_Status_ON && work.NtripServer_status == On_Off_Status_ON);
     }
-    assert(DeviceService::snapshot().ntrip == DataProc::NtripRole::Server && !DeviceService::snapshot().radio_on);
+    assert(hal_test::snapshot<dp::Work>().ntrip == hal::NtripRole::Server && !hal_test::snapshot<dp::Work>().radio_on);
     State::Confirm_Work(State::Work_Revision());
     run(600);
     assert(App_Get()->back());
@@ -497,7 +499,7 @@ main() {
         assert(record.record_status == On_Off_Status_ON && request.record_op && request.record_settings_pending);
         assert(record.record_type == 2 && record.record_interval == 0x01);
     }
-    assert(DeviceService::snapshot().recording && DeviceService::snapshot().record_pending);
+    assert(hal_test::snapshot<dp::Recorder>().recording && hal_test::snapshot<dp::Recorder>().pending);
     assert(find_text(lv_screen_active(), i18n::text(i18n::TextId::RequestWaiting)));
     run(400);
     assert(!status_recording()); // 主控确认前状态栏仍按实际（未录制）显示
@@ -506,7 +508,7 @@ main() {
     assert(State::Record_Revision() == revision);
     State::Confirm_Record(State::Record_Revision(), true);
     run(600);
-    assert(!DeviceService::snapshot().record_pending && status_recording());
+    assert(!hal_test::snapshot<dp::Recorder>().pending && status_recording());
     assert(host.record.record_status == On_Off_Status_ON && !request.record_op);
     choose(i18n::TextId::Stop);
     App_Get()->on_input(App::InputAction::Confirm);
@@ -521,14 +523,14 @@ main() {
     assert(on_page("Pages/Dialplate"));
 
     // Wi-Fi：发出设定后显示 "..."，主控回报一致后结束；主控不回报时 15 s 后放弃等待。
-    assert(SystemService::snapshot().wifi_available == (PRODUCT_SHUTDOWN_WIFI_BUTTON != 0));
+    assert(hal_test::snapshot<dp::WiFi>().available == (PRODUCT_SHUTDOWN_WIFI_BUTTON != 0));
     // 无论能否切换，主控回报的状态都要显示。
     host.wifi.wifi_status = On_Off_Status_ON;
     run(500);
-    assert(SystemService::snapshot().wifi_on && !SystemService::snapshot().wifi_pending);
+    assert(hal_test::snapshot<dp::WiFi>().on && !hal_test::snapshot<dp::WiFi>().pending);
     host.wifi.wifi_status = On_Off_Status_OFF;
     run(500);
-    assert(!SystemService::snapshot().wifi_on);
+    assert(!hal_test::snapshot<dp::WiFi>().on);
     if (PRODUCT_SHUTDOWN_WIFI_BUTTON) {
         auto& wifi = host.wifi;
         assert(App_Get()->show_page("Pages/SystemDash"));
@@ -537,17 +539,17 @@ main() {
         App_Get()->on_input(App::InputAction::Confirm);
         assert(request.wifi_on == On_Off_Status_ON && request.wifi_pending);
         run(50);
-        assert(SystemService::snapshot().wifi_pending && find_text(lv_screen_active(), "..."));
+        assert(hal_test::snapshot<dp::WiFi>().pending && find_text(lv_screen_active(), "..."));
         wifi.wifi_status = On_Off_Status_ON;
         run(500);
-        assert(!SystemService::snapshot().wifi_pending && SystemService::snapshot().wifi_on);
+        assert(!hal_test::snapshot<dp::WiFi>().pending && hal_test::snapshot<dp::WiFi>().on);
         assert(!find_text(lv_screen_active(), "..."));
         App_Get()->on_input(App::InputAction::Confirm);
         assert(request.wifi_on == On_Off_Status_OFF);
         run(14000);
-        assert(SystemService::snapshot().wifi_pending);
+        assert(hal_test::snapshot<dp::WiFi>().pending);
         run(1500);
-        assert(!SystemService::snapshot().wifi_pending && SystemService::snapshot().wifi_on);
+        assert(!hal_test::snapshot<dp::WiFi>().pending && hal_test::snapshot<dp::WiFi>().on);
         assert(App_Get()->back());
         run(800);
     }
@@ -567,20 +569,20 @@ main() {
     power_key = false; // 未满 100% 松开：关闭弹窗，不准备关机，也不会被当作单击重新打开
     run(800);
     assert(find_text(App_Get()->focused(), i18n::text(i18n::TextId::PowerTitle)));
-    assert(!SystemService::snapshot().power_pending);
+    assert(!hal_test::snapshot<dp::Power>().pending);
     App_Get()->on_input(App::InputAction::Confirm);
     run(100);
     power_key = true;
     run(1500);
-    assert(on_page("Pages/SystemDash") && !SystemService::snapshot().power_pending);
+    assert(on_page("Pages/SystemDash") && !hal_test::snapshot<dp::Power>().pending);
     run(800); // 满 2 s：准备关机并进入 SaveConfig
     assert(on_page("Pages/SaveConfig"));
-    assert(SystemService::snapshot().power_pending);
-    assert(SystemService::snapshot().power_action == DataProc::PowerAction::Off);
-    assert(SystemService::snapshot().power_calls == 0);
+    assert(hal_test::snapshot<dp::Power>().pending);
+    assert(hal_test::snapshot<dp::Power>().action == hal::PowerCommand::Off);
+    assert(hal_test::snapshot<dp::Power>().calls == 0);
     power_key = false;
     run(10000);
-    assert(SystemService::snapshot().power_calls == 1);
+    assert(hal_test::snapshot<dp::Power>().calls == 1);
     assert(systemInfo.power.ShutdownGoing); // HAL 已开始等待主控确认。
     run(200);
     assert(App_Get()->back() && on_page("Pages/SaveConfig")); // 关机中不能返回
@@ -602,7 +604,7 @@ main() {
     assert(find_text(lv_screen_active(), i18n::text(i18n::TextId::SaveConfigPowerOffBoard)));
     assert(App_Get()->back() && on_page("Pages/SaveConfig"));
     run(10000);
-    assert(SystemService::snapshot().power_calls == 1);
+    assert(hal_test::snapshot<dp::Power>().calls == 1);
     hal_enter_standby();
 
     // V1.3 主板没有 MP2762A（GPIO 控制充电），充电初始化步骤不算失败。
@@ -611,7 +613,7 @@ main() {
     std::snprintf(State::Board().hardware_version, sizeof(systemInfo.board.hardware_version), "V1.3");
     hal_power_on_and_boot();
     {
-        const auto charger = SystemService::snapshot().initialization[2];
+        const auto charger = hal_test::snapshot<dp::Init>().results[2];
         assert(charger.status == DataProc::InitializationStatus::Ok);
         assert(std::strstr(charger.detail.data(), "GPIO charge control (board V1.3)"));
     }
@@ -646,7 +648,7 @@ main() {
     run(25000); // 第 5 步约在加载开始 2 s 后开始，等满 30 s，再经过完成与就绪页（约 1.5 s）
     assert(on_page("Pages/Dialplate"));
     {
-        const auto report = SystemService::snapshot().initialization;
+        const auto report = hal_test::snapshot<dp::Init>().results;
         assert(report[1].status == DataProc::InitializationStatus::Ok);
         assert(report[2].status == DataProc::InitializationStatus::Failed);
         assert(std::strstr(report[2].detail.data(), "MP2762A not responding (board V1.5)"));
@@ -664,7 +666,7 @@ main() {
     run(2500);
     assert(on_page("Pages/Dialplate"));
     {
-        const auto link = SystemService::snapshot().initialization[4];
+        const auto link = hal_test::snapshot<dp::Init>().results[4];
         assert(link.status == DataProc::InitializationStatus::Ok && std::strstr(link.detail.data(), "host link up"));
     }
     // 等待主控期间强制关机（Function 长按，HAL 置 Force_ShutDown）：立即进入关机页，随后正常待机。

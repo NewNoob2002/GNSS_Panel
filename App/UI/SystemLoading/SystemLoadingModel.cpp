@@ -1,7 +1,6 @@
 #include "SystemLoadingModel.h"
 #include <algorithm>
 #include <cstdio>
-#include "SystemBackend.h"
 #include "Log.h"
 
 using namespace page;
@@ -41,14 +40,19 @@ DataProc::InitializationStatus SystemLoadingModel::poll_step(unsigned step, uint
         APP_LOG_E("SystemLoading", "invalid/uninitialized step %u", step);
         return DataProc::InitializationStatus::Failed;
     }
-    const char* name = system_backend::initialization_name(step);
+    dp::InitStepInfo info;
+    (void)dp::Init::info(*this, step, info);
+    const char* name = info.name;
     const char* tag = state_.simulated ? " [DEMO]" : "";
     if (elapsed_ms == 0)
         APP_LOG_I("SystemLoading", "step %u/5 %s: begin%s", step + 1, name, tag);
 
     DataProc::InitializationResult result{};
     auto& detail = result.detail;
-    auto status = system_backend::poll_initialization_step(step, elapsed_ms, detail.data(), detail.size());
+    (void)dp::Init::poll(*this, step, elapsed_ms, result);
+    auto status = result.status;
+    if (status == DataProc::InitializationStatus::NotRun)
+        status = DataProc::InitializationStatus::Failed;
     if (status == DataProc::InitializationStatus::Pending && elapsed_ms >= kStepLimitMs) {
         std::snprintf(detail.data(), detail.size(), "no result within %lu ms",
                       static_cast<unsigned long>(kStepLimitMs));

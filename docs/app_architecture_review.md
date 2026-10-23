@@ -101,3 +101,14 @@ App/
 | 3.7f | 删除 `SystemBackend`/`SystemService`/`model_utils` 等旧路径；测试迁移；`AGENTS.md`、`App/ARCHITECTURE.md` 更新 | 无 |
 
 每步验收：6 个固件 preset、host-tests、app-core-tests、linux-host、三个模拟器冒烟、`check_layers.py`、`check_state_ownership.py`；九页截图与 3.6 后基线逐字节一致；X1Pro/XBase release 体积与 RAM 余量报告（RAM 余量不少于 8 KiB，主机 LVGL 池峰值不明显上升）。模拟器交互由用户对比确认。
+
+## 实施结果（3.7a–3.7f）
+
+- **3.7a**：目录调整为 `Config/Service/UI/Utils`；AppFactory 使用显式 PageList 清单安装九页，清单同时生成 PageId，StarMap 按领域能力过滤；模板参与主机编译但不注册。静态库不使用易被链接器丢弃的静态自注册。
+- **3.7b**：Power、Battery、GNSS、Clock、Work、Recorder、WiFi、Board、Init 九个精确尺寸设备契约落在 `Service/HAL/Def`，HC32/Board 共用实现，Linux/Demo 共用单一模型。协议码转换与 State 请求写入仍由 HC32 平台持有。
+- **3.7c**：拆出十个领域节点，主动拉取、值变化才发布；状态与命令分离，语义校验不依赖发送方名称，DataBroker 节点容量提高到 32，支持显式销毁。领域名集中定义，调用点使用类型化 Helper。
+- **3.7d**：App 收敛为组装与所有权管理；Button 处理采样和手势，Power 处理电源事务与导航边沿，AppNavigator 消费边沿、处理预加载和导航。没有引入 Global 节点；同步页面导航保留返回值与失败回滚，PageNavi 的有界 FIFO 仅用于非 UI 请求。
+- **3.7e**：页面 Model 继承 DataNode 并只订阅所需领域，Page 处理生命周期与输入，View 通过 LVGL 9 subject/observer 更新；StatusBar、BatteryWarning 自治。未引入参考仓库的 Binding/lv_msg，StatusBar 外观入口保留在 UI 组件，不增加同名领域节点。
+- **3.7f**：删除 Status/System/Device 聚合、200 ms 兼容定时重发、SystemService、ModelUtils、粗快照与命令；`hal::manager()` 成为正式平台注册入口，PowerObject 归 HAL。Init 节点提供类型化同步元数据/轮询查询，UI 不再直接包含 HAL，失败继续与原有时序保持；日期校验归 Clock。测试迁为领域/HAL 断言，分层检查增加 UI→HAL 禁令，AGENTS、ARCHITECTURE、SOURCE 同步更新。
+
+最终结构为十个领域节点加 Button/PageNavi，共十二个 provider、九个 HAL 细设备；与初稿相比未拆独立 Storage 节点，存储字段归 Recorder。HC32 运行时 State 及 revision 确认契约、同步应用线程分发、九页外观与交互继续保留。

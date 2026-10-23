@@ -10,7 +10,7 @@
 #include "Log.h"
 #include "PowerDevice.h"
 #include "StatusDevice.h"
-#include "SystemBackend.h"
+#include "HAL_Manager.h"
 #include "mcu_config.h"
 
 namespace {
@@ -47,16 +47,16 @@ log_sink(AppLogLevel level, const char* module, const char* message, void*) {
 
 } // namespace
 
-/** 固件和 Board 模拟器共用旧设备及领域设备，初始化不访问硬件。 */
+/** 平台持有九个细设备，初始化不访问硬件。 */
 DeviceManager&
-system_backend::devices() {
+hal::manager() {
     auto& manager = domain_devices(objects.power, objects.device, objects.status);
     // App_Init 可重建对象，因此重新标记设备可用；onInit 无硬件副作用。
     manager.init();
     return manager;
 }
 
-system_backend::Capabilities
+hal::Capabilities
 StatusDevice::capabilities() {
     return {.simulated = false,
             .reboot_available = false, // HC32 产品不提供重启

@@ -34,20 +34,6 @@ class SystemDashModel final : public Model<SystemDashState> {
 
     int onEvent(EventParam_t* event) override;
 
-    struct SettingsCompat {
-        bool wifi_available = false;
-        bool wifi_on = false;
-        bool wifi_pending = false;
-        bool reboot_available = true;
-        bool simulated = false;
-        i18n::Language language{};
-        DataProc::DateTime date{};
-    };
-    SettingsCompat settings() const {
-        return {state_.wifi_available, state_.wifi_on, state_.wifi_pending,
-                state_.reboot_available, state_.simulated, state_.language, state_.date};
-    }
-
   private:
     void apply(const dp::Settings::State& value);
     void apply(const dp::WiFi::State& value);

@@ -14,7 +14,6 @@ add_library(app_i18n STATIC
     Service/i18n/I18n.cpp Service/i18n/I18n_en.cpp Service/i18n/I18n_ru.cpp)
 add_library(app_core STATIC
     Service/DataProc/DataProc.cpp
-    Service/DataProc/DP_Status.cpp
     Service/DataProc/DP_Power.cpp
     Service/DataProc/DP_Button.cpp
     Service/DataProc/DP_PageNavi.cpp
@@ -27,9 +26,7 @@ add_library(app_core STATIC
     Service/DataProc/DP_Version.cpp
     Service/DataProc/DP_Init.cpp
     Service/DataProc/DP_Settings.cpp
-    Service/DataProc/DP_Device.cpp
-    Service/DataProc/SystemService.cpp
-    Service/HAL/SystemBackend.cpp
+    Service/HAL/PowerObject.cpp
     Utils/ButtonGesture/ButtonGesture.cpp
     Utils/FixedFormat/FixedFormat.cpp)
 foreach(target app_log app_framework app_i18n app_core)

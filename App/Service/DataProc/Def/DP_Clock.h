@@ -1,6 +1,15 @@
 #pragma once
 #include "Helper/NodeHelper.h"
 #include "HAL/Def/HAL_Clock.h"
+namespace DataProc {
+/** @brief 应用 RAM 日期；不修改平台时钟。 */
+struct DateTime {
+    unsigned year = 2026, month = 9, day = 30, hour = 12, minute = 30;
+    bool operator==(const DateTime& v) const {
+        return year == v.year && month == v.month && day == v.day && hour == v.hour && minute == v.minute;
+    }
+};
+}
 namespace dp {
 /** @brief 平台时钟与应用 RAM 日期互相独立；SetDate 不修改 HAL。 */
 struct ClockState {

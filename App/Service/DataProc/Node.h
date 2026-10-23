@@ -1,7 +1,8 @@
 #pragma once
 #include <new>
 #include "Helper/NodeHelper.h"
-#include "SystemBackend.h"
+#include "HAL_Manager.h"
+#include "HAL_Def.h"
 
 namespace dp {
 /** @brief DataProc 独占的节点对象，反初始化时逆依赖顺序销毁。 */
@@ -49,11 +50,11 @@ protected:
     const char* device_;
     virtual void refresh() {
         State next{};
-        if (hal::read(system_backend::devices().getDevice(device_), next) == DeviceObject::RES_OK && valid(next)) this->commit(next);
+        if (hal::read(hal::manager().getDevice(device_), next) == DeviceObject::RES_OK && valid(next)) this->commit(next);
     }
     virtual bool valid(const State&) const { return true; }
     template<class Command> int execute(const Command& command) {
-        const int result = hal::write(system_backend::devices().getDevice(device_), command);
+        const int result = hal::write(hal::manager().getDevice(device_), command);
         if (result != DeviceObject::RES_OK) return DataNode::RES_UNKNOWN;
         refresh();
         return DataNode::RES_OK;

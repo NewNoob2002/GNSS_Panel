@@ -8,7 +8,7 @@
 #include "DemoStatus.h"
 #include "DomainTestInput.hpp"
 #include "Log.h"
-#include "SystemService.h"
+#include "hal_device_checks.h"
 #include "UI/Common/PageStyle.h"
 #include "UI/Common/SettingsStyle.h"
 #include "UI/SaveConfig/SaveConfigView.h"
@@ -23,7 +23,7 @@ reject_save_navigation(PageManager::EVENT* event) {
         && std::strcmp(static_cast<const char*>(event->param), "Pages/SaveConfig") == 0) {
         auto* attempts = static_cast<unsigned*>(event->userData);
         ++*attempts;
-        assert(SystemService::snapshot().power_pending);
+        assert(hal_test::snapshot<dp::Power>().pending);
         return PageManager::RES_TYPE::STOP_PROCESS;
     }
     return PageManager::RES_TYPE::OK;
@@ -622,9 +622,9 @@ void saveconfig_view_lifecycle() {
     auto* ring = lv_obj_get_child(root, 0);
     auto* countdown = view.progress_animation();
     assert(lv_anim_get_playtime(countdown) == 8000 && countdown->path_cb == lv_anim_path_linear);
-    DataProc::SystemState state{};
+    page::SaveConfigState state{};
     state.power_pending = true;
-    state.power_action = DataProc::PowerAction::Off;
+    state.power_action = hal::PowerCommand::Off;
     view.appear();
     view.update(state);
     assert(label(ring, "8") && lv_arc_get_value(ring) == 0);
@@ -632,7 +632,7 @@ void saveconfig_view_lifecycle() {
     advance(100);
     state.power_pending = false;
     state.shutting_down = true;
-    state.power_cause = DataProc::PowerCause::User;
+    state.power_cause = hal::PowerCause::User;
     view.update(state);
     check_saveconfig_spinner(ring, countdown->exec_cb);
     assert(label(root, i18n::text(i18n::TextId::SaveConfigPowerOffPushKey)));
@@ -665,8 +665,8 @@ void saveconfig_view_lifecycle() {
 /** Exercise bilingual power actions, live platform takeover and the visible completion interval. */
 void
 saveconfig_scenarios(lv_display_t* display, const std::string& output) {
-    using DataProc::PowerAction;
-    using DataProc::PowerCause;
+    using PowerAction = hal::PowerCommand;
+    using hal::PowerCause;
     using i18n::TextId;
     saveconfig_view_lifecycle();
     for (auto language : {i18n::Language::English, i18n::Language::Russian}) {
@@ -720,7 +720,7 @@ saveconfig_scenarios(lv_display_t* display, const std::string& output) {
                 assert(label(root, i18n::text(TextId::SaveConfigWarning)));
                 assert(label(root, i18n::text(TextId::SaveConfigCancelHint)));
                 assert(!label(root, i18n::text(TextId::SaveConfigKeepPower)));
-                const auto calls = SystemService::snapshot().power_calls;
+                const auto calls = hal_test::snapshot<dp::Power>().calls;
                 const char* names[] = {"Off", "Reboot", "Host", "LowBattery", "Forced"};
                 if (scenario >= 2) {
                     const auto cause = scenario == 2   ? PowerCause::Host
@@ -738,7 +738,7 @@ saveconfig_scenarios(lv_display_t* display, const std::string& output) {
                     assert(!label(root, i18n::text(TextId::SaveConfigRestarting)));
                     assert(!label(root, i18n::text(TextId::SaveConfigCancelHint)));
                     assert(label(root, i18n::text(TextId::SaveConfigKeepPower)));
-                    assert(!SystemService::snapshot().power_pending);
+                    assert(!hal_test::snapshot<dp::Power>().pending);
                     assert(app.back() && std::strcmp(app.current_page(), "Pages/SaveConfig") == 0);
                     check_saveconfig_spinner(ring, countdown_callback);
                 }
@@ -757,7 +757,7 @@ saveconfig_scenarios(lv_display_t* display, const std::string& output) {
                     int previous_seconds = 8;
                     bool captured_midpoint = false;
                     for (unsigned elapsed = 0; elapsed < 8000 && !label(ring, "0"); elapsed += 10) {
-                        assert(SystemService::snapshot().power_calls == calls);
+                        assert(hal_test::snapshot<dp::Power>().calls == calls);
                         advance(10);
                         const auto value = lv_arc_get_value(ring);
                         assert(value >= previous);
@@ -778,16 +778,16 @@ saveconfig_scenarios(lv_display_t* display, const std::string& output) {
                     assert(label(ring, "0") && lv_obj_get_style_opa(seconds, LV_PART_MAIN) == LV_OPA_COVER);
                     assert(lv_arc_get_value(ring) == 1000 && lv_arc_get_angle_end(ring) == 360);
                     assert(!lv_anim_get(ring, countdown_callback));
-                    assert(SystemService::snapshot().power_calls == calls);
+                    assert(hal_test::snapshot<dp::Power>().calls == calls);
                     const auto remaining = deadline - lv_tick_get();
                     assert(remaining >= 480 && remaining <= 520); // Visible full ring precedes the 500 ms hold.
                     lv_obj_update_layout(root);
                     check_form_labels(root);
                     advance(remaining - 10);
-                    assert(SystemService::snapshot().power_calls == calls);
+                    assert(hal_test::snapshot<dp::Power>().calls == calls);
                     advance(10); // Execute at exactly the unchanged 8500 ms controller deadline.
-                    assert(SystemService::snapshot().power_calls == calls + 1);
-                    assert(SystemService::snapshot().power_action
+                    assert(hal_test::snapshot<dp::Power>().calls == calls + 1);
+                    assert(hal_test::snapshot<dp::Power>().action
                            == (restart ? PowerAction::Reboot : PowerAction::Off));
                     advance(400);
                     assert(std::strcmp(app.current_page(), restart ? "Pages/Dialplate" : "Pages/Startup") == 0);
@@ -800,7 +800,7 @@ saveconfig_scenarios(lv_display_t* display, const std::string& output) {
                     advance(8500);
                     check_saveconfig_spinner(ring, countdown_callback);
                     assert(lv_arc_get_value(ring) == value);
-                    assert(SystemService::snapshot().power_calls == calls);
+                    assert(hal_test::snapshot<dp::Power>().calls == calls);
                     assert(std::strcmp(app.current_page(), "Pages/SaveConfig") == 0);
                     assert(app.back() && std::strcmp(app.current_page(), "Pages/SaveConfig") == 0);
                     assert(test_input::standby());
@@ -892,7 +892,7 @@ int main(int argc, char** argv) {
             focused(i18n::TextId::Back);
             product_click(App::Key::Power);
             assert(std::strcmp(app.current_page(), "Pages/Dialplate") == 0);
-            assert(!SystemService::snapshot().power_pending && SystemService::snapshot().power_calls == 0);
+            assert(!hal_test::snapshot<dp::Power>().pending && hal_test::snapshot<dp::Power>().calls == 0);
             advance(600);
             assert(on_screen(label(lv_layer_top(), "DEMO")));
             product_click(App::Key::Power); // Home remembers the System entry.
@@ -913,7 +913,7 @@ int main(int argc, char** argv) {
             app.on_input(App::InputAction::Release); // Released early: closes, nothing prepared.
             advance(400);
             assert(std::strcmp(app.current_page(), "Pages/SystemDash") == 0
-                   && SystemService::snapshot().power_calls == 0 && !SystemService::snapshot().power_pending);
+                   && hal_test::snapshot<dp::Power>().calls == 0 && !hal_test::snapshot<dp::Power>().pending);
             focused(i18n::TextId::PowerTitle);
             assert(!on_screen(label(lv_layer_top(), "DEMO")));
             assert(app.show_page("Pages/SystemInfos"));
@@ -986,49 +986,49 @@ int main(int argc, char** argv) {
         assert(rejected == 1);
         assert(std::strcmp(app.current_page(), "Pages/SystemDash") == 0);
         assert(!manager->isSwitching());
-        assert(!SystemService::snapshot().power_pending && SystemService::snapshot().power_calls == 0);
+        assert(!hal_test::snapshot<dp::Power>().pending && hal_test::snapshot<dp::Power>().calls == 0);
         focused(i18n::TextId::PowerTitle);
         manager->setEventCallback(nullptr, nullptr);
         product_click(App::Key::Power);
         product_hold(App::Key::Power, 2300);
         assert(std::strcmp(app.current_page(), "Pages/SaveConfig") == 0);
-        assert(SystemService::snapshot().power_pending && SystemService::snapshot().power_calls == 0);
+        assert(hal_test::snapshot<dp::Power>().pending && hal_test::snapshot<dp::Power>().calls == 0);
         product_click(App::Key::Function, true); // Cancel before the simulated service runs.
-        assert(!SystemService::snapshot().power_pending && SystemService::snapshot().power_calls == 0);
+        assert(!hal_test::snapshot<dp::Power>().pending && hal_test::snapshot<dp::Power>().calls == 0);
         focused(i18n::TextId::PowerTitle); // Leaving for SaveConfig closed the dialog.
         // Both held actions run only after SaveConfig's timer; cancel also clears the transaction.
-        for (auto action : {DataProc::PowerAction::Off, DataProc::PowerAction::Reboot}) {
+        for (auto action : {hal::PowerCommand::Off, hal::PowerCommand::Reboot}) {
             const auto open = [&] {
                 choose(i18n::TextId::PowerTitle);
                 product_click(App::Key::Power);
                 focused(i18n::TextId::ShutdownAction);
-                if (action == DataProc::PowerAction::Reboot) {
+                if (action == hal::PowerCommand::Reboot) {
                     product_click(App::Key::Function); // Function still moves focus inside the dialog.
                     focused(i18n::TextId::RebootAction);
                 }
             };
-            const auto calls = SystemService::snapshot().power_calls;
+            const auto calls = hal_test::snapshot<dp::Power>().calls;
             open();
             product_click(App::Key::Power); // A short press dismisses without preparing anything.
-            assert(std::strcmp(app.current_page(), "Pages/SystemDash") == 0 && !SystemService::snapshot().power_pending
-                   && SystemService::snapshot().power_calls == calls);
+            assert(std::strcmp(app.current_page(), "Pages/SystemDash") == 0 && !hal_test::snapshot<dp::Power>().pending
+                   && hal_test::snapshot<dp::Power>().calls == calls);
             focused(i18n::TextId::PowerTitle); // The dismissing press must not reopen the dialog.
             open();
             product_hold(App::Key::Power, 1200); // Released before 100%.
             assert(std::strcmp(app.current_page(), "Pages/SystemDash") == 0
-                   && !SystemService::snapshot().power_pending);
+                   && !hal_test::snapshot<dp::Power>().pending);
             focused(i18n::TextId::PowerTitle);
             open();
             product_hold(App::Key::Power, 2300);
             assert(std::strcmp(app.current_page(), "Pages/SaveConfig") == 0
-                   && SystemService::snapshot().power_calls == calls && SystemService::snapshot().power_pending
-                   && SystemService::snapshot().power_action == action);
+                   && hal_test::snapshot<dp::Power>().calls == calls && hal_test::snapshot<dp::Power>().pending
+                   && hal_test::snapshot<dp::Power>().action == action);
             product_click(App::Key::Power, true); // Duplicate commit cannot create another request.
             advance(12000);
-            assert(SystemService::snapshot().power_calls == calls + 1
-                   && SystemService::snapshot().power_action == action);
-            assert(!SystemService::snapshot().power_pending);
-            if (action == DataProc::PowerAction::Off) {
+            assert(hal_test::snapshot<dp::Power>().calls == calls + 1
+                   && hal_test::snapshot<dp::Power>().action == action);
+            assert(!hal_test::snapshot<dp::Power>().pending);
+            if (action == hal::PowerCommand::Off) {
                 assert(std::strcmp(app.current_page(), "Pages/Startup") == 0 && !app.back());
                 assert(label(lv_screen_active(), "0%"));
                 assert(!DataProc::Broker()->search("DialplateModel"));
@@ -1102,7 +1102,9 @@ int main(int argc, char** argv) {
     lv_obj_remove_style_all(canvas);
     lv_obj_set_size(canvas, width, height);
     page::SystemLoadingView view;
-    view.create(canvas);
+    view.create(canvas,
+                {i18n::TextId::LoadingConfiguration, i18n::TextId::PreparingServices, i18n::TextId::StartingGnssService,
+                 i18n::TextId::PreparingNetwork, i18n::TextId::FinalizingStartup});
     for (bool fail : {false, true}) {
         view.show_logo();
         view.show_initialization();
@@ -1156,13 +1158,13 @@ int main(int argc, char** argv) {
                 } else if (std::strcmp(page, "Pages/RecordConfig") == 0) {
                     choose(i18n::TextId::StartupStart);
                     input(App::InputAction::Confirm); // 单击即开始
-                    assert(DeviceService::snapshot().recording);
+                    assert(hal_test::snapshot<dp::Recorder>().recording);
                     assert(lv_group_get_obj_count(lv_group_get_default()) == 2);
                     check_form_labels(root);
                     capture(display, output,
                             std::string("Recording-new-") + (language == i18n::Language::English ? "en" : "ru"));
                     input(App::InputAction::Confirm);
-                    assert(!DeviceService::snapshot().recording);
+                    assert(!hal_test::snapshot<dp::Recorder>().recording);
                     assert(lv_group_get_obj_count(lv_group_get_default()) == 4);
                 }
                 // 留在表单上销毁 App，ASan 检查定时器不再借用 Controller。

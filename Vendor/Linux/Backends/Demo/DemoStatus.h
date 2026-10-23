@@ -1,7 +1,6 @@
 #pragma once
 #include <cstdint>
 #include "DemoModel.h"
-#include "SystemBackend.h"
 #include "UI/StatusBar/StatusBar.h"
 
 /** @brief Demo 单一模型的确定性/随机采样配置；不发布应用快照。 */

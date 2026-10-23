@@ -1,4 +1,4 @@
-// SystemLoading 的初始化步骤（system_backend 接口）：检查真实器件状态，非阻塞轮询，失败只显示、不阻塞开机。
+// 初始化步骤：检查真实器件状态，非阻塞轮询，失败只显示、不阻塞开机。
 // 每步耗时即实际检查时间；I2C 探测有 WIRE_TIMEOUT 上限，等待主控有 kHostLinkTimeoutMs 上限。
 #include <cstdio>
 
@@ -12,26 +12,15 @@ namespace {
 
 constexpr GpioPin powerControl(POWER_CONTROL_PIN);
 
-struct InitStep {
-    const char* name;
-    i18n::TextId title;
-};
-
-constexpr InitStep kInitSteps[] = {
-    {"configuration", i18n::TextId::LoadingConfiguration},
-    {"battery-gauge", i18n::TextId::CheckingBatteryGauge},
-    {"charger", i18n::TextId::CheckingCharger},
-    {"host-power", i18n::TextId::PoweringHostBoard},
-    {"host-link", i18n::TextId::CheckingHostLink},
-};
-static_assert(sizeof(kInitSteps) / sizeof(kInitSteps[0]) == DataProc::kInitializationStepCount);
+constexpr const char* kInitSteps[] = {"configuration", "battery-gauge", "charger", "host-power", "host-link"};
+static_assert(sizeof(kInitSteps) / sizeof(kInitSteps[0]) == hal::kInitializationStepCount);
 
 constexpr uint8_t kBatteryGaugeAddress = 0x0B; // BQ40Z50
 constexpr uint8_t kChargerAddress = 0x5C;      // MP2762A（仅 V1.5 主板）
 // 主控上电后需数十秒启动；超时只标红此步并进入首页，关机/强制关机由 HAL 独立处理，不受加载页影响。
 constexpr std::uint32_t kHostLinkTimeoutMs = 30000;
 
-using Status = DataProc::InitializationStatus;
+using Status = hal::InitStatus;
 
 Status
 result(bool ok) {
@@ -42,15 +31,10 @@ result(bool ok) {
 
 const char*
 StatusDevice::initialization_name(unsigned step) {
-    return step < DataProc::kInitializationStepCount ? kInitSteps[step].name : "invalid";
+    return step < hal::kInitializationStepCount ? kInitSteps[step] : "invalid";
 }
 
-i18n::TextId
-StatusDevice::initialization_title(unsigned step) {
-    return step < DataProc::kInitializationStepCount ? kInitSteps[step].title : i18n::TextId::Initializing;
-}
-
-DataProc::InitializationStatus
+hal::InitStatus
 StatusDevice::poll_initialization_step(unsigned step, std::uint32_t elapsed_ms, char* detail, std::size_t size) {
     if (!detail || size == 0) {
         return Status::Failed;

@@ -124,10 +124,11 @@ main() {
         unsigned changes = 0;
         auto* observer = lv_subject_add_observer(model->subject(), count_change, &changes);
         assert(observer && changes == 1);
-        /** @brief 聚合重发、无关领域与相关领域的非显示字段都不刷新状态栏。 */
-        publish(dp::names::Status, DataProc::StatusSnapshot{});
-        publish(dp::names::System, DataProc::SystemState{});
-        publish(dp::names::Device, DataProc::DeviceSnapshot{});
+        /** @brief 旧聚合已删除；无关领域与相关领域的非显示字段都不刷新状态栏。 */
+        for (const char* name : {"Status", "System", "Device"}) {
+            assert(!DataProc::Broker()->search(name));
+            assert(!model->subscribe(name));
+        }
         auto version = input.board;
         ++version.uptime_s;
         publish(dp::names::Version, version);
@@ -157,7 +158,7 @@ main() {
         assert(changes == 3 && model->state().recording);
         lv_observer_delete(observer);
 
-        /** @brief 真正更新领域 provider 后重建，无需等待 Status 的 200 ms 兼容重发。 */
+        /** @brief 更新领域 provider 后立即重建，首次显示只依赖 pull。 */
         warning.destroy();
         bar.destroy();
         input.battery.level_percent = 62;

@@ -31,25 +31,6 @@ class SystemInfosModel final : public Model<SystemInfosState> {
 
     int onEvent(EventParam_t* event) override;
 
-    struct StatusCompat {
-        unsigned battery_percent = 0;
-        std::array<char, 16> position{};
-    };
-    StatusCompat status() const {
-        StatusCompat s{};
-        s.battery_percent = state_.battery.level_percent;
-        std::strcpy(s.position.data(), state_.version.capabilities.simulated ? "DEMO" : "");
-        return s;
-    }
-
-    struct SettingsCompat {
-        bool initialization_started = false;
-        dp::InitializationResults initialization{};
-    };
-    SettingsCompat settings() const {
-        return {state_.init.started, state_.init.results};
-    }
-
   private:
     void apply(const dp::Work::State& value);
     void apply(const dp::GNSS::State& value);

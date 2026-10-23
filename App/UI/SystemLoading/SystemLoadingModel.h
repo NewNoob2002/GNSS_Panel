@@ -26,6 +26,13 @@ class SystemLoadingModel final : public Model<SystemLoadingState> {
     /** UI 线程：轮询初始化步骤 0..4；返回 Pending/Ok/Failed。 */
     DataProc::InitializationStatus poll_step(unsigned step, uint32_t elapsed_ms);
 
+    /** @brief UI 线程：经 Init 节点读取静态步骤元数据。 */
+    dp::InitStepInfo step_info(unsigned step) {
+        dp::InitStepInfo value;
+        (void)dp::Init::info(*this, step, value);
+        return value;
+    }
+
     static constexpr uint32_t kStepLimitMs = 35000;
 
     int onEvent(EventParam_t* event) override;

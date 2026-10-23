@@ -150,7 +150,7 @@ void power_edges(DataNode& caller, Events& events) {
     assert(!pull<dp::Power>(caller).navigation.power_on);
 }
 }
-DeviceManager& system_backend::devices() { return fixture::devices(); }
+DeviceManager& hal::manager() { return fixture::devices(); }
 int main() {
     fixture::source = {};
     assert(DataProc_Init(clock_ms));

@@ -1,5 +1,5 @@
 #include "DomainFixture.hpp"
-#include "SystemService.h"
+#include "hal_device_checks.h"
 #include "Def/DP_Battery.h"
 #include "Def/DP_GNSS.h"
 #include "Def/DP_Clock.h"
@@ -29,10 +29,63 @@ template<class Node> typename Node::State pull(DataNode& caller) {
     typename Node::State result;
     assert(Node::pull(caller,result) == DataNode::RES_OK); return result;
 }
-unsigned calls = 0;
-bool power(DataProc::PowerAction) { ++calls; return true; }
+unsigned init_polls = 0;
+hal::InitStatus probe(unsigned step, uint32_t elapsed, char* detail, size_t size) {
+    ++init_polls;
+    std::snprintf(detail, size, "step %u at %lu", step, static_cast<unsigned long>(elapsed));
+    return elapsed < 400 ? hal::InitStatus::Pending : step == 3 ? hal::InitStatus::Failed : hal::InitStatus::Ok;
 }
-DeviceManager& system_backend::devices() { return fixture::devices(); }
+void init_queries(DataNode& caller) {
+    const auto original = pull<dp::Init>(caller);
+    fixture::source.poll = probe;
+    constexpr i18n::TextId titles[] = {i18n::TextId::LoadingConfiguration, i18n::TextId::CheckingBatteryGauge,
+        i18n::TextId::CheckingCharger, i18n::TextId::PoweringHostBoard, i18n::TextId::CheckingHostLink};
+    for (unsigned step = 0; step < DataProc::kInitializationStepCount; ++step) {
+        dp::InitStepInfo info;
+        assert(dp::Init::info(caller, step, info) == DataNode::RES_OK);
+        assert(info.title == titles[step] && std::strcmp(info.name, "test") == 0 && init_polls == step * 2);
+        DataProc::InitializationResult result;
+        assert(dp::Init::poll(caller, step, 399, result) == DataNode::RES_OK);
+        assert(result.status == DataProc::InitializationStatus::Pending);
+        assert(dp::Init::poll(caller, step, 400, result) == DataNode::RES_OK);
+        assert(result.status == (step == 3 ? DataProc::InitializationStatus::Failed : DataProc::InitializationStatus::Ok));
+        char expected[96];
+        std::snprintf(expected, sizeof(expected), "step %u at 400", step);
+        assert(std::strcmp(result.detail.data(), expected) == 0);
+    }
+    const auto calls_before = init_polls;
+    dp::InitStepInfo info;
+    DataProc::InitializationResult result;
+    assert(dp::Init::info(caller, 5, info) == DataNode::RES_PARAM_ERROR && std::strcmp(info.name, "invalid") == 0);
+    assert(dp::Init::poll(caller, 5, 0, result) == DataNode::RES_PARAM_ERROR
+        && result.status == DataProc::InitializationStatus::NotRun);
+    dp::InitQuery query;
+    query.operation = static_cast<dp::InitQueryOperation>(99);
+    assert(caller.pull(dp::names::Init, &query, sizeof(query)) == DataNode::RES_PARAM_ERROR);
+    assert(caller.pull(dp::names::Init, &query, sizeof(query) - 1) == DataNode::RES_SIZE_MISMATCH);
+    assert(caller.pull(dp::names::Init, &query, sizeof(query) + 1) == DataNode::RES_SIZE_MISMATCH);
+    assert(caller.pull(dp::names::Init, nullptr, sizeof(query)) == DataNode::RES_PARAM_ERROR);
+    assert(init_polls == calls_before && pull<dp::Init>(caller) == original && publishes.empty());
+    fixture::source.poll = nullptr;
+}
+void dates(DataNode& caller) {
+    assert(dp::days_in_month(2000, 2) == 29 && dp::days_in_month(2024, 2) == 29);
+    assert(dp::days_in_month(2100, 2) == 28 && dp::days_in_month(2026, 4) == 30);
+    assert(dp::days_in_month(2026, 0) == 0 && dp::days_in_month(2026, 13) == 0);
+    const auto original = pull<dp::Clock>(caller);
+    for (const DataProc::DateTime date : {DataProc::DateTime{1999,1,1,0,0}, {2100,1,1,0,0},
+        {2026,0,1,0,0}, {2026,13,1,0,0}, {2026,1,0,0,0}, {2026,4,31,0,0},
+        {2025,2,29,0,0}, {2026,1,1,24,0}, {2026,1,1,0,60}}) {
+        assert(!dp::valid_date(date));
+        assert(dp::Clock::notify(caller, {date}) == DataNode::RES_PARAM_ERROR);
+        assert(pull<dp::Clock>(caller) == original && publishes.empty());
+    }
+    assert(dp::valid_date({2000,2,29,23,59}) && dp::valid_date({2099,12,31,23,59}));
+}
+unsigned calls = 0;
+bool power(hal::PowerCommand) { ++calls; return true; }
+}
+DeviceManager& hal::manager() { return fixture::devices(); }
 int main() {
     fixture::source = {};
     auto& s = fixture::source;
@@ -40,7 +93,9 @@ int main() {
     s.work.valid = s.recorder.valid = true; s.work.channel = 1;
     s.execute_power = power;
     assert(DataProc_Init(clock_ms));
-    assert(DataProc::Broker()->getNodeNumber() == 15);
+    assert(DataProc::Broker()->getNodeNumber() == 12);
+    assert(!DataProc::Broker()->search("Status") && !DataProc::Broker()->search("System")
+        && !DataProc::Broker()->search("Device"));
     {
         DataNode arbitrary("AnyCaller",DataProc::Broker());
         arbitrary.setEventCallback(receive);
@@ -48,6 +103,8 @@ int main() {
             && dp::Clock::subscribe(arbitrary) && dp::Work::subscribe(arbitrary) && dp::Recorder::subscribe(arbitrary)
             && dp::WiFi::subscribe(arbitrary) && dp::Version::subscribe(arbitrary) && dp::Init::subscribe(arbitrary)
             && dp::Settings::subscribe(arbitrary));
+        init_queries(arbitrary);
+        dates(arbitrary);
         assert(!DataProc_Deinit());
         advance(1000); advance(1000);
         assert(publishes.empty()); // 十个领域节点静态值轮询不发布。
@@ -139,20 +196,19 @@ int main() {
         assert(pull<dp::Power>(arbitrary).platform.standby);
         assert(dp::Power::notify(arbitrary,{dp::PowerOperation::RequestOn}) == DataNode::RES_OK);
         assert(pull<dp::Power>(arbitrary).platform.powered_on);
-        // 旧 Device/System 聚合转发同样无名字授权；实际约束全部在领域节点。
-        assert(arbitrary.subscribe(dp::names::Device) && arbitrary.subscribe(dp::names::System));
-        DataProc::SystemRequest request;
-        request.command = DataProc::SystemCommand::SetTime; request.date = {2026,1,1,1,1};
-        assert(arbitrary.notify(dp::names::System,&request,sizeof(request)) == DataNode::RES_OK);
-        assert(SystemService::snapshot().date == request.date);
-        DataProc::DeviceRequest work;
-        work.target = DataProc::WorkTarget::Base; work.radio_protocol = 1; work.radio_channel = 2;
-        assert(arbitrary.notify(dp::names::Device,&work,sizeof(work)) == DataNode::RES_OK);
+        // 任意调用者直接发送领域命令；日期和协议选项仍由各领域校验。
+        const dp::ClockCommand request{{2026,1,1,1,1}};
+        assert(dp::Clock::notify(arbitrary,request) == DataNode::RES_OK);
+        assert(pull<dp::Clock>(arbitrary).date == request.date);
+        const hal::WorkCommand work{hal::WorkTarget::Base,1,2};
+        assert(dp::Work::notify(arbitrary,work) == DataNode::RES_OK);
+        assert(pull<dp::Work>(arbitrary).mode == hal::WorkMode::Base
+            && pull<dp::Work>(arbitrary).protocol == 1 && pull<dp::Work>(arbitrary).channel == 2);
     }
     assert(DataProc_Deinit() && DataProc::Broker()->getNodeNumber() == 0 && DataProc_RunLoop() == UINT32_MAX);
     fixture::source = {};
     assert(DataProc_Init(clock_ms));
-    assert(SystemService::snapshot().power_token == 0 && SystemService::snapshot().power_calls == 0);
+    assert(hal_test::snapshot<dp::Power>().token == 0 && hal_test::snapshot<dp::Power>().calls == 0);
     assert(DataProc_Deinit());
-    std::puts("领域节点：变化发布、语义命令、聚合转发与重建通过；15 节点、9 定时器。");
+    std::puts("领域节点：变化发布、语义命令与重建通过；12 节点、8 定时器。");
 }

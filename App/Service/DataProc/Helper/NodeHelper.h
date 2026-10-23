@@ -2,12 +2,11 @@
 #include "DataProc.h"
 #include <cstring>
 
-/** @brief 集中定义所有服务节点 ID；UI 旧接口在 3.7e 迁移。 */
+/** @brief 集中定义所有领域与编排节点 ID。 */
 namespace dp::names {
 inline constexpr char Power[] = "Power", Battery[] = "Battery", GNSS[] = "GNSS", Clock[] = "Clock";
 inline constexpr char Work[] = "Work", Recorder[] = "Recorder", WiFi[] = "WiFi", Version[] = "Version";
 inline constexpr char Init[] = "Init", Settings[] = "Settings", Button[] = "Button", PageNavi[] = "PageNavi";
-inline constexpr char Status[] = "Status", System[] = "System", Device[] = "Device";
 }
 
 namespace dp {

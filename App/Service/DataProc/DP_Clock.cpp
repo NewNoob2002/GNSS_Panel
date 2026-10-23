@@ -33,7 +33,7 @@ public:
 private:
     void refresh() {
         auto next = state_;
-        if (hal::read(system_backend::devices().getDevice(hal::names::Clock), next.clock) == DeviceObject::RES_OK) commit(next);
+        if (hal::read(hal::manager().getDevice(hal::names::Clock), next.clock) == DeviceObject::RES_OK) commit(next);
     }
 };
 }

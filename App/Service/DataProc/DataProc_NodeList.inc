@@ -1,4 +1,4 @@
-// 领域节点先于聚合节点；销毁时逆序执行，避免遗留订阅与定时器。
+// 十二个领域与编排节点；销毁时逆序执行。
 DP_DEF(Power)
 DP_DEF(Battery)
 DP_DEF(GNSS)
@@ -11,6 +11,3 @@ DP_DEF(Init)
 DP_DEF(Settings)
 DP_DEF(Button)
 DP_DEF(PageNavi)
-DP_DEF(Status)
-DP_DEF(System)
-DP_DEF(Device)

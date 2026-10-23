@@ -26,7 +26,7 @@ include(portable.cmake)
 linux_add_page_manager_test(app_page_manager_test)
 
 add_executable(app_navigation_preview app_navigation_preview.cpp)
-target_link_libraries(app_navigation_preview PRIVATE linux::demo_backend)
+target_link_libraries(app_navigation_preview PRIVATE linux::demo_backend app::hal_test_checks)
 target_compile_options(app_navigation_preview PRIVATE -Wall -Wextra -Werror -UNDEBUG)
 add_test(NAME app_navigation_preview COMMAND app_navigation_preview)
 
@@ -36,7 +36,7 @@ target_compile_options(app_deferred_navigation_test PRIVATE -Wall -Wextra -Werro
 add_test(NAME app_deferred_navigation COMMAND app_deferred_navigation_test)
 
 add_executable(app_status_test app_status_test.cpp)
-target_link_libraries(app_status_test PRIVATE linux::demo_backend)
+target_link_libraries(app_status_test PRIVATE linux::demo_backend app::hal_test_checks)
 target_compile_options(app_status_test PRIVATE -Wall -Wextra -Werror -UNDEBUG)
 add_test(NAME app_status COMMAND app_status_test)
 
@@ -51,11 +51,11 @@ target_compile_options(hal_devices_test PRIVATE -Wall -Wextra -Werror -UNDEBUG)
 add_test(NAME hal_devices COMMAND hal_devices_test)
 
 add_executable(app_system_dash_test app_system_dash_test.cpp)
-target_link_libraries(app_system_dash_test PRIVATE linux::demo_backend)
+target_link_libraries(app_system_dash_test PRIVATE linux::demo_backend app::hal_test_checks)
 target_compile_options(app_system_dash_test PRIVATE -Wall -Wextra -Werror -UNDEBUG)
 add_test(NAME app_system_dash COMMAND app_system_dash_test "${CMAKE_CURRENT_BINARY_DIR}/system-dash-pages")
 
-# Platform-decided power flow with a test system_backend (no simulation library).
+# 平台决定的电源流程，使用测试细设备（不链接演示模型）。
 add_executable(app_platform_test app_platform_test.cpp)
 target_link_libraries(app_platform_test PRIVATE app::ui app::hal_test_checks)
 target_compile_options(app_platform_test PRIVATE -Wall -Wextra -Werror -UNDEBUG)
