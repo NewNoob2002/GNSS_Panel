@@ -299,7 +299,7 @@ component() {
 /** @brief 每个接入页面的终态、60 ms 连切保速、离页停表与恢复回归。 */
 template <typename View, std::size_t N>
 void
-rollout(View& view, const std::array<lv_obj_t*, N>& controls) {
+rollout(View& view, const std::array<lv_obj_t*, N>& controls, bool shared_layer = false) {
     const auto baseline = timers();
     page::utils::focus_controls(controls);
     view.resume_focus();
@@ -317,6 +317,7 @@ rollout(View& view, const std::array<lv_obj_t*, N>& controls) {
     check();
     for (unsigned index = 0; index < controls.size() * 3; ++index) {
         const auto* parent = lv_obj_get_parent(lv_group_get_focused(lv_group_get_default()));
+        const auto* host = lv_obj_get_parent(focus.object());
         std::array<float, 4> positions{}, velocities{};
         for (unsigned axis = 0; axis < 4; ++axis) {
             const auto& value = focus.motion().value(static_cast<app::LvSpring::Axis>(axis));
@@ -324,7 +325,10 @@ rollout(View& view, const std::array<lv_obj_t*, N>& controls) {
             velocities[axis] = value.velocity();
         }
         lv_group_focus_next(lv_group_get_default());
-        if (parent == lv_obj_get_parent(lv_group_get_focused(lv_group_get_default()))) {
+        /** @brief 覆盖框宿主不变即保速重定向；仅非共享层换父容器时直接落位。 */
+        const bool same_parent = parent == lv_obj_get_parent(lv_group_get_focused(lv_group_get_default()));
+        assert(!shared_layer || host == lv_obj_get_parent(focus.object()));
+        if (same_parent || shared_layer) {
             for (unsigned axis = 0; axis < 4; ++axis) {
                 const auto& value = focus.motion().value(static_cast<app::LvSpring::Axis>(axis));
                 assert(value.position() == positions[axis] && value.velocity() == velocities[axis]);
@@ -351,7 +355,17 @@ rollout_pages() {
     {
         page::DialplateView view{};
         view.create(root);
-        rollout(view, view.controls(true));
+        /** @brief 按钮行与卫星图标分属两个容器：跨容器切换必须有弹簧过渡，不得直接落位。 */
+        const auto controls = view.controls(true);
+        page::utils::focus_controls(controls, controls[3]);
+        view.resume_focus();
+        advance(800);
+        lv_group_focus_obj(controls[4]);
+        assert(lv_obj_get_parent(controls[3]) != lv_obj_get_parent(controls[4]));
+        assert(view.focus_highlight().motion().running());
+        advance(800);
+        page::utils::leave_focus_group();
+        rollout(view, controls, true);
     }
     lv_obj_clean(root);
     {

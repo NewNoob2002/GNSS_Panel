@@ -4,10 +4,12 @@
 #include "Log.h"
 
 namespace page {
-bool FocusHighlight::bind_controls(lv_obj_t* root, lv_obj_t* const* controls, std::size_t count) {
+bool FocusHighlight::bind_controls(lv_obj_t* root, lv_obj_t* const* controls, std::size_t count,
+                                   bool shared_layer) {
     unbind();
     if (!root)
         return false;
+    host_ = shared_layer ? root : nullptr;
     auto* highlight = style::box(root, 0, 0, 1, 1);
     style::card(highlight);
     lv_obj_set_style_border_width(highlight, 2, 0);
@@ -60,6 +62,7 @@ void FocusHighlight::watch_parent(lv_obj_t* parent) {
 void FocusHighlight::unbind() {
     stop();
     focused_ = nullptr;
+    host_ = nullptr;
     watch_parent(nullptr);
     for (auto*& object : controls_) {
         if (!object)
@@ -98,17 +101,21 @@ void FocusHighlight::focus_to(lv_obj_t* object, bool animated, bool layout_only)
     focused_ = object;
     lv_obj_update_layout(object);
     auto* parent = lv_obj_get_parent(object);
-    if (lv_obj_get_parent(highlight) != parent) {
-        lv_obj_set_parent(highlight, parent);
+    auto* host = host_ ? host_ : parent;
+    if (lv_obj_get_parent(highlight) != host) {
+        lv_obj_set_parent(highlight, host);
         animated = false;
     }
     watch_parent(parent);
     lv_obj_move_to_index(highlight, -1);
     lv_obj_set_style_radius(highlight, lv_obj_get_style_radius(object, LV_PART_MAIN), 0);
     visibility();
-    /** @brief floating 覆盖框不随父容器滚动，减去滚动偏移才能与卡片屏幕坐标一致。 */
-    const auto x = lv_obj_get_x(object) - (lv_obj_is_floating(object) ? 0 : lv_obj_get_scroll_x(parent));
-    const auto y = lv_obj_get_y(object) - (lv_obj_is_floating(object) ? 0 : lv_obj_get_scroll_y(parent));
+    /** @brief floating 覆盖框不随宿主滚动，按屏幕坐标换算到宿主内容区才能与卡片重合（含跨父容器）。 */
+    lv_area_t area, origin;
+    lv_obj_get_coords(object, &area);
+    lv_obj_get_coords(host, &origin);
+    const auto x = area.x1 - origin.x1 - lv_obj_get_style_space_left(host, LV_PART_MAIN);
+    const auto y = area.y1 - origin.y1 - lv_obj_get_style_space_top(host, LV_PART_MAIN);
     const auto width = lv_obj_get_width(object), height = lv_obj_get_height(object);
     const bool unchanged = motion_.value(app::LvSpring::X).target() == x
                            && motion_.value(app::LvSpring::Y).target() == y

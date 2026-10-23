@@ -13,10 +13,15 @@ class FocusHighlight {
     FocusHighlight(const FocusHighlight&) = delete;
     FocusHighlight& operator=(const FocusHighlight&) = delete;
 
-    /** @brief 显式接管最多六个 card/control 的焦点边框；首次聚焦直接落位，失败撤销绑定。 */
-    template <std::size_t N> bool bind(lv_obj_t* root, const std::array<lv_obj_t*, N>& controls) {
+    /**
+     * @brief 显式接管最多六个 card/control 的焦点边框；首次聚焦直接落位，失败撤销绑定。
+     * @param shared_layer true 时覆盖框固定在 root，跨父容器切换也保速过渡（控件父容器须静止、不裁剪覆盖框）；
+     *        false 时覆盖框跟随控件父容器，随其滚动裁剪与动画，换父容器时直接落位。
+     */
+    template <std::size_t N>
+    bool bind(lv_obj_t* root, const std::array<lv_obj_t*, N>& controls, bool shared_layer = false) {
         static_assert(N <= 6, "焦点控件超出页面容量");
-        return bind_controls(root, controls.data(), N);
+        return bind_controls(root, controls.data(), N, shared_layer);
     }
     /** @brief 恢复 card/control 样式、解除所有事件并删除覆盖框，不删除控件。 */
     void unbind();
@@ -30,7 +35,7 @@ class FocusHighlight {
     const app::LvSpring& motion() const { return motion_; }
 
   private:
-    bool bind_controls(lv_obj_t* root, lv_obj_t* const* controls, std::size_t count);
+    bool bind_controls(lv_obj_t* root, lv_obj_t* const* controls, std::size_t count, bool shared_layer);
     void focus_to(lv_obj_t* object, bool animated, bool layout_only = false);
     void watch_parent(lv_obj_t* parent);
     void visibility();
@@ -38,7 +43,7 @@ class FocusHighlight {
     static void on_parent(lv_event_t* event);
     app::LvSpring motion_{};
     std::array<lv_obj_t*, 6> controls_{};
-    lv_obj_t *focused_ = nullptr, *parent_ = nullptr;
+    lv_obj_t *focused_ = nullptr, *parent_ = nullptr, *host_ = nullptr;
     bool animate_ = false, aligning_ = false;
 };
 } // namespace page

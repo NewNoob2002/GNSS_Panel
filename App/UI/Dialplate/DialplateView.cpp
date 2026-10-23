@@ -79,7 +79,8 @@ void DialplateView::on_state(lv_observer_t* observer, lv_subject_t* subject) {
 
 void DialplateView::resume_focus() {
     /** @brief 独立表盘预览不建立导航覆盖框，由页面在组装焦点后显式启用。 */
-    if (!focus_.object() && !focus_.bind(lv_obj_get_parent(ui.top_info.cont), controls(true)))
+    /** @brief 卫星图标与按钮行分属两个静止容器，共享页面根层才能在两者间保速过渡。 */
+    if (!focus_.object() && !focus_.bind(lv_obj_get_parent(ui.top_info.cont), controls(true), true))
         app_fatal("Dialplate", "Focus driver binding failed");
     focus_.resume();
 }
