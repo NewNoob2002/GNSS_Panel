@@ -11,8 +11,10 @@
 #include "DomainTestInput.hpp"
 #include "I18n.h"
 #include "PageManager.h"
-#include "hal_device_checks.h"
+#include "UI/Resource/LogoParts.h"
 #include "UI/Resource/ResourcePool.h"
+#include "UI/SystemLoading/SystemLoadingView.h"
+#include "hal_device_checks.h"
 
 /** @brief 通过公开 API 读取对象的屏幕绝对坐标供布局断言使用。 */
 static lv_area_t
@@ -225,23 +227,19 @@ int main(int argc, char** argv) {
             app.on_input(Input::Press); // Repeated keydown cannot restart the timer.
             advance(1100);
             assert(std::strcmp(app.current_page(), "Pages/SystemLoading") == 0);
-#if defined(RGK_LOGO_USE)
-            const auto* loading_logo = resource_pool::get_image("RGKLogo");
-#elif defined(MIDDLE_LOGO_USE)
-            const auto* loading_logo = resource_pool::get_image("MiddleLogo");
-#else
-            const auto* loading_logo = resource_pool::get_image("startupLogo");
-#endif
-            assert(loading_logo && find_image(lv_screen_active(), loading_logo));
+            const auto* loading_logo = resource_pool::get_image("oemLogoParts");
+            assert(loading_logo);
+            loading_logo = static_cast<const logo_parts_t*>(loading_logo)->parts[0].image;
+            assert(find_image(lv_screen_active(), loading_logo));
             assert(!find_label(lv_screen_active(), i18n::text(i18n::TextId::SystemLoadingTitle)));
             lv_tick_inc(5000); // A stalled host frame must not lose the loading completion request.
             lv_timer_handler();
             assert(std::strcmp(app.current_page(), "Pages/SystemLoading") == 0);
-            advance(300);
-            assert(object_coords(startup_status).y2 < 0); // SystemLoading slides a previously shown bar off-screen.
+            advance(20);
+            assert(object_coords(startup_status).y2 < 0); /** @brief 长帧之后状态栏已完全移出屏幕。 */
             assert(!app.back());                   // Loading replaced Startup, rather than retaining it underneath.
             app.on_input(Input::Release);          // Cross-page release must not activate the next page.
-            advance(800);
+            advance(400);
             assert(!find_image(lv_screen_active(), loading_logo));
             assert(find_label(lv_screen_active(), i18n::text(i18n::TextId::SystemLoadingTitle)));
             // Steps take their simulated check time (0/400/1200/700/200 ms, each shown at least 300 ms).
@@ -439,7 +437,8 @@ int main(int argc, char** argv) {
                 assert(lv_group_get_focus_cb(lv_group_get_default()) == nullptr);
             }
             // Cancelling Logo, Initialization or Ready must remove timers/animations, not navigate later.
-            for (const auto phase_ms : {400u, 1600u, 4450u}) {
+            constexpr uint32_t kLogoMs = page::SystemLoadingView::kLogoMs;
+            for (const auto phase_ms : {400u, kLogoMs + 300, kLogoMs + 3150}) {
                 advance(300);
                 assert(app.show_page("Pages/SystemLoading"));
                 advance(phase_ms);
@@ -448,7 +447,7 @@ int main(int argc, char** argv) {
                 assert(app.back());
                 advance(400);
                 assert(std::strcmp(app.current_page(), "Pages/SystemLoading") == 0);
-                advance(900); // Logo (800 ms after the return), then step 1 fades in (160 ms) for its minimum 300 ms.
+                advance(kLogoMs + 200); /** @brief OEM Logo 结束后，首步淡入已完成且尚未跳过最短展示窗口。 */
                 auto* restarted = find_label(lv_screen_active(), i18n::text(i18n::TextId::LoadingConfiguration));
                 assert(restarted && lv_obj_get_style_opa(restarted, LV_PART_MAIN) == LV_OPA_COVER);
                 assert(!find_label(lv_screen_active(), i18n::text(i18n::TextId::ReadyWithWarnings)));

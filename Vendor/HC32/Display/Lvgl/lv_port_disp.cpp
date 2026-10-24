@@ -26,6 +26,56 @@ static bool flush_active;
 static uint32_t flush_started_ms;
 volatile uint32_t display_dma_timeouts;
 
+#if PRODUCT_DISPLAY_BRIGHTNESS_FADE
+static constexpr uint32_t kBrightnessFadeMs = 300U;
+static constexpr uint32_t kBrightnessStepMs = 16U;
+static constexpr uint32_t kBrightnessFallbackMs = 1000U;
+static uint32_t brightness_wait_started_ms;
+static uint32_t brightness_started_ms;
+static uint32_t brightness_step_ms;
+static bool brightness_done;
+static bool brightness_started;
+static bool brightness_polled;
+static bool first_frame_failed;
+static bool flush_last;
+
+/** @brief 无定时器分配；首帧失败或 1 s 无完整帧时直接全亮，DMA 必须先回收。 */
+static void
+brightness_poll() {
+    if (brightness_done || flush_active) {
+        return;
+    }
+    const uint32_t now = millis();
+    if (first_frame_failed || (!brightness_started && now - brightness_wait_started_ms >= kBrightnessFallbackMs)) {
+        screen.setBrightness(0xFF);
+        brightness_done = true;
+        return;
+    }
+    if (!brightness_started || now - brightness_step_ms < kBrightnessStepMs) {
+        return;
+    }
+    brightness_step_ms = now;
+    const uint32_t elapsed = now - brightness_started_ms;
+    if (elapsed >= kBrightnessFadeMs) {
+        screen.setBrightness(0xFF);
+        brightness_done = true;
+    } else {
+        const uint32_t value =
+            255U * elapsed * (2U * kBrightnessFadeMs - elapsed) / (kBrightnessFadeMs * kBrightnessFadeMs);
+        screen.setBrightness(static_cast<uint8_t>(value));
+    }
+}
+
+/** @brief LVGL 首帧的最后一块已完成移位，之后的轮询才发送亮度命令。 */
+static void
+first_frame_complete() {
+    if (flush_last && !brightness_started && !first_frame_failed) {
+        brightness_started = true;
+        brightness_started_ms = brightness_step_ms = millis();
+    }
+}
+#endif
+
 /** @brief 将失效区域扩展到面板要求的双像素边界。 */
 static void
 my_rounder_cb(lv_event_t* event) {
@@ -66,6 +116,10 @@ disp_flush(lv_display_t* disp, const lv_area_t* area, uint8_t* px_map) {
     const int32_t w = lv_area_get_width(area);
     const int32_t h = lv_area_get_height(area);
     rotate_90(color_p, w, h, tx_buf);
+    /** @brief LVGL 在 flush_ready 后可能清除末块标记，须先保存。 */
+#if PRODUCT_DISPLAY_BRIGHTNESS_FADE
+    flush_last = lv_display_flush_is_last(disp);
+#endif
     // 数据已复制到 tx_buf，立即归还绘制缓冲，LVGL 可在 DMA 期间渲染下一块。
     lv_display_flush_ready(disp);
 
@@ -83,6 +137,9 @@ disp_flush(lv_display_t* disp, const lv_area_t* area, uint8_t* px_map) {
         rows = panel_rows - first_row;
     }
     if (rows <= 0) {
+#if PRODUCT_DISPLAY_BRIGHTNESS_FADE
+        first_frame_complete();
+#endif
         return; // 整块都在玻璃外
     }
 
@@ -98,24 +155,40 @@ disp_flush(lv_display_t* disp, const lv_area_t* area, uint8_t* px_map) {
         board_display_spi.abort();
         screen.deselect();
         flush_active = false;
+#if PRODUCT_DISPLAY_BRIGHTNESS_FADE
+        first_frame_failed = true;
+#endif
     }
 }
 
 void
 lv_port_disp_poll() {
-    if (!flush_active) {
-        return;
+#if PRODUCT_DISPLAY_BRIGHTNESS_FADE
+    /** @brief App_Init 的建页耗时不计入首帧兜底窗口，首次进入轮询后才计时。 */
+    if (!brightness_polled) {
+        brightness_wait_started_ms = millis();
+        brightness_polled = true;
     }
-    const bool expired = millis() - flush_started_ms >= 100U;
-    // IDLNF 为 1 表示 SPI 仍忙；DMA 结束时最后一个字节可能还在移位。
-    if ((board_display_spi.dmaDone() && board_display_spi.isIdle()) || expired) {
-        board_display_spi.abort();
-        screen.deselect();
-        flush_active = false;
-        if (expired) {
-            ++display_dma_timeouts;
+#endif
+    if (flush_active) {
+        const bool expired = millis() - flush_started_ms >= 100U;
+        // IDLNF 为 1 表示 SPI 仍忙；DMA 结束时最后一个字节可能还在移位。
+        if ((board_display_spi.dmaDone() && board_display_spi.isIdle()) || expired) {
+            board_display_spi.abort();
+            screen.deselect();
+            flush_active = false;
+            if (expired) {
+                ++display_dma_timeouts;
+            }
+#if PRODUCT_DISPLAY_BRIGHTNESS_FADE
+            first_frame_failed = first_frame_failed || expired;
+            first_frame_complete();
+#endif
         }
     }
+#if PRODUCT_DISPLAY_BRIGHTNESS_FADE
+    brightness_poll();
+#endif
 }
 
 void
@@ -129,8 +202,14 @@ lv_port_disp_init() {
     // 面板物理竖屏，逻辑横屏旋转在 disp_flush 中完成。
     display = lv_display_create(screen.height(), screen.width());
     if (!display) {
+#if PRODUCT_DISPLAY_BRIGHTNESS_FADE
+        screen.setBrightness(0xFF);
+#endif
         for (;;) {}
     }
+#if PRODUCT_DISPLAY_BRIGHTNESS_FADE
+    brightness_done = brightness_started = brightness_polled = first_frame_failed = flush_last = false;
+#endif
     lv_display_set_color_format(display, LV_COLOR_FORMAT_RGB565);
     lv_display_set_buffers(display, draw_buf, nullptr, sizeof(draw_buf), LV_DISPLAY_RENDER_MODE_PARTIAL);
     lv_display_set_flush_cb(display, disp_flush);
@@ -145,4 +224,18 @@ lv_port_reset() {
         for (;;) {}
     }
     screen.fill(0x0000);
+#if PRODUCT_DISPLAY_BRIGHTNESS_FADE
+    /** @brief 唤醒复位保持旧版全亮终态，不重复冷启动动画。 */
+    screen.setBrightness(0xFF);
+    brightness_done = true;
+#endif
 }
+
+#if defined(__CORE_DEBUG)
+/** @brief GDB 手动验证入口；先回收 DMA，再同步设置亮度，不添加面板控制命令。 */
+__attribute__((noinline)) void
+lv_port_debug_brightness(uint8_t value) {
+    wait_flush_idle();
+    screen.setBrightness(value);
+}
+#endif

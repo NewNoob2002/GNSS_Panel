@@ -3,6 +3,8 @@
 
 #include "UI/Resource/ResourcePool.h"
 #include "I18n.h"
+#include "UI/Common/LogoReveal.h"
+#include "oem_config.h"
 #include <array>
 #include "lvgl.h"
 
@@ -10,13 +12,14 @@ namespace page {
 /** Simulated boot presentation; Ready is not evidence of initialized hardware. */
 class SystemLoadingView {
   public:
+    static constexpr uint32_t kLogoMs = OEM_LOGO_TOTAL_MS;
     static constexpr uint32_t kTransitionMs = 220;
     static constexpr unsigned kStepCount = 5;
     static constexpr uint32_t kProgressMs = 240; // Bar animation after a step finishes; steps themselves are not timed.
     void create(lv_obj_t* root, const std::array<i18n::TextId, kStepCount>& titles);
     /** UI thread: cancel child animations before hiding/unloading; the page root still owns the widgets. */
     void destroy();
-    void show_logo() const;
+    void show_logo();
     void show_initialization();
     /** Step 0..4 started: headline and active node; the bar only advances when the step finishes. */
     void begin_step(unsigned step);
@@ -52,6 +55,7 @@ class SystemLoadingView {
         lv_obj_t* footer{};
         lv_obj_t* logo_container{};
     } ui_{};
+    app::LogoReveal logo_;
     std::array<i18n::TextId, kStepCount> titles_{};
     bool ready_ = false;
     int32_t progress_ = 0;

@@ -236,7 +236,7 @@ hal_power_on_and_boot() {
     power_key = false;
     assert(!systemInfo.host.online); // 驻留恢复清除主控数据，随后模拟重新通信。
     State::Host().online = true;
-    run(7000);
+    run(7500);
     assert(on_page("Pages/Dialplate"));
 }
 
@@ -377,7 +377,7 @@ main() {
     power_key = false;
     run(300);
     assert(on_page("Pages/SystemLoading"));
-    run(7000);
+    run(7500);
     assert(on_page("Pages/Dialplate"));
 
     // 逐页进入并返回，检查导航与内存。
@@ -696,7 +696,7 @@ main() {
     assert(systemInfo.power.panel_power_on && !power_key && power_on_requests == before_reset);
     run(300);
     assert(on_page("Pages/SystemLoading"));
-    run(7000);
+    run(7500);
     assert(on_page("Pages/Dialplate") && power_on_requests == before_reset);
 
     std::printf("%s: DataNode peak %zu (providers %zu, DataBroker capacity %zu)\n", PRODUCT_NAME, peak_nodes,

@@ -9,9 +9,9 @@
 using namespace page;
 
 void SystemLoading::onInstalled() {
-    setLoadAnimType(PAGE_ANIM::OVER_TOP);
+    setLoadAnimType(PAGE_ANIM::NONE);
     setLoadAnimTime(style::kPageTransitionMs);
-    setLoadAnimPath(lv_anim_path_ease_out);
+    setLoadAnimPath(style::page_transition_path);
 }
 
 void SystemLoading::onViewLoad() {
@@ -36,7 +36,7 @@ void SystemLoading::onViewWillAppear() {
 
 void SystemLoading::onViewDidAppear() {
     // Start completion timing after the page transition, including a stalled host frame.
-    timer_ = lv_timer_create(on_timeout, 800, this); // Full-screen logo before simulated progress.
+    timer_ = lv_timer_create(on_timeout, SystemLoadingView::kLogoMs, this);
     if (!timer_)
         LV_LOG_ERROR("SystemLoading: preview timer allocation failed");
 }

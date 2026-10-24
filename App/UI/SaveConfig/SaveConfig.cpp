@@ -9,7 +9,7 @@ using namespace page;
 void SaveConfig::onInstalled() {
     setLoadAnimType(PAGE_ANIM::OVER_TOP);
     setLoadAnimTime(style::kPageTransitionMs);
-    setLoadAnimPath(lv_anim_path_ease_out);
+    setLoadAnimPath(style::page_transition_path);
 }
 
 void SaveConfig::onViewLoad() {

@@ -224,7 +224,7 @@ void check_saveconfig_bounds(lv_obj_t* obj);
 void check_startup() {
     auto* start = active->focused();
     assert(start && lv_obj_get_width(start) >= 100 && lv_obj_get_height(start) >= 90);
-    assert(label(lv_screen_active(), "GNSS RTK"));
+    assert(label(lv_screen_active(), i18n::device_name()));
     assert(lv_group_get_obj_count(lv_group_get_default()) == 1);
     assert(lv_obj_is_clickable(start));
     assert(lv_obj_get_style_bg_opa(start, LV_PART_MAIN) == LV_OPA_TRANSP);

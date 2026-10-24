@@ -2,13 +2,26 @@
 """图片迁移回归测试（标准库）：python3 -B App/UI/Resource/tools/test_convert_images_v9.py。"""
 import contextlib
 import io
+import random
+import re
 from pathlib import Path
+import struct
 import tempfile
 import unittest
+import zlib
 from unittest.mock import patch
 
 import convert_images_v9 as converter
 import convert_logo_a8 as logo_converter
+import png_logo
+import split_logo_a8 as splitter
+import test_oem_build
+
+
+def load_tests(loader, tests, pattern):
+    """资源工具统一执行 OEM 校验；Pillow 缺失仅跳过文字项并明确报告。"""
+    tests.addTests(loader.loadTestsFromModule(test_oem_build))
+    return tests
 
 
 class ConversionTests(unittest.TestCase):
@@ -258,6 +271,189 @@ class ConversionTests(unittest.TestCase):
             parsed, = converter.parse_v9_text(target.read_text())
             self.assertEqual(parsed.data, image.data)
             self.assertEqual(parsed.cf, "RGB565")
+
+    def test_logo_parts_exact_reconstruction(self):
+        """部署零件从 C 独立回读，max 与相加重建都逐字节等于旧数组。"""
+        for customer, count in (('singularxyz', 10), ('neutral', 1)):
+            original_path = converter.HERE.parent / 'oem' / customer / 'logo.c'
+            original, = converter.parse_v9_text(original_path.read_text())
+            parts = splitter.split(original)
+            self.assertEqual(len(parts), count)
+            deployed = original_path.parent / 'generated' / 'oem_logo.c'
+            deployed_text = deployed.read_text()
+            images = {p.symbol: p for p in converter.parse_v9_text(deployed_text)}
+            rows = re.findall(r'\{&(\w+),\s*(-?\d+),\s*(-?\d+),\s*(\d+)\}', deployed_text)
+            self.assertEqual(len(rows), count)
+            restored = []
+            for symbol, x, y, group in rows:
+                im = images[symbol]
+                restored.append(splitter.Part(converter.Image9(im.symbol, im.w, im.h, im.cf, im.stride, im.data),
+                                               int(x), int(y), int(group)))
+            self.assertEqual([p.image.data for p in parts], [p.image.data for p in restored])
+            splitter.verify(original, restored)
+            if count == 10:
+                bounds = [(p.x + min(n % p.image.w for n, a in enumerate(p.image.data) if a > 24),
+                           p.x + max(n % p.image.w for n, a in enumerate(p.image.data) if a > 24)) for p in restored]
+                self.assertEqual(bounds, [(2, 28), (27, 39), (36, 59), (54, 83), (83, 105),
+                                          (104, 116), (114, 139), (137, 154), (154, 241), (248, 260)])
+                self.assertLess(parts[1].x, parts[0].x + parts[0].image.w)  # 斜体列重叠仍不混字。
+
+    def test_logo_groups_and_weak_edges(self):
+        """斜线的八邻域连接、弱边缘归属及显式分组不丢像素。"""
+        im = converter.Image9('img_src_t', 7, 3, 'A8', 7,
+                              bytes((255, 0, 0, 0, 0, 0, 255, 0, 255, 0, 5, 0, 255, 0, 0, 0, 255, 0, 255, 0, 0)))
+        parsed, = converter.parse_v9_text(converter.render_c_file([im]))
+        parts = splitter.split(parsed, '0,1')
+        self.assertEqual(len(parts), 2)
+        self.assertEqual([p.group for p in parts], [0, 0])
+        splitter.verify(parsed, parts)
+        for bad in ('0', '0|0,1', '0|2', '|0,1'):
+            with self.assertRaises(ValueError):
+                splitter.split(parsed, bad)
+
+    @staticmethod
+    def png(width, height, color, pixels, filters=None, depth=8, interlace=0, palette=None, transparency=None):
+        """用 zlib 生成 PNG fixture，反向编码所有五种行滤波。"""
+        def chunk(kind, body):
+            return struct.pack('>I', len(body)) + kind + body + struct.pack('>I', zlib.crc32(kind + body))
+        channels = {0: 1, 2: 3, 3: 1, 4: 2, 6: 4}[color]
+        stride = (width * channels * depth + 7) // 8
+        bpp = max(1, (channels * depth + 7) // 8)
+        raw = bytearray()
+        previous = bytes(stride)
+        for y in range(height):
+            row = pixels[y * stride:(y + 1) * stride]
+            mode = filters[y] if filters else 0
+            raw.append(mode)
+            for i, value in enumerate(row):
+                left = row[i - bpp] if i >= bpp else 0
+                up, corner = previous[i], previous[i - bpp] if i >= bpp else 0
+                pred = left + up - corner
+                distances = abs(pred - left), abs(pred - up), abs(pred - corner)
+                paeth = (left, up, corner)[distances.index(min(distances))]
+                raw.append((value - (0, left, up, (left + up) // 2, paeth)[mode]) & 255)
+            previous = row
+        return (b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', width, height, depth, color, 0, 0, interlace))
+                + (chunk(b'PLTE', palette) if palette is not None else b'')
+                + (chunk(b'tRNS', transparency) if transparency is not None else b'')
+                + chunk(b'IDAT', zlib.compress(raw)) + chunk(b'IEND', b''))
+
+    def test_png_modes_filters_and_failures(self):
+        """四类 PNG 的五种行滤波、透明合成、CRC/位深/隔行错误及显式 fit。"""
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'logo.png'
+            for color, channels in ((0, 1), (2, 3), (4, 2), (6, 4)):
+                samples = bytes(v for y in range(5) for x in range(4)
+                                for v in ((x * 63,) * (channels - (color in (4, 6)))
+                                          + ((255,) if color in (4, 6) else ())))
+                path.write_bytes(self.png(4, 5, color, samples, list(range(5))))
+                image = png_logo.read(path)
+                self.assertEqual(image.rgba, bytes(v for y in range(5) for x in range(4) for v in (x * 63,) * 3 + (255,)))
+            path.write_bytes(self.png(1, 1, 6, bytes((255, 255, 255, 128))))
+            self.assertEqual(png_logo.read(path, (0, 0, 0)).rgba, bytes((128, 128, 128, 255)))
+            valid = self.png(1, 1, 0, b'\xff')
+            for bad in (valid[:-1], valid.replace(b'IDAT', b'IDXT'),
+                        self.png(1, 1, 0, b'\xff', depth=16), self.png(1, 1, 0, b'\xff', interlace=1)):
+                path.write_bytes(bad)
+                with self.assertRaises(ValueError):
+                    png_logo.read(path)
+            path.write_bytes(self.png(300, 10, 0, bytes(3000)))
+            with self.assertRaises(ValueError):
+                png_logo.read(path)
+            self.assertEqual(png_logo.read(path, fit=True).w, 294)
+
+    def test_png_palette_bit_depths_and_transparency(self):
+        """索引色各位深、奇数行填充、五种滤波和缺省不透明的 tRNS 尾项。"""
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'indexed.png'
+            for depth in (1, 2, 4, 8):
+                count = 2 if depth == 1 else 4
+                palette = bytes((255, 255, 255, 255, 0, 0, 0, 0, 255, 0, 255, 0))[:count * 3]
+                transparency = bytes((0, 128))
+                packed, expected = bytearray(), bytearray()
+                for y in range(5):
+                    row = bytearray((5 * depth + 7) // 8)
+                    for x in range(5):
+                        index = (x + y) % count
+                        row[x * depth // 8] |= index << (8 - depth - x * depth % 8)
+                        rgb = palette[index * 3:index * 3 + 3]
+                        alpha = transparency[index] if index < len(transparency) else 255
+                        expected.extend((*((v * alpha + 127) // 255 for v in rgb), 255))
+                    packed.extend(row)
+                path.write_bytes(self.png(5, 5, 3, packed, list(range(5)), depth=depth,
+                                          palette=palette, transparency=transparency))
+                self.assertEqual(png_logo.read(path, (0, 0, 0)).rgba, bytes(expected))
+            for data in (self.png(1, 1, 3, b'\0'),
+                         self.png(1, 1, 3, b'\x02', palette=b'\xff\0\0'),
+                         self.png(1, 1, 3, b'\0', palette=b'\xff\0\0', transparency=b'\xff\xff')):
+                path.write_bytes(data)
+                with self.assertRaises(ValueError):
+                    png_logo.read(path)
+
+    def test_png_16_bit_modes_and_color_key(self):
+        """四类 16 位采样在滤波还原后取高字节；透明色键按原 16 位值比较。"""
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'sixteen.png'
+            for color, values in ((0, (0x1234,)), (2, (0x1234, 0x5678, 0x9abc)),
+                                  (4, (0xabcd, 0x8000)), (6, (0x1234, 0x5678, 0x9abc, 0x8000))):
+                samples = struct.pack('>' + 'H' * len(values), *values) * 15
+                path.write_bytes(self.png(3, 5, color, samples, list(range(5)), depth=16))
+                rgb = [v >> 8 for v in values[:3]] if color in (2, 6) else [values[0] >> 8] * 3
+                alpha = values[-1] >> 8 if color in (4, 6) else 255
+                expected = bytes((*((v * alpha + 127) // 255 for v in rgb), 255)) * 15
+                self.assertEqual(png_logo.read(path, (0, 0, 0)).rgba, expected)
+            path.write_bytes(self.png(2, 1, 0, struct.pack('>HH', 0x1234, 0x12ff), depth=16,
+                                      transparency=struct.pack('>H', 0x1234)))
+            self.assertEqual(png_logo.read(path, (0, 0, 0)).rgba, bytes((0, 0, 0, 255, 18, 18, 18, 255)))
+
+    def test_png_noisy_logo_error_override(self):
+        """随机噪点单色 Logo 默认拒绝；显式门槛成功且输出实际最大/平均误差。"""
+        rng = random.Random(1234)
+        pixels = bytearray()
+        for y in range(10):
+            for x in range(16):
+                color = (220, 30, 20) if x in (4, 11) and 3 <= y <= 6 else (255, 255, 255)
+                pixels.extend((*[min(255, max(0, v + rng.randint(-40, 40))) for v in color], 255))
+        with tempfile.TemporaryDirectory() as directory:
+            source, target = Path(directory) / 'noisy.png', Path(directory) / 'result.c'
+            source.write_bytes(self.png(16, 10, 6, pixels))
+            target.write_text('unchanged')
+            args = ['split_logo_a8.py', str(source), str(target), '--background', 'ffffff', '--foreground', 'dc1e14']
+            with patch('sys.argv', args), contextlib.redirect_stdout(io.StringIO()), \
+                    contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                splitter.main()
+            self.assertEqual(target.read_text(), 'unchanged')
+            output = io.StringIO()
+            with patch('sys.argv', args + ['--max-error', '80']), contextlib.redirect_stdout(output):
+                self.assertEqual(splitter.main(), 0)
+            self.assertIn('最大', output.getvalue())
+            self.assertIn('平均', output.getvalue())
+            self.assertIn('继续近似单色', output.getvalue())
+            self.assertIn('logo_parts_t', target.read_text())
+            for bad in ('-1', '256'):
+                with patch('sys.argv', args + ['--max-error', bad]), contextlib.redirect_stderr(io.StringIO()), \
+                        self.assertRaises(SystemExit):
+                    splitter.main()
+
+    def test_png_to_parts_cli(self):
+        """PNG 直接转换、显式颜色/分组与 layout，拒绝多色及错误组号。"""
+        with tempfile.TemporaryDirectory() as directory:
+            source, target = Path(directory) / 'designer.png', Path(directory) / 'result.c'
+            pixels = bytes(v for y in range(8) for x in range(12)
+                           for v in ((255 if x in (3, 8) and 2 <= y <= 5 else 0,) * 3 + (255,)))
+            source.write_bytes(self.png(12, 8, 6, pixels))
+            args = ['split_logo_a8.py', str(source), str(target), '--groups', '0,1',
+                    '--symbol', 'img_src_NewLogo', '--background', '000000', '--foreground', 'ffffff']
+            with patch('sys.argv', args), contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(splitter.main(), 0)
+            self.assertIn('img_src_NewLogo_parts', target.read_text())
+            self.assertEqual(splitter.layout_from(target.read_text(), 'img_src_NewLogo'), (0, 0xffffff, 1, 0))
+            self.assertEqual(len(converter.parse_v9_text(target.read_text())), 2)
+            before = target.read_bytes()
+            with patch('sys.argv', args + ['--timings', '7:0:250']), contextlib.redirect_stderr(io.StringIO()), \
+                    contextlib.redirect_stdout(io.StringIO()), self.assertRaises(SystemExit):
+                splitter.main()
+            self.assertEqual(target.read_bytes(), before)
 
     def test_deployed_v9_check(self):
         """Check deployed v9 resources in place. 正式资源支持同目录只读校验，拒绝错误头字段。"""

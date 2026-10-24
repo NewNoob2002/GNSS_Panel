@@ -8,7 +8,7 @@ using namespace page;
 void RecordConfig::onInstalled() {
     setLoadAnimType(PAGE_ANIM::OVER_TOP);
     setLoadAnimTime(style::kPageTransitionMs);
-    setLoadAnimPath(lv_anim_path_ease_out);
+    setLoadAnimPath(style::page_transition_path);
 }
 
 void RecordConfig::onViewLoad() {

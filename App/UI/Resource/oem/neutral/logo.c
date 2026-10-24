@@ -12,7 +12,7 @@
 #elif defined(LV_LVGL_H_INCLUDE_SYSTEM)
 #include <lvgl.h>
 #elif defined(LV_BUILD_TEST)
-#include "../lvgl.h"
+#include "lvgl.h"
 #else
 #include "lvgl/lvgl.h"
 #endif

@@ -3,7 +3,9 @@
 #include <cstring>
 #include <initializer_list>
 #include "UI/Common/PageStyle.h"
-#include "UI/Resource/LogoLayout.h"
+#include "UI/Resource/LogoParts.h"
+#include "UI/Resource/DeviceNameLayout.h"
+#include "oem_config.h"
 
 using namespace page;
 
@@ -139,39 +141,24 @@ void SystemLoadingView::create(lv_obj_t* root, const std::array<i18n::TextId, kS
             lv_obj_set_style_bg_opa(ui_.links[i], LV_OPA_COVER, 0);
         }
     }
-    ui_.footer = style::label(ui_.cont, small_font, 16, 105, 116);
-    lv_obj_set_style_text_color(ui_.footer, kGrey, 0);
-#if defined(RGK_LOGO_USE)
-    const auto* logo_source = resource_pool::get_image("RGKLogo");
-    const auto& logo_layout = img_src_RGKLogo_layout;
-#elif defined(MIDDLE_LOGO_USE)
-    const auto* logo_source = resource_pool::get_image("MiddleLogo");
-    const auto& logo_layout = img_src_MiddleLogo_layout;
-#else
-    const auto* logo_source = resource_pool::get_image("startupLogo");
-    const auto& logo_layout = img_src_startupLogo_layout;
-#endif
-    ui_.logo_container = style::box(root, 0, 0, 294, 126);
-    lv_obj_set_style_bg_color(ui_.logo_container, lv_color_hex(logo_layout.background), 0);
-    lv_obj_set_style_bg_opa(ui_.logo_container, LV_OPA_COVER, 0);
-    auto* logo = lv_image_create(ui_.logo_container);
-    lv_image_set_src(logo, logo_source);
-    lv_obj_set_pos(logo, logo_layout.x, logo_layout.y);
-#if !defined(RGK_LOGO_USE)
-    lv_obj_set_style_image_recolor(logo, lv_color_hex(logo_layout.foreground), 0);
-    lv_obj_set_style_image_recolor_opa(logo, LV_OPA_COVER, 0);
-#endif
+    ui_.footer = style::label(ui_.cont, small_font, 16, 105, OEM_LOADING_FOOTER_WIDTH);
+    lv_obj_set_style_text_color(ui_.footer, lv_color_hex(OEM_FOOTER_COLOR), 0);
+    const auto* logo_parts = static_cast<const logo_parts_t*>(resource_pool::get_image("oemLogoParts"));
+    logo_.create(root, *logo_parts);
+    ui_.logo_container = logo_.container();
     update_text();
     show_logo();
 }
 
-void SystemLoadingView::show_logo() const {
+void SystemLoadingView::show_logo() {
+    lv_obj_set_style_bg_color(lv_obj_get_parent(ui_.logo_container), lv_color_black(), 0);
     lv_obj_set_hidden(ui_.cont, true);
-    lv_obj_set_hidden(ui_.logo_container, false);
-    set_opa(ui_.logo_container, LV_OPA_COVER);
+    logo_.play();
 }
 
 void SystemLoadingView::show_initialization() {
+    logo_.stop();
+    lv_obj_set_style_bg_color(lv_obj_get_parent(ui_.logo_container), style::kBackground, 0);
     ready_ = false;
     step_ = 1;
     waited_s_ = 0;
@@ -301,6 +288,7 @@ void SystemLoadingView::update_text() const {
     lv_label_set_text(ui_.footer, i18n::text(i18n::TextId::SystemLoadingTitle));
 }
 void SystemLoadingView::destroy() {
+    logo_.stop();
     // Includes fades and callbacks borrowing View/widget pointers; cancel before the root is destroyed.
     for (auto* obj : {ui_.cont, ui_.bar, ui_.gear, ui_.check, ui_.logo_container, ui_.service, ui_.subtitle})
         lv_anim_delete(obj, nullptr);

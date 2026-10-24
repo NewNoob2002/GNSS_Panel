@@ -15,10 +15,8 @@ typedef struct {
     int16_t y;
 } system_loading_logo_layout_t;
 
-/** @brief 各 Logo 的静态布局，与同名 lv_image_dsc_t 资源配对。 */
-extern const system_loading_logo_layout_t img_src_startupLogo_layout;
-extern const system_loading_logo_layout_t img_src_MiddleLogo_layout;
-extern const system_loading_logo_layout_t img_src_RGKLogo_layout;
+/** @brief 构建所选 OEM 的静态布局，资源表与图像共用同一份数据。 */
+extern const system_loading_logo_layout_t oem_logo_layout;
 
 #ifdef __cplusplus
 }

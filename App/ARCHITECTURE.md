@@ -55,11 +55,15 @@ Model 继承 DataNode，只订阅所需领域并立即 pull 首值；自有值�
 
 AppNavigator 是 UI 组装对象，其 20 ms LVGL 定时器消费 Power 边沿和 PageNavi 队列，繁忙切页后重试。页面点击仍同步调用 PageManager，以保留导航返回值、拒绝回滚和时序；PageNavi 仅供非 UI 请求。SystemLoading 期间只预加载 Dialplate 与 SaveConfig，每节拍最多新建一页。
 
-SystemLoading 的元数据从 Model 经 `dp::Init::info` 读取后交给 View，检查经 `dp::Init::poll` 执行。Logo 800 ms、50 ms 轮询、单步至少 300 ms、结果至少 150 ms、100% 停留 200 ms、Ready 停留 1000 ms 均保留；平台有界超时之外仍有 `kStepLimitMs = 35000` 兜底。失败记录为红色并继续后续步骤，Pending 不写入已完成结果，Begin 清除上次报告。
+SystemLoading 的元数据从 Model 经 `dp::Init::info` 读取后交给 View，检查经 `dp::Init::poll` 执行。Logo 1300 ms、50 ms 轮询、单步至少 300 ms、结果至少 150 ms、100% 停留 200 ms、Ready 停留 1000 ms 均保留；平台有界超时之外仍有 `kStepLimitMs = 35000` 兜底。失败记录为红色并继续后续步骤，Pending 不写入已完成结果，Begin 清除上次报告。
+
+Startup 与 SystemLoading 直接切页；冷启动首屏由 HC32 显示端口在完整首帧后用 DCS 0x51 渐亮 300 ms（产品开关控制），SDL 两后端用纹理亮度等效，Linux 不处理亮度、页面直接出现。SystemLoading 的静态零件表由 `UI/Resource/tools/oem_build.py` 复用 `split_logo_a8.py` 生成，`UI/Common/LogoReveal` 单动画播放，离页停止，根对象删除时清理。
+
+OEM 配置由 App 层的 `OEM` CMake 缓存变量选择（默认 `singularxyz`），每份 `UI/Resource/oem/<name>/oem.toml` 与源图/字体引用及 `generated/oem_logo.c`、`generated/oem_config.h` 一起提交；构建只消费生成物，不运行 Python，未知目录或缺生成物直接报错并列出可用项。无屏 X1 也执行同一选择校验，不链接图形资源。生成器的 docstring 说明全部字段与 PNG/文字两种命令；PNG 路径只用标准库，文字路径仅通过 `uv run --with pillow` 临时使用 Pillow 与仓库 Oswald TTF。迁移资源保留原 A8 C 输入及 RGK RGB565 原数组，避免往返转换的量化误差。Startup 名称按当前语言取生成头文件，页脚仍经 `TextId::SystemLoadingTitle` 的原语言表位置注入，缺省俄文回退英文；生成时检查实际 Oswald 18/12 的 Unicode cmap，并按 advance、kerning 与 LVGL 舍入计算英俄文字宽度；宽度上限唯一存于 `DeviceNameLayout.h`，UI 与 Python 共读，超宽拒绝生成，Linux 测试对照实际排版宽度与生成器预测值。`colors.text` 同时控制两处文字，默认客户额外使用 `footer_text` 保留旧版 muted 页脚色，其余界面主题不变。四种静态预设为 cascade（旧逐组时间及像素保持）、soft（整体缓出上浮淡入）、sweep（整体淡入后扫光）、wipe（固定零件布局，未显现区底色覆盖加 16 列柔边）；wipe 只在 Logo 包围盒内绘制一个底色矩形和最多 16×Logo 高度的窄列，不增加裁剪对象、整屏图层、像素缓冲或逐字计时器。所有预设复用 LVGL 样式值避免重复 setter，扫光/柔边坐标仅在变化时失效，停留段零刷新。资源工具测试逐客户再生成并逐字节比较；无 Pillow 时文字项明确 SKIP，不作为已验证。
 
 PageManager 拥有已注册页面；导航结果必须显式比较 `PageManager::RES_TYPE::OK`（值为 0）。各页保留 260 ms 缓出位移过渡，建页耗时不计入动画；根对象异步删除前清理动画、控件与外部样式引用。双键输入和 SDL 输入各用既有归一化路径，页面成员通过 getter 访问。
 
-所有 DataNode、设备、输入、定时器和 LVGL 操作只在应用线程执行。SystemDash、Dialplate、WorkSettings、RecordConfig 显式启用 `UI/Common/FocusHighlight`：单定时器驱动上层透明边框，控件保留自身背景与普通边框，连续切换保留速度；入场、恢复、语言、尺寸及父容器改变直接对齐，滚动按真实偏移对齐，按下/禁用时隐藏覆盖框，离页停止，卸载解除对象及父容器事件和 observer。覆盖框沿用 250 ms、bounce 0.15，匹配控件圆角；渐变卡片保留原 2 px 底边框以保持填充取样不变。SystemInfos 的整页滚动/收窄单侧边线、StarMap 的无边框整页焦点、Startup 的 hold 进度环保持原绘制。DataBroker 最多注册 32 个外部节点和 32 个独立时钟定时器；Publish/Notify/Pull 同步完成，禁止中断/后台线程直接分发或保存载荷指针。发布时使用地址加注册序号快照，可在回调中解除订阅或删除订阅者，禁止销毁当前发布者或 Broker。
+所有 DataNode、设备、输入、定时器和 LVGL 操作只在应用线程执行。SystemDash、Dialplate、WorkSettings、RecordConfig 显式启用 `UI/Common/FocusHighlight`：单定时器驱动上层透明边框，控件保留自身背景与普通边框，连续切换保留速度；入场、恢复、语言、尺寸及父容器改变直接对齐（Dialplate 以 `shared_layer` 把覆盖框固定在页面根层，卫星图标与按钮行之间跨容器切换也保速过渡；其余页面覆盖框随控件父容器滚动、裁剪与动画），滚动按真实偏移对齐，按下/禁用时隐藏覆盖框，离页停止，卸载解除对象及父容器事件和 observer。覆盖框沿用 250 ms、bounce 0.15，匹配控件圆角；渐变卡片保留原 2 px 底边框以保持填充取样不变。SystemInfos 的整页滚动/收窄单侧边线、StarMap 的无边框整页焦点、Startup 的 hold 进度环保持原绘制。DataBroker 最多注册 32 个外部节点和 32 个独立时钟定时器；Publish/Notify/Pull 同步完成，禁止中断/后台线程直接分发或保存载荷指针。发布时使用地址加注册序号快照，可在回调中解除订阅或删除订阅者，禁止销毁当前发布者或 Broker。
 
 初始化先注入单调毫秒时钟 `DataProc_Init(clock)`，再创建页面；主循环运行平台更新、`App::update()`（即 DataProc_RunLoop）和 `lv_timer_handler()`。销毁先停止导航定时器、销毁页面和组件，再逆序销毁领域节点；Broker 必须比全部节点和定时器存活更久。HC32 的标准 `new` 仍由平台映射到 LVGL 池，Frameworks 不选择分配器。
 
@@ -67,4 +71,4 @@ PageManager 拥有已注册页面；导航结果必须显式比较 `PageManager:
 
 ## 验证
 
-`App/tests` 无 LVGL，覆盖框架生命周期、容量、同步边界、计时器、领域发布/命令、Clock 日期与 Init 查询/留存；`tests` 验证 HC32 协议映射、pending/revision、平台时序与 LVGL 池；Linux 测试验证页面 MVP、导航/输入、双语布局和截图。构建与检查命令见根 `AGENTS.md`；CMake 层级和自有源码包含规则由 `tests/check_layers.py` 检查，HC32 状态单写者由 `check_state_ownership.py` 检查。
+`App/tests` 无 LVGL，覆盖框架生命周期、容量、同步边界、计时器、领域发布/命令、Clock 日期与 Init 查询/留存；`tests` 验证 HC32 协议映射、pending/revision、平台时序与 LVGL 池；Linux 测试验证页面 MVP、导航/输入、双语布局和截图。`uv run --with pillow python3 -B Vendor/Linux/tests/oem_presets.py` 用临时客户配置将全部 Linux 测试分别跑在四种预设下，共用一个增量构建目录避免重复编译 LVGL；该脚本不注册进默认 CTest，避免递归调用。构建与检查命令见根 `AGENTS.md`；CMake 层级和自有源码包含规则由 `tests/check_layers.py` 检查，HC32 状态单写者由 `check_state_ownership.py` 检查。

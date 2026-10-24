@@ -42,7 +42,7 @@ HC32、Simulator、Linux 与 `tests/` 共用 `cmake/lvgl.cmake` 的 `project_add
 
 ## 产品差异放在哪里
 
-共享构建与架构边界见 [App/ARCHITECTURE.md](../App/ARCHITECTURE.md)：`app_framework` / `app_core` 不依赖 LVGL，`app_ui` 是 UI；固件、主机测试、模拟器与 Linux 端口复用同一个 `App/CMakeLists.txt`。平台通过 `app_build_options` 和 `app_lvgl` 绑定编译选项与显示库。`app_framework` 汇总组件自有目标中的 DataBroker/DeviceManager，ResourceManager 使用静态数组模板；DataNode 同步分发，最多 16 个节点、32 个独立时钟定时器。资源池与页面外观不变，LVGL 为 9.6.0，页面管理由加固后的 `Frameworks/PageManager` 编译为 `app_page_manager`，统一拥有页面池、预加载和根栈重置；导航返回值显式与 `RES_TYPE::OK` 比较，页面使用 getter 与 lowerCamelCase 生命周期。`App/` 与 `Frameworks/` 直接在本仓库修改；平台相关行为放在 `Vendor/<平台>`。
+共享构建与架构边界见 [App/ARCHITECTURE.md](../App/ARCHITECTURE.md)：`app::framework` / `app::core` 不依赖 LVGL，`app::ui` 是 UI；固件、主机测试、模拟器与 Linux 端口复用同一个 `App/CMakeLists.txt`。平台通过 `proj::options` 和 `lvgl::lvgl` 提供编译选项与显示库（见 [CMake 分层构建架构](build_architecture.md)）。`app::framework` 汇总组件自有目标中的 DataBroker/DeviceManager，ResourceManager 使用静态数组模板；DataNode 同步分发，最多 32 个节点、32 个独立时钟定时器。资源池与页面外观不变，LVGL 为 9.6.0，页面管理由加固后的 `Frameworks/PageManager` 编译为 `app_page_manager`，统一拥有页面池、预加载和根栈重置；导航返回值显式与 `RES_TYPE::OK` 比较，页面使用 getter 与 lowerCamelCase 生命周期。`App/` 与 `Frameworks/` 直接在本仓库修改；平台相关行为放在 `Vendor/<平台>`。
 
 1. **功能开关**：`Vendor/HC32/Products/<产品>/product_config.h` 中的 `PRODUCT_*` 宏，经 `mcu_config.h` 被所有源码看到。带屏产品缺少任一开关时 `mcu_config.h` 直接报错，避免 `#if` 未定义被当作 0。
 2. **弱符号扩展点**（`Vendor/HC32/Platform/HAL/HAL.h`）：`Power_ProductInit`、`Power_ProductUpdate`、`Power_AdjustPercent`、`Key_ProductInit`、`Key_ProductUpdate`。默认无动作，产品源码覆盖（X1：电量补偿、MultiButton 按键动作）。

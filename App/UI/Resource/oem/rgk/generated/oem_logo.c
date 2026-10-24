@@ -12,7 +12,7 @@
 #elif defined(LV_LVGL_H_INCLUDE_SYSTEM)
 #include <lvgl.h>
 #elif defined(LV_BUILD_TEST)
-#include "../lvgl.h"
+#include "lvgl.h"
 #else
 #include "lvgl/lvgl.h"
 #endif
@@ -21,11 +21,11 @@
 #define LV_ATTRIBUTE_MEM_ALIGN
 #endif
 
-#ifndef LV_ATTRIBUTE_IMG_SRC_RGKLOGO
-#define LV_ATTRIBUTE_IMG_SRC_RGKLOGO
+#ifndef LV_ATTRIBUTE_OEM_LOGO_PART0
+#define LV_ATTRIBUTE_OEM_LOGO_PART0
 #endif
 
-static const LV_ATTRIBUTE_MEM_ALIGN LV_ATTRIBUTE_LARGE_CONST LV_ATTRIBUTE_IMG_SRC_RGKLOGO uint8_t img_src_RGKLogo_map[] = {
+static const LV_ATTRIBUTE_MEM_ALIGN LV_ATTRIBUTE_LARGE_CONST LV_ATTRIBUTE_OEM_LOGO_PART0 uint8_t oem_logo_part0_map[] = {
     0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
     0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
     0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
@@ -2344,7 +2344,7 @@ static const LV_ATTRIBUTE_MEM_ALIGN LV_ATTRIBUTE_LARGE_CONST LV_ATTRIBUTE_IMG_SR
     0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 };
 
-const lv_image_dsc_t img_src_RGKLogo = {
+const lv_image_dsc_t oem_logo_part0 = {
   .header = {
     .magic = LV_IMAGE_HEADER_MAGIC,
     .cf = LV_COLOR_FORMAT_RGB565,
@@ -2354,12 +2354,21 @@ const lv_image_dsc_t img_src_RGKLogo = {
     .stride = 588,
     .reserved_2 = 0,
   },
-  .data_size = sizeof(img_src_RGKLogo_map),
-  .data = img_src_RGKLogo_map,
+  .data_size = sizeof(oem_logo_part0_map),
+  .data = oem_logo_part0_map,
   .reserved = NULL,
   .reserved_2 = NULL,
 };
 
-/* Logo 布局：底色、前景色及原画面中的裁剪偏移。 */
-#include "UI/Resource/LogoLayout.h"
-const system_loading_logo_layout_t img_src_RGKLogo_layout = {0xffffff, 0xde2821, 0, 0};
+#include "UI/Resource/LogoParts.h"
+const system_loading_logo_layout_t oem_logo_layout = {0xffffff, 0xde2821, 0, 0};
+static const logo_part_t oem_logo_pieces[] = {
+    {&oem_logo_part0, 0, 0, 0},
+};
+static const logo_group_t oem_logo_groups[] = {
+    {-1, 0},
+};
+const logo_parts_t oem_logo_parts = {
+    oem_logo_pieces, oem_logo_groups, 1, 1,
+    {0xffffff, 0xde2821, 0, 0}, 294, 126, false, false, {150, 50, 250, 6, true, 900, 300, 1300, LOGO_EFFECT_CASCADE}
+};

@@ -27,6 +27,7 @@
  */
 #include "PanelRm690a0.h"
 #include <delay.h>
+#include "mcu_config.h"
 
 bool
 PanelRm690a0::init() {
@@ -55,9 +56,15 @@ PanelRm690a0::init() {
     delay_ms(150);
 
     // Adafruit_ST7789.cpp generic_RM690A0 原表；255 的延时按 displayInit 解释为 500 ms。
+#if PRODUCT_DISPLAY_BRIGHTNESS_FADE
+    constexpr uint8_t initial_brightness = 0x00;
+#else
+    constexpr uint8_t initial_brightness = 0xFF;
+#endif
     static constexpr uint8_t commands[] = {
-        11, 0x01, 0x80, 150, 0xFE, 1,    0x01, 0x6A, 1,    0x21, 0xFE, 1,    0x00, 0xC4, 1,    0x80, 0x35,
-        1,  0x00, 0x51, 1,   0xFF, 0x3A, 1,    0x05, 0x20, 0,    0x11, 0x80, 255,  0x29, 0x80, 255,
+        11,   0x01, 0x80, 150,  0xFE, 1,    0x01, 0x6A, 1,    0x21, 0xFE,
+        1,    0x00, 0xC4, 1,    0x80, 0x35, 1,    0x00, 0x51, 1,    initial_brightness,
+        0x3A, 1,    0x05, 0x20, 0,    0x11, 0x80, 255,  0x29, 0x80, 255,
     };
     const uint8_t* cursor = commands;
     uint8_t remaining = *cursor++;
@@ -108,6 +115,11 @@ PanelRm690a0::sendCommand(uint8_t command, const uint8_t* data, size_t count) {
     writeCommand(command);
     spi.write(data, count);
     deselect();
+}
+
+void
+PanelRm690a0::setBrightness(uint8_t brightness) {
+    sendCommand(0x51, &brightness, 1);
 }
 
 void

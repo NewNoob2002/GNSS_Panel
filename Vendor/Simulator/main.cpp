@@ -361,6 +361,11 @@ main(int argc, char** argv) {
 #endif
                 result = EXIT_SUCCESS;
                 bool enter_down = false;
+                constexpr uint32_t kBrightnessFadeMs = 300;
+                uint32_t brightness_started_ms = 0;
+                uint32_t brightness_step_ms = 0;
+                bool first_frame = true;
+                bool brightness_done = false;
                 while (!stop) {
                     SDL_Event event;
                     while (SDL_PollEvent(&event)) {
@@ -446,8 +451,24 @@ main(int argc, char** argv) {
                     }
 #endif
                     SDL_SetWindowTitle(window, app->current_page());
-                    if (frame.dirty) {
-                        if (SDL_UpdateTexture(texture, nullptr, frame.pixels.data(), kWidth * 4) != 0
+                    const uint32_t now = SDL_GetTicks();
+                    if (first_frame && frame.dirty) {
+                        /** @brief lv_timer_handler 已完成首帧的全部 flush，再以黑色首帧开始渐亮。 */
+                        brightness_started_ms = brightness_step_ms = now;
+                        first_frame = false;
+                    }
+                    const bool brightness_step = !first_frame && !brightness_done && now - brightness_step_ms >= 16;
+                    if (frame.dirty || brightness_step) {
+                        const uint32_t elapsed = now - brightness_started_ms;
+                        const uint8_t brightness =
+                            brightness_done || elapsed >= kBrightnessFadeMs
+                                ? 255
+                                : static_cast<uint8_t>(255U * elapsed * (2U * kBrightnessFadeMs - elapsed)
+                                                       / (kBrightnessFadeMs * kBrightnessFadeMs));
+                        brightness_done = brightness_done || elapsed >= kBrightnessFadeMs;
+                        brightness_step_ms = now;
+                        if (SDL_SetTextureColorMod(texture, brightness, brightness, brightness) != 0
+                            || SDL_UpdateTexture(texture, nullptr, frame.pixels.data(), kWidth * 4) != 0
                             || SDL_RenderClear(renderer) != 0
                             || SDL_RenderCopy(renderer, texture, nullptr, nullptr) != 0) {
                             std::fprintf(stderr, "SDL render: %s\n", SDL_GetError());
