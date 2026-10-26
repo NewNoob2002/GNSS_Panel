@@ -84,8 +84,9 @@ int main(int argc, char** argv) {
     assert(display);
 
     resource_pool::init();
-    assert(resource_pool::get_image("settings") && resource_pool::get_image("ui_satellite_large"));
-    assert(resource_pool::get_font("rajdhaniBold_40") && resource_pool::get_font("dialplate"));
+    assert(resource_pool::get_image("ui_settings") && resource_pool::get_image("ui_satellite_large"));
+    assert(!resource_pool::get_image("settings")); // 旧位图已由生成的 ui_* 图标替代并移除。
+    assert(resource_pool::get_font("rajdhaniBold_40") && resource_pool::get_font("oswaldBold_12"));
     page::DialplateView view{};
     view.create(lv_screen_active());
     assert(view.widgets().top_info.cont && view.widgets().btn_cont.btn_map && view.widgets().btn_cont.btn_rec);
