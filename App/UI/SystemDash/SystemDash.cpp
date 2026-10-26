@@ -25,7 +25,7 @@ void SystemDash::onViewLoad() {
 }
 
 void SystemDash::onViewWillAppear() {
-    model_->set_status_bar(false);
+    model_->set_status_bar(true);
     view_.apply_language();
     if (!view_.bind(model_->subject()))
         app_fatal("SystemDash", "View binding failed");

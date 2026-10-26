@@ -20,18 +20,18 @@ void RecordConfigView::create(lv_obj_t* root) {
     status_dot_ = settings_style::dot(hero_, 73, 8);
     ui.type = style::box(root, 102, 28, 186, 23, true);
     ui.interval = style::box(root, 102, 55, 186, 23, true);
-    ui.record = style::box(root, 102, 82, 89, 23, true);
-    ui.back = style::box(root, 199, 82, 89, 23, true);
+    // 底行与工作页一致：主操作 138 px + 仅图标的返回 42 px。
+    ui.record = style::box(root, 102, 82, 138, 23, true);
+    ui.back = style::box(root, 246, 82, 42, 23, true);
     for (auto* control : controls())
         style::control(control);
     settings_style::icon(ui.type, "ui_record", 8, 3, style::kInfo);
     settings_style::icon(ui.interval, "ui_clock", 8, 3, style::kInfo);
-    record_icon_ = settings_style::icon(ui.record, "ui_play", 8, 3);
-    settings_style::icon(ui.back, "ui_back", 8, 3);
+    record_icon_ = settings_style::icon(ui.record, "ui_play", 10, 3);
+    settings_style::icon(ui.back, "ui_back", 13, 3);
     type_text_ = style::label(ui.type, font, 32, 2, 146);
     interval_text_ = style::label(ui.interval, font, 32, 2, 146);
-    record_text_ = style::label(ui.record, font, 32, 2, 49);
-    back_text_ = style::label(ui.back, font, 32, 2, 49);
+    record_text_ = style::label(ui.record, font, 36, 2, 94);
     feedback_ = style::label(root, font, 8, 108, 278);
     lv_obj_set_style_text_align(feedback_, LV_TEXT_ALIGN_CENTER, 0);
     if (!focus_.bind(root, controls()))
@@ -109,7 +109,6 @@ bool RecordConfigView::update(const RecordConfigState& state) {
     settings_style::value(interval_text_, value);
     settings_style::set_text(record_text_, i18n::text(recorder.recording ? TextId::Stop : TextId::StartupStart));
     settings_style::set_image(record_icon_, recorder.recording ? "ui_stop" : "ui_play");
-    settings_style::set_text(back_text_, i18n::text(TextId::Back));
     for (auto* control : {ui.type, ui.interval}) {
         if (configurable && !locked)
             lv_obj_set_disabled(control, false);

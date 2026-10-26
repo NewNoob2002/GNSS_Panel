@@ -357,7 +357,7 @@ int main(int argc, char** argv) {
                 const bool system_dash = std::strcmp(page.name, "Pages/SystemDash") == 0;
                 const bool star_map = std::strcmp(page.name, "Pages/StarMap") == 0;
                 auto* position = find_label(lv_layer_top(), "DEMO");
-                assert(position && (object_coords(position).y2 >= 0) == !(infos || system_dash));
+                assert(position && (object_coords(position).y2 >= 0) == !infos);
                 if (work || record || infos || system_dash || star_map) {
                     lv_obj_t* first = app.focused();
                     assert(first);

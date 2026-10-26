@@ -551,6 +551,15 @@ boot_sequence(lv_display_t* display, const std::string& output, const std::strin
 void focused(i18n::TextId id) {
     assert(active->focused() && label(active->focused(), i18n::text(id)));
 }
+
+/** 返回按钮只有图标：按其图标资源识别焦点。 */
+void
+focused_back() {
+    auto* focus = active->focused();
+    assert(focus && lv_obj_get_child_count(focus) == 1);
+    auto* icon = lv_obj_get_child(focus, 0);
+    assert(lv_obj_check_type(icon, &lv_image_class) && lv_image_get_src(icon) == resource_pool::get_image("ui_back"));
+}
 void check_form_labels(lv_obj_t* obj) {
     if (lv_obj_is_hidden(obj)) {
         return;
@@ -882,14 +891,14 @@ int main(int argc, char** argv) {
             const std::string suffix = language == i18n::Language::English ? "-en" : "-ru";
             focused(i18n::TextId::LanguageTitle);
             assert(lv_group_get_obj_count(lv_group_get_default()) == 3); // Disabled Wi-Fi is skipped.
-            capture(display, output, "SystemDash" + suffix, false);
+            capture(display, output, "SystemDash" + suffix);
             auto* wifi = label(lv_screen_active(), i18n::text(i18n::TextId::SystemWifiTitle));
             assert(wifi && lv_obj_is_disabled(lv_obj_get_parent(wifi)));
             assert(!label(lv_screen_active(), i18n::text(i18n::TextId::DateTimeTitle)));
             product_click(App::Key::Function);
             focused(i18n::TextId::PowerTitle);
             product_backlog_click(App::Key::Function);
-            focused(i18n::TextId::Back);
+            focused_back();
             product_click(App::Key::Power);
             assert(std::strcmp(app.current_page(), "Pages/Dialplate") == 0);
             assert(!hal_test::snapshot<dp::Power>().pending && hal_test::snapshot<dp::Power>().calls == 0);
@@ -904,18 +913,18 @@ int main(int argc, char** argv) {
             assert(lv_color_to_u32(lv_obj_get_style_bg_color(app.focused(), LV_PART_MAIN))
                    == lv_color_to_u32(page::style::kDanger)); // Red when focused.
             assert(lv_group_get_obj_count(lv_group_get_default()) == 2);
-            capture(display, output, "Power" + suffix, false);
+            capture(display, output, "Power" + suffix);
             input(App::InputAction::NextFocus);
             focused(i18n::TextId::RebootAction);
             app.on_input(App::InputAction::Press); // Half a hold: the bar shows progress.
             advance(1000);
-            capture(display, output, "Power-Hold" + suffix, false);
+            capture(display, output, "Power-Hold" + suffix);
             app.on_input(App::InputAction::Release); // Released early: closes, nothing prepared.
             advance(400);
             assert(std::strcmp(app.current_page(), "Pages/SystemDash") == 0
                    && hal_test::snapshot<dp::Power>().calls == 0 && !hal_test::snapshot<dp::Power>().pending);
             focused(i18n::TextId::PowerTitle);
-            assert(!on_screen(label(lv_layer_top(), "DEMO")));
+            assert(on_screen(label(lv_layer_top(), "DEMO"))); // SystemDash 与其他设置页一样显示状态栏。
             assert(app.show_page("Pages/SystemInfos"));
             advance(400);
             assert(label(lv_screen_active(), "31.230400\n121.473700\n12.50 m")); // Simulated Device data.
@@ -958,7 +967,7 @@ int main(int argc, char** argv) {
             assert(lv_group_get_obj_count(lv_group_get_default()) == 7);
             capture(display, output, "SystemInfos-Reopen" + suffix, false);
             product_click(App::Key::Power); // 根页也可点击返回。
-            assert(!on_screen(label(lv_layer_top(), "DEMO")));
+            assert(on_screen(label(lv_layer_top(), "DEMO"))); // 返回 SystemDash，状态栏保持显示。
             assert(app.show_page("Pages/StarMap"));
             advance(600);
             assert(app.focused() && lv_obj_is_focused(app.focused()));
@@ -1059,7 +1068,7 @@ int main(int argc, char** argv) {
         }
         input(App::InputAction::Back);
         advance(400);
-        assert(!on_screen(label(lv_layer_top(), "DEMO")));
+        assert(on_screen(label(lv_layer_top(), "DEMO"))); // Back on SystemDash, which shows the bar.
         input(App::InputAction::Back);
         advance(300);
         assert(std::strcmp(app.current_page(), "Pages/Dialplate") == 0 && !app.back());
@@ -1145,8 +1154,7 @@ int main(int argc, char** argv) {
                 }
                 check_form_labels(root);
                 capture(display, output,
-                        std::string(page + 6) + (language == i18n::Language::English ? "-new-en" : "-new-ru"),
-                        std::strcmp(page, "Pages/SystemDash") != 0);
+                        std::string(page + 6) + (language == i18n::Language::English ? "-new-en" : "-new-ru"));
                 if (std::strcmp(page, "Pages/WorkSettings") == 0) {
                     input(App::InputAction::Confirm); // Rover -> Base
                     input(App::InputAction::Confirm); // Base -> Network
