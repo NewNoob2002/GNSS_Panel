@@ -324,14 +324,10 @@ int main(int argc, char** argv) {
                     auto* seconds = find_label(page_root, "8");
                     assert(seconds && lv_obj_get_style_opa(seconds, LV_PART_MAIN) == LV_OPA_COVER);
                 }
-                // Pages slide (no page-level opacity layer): info pages vertically, the save page over the top.
+                // Pages slide (no page-level opacity layer): every child of the home page pushes in from the right,
+                // only the save page covers from the bottom.
                 const auto expected_anim =
-                    std::strcmp(page.name, "Pages/StarMap") == 0 || std::strcmp(page.name, "Pages/SystemInfos") == 0
-                        ? PAGE_ANIM::MOVE_TOP
-                    : std::strcmp(page.name, "Pages/SaveConfig") == 0   ? PAGE_ANIM::OVER_TOP
-                    : std::strcmp(page.name, "Pages/RecordConfig") == 0 ? PAGE_ANIM::OVER_TOP
-                    : std::strcmp(page.name, "Pages/SystemDash") == 0   ? PAGE_ANIM::OVER_BOTTOM
-                                                                        : PAGE_ANIM::MOVE_LEFT;
+                    std::strcmp(page.name, "Pages/SaveConfig") == 0 ? PAGE_ANIM::OVER_TOP : PAGE_ANIM::MOVE_LEFT;
                 const auto* controller = static_cast<PageBase*>(lv_obj_get_user_data(page_root));
                 assert(controller && controller->getLoadAnimType() == expected_anim);
                 assert(controller->getLoadAnimType() != PAGE_ANIM::FADE_ON);
@@ -357,7 +353,7 @@ int main(int argc, char** argv) {
                 const bool system_dash = std::strcmp(page.name, "Pages/SystemDash") == 0;
                 const bool star_map = std::strcmp(page.name, "Pages/StarMap") == 0;
                 auto* position = find_label(lv_layer_top(), "DEMO");
-                assert(position && (object_coords(position).y2 >= 0) == !(infos || system_dash));
+                assert(position && (object_coords(position).y2 >= 0) == !infos);
                 if (work || record || infos || system_dash || star_map) {
                     lv_obj_t* first = app.focused();
                     assert(first);

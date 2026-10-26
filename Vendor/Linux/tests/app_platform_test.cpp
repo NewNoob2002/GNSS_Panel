@@ -330,7 +330,7 @@ int main() {
         advance(500);
         assert(find_text(lv_screen_active(), "22.543096\n114.057865\n8.25 m"));
         assert(find_text(lv_screen_active(), "AP-X1PRO-TEST\nOFF\n10.0.0.7"));
-        assert(find_text(lv_screen_active(), "64.5%\n7.71 V\n31.0 C"));
+        assert(find_text(lv_screen_active(), "64.5%\n7.71 V\n31.0 °C"));
         assert(find_text(lv_screen_active(), "V2.4.4\n01:02:05\n0\n2026-10-19"));
         assert(find_text(lv_screen_active(), i18n::text(i18n::TextId::WorkModeBase)));
         assert(app.back());

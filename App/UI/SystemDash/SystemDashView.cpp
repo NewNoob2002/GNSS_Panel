@@ -17,29 +17,29 @@ void SystemDashView::create(lv_obj_t* root, bool reboot_available) {
     caption_count_ = 0;
     reboot_available_ = reboot_available;
     lv_obj_set_scrollable(root, false);
-    hero_ = style::box(root, 8, 4, 88, 118);
+    // 与工作页、记录页共用同一网格：状态栏下方主卡 88×77，右侧两行 23 px，底行主操作 138 px + 图标返回 42 px。
+    hero_ = style::box(root, 8, 28, 88, 77);
     settings_style::hero(hero_);
-    settings_style::icon(hero_, "ui_settings_large", 28, 30, style::kAccent);
+    settings_style::icon(hero_, "ui_settings_large", 28, 8, style::kAccent);
     status_dot_ = settings_style::dot(hero_, 73, 8);
-    auto* title = caption(hero_, TextId::SystemMenu, 4, 76, 80);
+    auto* title = caption(hero_, TextId::SystemMenu, 4, 48, 80);
     lv_obj_set_style_text_align(title, LV_TEXT_ALIGN_CENTER, 0);
-    ui.language = style::box(root, 102, 4, 186, 32, true);
-    ui.wifi = style::box(root, 102, 42, 186, 32, true);
-    ui.power = style::box(root, 102, 80, 89, 32, true);
-    ui.back = style::box(root, 199, 80, 89, 32, true);
-    const std::array<TextId, 4> ids{TextId::LanguageTitle, TextId::SystemWifiTitle, TextId::PowerTitle, TextId::Back};
-    unsigned index = 0;
-    for (auto* row : {ui.language, ui.wifi, ui.power, ui.back}) {
+    ui.language = style::box(root, 102, 28, 186, 23, true);
+    ui.wifi = style::box(root, 102, 55, 186, 23, true);
+    ui.power = style::box(root, 102, 82, 138, 23, true);
+    ui.back = style::box(root, 246, 82, 42, 23, true);
+    for (auto* row : {ui.language, ui.wifi, ui.power, ui.back})
         style::card(row);
-        caption(row, ids[index++], 30, 7, row == ui.language || row == ui.wifi ? 58 : 53);
-    }
+    caption(ui.language, TextId::LanguageTitle, 32, 2, 58);
+    wifi_caption_ = caption(ui.wifi, TextId::SystemWifiTitle, 32, 2, 58);
+    caption(ui.power, TextId::PowerTitle, 36, 2, 94);
     const auto* font = resource_pool::get_font("oswaldBold_12");
-    settings_style::icon(ui.language, "ui_network", 8, 8, style::kInfo);
-    settings_style::icon(ui.wifi, "ui_wifi", 8, 8, style::kInfo);
-    settings_style::icon(ui.power, "ui_power", 8, 8, style::kDanger);
-    settings_style::icon(ui.back, "ui_back", 8, 8);
-    language_value_ = style::label(ui.language, font, 94, 7, 84);
-    wifi_value_ = style::label(ui.wifi, font, 94, 7, 84);
+    settings_style::icon(ui.language, "ui_network", 8, 3, style::kInfo);
+    wifi_icon_ = settings_style::icon(ui.wifi, "ui_wifi", 8, 3, style::kInfo);
+    settings_style::icon(ui.power, "ui_power", 10, 3, style::kDanger);
+    settings_style::icon(ui.back, "ui_back", 13, 3);
+    language_value_ = style::label(ui.language, font, 94, 2, 84);
+    wifi_value_ = style::label(ui.wifi, font, 94, 2, 84);
     for (auto* value : {language_value_, wifi_value_})
         lv_obj_set_style_text_align(value, LV_TEXT_ALIGN_RIGHT, 0);
     lv_obj_set_style_text_color(lv_obj_get_child(ui.power, 0), style::kDanger, 0);
@@ -47,28 +47,39 @@ void SystemDashView::create(lv_obj_t* root, bool reboot_available) {
     ui.overlay = style::box(root, 0, 0, 294, 126, true);
     lv_obj_set_style_bg_color(ui.overlay, lv_color_black(), 0);
     lv_obj_set_style_bg_opa(ui.overlay, LV_OPA_70, 0);
-    auto* panel = style::box(ui.overlay, 8, 10, 278, 106);
+    // 状态栏保持可见，确认窗位于其下方。
+    auto* panel = style::box(ui.overlay, 8, 30, 278, 90);
     style::panel(panel);
-    caption(panel, TextId::PowerTitle, 12, 6, 254);
-    auto* hint = caption(panel, TextId::PowerPreviewHint, 12, 36, 254);
+    auto* heading = caption(panel, TextId::PowerTitle, 12, 4, 254);
+    lv_obj_set_style_text_font(heading, resource_pool::get_font("oswaldBold_18"), 0);
+    auto* hint = caption(panel, TextId::PowerPreviewHint, 12, 32, 254);
     lv_obj_set_style_text_color(hint, style::kMuted, 0);
     // Hold Power on an action until its bar fills; a short press closes the dialog (SystemDash controller).
-    ui.shutdown = style::box(panel, 8, 68, 127, 28, true);
-    ui.reboot = style::box(panel, 143, 68, 127, 28, true);
+    ui.shutdown = style::box(panel, 8, 54, 127, 28, true);
+    ui.reboot = style::box(panel, 143, 54, 127, 28, true);
     const std::array<TextId, 2> actions{TextId::ShutdownAction, TextId::RebootAction};
-    index = 0;
+    // 与 SaveConfig 一致：关机红、重启橙。未聚焦为描边按钮，聚焦/按住时整块填色，
+    // 避免橙色焦点框压在红底上难以分辨。
+    const std::array<lv_color_t, 2> tints{style::kDanger, style::kAccent};
+    unsigned index = 0;
     for (auto* button : {ui.shutdown, ui.reboot}) {
+        const auto tint = tints[index];
         style::card(button);
-        // Stay red when focused/held (card() darkens those states); the orange border still marks focus.
+        lv_obj_set_style_border_color(button, tint, 0);
+        lv_obj_set_style_text_color(button, tint, 0);
         for (const lv_style_selector_t state :
-             {lv_style_selector_t{0}, lv_style_selector_t{LV_STATE_FOCUSED}, lv_style_selector_t{LV_STATE_PRESSED}})
-            lv_obj_set_style_bg_color(button, style::kDanger, state);
+             {lv_style_selector_t{LV_STATE_FOCUSED}, lv_style_selector_t{LV_STATE_PRESSED}}) {
+            lv_obj_set_style_bg_color(button, tint, state);
+            lv_obj_set_style_text_color(button, style::kText, state);
+        }
         lv_obj_set_style_clip_corner(button, true, 0);
         hold_fill_[index] = style::box(button, 0, 0, 0, 28); // Behind the caption.
         lv_obj_set_style_bg_color(hold_fill_[index], style::kText, 0);
         lv_obj_set_style_bg_opa(hold_fill_[index], LV_OPA_40, 0);
         auto* text = caption(button, actions[index++], 2, 5, 123);
         lv_obj_set_style_text_align(text, LV_TEXT_ALIGN_CENTER, 0);
+        // 文字颜色随按钮状态继承。
+        lv_obj_remove_local_style_prop(text, LV_STYLE_TEXT_COLOR, 0);
     }
     if (!reboot_available_) {
         lv_obj_set_hidden(ui.reboot, true);
@@ -164,17 +175,22 @@ void SystemDashView::update(const SystemDashState& state) const {
                              state.wifi_pending ? style::kAccent
                              : state.wifi_on    ? style::kSuccess
                                                 : style::kMuted);
-    lv_label_set_text(language_value_, i18n::text(state.language == i18n::Language::English ? TextId::EnglishName
-                                                                                            : TextId::RussianName));
-    if (state.wifi_available)
-        lv_obj_set_disabled(ui.wifi, false);
-    else
-        lv_obj_set_disabled(ui.wifi, true);
-    lv_obj_set_style_opa(ui.wifi, LV_OPA_50, LV_STATE_DISABLED);
-    // v8 的容器透明度对文字额外衰减；v9 显式设置文字透明度以保持禁用行外观。
-    lv_obj_set_style_text_opa(ui.wifi, LV_OPA_50, LV_STATE_DISABLED);
-    lv_label_set_text(wifi_value_,
-                      state.wifi_pending ? "..." : i18n::text(state.wifi_on ? TextId::StatusOn : TextId::StatusOff));
+    settings_style::set_text(language_value_, i18n::text(state.language == i18n::Language::English
+                                                             ? TextId::EnglishName
+                                                             : TextId::RussianName));
+    // 平台不允许切换时该行只读：不进焦点组，标题与图标转为次文字色，但开关状态保持清晰可读，
+    // 不再整行半透明（否则"不可操作"会被误读为"不可用/关闭"）。
+    if (lv_obj_is_disabled(ui.wifi) == state.wifi_available) {
+        if (state.wifi_available)
+            lv_obj_set_disabled(ui.wifi, false);
+        else
+            lv_obj_set_disabled(ui.wifi, true);
+    }
+    settings_style::set_text_color(wifi_caption_, state.wifi_available ? style::kText : style::kMuted);
+    settings_style::set_recolor(wifi_icon_, state.wifi_available ? style::kInfo : style::kMuted);
+    settings_style::set_text(wifi_value_, state.wifi_pending
+                                              ? "..."
+                                              : i18n::text(state.wifi_on ? TextId::StatusOn : TextId::StatusOff));
 }
 
 void SystemDashView::set_hold(lv_obj_t* button, int32_t percent) const {

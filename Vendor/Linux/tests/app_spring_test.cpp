@@ -36,10 +36,11 @@ complete_card(const page::SystemDashView& view, lv_obj_t* target) {
     assert(lv_color_to_u32(lv_obj_get_style_border_color(target, LV_PART_MAIN))
            == lv_color_to_u32(page::style::kBorder));
     const auto control = view.control(target);
-    const bool action =
-        control == page::SystemDashView::Control::Shutdown || control == page::SystemDashView::Control::Reboot;
-    assert(lv_color_to_u32(lv_obj_get_style_bg_color(target, LV_PART_MAIN))
-           == lv_color_to_u32(action ? page::style::kDanger : page::style::kFocus));
+    // 聚焦的电源动作整块填色：关机红、重启橙；其余卡片为焦点底色。
+    const auto fill = control == page::SystemDashView::Control::Shutdown ? page::style::kDanger
+                      : control == page::SystemDashView::Control::Reboot ? page::style::kAccent
+                                                                         : page::style::kFocus;
+    assert(lv_color_to_u32(lv_obj_get_style_bg_color(target, LV_PART_MAIN)) == lv_color_to_u32(fill));
     auto* highlight = view.focus_highlight();
     assert(highlight && !lv_obj_is_hidden(highlight));
     assert(!lv_obj_is_clickable(highlight) && lv_obj_is_ignore_layout(highlight) && lv_obj_is_floating(highlight));

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "UI/Common/Model.h"
+#include "UI/Common/PageStyle.h"
 #include "Def/DP_Battery.h"
 #include "Def/DP_Clock.h"
 #include "Def/DP_GNSS.h"
@@ -16,7 +17,7 @@ struct StatusBarState {
     unsigned satellites = 0;
     bool satellites_valid = false;
     const char* position = "DEMO";
-    lv_color_t position_color = lv_color_hex(0xf44336);
+    lv_color_t position_color = style::kDanger;
     unsigned hour = 0;
     unsigned minute = 0;
     unsigned second = 0;

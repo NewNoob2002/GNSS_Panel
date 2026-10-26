@@ -7,7 +7,7 @@
 using namespace page;
 
 void SystemDash::onInstalled() {
-    setLoadAnimType(PAGE_ANIM::OVER_BOTTOM);
+    setLoadAnimType(PAGE_ANIM::MOVE_LEFT);
     setLoadAnimTime(style::kPageTransitionMs);
     setLoadAnimPath(style::page_transition_path);
 }
@@ -25,7 +25,7 @@ void SystemDash::onViewLoad() {
 }
 
 void SystemDash::onViewWillAppear() {
-    model_->set_status_bar(false);
+    model_->set_status_bar(true);
     view_.apply_language();
     if (!view_.bind(model_->subject()))
         app_fatal("SystemDash", "View binding failed");
