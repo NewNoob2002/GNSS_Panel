@@ -102,19 +102,21 @@
 
 ## 界面预览与重生成
 
-[八页概览](images/ui-pages.png)、[首页预览](images/ui-dialplate.png)、[英俄设置与充电待机预览](images/ui-settings-bilingual.png)、[Device Info 根页预览](images/ui-device-info.png) 均由 3.0.0 共享应用与 Demo 后端的无窗口 LVGL 渲染生成，纳入版本控制后可直接查看。每页以 294×126 原生 RGB565 渲染、最近邻放大 2 倍，再无损压缩为 PNG；没有修改界面文字或合成控件。
+[八页概览](images/ui-pages.png)、[首页预览](images/ui-dialplate.png)、[英俄设置与充电待机预览](images/ui-settings-bilingual.png)、[Device Info 根页预览](images/ui-device-info.png) 均由 3.0.0 共享应用与 Demo 后端的无窗口 LVGL 渲染生成，使用中立白牌 OEM（`neutral`），纳入版本控制后可直接查看。每页以 294×126 原生 RGB565 渲染、最近邻放大 2 倍，再无损压缩为 PNG；没有修改界面文字或合成控件。
 
-- 八页概览按行依次为 Startup（CHG 12.5W）/SystemLoading（Logo）、Dialplate/StarMap、WorkSettings/RecordConfig、SystemInfos/SystemDash。系统页亮度为 60%，五段短线亮起三段。
+- 八页概览按行依次为 Startup（CHG 12.5W）/SystemLoading（中立 Logo）、Dialplate/StarMap、WorkSettings/RecordConfig、SystemInfos/SystemDash。系统页亮度为 60%，五段短线亮起三段。
 - 英俄预览每行左英右俄，依次展示 SystemDash 亮度主卡、Startup 充电功率、电源按住确认进度、WorkSettings、RecordConfig。Demo 提供重启能力，HC32 产品只显示关机；预览中的 FW 1.0.0、卫星数、功率等均为模拟数据，产品发布版本见发布说明。
 - 首页单图保留状态栏与四个入口；Device Info 单图为根页，显示首张 Work 分类卡，继续切焦点可浏览其他分类。
 
 在仓库根目录运行（可从空构建目录开始，仅需 CMake、Ninja、主机 C/C++ 编译器及 Python 3.9+）：
 
 ```bash
-python3 Vendor/Linux/tools/generate_doc_previews.py --build-dir build/doc-previews
+python3 Vendor/Linux/tools/generate_doc_previews.py
+# 或指定 OEM 与独立构建目录：
+python3 Vendor/Linux/tools/generate_doc_previews.py --oem neutral
 ```
 
-工具自动按 `linux-host` preset、默认 OEM `singularxyz` 配置并构建三个既有回归程序：`app_system_dash_test` 输出加载、星图、信息、设置和确认窗，`app_startup_power_test` 输出英俄充电待机，`app_focus_rollout_preview` 的 `Dialplate stills en` 模式输出首页。原始 PPM 与日志保留在指定构建目录的 `doc-preview/`，Python 标准库 `struct/zlib` 负责拼图与 PNG 编码，只更新 `docs/images/` 的四个同名文件，不依赖 SDL 窗口或外部图像包。早期 `08a653d2` 提交只保存了八页拼图，没有保留拼图脚本；此工具补全可复现命令。
+工具默认采用中立白牌 OEM（`--oem neutral`，独立构建目录 `build/doc-previews-neutral`），支持通过 `--oem <name>`（从 `App/UI/Resource/oem/` 校验）生成其他 OEM 的预览。工具自动按 `linux-host` preset、指定 OEM 配置并构建三个既有回归程序：`app_system_dash_test` 输出加载、星图、信息、设置和确认窗，`app_startup_power_test` 输出英俄充电待机，`app_focus_rollout_preview` 的 `Dialplate stills en` 模式输出首页。原始 PPM 与日志保留在对应构建目录的 `doc-preview/`，Python 标准库 `struct/zlib` 负责拼图与 PNG 编码，只更新 `docs/images/` 的四个同名文件，不依赖 SDL 窗口或外部图像包。早期 `08a653d2` 提交只保存了八页拼图，没有保留拼图脚本；此工具补全可复现命令。
 
 交互预览可运行 `build/sim-demo/bin/main`（Demo 后端）、`build/simulator-x1pro/bin/main` 或 `build/simulator-xbase/bin/main`。
 

@@ -2,7 +2,9 @@
 """用现有无窗口 LVGL 回归生成文档 PNG；仅依赖 CMake、主机编译器和 Python 标准库。
 
 仓库根目录用法：
-    python3 Vendor/Linux/tools/generate_doc_previews.py --build-dir build/doc-previews
+    python3 Vendor/Linux/tools/generate_doc_previews.py
+    python3 Vendor/Linux/tools/generate_doc_previews.py --oem neutral
+    python3 Vendor/Linux/tools/generate_doc_previews.py --oem singularxyz --build-dir build/doc-previews-singularxyz
 
 原始 PPM 和回归日志保存在构建目录，docs/images 只写入四张 PNG。
 """
@@ -14,10 +16,22 @@ import zlib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
+OEM_ROOT = ROOT / "App/UI/Resource/oem"
 NATIVE_WIDTH, NATIVE_HEIGHT = 294, 126
 SCALE = 2
 WIDTH, HEIGHT = NATIVE_WIDTH * SCALE, NATIVE_HEIGHT * SCALE
 MARGIN, GAP = 12, 24
+
+
+def available_oems() -> list[str]:
+    """列出 App/UI/Resource/oem/* 下所有具备 oem.toml 的合法 OEM。"""
+    if not OEM_ROOT.is_dir():
+        return []
+    return sorted(
+        d.name
+        for d in OEM_ROOT.iterdir()
+        if d.is_dir() and (d / "oem.toml").is_file()
+    )
 
 
 def run(*args: str) -> None:
@@ -105,10 +119,24 @@ def montage(paths: list[Path]) -> tuple[int, int, bytes]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--build-dir", type=Path, default=Path("build/doc-previews"))
+    valid_oems = available_oems()
+    parser.add_argument(
+        "--oem",
+        default="neutral",
+        choices=valid_oems,
+        metavar="NAME",
+        help=f"选择 OEM 资源（可选：{', '.join(valid_oems)}；默认：neutral）",
+    )
+    parser.add_argument(
+        "--build-dir",
+        type=Path,
+        default=None,
+        help="构建目录（默认：build/doc-previews-<oem>）",
+    )
     args = parser.parse_args()
-    build = (ROOT / args.build_dir).resolve()
-    run("cmake", "--preset", "linux-host", "-B", str(build), "-DOEM=singularxyz")
+    build_dir = args.build_dir if args.build_dir is not None else Path(f"build/doc-previews-{args.oem}")
+    build = (ROOT / build_dir).resolve()
+    run("cmake", "--preset", "linux-host", "-B", str(build), f"-DOEM={args.oem}")
     targets = [
         "app_system_dash_test",
         "app_startup_power_test",

@@ -52,7 +52,7 @@ X1Pro 与 XBase 当前发布版本为 **3.0.0**，X1 保持 **1.30**；变化见
 
 ## 😄 界面演示
 
-3.0.0 界面概览（Demo 后端、无窗口 LVGL 渲染，294×126 原尺寸放大 2 倍），从左到右、从上到下：Startup 充电待机、SystemLoading Logo、Dialplate 主页、StarMap 星图、WorkSettings 工作设置、RecordConfig 记录设置、SystemInfos 设备信息、SystemDash 系统设置。另有 SaveConfig 保存/关机准备页。
+3.0.0 界面概览（Demo 后端、中立白牌 OEM `neutral`、无窗口 LVGL 渲染，294×126 原尺寸放大 2 倍），从左到右、从上到下：Startup 充电待机、SystemLoading 中立 Logo、Dialplate 主页、StarMap 星图、WorkSettings 工作设置、RecordConfig 记录设置、SystemInfos 设备信息、SystemDash 系统设置。另有 SaveConfig 保存/关机准备页。
 
 ![3.0.0 八页界面概览](docs/images/ui-pages.png)
 
