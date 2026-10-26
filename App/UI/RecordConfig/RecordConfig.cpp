@@ -6,7 +6,7 @@
 using namespace page;
 
 void RecordConfig::onInstalled() {
-    setLoadAnimType(PAGE_ANIM::OVER_TOP);
+    setLoadAnimType(PAGE_ANIM::MOVE_LEFT);
     setLoadAnimTime(style::kPageTransitionMs);
     setLoadAnimPath(style::page_transition_path);
 }

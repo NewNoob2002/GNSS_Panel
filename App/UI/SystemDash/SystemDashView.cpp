@@ -31,11 +31,11 @@ void SystemDashView::create(lv_obj_t* root, bool reboot_available) {
     for (auto* row : {ui.language, ui.wifi, ui.power, ui.back})
         style::card(row);
     caption(ui.language, TextId::LanguageTitle, 32, 2, 58);
-    caption(ui.wifi, TextId::SystemWifiTitle, 32, 2, 58);
+    wifi_caption_ = caption(ui.wifi, TextId::SystemWifiTitle, 32, 2, 58);
     caption(ui.power, TextId::PowerTitle, 36, 2, 94);
     const auto* font = resource_pool::get_font("oswaldBold_12");
     settings_style::icon(ui.language, "ui_network", 8, 3, style::kInfo);
-    settings_style::icon(ui.wifi, "ui_wifi", 8, 3, style::kInfo);
+    wifi_icon_ = settings_style::icon(ui.wifi, "ui_wifi", 8, 3, style::kInfo);
     settings_style::icon(ui.power, "ui_power", 10, 3, style::kDanger);
     settings_style::icon(ui.back, "ui_back", 13, 3);
     language_value_ = style::label(ui.language, font, 94, 2, 84);
@@ -175,17 +175,22 @@ void SystemDashView::update(const SystemDashState& state) const {
                              state.wifi_pending ? style::kAccent
                              : state.wifi_on    ? style::kSuccess
                                                 : style::kMuted);
-    lv_label_set_text(language_value_, i18n::text(state.language == i18n::Language::English ? TextId::EnglishName
-                                                                                            : TextId::RussianName));
-    if (state.wifi_available)
-        lv_obj_set_disabled(ui.wifi, false);
-    else
-        lv_obj_set_disabled(ui.wifi, true);
-    lv_obj_set_style_opa(ui.wifi, LV_OPA_50, LV_STATE_DISABLED);
-    // v8 的容器透明度对文字额外衰减；v9 显式设置文字透明度以保持禁用行外观。
-    lv_obj_set_style_text_opa(ui.wifi, LV_OPA_50, LV_STATE_DISABLED);
-    lv_label_set_text(wifi_value_,
-                      state.wifi_pending ? "..." : i18n::text(state.wifi_on ? TextId::StatusOn : TextId::StatusOff));
+    settings_style::set_text(language_value_, i18n::text(state.language == i18n::Language::English
+                                                             ? TextId::EnglishName
+                                                             : TextId::RussianName));
+    // 平台不允许切换时该行只读：不进焦点组，标题与图标转为次文字色，但开关状态保持清晰可读，
+    // 不再整行半透明（否则"不可操作"会被误读为"不可用/关闭"）。
+    if (lv_obj_is_disabled(ui.wifi) == state.wifi_available) {
+        if (state.wifi_available)
+            lv_obj_set_disabled(ui.wifi, false);
+        else
+            lv_obj_set_disabled(ui.wifi, true);
+    }
+    settings_style::set_text_color(wifi_caption_, state.wifi_available ? style::kText : style::kMuted);
+    settings_style::set_recolor(wifi_icon_, state.wifi_available ? style::kInfo : style::kMuted);
+    settings_style::set_text(wifi_value_, state.wifi_pending
+                                              ? "..."
+                                              : i18n::text(state.wifi_on ? TextId::StatusOn : TextId::StatusOff));
 }
 
 void SystemDashView::set_hold(lv_obj_t* button, int32_t percent) const {

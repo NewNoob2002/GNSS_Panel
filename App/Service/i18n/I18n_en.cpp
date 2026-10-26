@@ -130,6 +130,7 @@ const char* const texts[] = {
     "Select: next | Back: return",
     "Stop",
     "Connecting to host board",
+    "ROVER",
 };
 
 static_assert(sizeof(texts) / sizeof(texts[0]) == static_cast<size_t>(i18n::TextId::Count));

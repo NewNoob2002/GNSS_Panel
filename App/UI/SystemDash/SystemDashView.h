@@ -61,7 +61,7 @@ class SystemDashView {
     std::array<Caption, 10> captions_{};
     unsigned caption_count_ = 0;
     bool power_open_ = false, reboot_available_ = true;
-    lv_obj_t *language_value_{}, *wifi_value_{}, *hero_{}, *status_dot_{};
+    lv_obj_t *language_value_{}, *wifi_value_{}, *wifi_caption_{}, *wifi_icon_{}, *hero_{}, *status_dot_{};
     lv_obj_t* hold_fill_[2]{}; // Shutdown, reboot.
     lv_obj_t* caption(lv_obj_t* parent, i18n::TextId id, int x, int y, int width);
 };

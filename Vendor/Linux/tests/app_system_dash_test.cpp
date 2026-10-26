@@ -10,6 +10,7 @@
 #include "Log.h"
 #include "hal_device_checks.h"
 #include "UI/Common/PageStyle.h"
+#include "UI/Common/BatteryStyle.h"
 #include "UI/Common/SettingsStyle.h"
 #include "UI/SaveConfig/SaveConfigView.h"
 #include "UI/SystemLoading/SystemLoadingView.h"
@@ -339,7 +340,8 @@ random_battery_events(lv_display_t* display, const std::string& output) {
             const auto target = state.battery_valid ? full_width * percent / 100 : 0;
             auto* animation = lv_anim_get(current, nullptr);
             if (charging) {
-                assert(animation && animation->start_value == 0 && animation->end_value == full_width);
+                assert(animation && animation->start_value == page::battery::charge_start(full_width, percent)
+                       && animation->end_value == full_width);
                 assert(animation->reverse_duration == 0 && !animation->reverse_play_in_progress);
                 assert(lv_obj_get_width(current) >= 0 && lv_obj_get_width(current) <= full_width);
             } else {
@@ -374,7 +376,7 @@ random_battery_events(lv_display_t* display, const std::string& output) {
             check();
         }
     }
-    // At full actual charge, both slots still animate from zero and the number stays 100.
+    // At full actual charge, both slots still sweep (from 4/5 of the slot) and the number stays 100.
     advance(10000); // Let Startup's idle timer expose StatusBar for the joint captures.
     state.battery_percent = 100;
     state.charging = false;
@@ -383,18 +385,21 @@ random_battery_events(lv_display_t* display, const std::string& output) {
     test_input::status(state);
     lv_obj_update_layout(lv_screen_active());
     lv_obj_update_layout(lv_layer_top());
-    assert(lv_obj_get_width(fill) == 0 && lv_obj_get_width(status_fill) == 0);
+    const auto start = page::battery::charge_start(kStartupBatteryWidth, 100);
+    const auto status_start = page::battery::charge_start(kStatusBatteryWidth, 100);
+    assert(lv_obj_get_width(fill) == start && lv_obj_get_width(status_fill) == status_start);
     capture(display, output, "Startup-StatusBar-charge-empty", on_screen(label(lv_layer_top(), "DEMO")), 0);
     advance(600);
-    assert(lv_obj_get_width(fill) >= kStartupBatteryWidth * 45 / 100
-           && lv_obj_get_width(fill) <= kStartupBatteryWidth * 55 / 100);
-    assert(lv_obj_get_width(status_fill) >= 9 && lv_obj_get_width(status_fill) <= 11);
+    assert(lv_obj_get_width(fill) >= start + (kStartupBatteryWidth - start) * 45 / 100
+           && lv_obj_get_width(fill) <= start + (kStartupBatteryWidth - start) * 55 / 100);
+    assert(lv_obj_get_width(status_fill) > status_start && lv_obj_get_width(status_fill) < kStatusBatteryWidth);
     capture(display, output, "Startup-StatusBar-charge-half", on_screen(label(lv_layer_top(), "DEMO")), 0);
     advance(650);
     assert(lv_obj_get_width(fill) == kStartupBatteryWidth && lv_obj_get_width(status_fill) == kStatusBatteryWidth);
     capture(display, output, "Startup-StatusBar-charge-full", on_screen(label(lv_layer_top(), "DEMO")), 0);
     advance(350);
-    assert(lv_obj_get_width(fill) < kStartupBatteryWidth / 6 && lv_obj_get_width(status_fill) < 3);
+    assert(lv_obj_get_width(fill) >= start && lv_obj_get_width(fill) < start + (kStartupBatteryWidth - start) / 6);
+    assert(lv_obj_get_width(status_fill) >= status_start && lv_obj_get_width(status_fill) < status_start + 2);
     auto* reading = lv_obj_get_child(lv_obj_get_parent(lv_obj_get_parent(fill)), 2);
     assert(label(reading, "100") && label(reading, "%"));
     capture(display, output, "Startup-StatusBar-charge-reset", on_screen(label(lv_layer_top(), "DEMO")), 0);
@@ -428,7 +433,7 @@ random_battery_events(lv_display_t* display, const std::string& output) {
             previous_width = current_width;
         }
         if (state.charging)
-            assert(moved && status_moved && saw_reset); // Grow from empty to full and restart, even at 100%.
+            assert(moved && status_moved && saw_reset); // Sweep from the level to full and restart, even at 100%.
         if (event < 4)
             capture(display, output, "Startup-random-42-" + std::to_string(event),
                     on_screen(label(lv_layer_top(), "DEMO")), 0);
@@ -456,7 +461,8 @@ random_battery_events(lv_display_t* display, const std::string& output) {
     check();
     state.charging = false;
     check();
-    std::puts("Startup/StatusBar random events: seed=42, 128 events, matching colors and 0-100% charging verified");
+    std::puts(
+        "Startup/StatusBar random events: seed=42, 128 events, matching colors and level-to-full charging verified");
 }
 
 void

@@ -7,7 +7,7 @@
 using namespace page;
 
 void StarMap::onInstalled() {
-    setLoadAnimType(PAGE_ANIM::MOVE_TOP);
+    setLoadAnimType(PAGE_ANIM::MOVE_LEFT);
     setLoadAnimTime(style::kPageTransitionMs);
     setLoadAnimPath(style::page_transition_path);
 }

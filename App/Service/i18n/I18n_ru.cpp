@@ -130,6 +130,7 @@ const char* const texts[] = {
     "Выбор: далее | Назад: выход",
     "Стоп",
     "Связь с основной платой",
+    "РОВЕР",
 };
 
 static_assert(sizeof(texts) / sizeof(texts[0]) == static_cast<size_t>(i18n::TextId::Count));
