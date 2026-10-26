@@ -6,10 +6,10 @@ This is the unified SDL2 simulator (`Vendor/Simulator`) for the repository. It l
 
 It supports two backends selected by the `SIM_BACKEND` CMake cache variable:
 
-- `Board` (default): simulates HC32 `X1Pro` or `XBase` (`SIM_PRODUCT=X1Pro|XBase`) using `../HC32/Display/AppPlatform/`, `HAL/` (virtual GPIO, time and no-op charger), and the firmware `../HC32/Platform/HAL/HAL_Power.cpp` (with `HAL/HAL.h` force-included).
+- `Board` (default): simulates HC32 `X1Pro` or `XBase` (`SIM_PRODUCT=X1Pro|XBase`) using `../HC32/Display/AppPlatform/`, `HAL/` (virtual GPIO, time and no-op charger), and the firmware `../HC32/Platform/HAL/HAL_Power.cpp` through the `sim::hardware_port` target, which supplies `HAL/HAL.h` and simulator definitions without force-including headers.
 - `Demo`: links the Linux demo backend (`../Linux/Backends/Demo`) and supports `--random-status [seed]` on the command line.
 
-`main.cpp` owns SDL, pointer/keyboard input, SIGINT/SIGTERM cleanup, CLI argument validation, and backend-specific status/host updates.
+`main.cpp` owns SDL, pointer/keyboard input, SIGINT/SIGTERM cleanup, CLI argument validation, and backend-specific status/host updates. Board firmware versions are read from the selected product CMake file (`[0-9.]+`, including `3.0.0`); Board and Demo brightness previews share the CIE L* table in `HAL_Board.h`.
 
 Enter/middle click and the Startup pointer target request power-on after a complete 2 s hold. On the `Board` backend, the main loop finishes cold boot with `Power_OnCheck()` once accepted, and standby resume restores the outputs directly.
 

@@ -2,6 +2,8 @@
 
 本文是阶段 3 的设计依据，由两次只读调研（3.0a：LVGL API、资源、内存；3.0b：框架映射、风险）汇总并经主控对照源码复核。目标版本为 LVGL v9.6.0（上游提交 `80ca777`）。标注“已核实”的结论有源码依据；标注“估算”的数字需在对应子任务中实测。
 
+本文保留迁移前调研、预算估算与阶段 3 设计，不作为当前接口或资源清单。迁移已完成，阶段 3.7 又拆分了九个 HAL 细设备并启用 observer；当前配置、页面与版本变化见 [App/ARCHITECTURE.md](../App/ARCHITECTURE.md) 和[发布说明](release_notes.md)。
+
 ## 1. 已确认的前提
 
 | 事实 | 依据 | 影响 |
@@ -64,7 +66,7 @@
 | flash（release） | 334 KiB | 图片增量以 3.2 按产品统计为准（启动 Logo 由 I8 改 RGB565 约 +36 KiB），LVGL 代码裁剪后 +5–10 KiB |
 | flash（debug） | 约 389 KiB | 约 434/456 KiB，余量偏紧 |
 
-`lv_conf.h` 关键项（HC32）：`LV_USE_STDLIB_MALLOC/STRING/SPRINTF = LV_STDLIB_BUILTIN`、`LV_MEM_SIZE (96U * 1024U)`、`LV_USE_OS LV_OS_NONE`、`LV_COLOR_DEPTH 16`、`LV_DEF_REFR_PERIOD 16`、`LV_DRAW_SW_SUPPORT_*` 只保留 `RGB565`、`RGB565A8`、`A8`、`ARGB8888`（简单图层需要）、`LV_DRAW_SW_COMPLEX 1`、`LV_DRAW_SW_CIRCLE_CACHE_SIZE 4`、`LV_CACHE_DEF_SIZE 0`、`LV_IMAGE_HEADER_CACHE_DEF_CNT 0`、`LV_BIN_DECODER_RAM_LOAD 0`、关闭 observer/obj_id/obj_name/obj_property/float/matrix/vector_graphic/thorvg、控件只开 arc/image/label/animimg、`LV_USE_SYSMON`/`LV_USE_PERF_MONITOR` 仅 debug。`LV_DRAW_LAYER_SIMPLE_BUF_SIZE` 按实测下调。8 KiB C 堆在带屏产品上基本闲置（`operator new` 走 LVGL 池），可在 3.6 缩减以换 RAM。
+`lv_conf.h` 关键项（HC32）：`LV_USE_STDLIB_MALLOC/STRING/SPRINTF = LV_STDLIB_BUILTIN`、`LV_MEM_SIZE (96U * 1024U)`、`LV_USE_OS LV_OS_NONE`、`LV_COLOR_DEPTH 16`、`LV_DEF_REFR_PERIOD 16`、`LV_DRAW_SW_SUPPORT_*` 只保留 `RGB565`、`RGB565A8`、`A8`、`ARGB8888`（简单图层需要）、`LV_DRAW_SW_COMPLEX 1`、`LV_DRAW_SW_CIRCLE_CACHE_SIZE 4`、`LV_CACHE_DEF_SIZE 0`、`LV_IMAGE_HEADER_CACHE_DEF_CNT 0`、`LV_BIN_DECODER_RAM_LOAD 0`、迁移初期关闭 observer（阶段 3.7 已开启）/obj_id/obj_name/obj_property/float/matrix/vector_graphic/thorvg、控件只开 arc/image/label/animimg、`LV_USE_SYSMON`/`LV_USE_PERF_MONITOR` 仅 debug。`LV_DRAW_LAYER_SIMPLE_BUF_SIZE` 按实测下调。8 KiB C 堆在带屏产品上基本闲置（`operator new` 走 LVGL 池），可在 3.6 缩减以换 RAM。
 
 ## 5. X-TRACK 框架映射
 
