@@ -14,6 +14,14 @@
 
 X1Pro 与 XBase 当前发布版本为 **3.0.0**，X1 保持 **1.30**；变化见[发布说明](docs/release_notes.md)。
 
+### 3.0.0 新特性
+
+- **开机与导航**：待机到加载页采用 300 ms 纯色过渡；首页入口约 350 ms 展开，返回首帧刷新完成后用完整 350 ms 收回。
+- **系统设置**：亮度主卡以五段短线显示 20%–100% 五档感知亮度，右侧采用三行网格；电源窗按住 2 s 确认，底部细进度条显示进度。
+- **待机充电**：使用电池平均电流与电压显示充入电池的功率，电流不可用时回退电压。
+
+完整行为、兼容性和验证范围见 [3.0.0 发布说明](docs/release_notes.md#300)。
+
 同一份源码构建三类目标：
 
 | 目标 | 说明 |
@@ -30,7 +38,7 @@ X1Pro 与 XBase 当前发布版本为 **3.0.0**，X1 保持 **1.30**；变化见
 
 > 🏗 **X-TRACK 风格应用框架**：`Frameworks/` 提供 PageManager（页面生命周期与切换动画）、DataBroker（同步发布/订阅数据节点与定时器）、DeviceManager（设备注册与 read/write/ioctl）、ResourceManager（静态资源表）。页面按 `UI/PageList.inc` 显式清单安装，并生成类型化的 `PageId`。
 
-> 🔄 **节点化数据流**：`Service/DataProc` 中的 Power、Battery、GNSS、Clock、Work、Recorder、WiFi、Version、Init、Settings 等领域节点定时从 `Service/HAL` 细粒度设备拉取数据，只在值变化时发布；命令按语义校验，命令与状态使用不同类型。Button、PageNavi 节点负责两键手势与导航请求。
+> 🔄 **节点化数据流**：`Service/DataProc` 的 Power、Battery、GNSS、Clock、Work、Recorder、WiFi、Version 节点定时从 `Service/HAL` 细粒度设备拉取数据，只在值变化时发布；Init 按需查询初始化步骤并记录结果，Settings 通过命令更新语言与亮度。命令按语义校验，命令与状态使用不同类型，加上两键手势 Button 和导航 PageNavi，共十二个节点。
 
 > 💻 **跨平台开发**：PC 端 SDL2 模拟器可直接运行 HC32 平台层代码，在电脑端预览和调试 UI 与业务逻辑，极大缩短开发周期。
 
@@ -42,11 +50,17 @@ X1Pro 与 XBase 当前发布版本为 **3.0.0**，X1 保持 **1.30**；变化见
 
 ---
 
-## 😄 实物演示
+## 😄 界面演示
 
-界面概览（Demo 后端模拟器渲染，294×126 原尺寸放大 2 倍；静态拼图不反映 3.0.0 的全部调整）：Startup 待机、SystemLoading Logo、Dialplate 主页、StarMap 星图、WorkSettings、RecordConfig、SystemInfos、SystemDash。
+3.0.0 界面概览（Demo 后端、无窗口 LVGL 渲染，294×126 原尺寸放大 2 倍），从左到右、从上到下：Startup 充电待机、SystemLoading Logo、Dialplate 主页、StarMap 星图、WorkSettings 工作设置、RecordConfig 记录设置、SystemInfos 设备信息、SystemDash 系统设置。另有 SaveConfig 保存/关机准备页。
 
-![UI pages](docs/images/ui-pages.png)
+![3.0.0 八页界面概览](docs/images/ui-pages.png)
+
+英俄界面对照（左英右俄）：亮度主卡与三行网格、待机 CHG 12.5W、电源按住确认窗、工作设置、记录设置。重启按钮由 Demo 能力提供，HC32 产品仅支持关机；图中的 FW 1.0.0 是 Demo 模拟数据，固件版本由产品配置提供。
+
+![3.0.0 英俄系统设置、充电待机与电源确认](docs/images/ui-settings-bilingual.png)
+
+截图复现命令与页面交互见[页面布局与过渡](docs/ui_style_and_page_review.md#界面预览与重生成)。
 
 ## 📂 项目结构说明
 
@@ -106,6 +120,8 @@ cmake -S App/tests -B build/app-core-tests && cmake --build build/app-core-tests
 python3 tests/check_layers.py .
 python3 tests/check_state_ownership.py .
 ```
+
+3.0.0 默认主机回归规模：Linux **32 项**、HC32 **19 项**、共享核心 **4 项**；HC32 若额外配置 `SIMULATOR_EXECUTABLE`，会增加一项模拟器冒烟测试。
 
 更多说明：
 
