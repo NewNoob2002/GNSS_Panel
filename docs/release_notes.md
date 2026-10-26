@@ -2,7 +2,7 @@
 
 ## 3.0.0
 
-适用产品：X1Pro、XBase；X1 仍为 1.30。以下内容依据本次工作区相对 `HEAD` 的改动与最近五次提交核对，其中 `ebfa490b`、`0e1d31ef`、`d6ec2d2f` 的切屏与入口展开一并纳入本版。
+适用产品：X1Pro、XBase；X1 仍为 1.30。本版包含 #17 页面过渡、#18 首页入口展开与 #19 版本发布的功能更新，新增五档感知亮度、系统页布局与按住确认窗、待机充电功率，并完善首页返回时序。
 
 ### 开机与页面过渡
 
@@ -32,21 +32,22 @@
 
 ### 兼容性与回归
 
-版本仍由产品 `product.cmake` 提供，固件和 Board 模拟器生成 `SOFTWARE_VERSION "V3.0.0"`；模拟器 `[0-9.]+` 正则可解析三段版本。运行时 16 字节和 INFO1 的 10 字节软件版本字段均可容纳该字符串，面板帧布局与命令未改变，无须修改版本消费代码。
+版本仍由产品 `product.cmake` 提供，X1Pro/XBase 固件和 Board 模拟器生成 `SOFTWARE_VERSION "V3.0.0"`，X1 固件保持 `V1.30`；模拟器 `[0-9.]+` 正则可解析三段版本。运行时 16 字节和 INFO1 的 10 字节软件版本字段均可容纳该字符串，面板帧布局与命令未改变，无须修改版本消费代码。
 
 - 新增 `app_startup_power_test`，覆盖功率、49/50 mA 阈值、异常电压/电流回退、文本去重与英俄布局；`app_panel_return_test` 覆盖慢卸载/首帧后的收回几何、透明度及可见时长。
 - 扩展 PageManager 纯色过渡与销毁清理、SystemDash 亮度/Wi-Fi/确认窗、HAL 精确尺寸与亮度参数、领域变化发布、BQ40Z50 有符号读取与失败/过期回归；`app_transition_bench` 增加纯色过渡与静态重绘对比，仅手动运行，不注册 CTest。
 
-本次使用默认 OEM `singularxyz`，按对应 preset 配置到独立目录并构建：
+发布验证使用默认 OEM `singularxyz`：
 
-| 配置 | 产物 / 结果 |
+| 验证项 | 产物 / 结果 |
 |---|---|
-| `x1pro-release`，`build/wJ-x1pro` | `MCU_PRO_3.0.0.elf`，text/data/bss = 309380 / 520 / 168700 B |
-| `xbase-release`，`build/wJ-xbase` | `MCU_XBASE_3.0.0.elf`，text/data/bss = 308936 / 520 / 168700 B |
-| `simulator-x1pro`，`build/wJ-sim` | `bin/main` 构建通过，生成头文件为 `V3.0.0`；SDL dummy 启动/清理回归通过 |
-| `linux-host`，`build/wJ-linux-host` | 构建通过，CTest 32/32 |
-| HC32 主机回归，`build/wJ-host-tests` | 构建通过，CTest 20/20（含模拟器冒烟、状态归属与分层检查） |
-| 共享核心，`build/wJ-app-core-tests` | 构建通过，CTest 4/4 |
-| `python3 tests/check_layers.py .` | 默认六个已配置构建目录的 File API 与静态分层检查通过 |
+| X1Pro Debug / Release | 无警告构建通过，`MCU_PRO_3.0.0.elf` |
+| XBase Debug / Release | 无警告构建通过，`MCU_XBASE_3.0.0.elf` |
+| X1 Debug / Release | 无警告构建通过，`MCU_LED_1.30.elf` |
+| SDL 模拟器 | X1Pro、XBase Board 后端与 Demo 后端构建通过 |
+| `linux-host` | 构建通过，CTest 32/32 |
+| HC32 主机回归 | 构建通过，默认 CTest 19/19（含状态归属与分层检查；另可配置模拟器冒烟测试） |
+| 共享核心 | 构建通过，CTest 4/4 |
+| `check_layers.py` / `check_state_ownership.py` | CMake File API、静态分层与状态单写者归属检查通过 |
 
 本版未刷写硬件，未测量 HC32 上的新过渡帧率、实际亮度观感与充电功率精度；历史迁移/可靠性记录中的实机结果不代表这些新增行为已上板验收。

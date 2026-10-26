@@ -95,12 +95,28 @@
 
 ## 验证
 
-- 3.0.0 工作区复验：Linux 主机默认 CTest **32/32** 通过，包含 `app_startup_power_test` 的功率/电压回退、`app_panel_return_test` 的慢卸载/首帧收回、`app_system_dash_test` 的亮度与焦点、`app_page_manager_test` 的纯色过渡与清理断言。
-- X1Pro/XBase Release 与 X1Pro Board 模拟器均构建通过，生成版本均为 `V3.0.0`；镜像名与体积见[发布说明](release_notes.md)。本次没有刷写硬件。
+- 3.0.0 发布回归：Linux 主机默认 CTest **32/32** 通过，包含 `app_startup_power_test` 的功率/电压回退、`app_panel_return_test` 的慢卸载/首帧收回、`app_system_dash_test` 的亮度与焦点、`app_page_manager_test` 的纯色过渡与清理断言。
+- X1Pro/XBase Release 与 X1Pro Board 模拟器均构建通过，生成版本均为 `V3.0.0`；完整构建验证与镜像名见[发布说明](release_notes.md)。本版没有刷写硬件。
 - `python3 tests/check_layers.py .` 通过；`app_transition_bench` 是手动性能基准，不计入 CTest，上文耗时是既有同机测量记录。
 - 早期空闲重绘优化记录（主机渲染统计，2 s 内刷新像素折合整屏）：工作页 3.6→0.2、记录页 4.2→0.2 屏/秒，剩余为状态栏充电动画；首页只剩两张 54×44 状态卡的动效。
 
-[首页预览](images/ui-dialplate.png)、[英俄设置页及状态预览](images/ui-settings-bilingual.png)、[Device Info 根页预览](images/ui-device-info.png)。这三张预览纳入版本控制，克隆仓库后可直接查看；这些是既有静态预览，系统页亮度布局与电源确认窗以当前源码及 `app_system_dash_test` 生成的截图为准。预览含模拟数据；可执行文件为 `build/sim-demo/bin/main`（Demo 后端）、`build/simulator-x1pro/bin/main`、`build/simulator-xbase/bin/main`。
+## 界面预览与重生成
+
+[八页概览](images/ui-pages.png)、[首页预览](images/ui-dialplate.png)、[英俄设置与充电待机预览](images/ui-settings-bilingual.png)、[Device Info 根页预览](images/ui-device-info.png) 均由 3.0.0 共享应用与 Demo 后端的无窗口 LVGL 渲染生成，纳入版本控制后可直接查看。每页以 294×126 原生 RGB565 渲染、最近邻放大 2 倍，再无损压缩为 PNG；没有修改界面文字或合成控件。
+
+- 八页概览按行依次为 Startup（CHG 12.5W）/SystemLoading（Logo）、Dialplate/StarMap、WorkSettings/RecordConfig、SystemInfos/SystemDash。系统页亮度为 60%，五段短线亮起三段。
+- 英俄预览每行左英右俄，依次展示 SystemDash 亮度主卡、Startup 充电功率、电源按住确认进度、WorkSettings、RecordConfig。Demo 提供重启能力，HC32 产品只显示关机；预览中的 FW 1.0.0、卫星数、功率等均为模拟数据，产品发布版本见发布说明。
+- 首页单图保留状态栏与四个入口；Device Info 单图为根页，显示首张 Work 分类卡，继续切焦点可浏览其他分类。
+
+在仓库根目录运行（可从空构建目录开始，仅需 CMake、Ninja、主机 C/C++ 编译器及 Python 3.9+）：
+
+```bash
+python3 Vendor/Linux/tools/generate_doc_previews.py --build-dir build/doc-previews
+```
+
+工具自动按 `linux-host` preset、默认 OEM `singularxyz` 配置并构建三个既有回归程序：`app_system_dash_test` 输出加载、星图、信息、设置和确认窗，`app_startup_power_test` 输出英俄充电待机，`app_focus_rollout_preview` 的 `Dialplate stills en` 模式输出首页。原始 PPM 与日志保留在指定构建目录的 `doc-preview/`，Python 标准库 `struct/zlib` 负责拼图与 PNG 编码，只更新 `docs/images/` 的四个同名文件，不依赖 SDL 窗口或外部图像包。早期 `08a653d2` 提交只保存了八页拼图，没有保留拼图脚本；此工具补全可复现命令。
+
+交互预览可运行 `build/sim-demo/bin/main`（Demo 后端）、`build/simulator-x1pro/bin/main` 或 `build/simulator-xbase/bin/main`。
 
 ## 提交前复审
 
