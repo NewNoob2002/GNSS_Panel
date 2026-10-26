@@ -69,12 +69,12 @@
 | Startup | 无页面滑动，开机首屏亮度渐亮 |
 | SystemLoading | 无页面滑动，字标逐字浮现 |
 | Dialplate | 从底部覆盖上推（下方加载页同时压暗）；首页面板与按钮稍晚同向升起（仅开机首次进入播放，返回首页不重播） |
-| WorkSettings / RecordConfig / SystemInfos / SystemDash / StarMap | 从首页入口进入时：焦点框按弹簧从入口展开为页面背景色面板，盖满屏幕（约 160 ms）后以 `PageManager::pushWithAnim(..., NONE)` 直接切换，新页控件依次浮现；返回同样直接切换，首页把面板收回到原入口并随面积淡出（参照 smooth_ui_toolkit SmoothSelectorMenu 的 open）。其他途径进入（如 SystemDash → SystemInfos）用页面自身的视差推入 `PUSH_LEFT`：新页完整滑入，旧页只左移 1/3 并逐渐压暗，Back 反向。SystemDash 电源面板淡入 |
+| WorkSettings / RecordConfig / SystemInfos / SystemDash / StarMap | 从首页入口进入时：焦点框从入口展开为页面背景色面板（缓入缓出 `cubic-bezier(0.4, 0, 0.2, 1)`，橙框随之淡出），约 350 ms 盖满屏幕即以 `PageManager::pushWithAnim(..., NONE)` 直接切换，新页控件依次浮现；返回同样直接切换，首页用 350 ms 把面板收回到原入口，填充淡出、橙框淡入（参照 smooth_ui_toolkit SmoothSelectorMenu 的 open）。展开动画时长取 500 ms 并在盖满时即完成，使切换发生时面板仍在中速移动，不出现曲线末段近乎静止的满屏等待。其他途径进入（如 SystemDash → SystemInfos）用页面自身的视差推入 `PUSH_LEFT`：新页完整滑入，旧页只左移 1/3 并逐渐压暗，Back 反向。SystemDash 电源面板淡入 |
 | SaveConfig | 从底部覆盖进入 `OVER_TOP`，下方页面同时压暗 |
 
 所有页面切换统一 `style::kPageTransitionMs`（350 ms）、`cubic-bezier(0.2, 0, 0, 1)` 曲线（`style::page_transition_path`），Back 沿同一过渡反向退出。
 
-遮罩（`PageManager::setScrimOpa`，应用取 `style::kPageScrimOpa` ≈ 45%）在 `OVER_*`、`PUSH_*` 切屏时临时创建于被覆盖页与覆盖页之间，只铺在覆盖页尚未盖住的条带上，切换结束即删除；它按与页面动画相同的进度自行计算覆盖页位置（LVGL 新动画插在链表头部、先于页面动画执行，读实际坐标会落后一帧）。主机基准 `app_transition_bench`（首页往返三个子页，Release，同机相对值）：`MOVE_LEFT` 89.9 µs/帧，`PUSH_LEFT` 无遮罩 101 µs/帧（被覆盖页在新页下的重绘 +12%），加遮罩 117 µs/帧（混合再 +16%）。入口展开（SystemInfos 往返）55.7 µs/帧、刷新 17.1 屏，同一页视差推入加遮罩为 110.7 µs/帧、45.1 屏，即入口展开约为后者的一半。`LV_DRAW_SW_CIRCLE_CACHE_SIZE` 4→8 实测无可测差异，保持 4。实机帧率用调试固件的 `LV_USE_PERF_MONITOR` 确认；若 MCU 上切屏掉帧，可把 `kPageScrimOpa` 设为 0（省遮罩）或改回 `MOVE_LEFT`（省视差重绘）。
+遮罩（`PageManager::setScrimOpa`，应用取 `style::kPageScrimOpa` ≈ 45%）在 `OVER_*`、`PUSH_*` 切屏时临时创建于被覆盖页与覆盖页之间，只铺在覆盖页尚未盖住的条带上，切换结束即删除；它按与页面动画相同的进度自行计算覆盖页位置（LVGL 新动画插在链表头部、先于页面动画执行，读实际坐标会落后一帧）。主机基准 `app_transition_bench`（首页往返三个子页，Release，同机相对值）：`MOVE_LEFT` 89.9 µs/帧，`PUSH_LEFT` 无遮罩 101 µs/帧（被覆盖页在新页下的重绘 +12%），加遮罩 117 µs/帧（混合再 +16%）。入口展开（SystemInfos 往返）59.7 µs/帧、刷新 23.3 屏，同一页视差推入加遮罩为 110.5 µs/帧、45.1 屏，即入口展开约为后者的一半。`LV_DRAW_SW_CIRCLE_CACHE_SIZE` 4→8 实测无可测差异，保持 4。实机帧率用调试固件的 `LV_USE_PERF_MONITOR` 确认；若 MCU 上切屏掉帧，可把 `kPageScrimOpa` 设为 0（省遮罩）或改回 `MOVE_LEFT`（省视差重绘）。
 
 为在性能不足时保持流畅：
 

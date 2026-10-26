@@ -282,8 +282,8 @@ int main(int argc, char** argv) {
             auto* panel = find_highlight(home_root);
             assert(panel && lv_obj_get_style_bg_opa(panel, LV_PART_MAIN) == LV_OPA_TRANSP);
             app.on_input(Input::Confirm);
-            // The focused entry expands over the home page first (spring steps are capped at 64 ms, so deliver
-            // frames), then the page switches without a slide once the panel covers the screen.
+            // The focused entry expands over the home page with the page transition's 350 ms curve (deliver frames),
+            // then the page switches without a slide once the panel covers the screen.
             advance(60);
             assert(std::strcmp(app.current_page(), "Pages/Dialplate") == 0);
             assert(lv_obj_get_style_bg_opa(panel, LV_PART_MAIN) == LV_OPA_COVER);
@@ -292,6 +292,8 @@ int main(int argc, char** argv) {
             app.on_input(Input::NextFocus); // Focus is frozen until the navigation happens.
             assert(app.focused() == initial_focus);
             advance(240);
+            assert(std::strcmp(app.current_page(), "Pages/Dialplate") == 0); // Not before the 350 ms expansion.
+            advance(100);
             assert(std::strcmp(app.current_page(), "Pages/SystemInfos") == 0);
             advance(50);
             app.on_input(Input::Back);
@@ -312,13 +314,13 @@ int main(int argc, char** argv) {
             advance(800);
             // Re-entering while the panel is still collapsing expands again instead of falling back to a slide.
             app.on_input(Input::Confirm);
-            advance(300);
+            advance(400);
             assert(std::strcmp(app.current_page(), "Pages/SystemInfos") == 0);
             app.on_input(Input::Back);
             advance(100);
             assert(lv_obj_get_style_bg_opa(panel, LV_PART_MAIN) < LV_OPA_COVER); // Fading while collapsing.
             app.on_input(Input::Confirm);
-            advance(300);
+            advance(400);
             assert(std::strcmp(app.current_page(), "Pages/SystemInfos") == 0);
             auto* infos_root = app.focused();
             while (lv_obj_get_parent(infos_root) != lv_screen_active()) {

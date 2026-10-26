@@ -23,8 +23,6 @@ bool FocusHighlight::bind_controls(lv_obj_t* root, lv_obj_t* const* controls, st
         lv_obj_delete(highlight);
         return false;
     }
-    motion_.set_settled_callback(on_settled, this);
-    motion_.set_frame_callback(on_frame);
     for (std::size_t i = 0; i < count; ++i) {
         auto* object = controls[i];
         if (!object)
@@ -61,6 +59,8 @@ void FocusHighlight::watch_parent(lv_obj_t* parent) {
 
 void FocusHighlight::unbind() {
     stop();
+    if (motion_.object())
+        lv_anim_delete(motion_.object(), nullptr);
     mode_ = Mode::Focus;
     done_ = nullptr;
     focused_ = nullptr;
@@ -97,14 +97,118 @@ void FocusHighlight::freeze(bool frozen) {
     frozen_ = frozen;
 }
 
+/** @brief 回到普通覆盖框：透明填充、完整橙框。 */
 void FocusHighlight::restore_border() {
+    if (!motion_.object())
+        return;
+    lv_obj_set_style_bg_opa(motion_.object(), LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_opa(motion_.object(), LV_OPA_COVER, 0);
+}
+
+/** @brief 控件在宿主内容区的覆盖框几何；按下时向内挤压（每边最多 4/3 px、不超过尺寸 1/8）。 */
+void FocusHighlight::target_of(lv_obj_t* object, lv_obj_t* host, int32_t (&geometry)[4]) const {
+    /** @brief floating 覆盖框不随宿主滚动，按屏幕坐标换算到宿主内容区才能与卡片重合（含跨父容器）。 */
+    lv_area_t area, origin;
+    lv_obj_get_coords(object, &area);
+    lv_obj_get_coords(host, &origin);
+    geometry[0] = area.x1 - origin.x1 - lv_obj_get_style_space_left(host, LV_PART_MAIN);
+    geometry[1] = area.y1 - origin.y1 - lv_obj_get_style_space_top(host, LV_PART_MAIN);
+    geometry[2] = lv_obj_get_width(object);
+    geometry[3] = lv_obj_get_height(object);
+    if (lv_obj_is_pressed(object)) {
+        const int32_t dx = std::min<int32_t>(4, geometry[2] / 8), dy = std::min<int32_t>(3, geometry[3] / 8);
+        geometry[0] += dx;
+        geometry[1] += dy;
+        geometry[2] -= 2 * dx;
+        geometry[3] -= 2 * dy;
+    }
+}
+
+/**
+ * @brief 面板几何按缓入缓出曲线从当前位置插值到 to。收回用切屏时长（350 ms），减速落在入口上、内容逐渐露出；
+ *        展开用 10/7 倍时长并在盖满宿主时即完成：首页各入口约在 330–365 ms 盖满，此时面板仍在中速移动，
+ *        避免曲线最后约 15% 时间只挪几像素的近乎静止满屏；余下部分在首页隐藏后静默跑完。
+ */
+void FocusHighlight::panel_start(const int32_t (&to)[4]) {
+    auto* highlight = motion_.object();
+    motion_.stop();
+    lv_anim_delete(highlight, nullptr);
+    for (unsigned i = 0; i < 4; ++i) {
+        from_[i] = static_cast<int32_t>(motion_.value(static_cast<app::LvSpring::Axis>(i)).position());
+        to_[i] = to[i];
+    }
+    lv_anim_t animation;
+    lv_anim_init(&animation);
+    lv_anim_set_var(&animation, highlight);
+    lv_anim_set_user_data(&animation, this);
+    lv_anim_set_values(&animation, 0, kPanelSteps);
+    lv_anim_set_duration(&animation, mode_ == Mode::Opening ? style::kPageTransitionMs * 10 / 7
+                                                            : style::kPageTransitionMs);
+    lv_anim_set_path_cb(&animation, style::panel_transition_path);
+    lv_anim_set_custom_exec_cb(&animation, on_panel);
+    lv_anim_set_completed_cb(&animation, on_panel_done);
+    if (!lv_anim_start(&animation)) {
+        panel_apply(kPanelSteps);
+        panel_done();
+    }
+}
+
+/**
+ * @brief 展开：填充不透明，橙框随进度淡出，终态不留贴边细线。
+ *        收回：填充随进度淡出、橙框淡入，控件内容逐渐露出，抵达时只剩普通覆盖框。
+ */
+void FocusHighlight::panel_apply(int32_t step) {
+    int32_t geometry[4];
+    for (unsigned i = 0; i < 4; ++i)
+        geometry[i] = from_[i] + (to_[i] - from_[i]) * step / kPanelSteps;
+    motion_.snap(geometry[0], geometry[1], geometry[2], geometry[3]);
+    const auto rising = static_cast<lv_opa_t>(LV_OPA_COVER * step / kPanelSteps);
+    const auto falling = static_cast<lv_opa_t>(LV_OPA_COVER - rising);
+    auto* highlight = motion_.object();
+    const bool opening = mode_ == Mode::Opening;
+    lv_obj_set_style_bg_opa(highlight, opening ? static_cast<lv_opa_t>(LV_OPA_COVER) : falling, 0);
+    lv_obj_set_style_border_opa(highlight, opening ? falling : rising, 0);
+    auto* host = lv_obj_get_parent(highlight);
+    if (opening && geometry[0] <= 0 && geometry[1] <= 0 && geometry[0] + geometry[2] >= lv_obj_get_content_width(host)
+        && geometry[1] + geometry[3] >= lv_obj_get_content_height(host))
+        panel_done(); // 盖满即完成；动画继续写几何，mode 已为 Open 后不再回调。
+}
+
+void FocusHighlight::panel_done() {
+    if (mode_ == Mode::Opening) {
+        mode_ = Mode::Open;
+        const auto done = done_;
+        done_ = nullptr;
+        if (done)
+            done(done_user_data_);
+    } else if (mode_ == Mode::Closing) {
+        mode_ = Mode::Focus;
+        restore_border();
+        visibility();
+    }
+}
+
+void FocusHighlight::on_panel(lv_anim_t* animation, int32_t step) {
+    static_cast<FocusHighlight*>(lv_anim_get_user_data(animation))->panel_apply(step);
+}
+
+void FocusHighlight::on_panel_done(lv_anim_t* animation) {
+    static_cast<FocusHighlight*>(lv_anim_get_user_data(animation))->panel_done();
+}
+
+/** @brief 立即结束收回（离页或用户换焦点）：停在控件处，恢复普通覆盖框。 */
+void FocusHighlight::finish_close() {
+    if (mode_ != Mode::Closing)
+        return;
     if (motion_.object())
-        lv_obj_set_style_bg_opa(motion_.object(), LV_OPA_TRANSP, 0);
+        lv_anim_delete(motion_.object(), nullptr);
+    mode_ = Mode::Focus;
+    restore_border();
 }
 
 bool FocusHighlight::open(lv_color_t fill, DoneCallback done, void* user_data) {
     auto* highlight = motion_.object();
-    // 收回途中可再次展开：从当前几何保速反向，填充恢复不透明。
+    // 收回途中可再次展开：从当前几何反向，填充恢复不透明。
     if (!highlight || !focused_ || (mode_ != Mode::Focus && mode_ != Mode::Closing))
         return false;
     mode_ = Mode::Opening;
@@ -120,10 +224,9 @@ bool FocusHighlight::open(lv_color_t fill, DoneCallback done, void* user_data) {
     auto* host = lv_obj_get_parent(highlight);
     const int32_t margin = lv_obj_get_style_radius(highlight, LV_PART_MAIN)
                            + lv_obj_get_style_border_width(highlight, LV_PART_MAIN) + 2;
-    const int32_t width = lv_obj_get_content_width(host) + 2 * margin;
-    const int32_t height = lv_obj_get_content_height(host) + 2 * margin;
-    open_area_ = static_cast<float>(width) * static_cast<float>(height);
-    motion_.retarget(-margin, -margin, width, height);
+    const int32_t to[4]{-margin, -margin, lv_obj_get_content_width(host) + 2 * margin,
+                        lv_obj_get_content_height(host) + 2 * margin};
+    panel_start(to);
     return true;
 }
 
@@ -134,62 +237,15 @@ void FocusHighlight::close() {
     done_ = nullptr;
     mode_ = Mode::Closing;
     if (!focused_) {
-        mode_ = Mode::Focus;
+        finish_close();
         motion_.stop();
-        restore_border();
         lv_obj_set_hidden(motion_.object(), true);
         return;
     }
-    focus_to(focused_, true); // 保速收回到焦点控件，静止后 on_settled 恢复透明。
-}
-
-/** @brief 展开完成：只通知一次，弹簧可继续在面板后方静止。 */
-void FocusHighlight::opened_now() {
-    mode_ = Mode::Open;
-    const auto done = done_;
-    done_ = nullptr;
-    if (done)
-        done(done_user_data_);
-}
-
-/**
- * @brief 展开：面板四边都越过宿主边缘即视为完成，不等弹簧收敛尾段（误差 0.1 px 级、肉眼不可见）。
- *        收回：填充不透明度随面积从展开尺寸降到控件尺寸线性减为 0，控件内容逐渐露出，抵达时已透明。
- */
-void FocusHighlight::on_frame(void* user_data) {
-    auto* self = static_cast<FocusHighlight*>(user_data);
-    auto* highlight = self->motion_.object();
-    if (!highlight)
-        return;
-    const auto& spring = self->motion_;
-    if (self->mode_ == Mode::Closing) {
-        const float area = spring.value(app::LvSpring::Width).position() * spring.value(app::LvSpring::Height).position();
-        const float target = spring.value(app::LvSpring::Width).target() * spring.value(app::LvSpring::Height).target();
-        const float span = self->open_area_ - target;
-        const float ratio = span > 0 ? std::clamp((area - target) / span, 0.0f, 1.0f) : 0.0f;
-        lv_obj_set_style_bg_opa(highlight, static_cast<lv_opa_t>(ratio * LV_OPA_COVER), 0);
-        return;
-    }
-    if (self->mode_ != Mode::Opening)
-        return;
-    auto* host = lv_obj_get_parent(highlight);
-    // 读弹簧刚写入的几何：对象坐标要到下一次布局刷新才更新。
-    const auto& m = self->motion_;
-    const float x = m.value(app::LvSpring::X).position(), y = m.value(app::LvSpring::Y).position();
-    if (x <= 0 && y <= 0 && x + m.value(app::LvSpring::Width).position() >= lv_obj_get_content_width(host)
-        && y + m.value(app::LvSpring::Height).position() >= lv_obj_get_content_height(host))
-        self->opened_now();
-}
-
-void FocusHighlight::on_settled(void* user_data) {
-    auto* self = static_cast<FocusHighlight*>(user_data);
-    if (self->mode_ == Mode::Opening) {
-        self->opened_now();
-    } else if (self->mode_ == Mode::Closing) {
-        self->mode_ = Mode::Focus;
-        self->restore_border();
-        self->visibility();
-    }
+    lv_obj_update_layout(focused_);
+    int32_t to[4];
+    target_of(focused_, lv_obj_get_parent(motion_.object()), to);
+    panel_start(to);
 }
 
 void FocusHighlight::focus_to(lv_obj_t* object, bool animated, bool layout_only) {
@@ -199,6 +255,11 @@ void FocusHighlight::focus_to(lv_obj_t* object, bool animated, bool layout_only)
     if (mode_ == Mode::Opening || mode_ == Mode::Open) {
         focused_ = object; // 展开面板保持盖住宿主，只记录收回目标。
         return;
+    }
+    if (mode_ == Mode::Closing) {
+        if (layout_only)
+            return; // 首页恢复时的布局刷新不打断收回动画。
+        finish_close(); // 用户换焦点/按下：结束收回，从当前几何按弹簧继续。
     }
     aligning_ = true;
     focused_ = object;
@@ -213,21 +274,9 @@ void FocusHighlight::focus_to(lv_obj_t* object, bool animated, bool layout_only)
     lv_obj_move_to_index(highlight, -1);
     lv_obj_set_style_radius(highlight, lv_obj_get_style_radius(object, LV_PART_MAIN), 0);
     visibility();
-    /** @brief floating 覆盖框不随宿主滚动，按屏幕坐标换算到宿主内容区才能与卡片重合（含跨父容器）。 */
-    lv_area_t area, origin;
-    lv_obj_get_coords(object, &area);
-    lv_obj_get_coords(host, &origin);
-    auto x = area.x1 - origin.x1 - lv_obj_get_style_space_left(host, LV_PART_MAIN);
-    auto y = area.y1 - origin.y1 - lv_obj_get_style_space_top(host, LV_PART_MAIN);
-    auto width = lv_obj_get_width(object), height = lv_obj_get_height(object);
-    /** @brief 按下时向内挤压（每边最多 4/3 px、不超过尺寸 1/8），任何重新对齐都保持挤压，松开即回弹。 */
-    if (lv_obj_is_pressed(object)) {
-        const int32_t dx = std::min<int32_t>(4, width / 8), dy = std::min<int32_t>(3, height / 8);
-        x += dx;
-        y += dy;
-        width -= 2 * dx;
-        height -= 2 * dy;
-    }
+    int32_t geometry[4];
+    target_of(object, host, geometry); // 按下时的挤压在任何重新对齐中都保持，松开即回弹。
+    const auto x = geometry[0], y = geometry[1], width = geometry[2], height = geometry[3];
     const bool unchanged = motion_.value(app::LvSpring::X).target() == x
                            && motion_.value(app::LvSpring::Y).target() == y
                            && motion_.value(app::LvSpring::Width).target() == width
@@ -295,9 +344,10 @@ void FocusHighlight::stop() {
     motion_.stop();
     freeze(false); // 焦点组由所有页面共用，离页必须解冻。
     if (mode_ == Mode::Closing) { // 收回中离页：直接落位，下次进入不再遗留不透明面板。
-        mode_ = Mode::Focus;
-        restore_border();
+        finish_close();
         focus_to(focused_, false);
+    } else if (mode_ == Mode::Opening && motion_.object()) {
+        lv_anim_delete(motion_.object(), nullptr); // 展开中被其他导航带走：停在原处，返回时 close() 收回。
     }
 }
 } // namespace page

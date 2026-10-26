@@ -73,7 +73,6 @@ bool LvSpring::retarget(int32_t x, int32_t y, int32_t width, int32_t height) {
         values_[i].retarget(static_cast<float>(geometry[i]));
     if (settled()) {
         snap(x, y, width, height);
-        notify_settled();
         return true;
     }
     if (!timer_) {
@@ -81,7 +80,6 @@ bool LvSpring::retarget(int32_t x, int32_t y, int32_t width, int32_t height) {
         timer_ = lv_timer_create(on_timer, 16, this);
         if (!timer_) {
             snap(x, y, width, height);
-            notify_settled();
             return false;
         }
     }
@@ -104,17 +102,8 @@ void LvSpring::on_timer(lv_timer_t* timer) {
     for (auto& value : self->values_)
         value.step(elapsed);
     self->apply();
-    if (self->frame_cb_)
-        self->frame_cb_(self->settled_user_data_);
-    if (self->settled()) {
+    if (self->settled())
         self->stop();
-        self->notify_settled(); // 最后一步：回调可能再次驱动或解除本对象。
-    }
-}
-
-void LvSpring::notify_settled() {
-    if (settled_cb_)
-        settled_cb_(settled_user_data_);
 }
 
 void LvSpring::on_delete(lv_event_t* event) {

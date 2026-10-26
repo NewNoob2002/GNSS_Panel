@@ -19,6 +19,17 @@ inline int32_t page_transition_path(const lv_anim_t* a) {
 /** @brief 切屏时压暗被覆盖页的遮罩最深不透明度（PUSH_*、OVER_*）；单色混合、无离屏图层，开销远低于整页淡出。 */
 inline constexpr lv_opa_t kPageScrimOpa = 115; // 约 45%
 
+/**
+ * @brief 首页入口面板展开/收回曲线 cubic-bezier(0.4, 0, 0.2, 1)（标准缓入缓出），时长同 kPageTransitionMs。
+ *        展开不像整页平移那样有内容随尾段移动，强缓出曲线会在前约 1/3 时长盖满、随后留下一段空白等待。
+ */
+inline int32_t panel_transition_path(const lv_anim_t* a) {
+    const auto t = static_cast<int32_t>(lv_map(a->act_time, 0, a->duration, 0, LV_BEZIER_VAL_MAX));
+    const int32_t step =
+        lv_cubic_bezier(t, LV_BEZIER_VAL_FLOAT(0.4), 0, LV_BEZIER_VAL_FLOAT(0.2), LV_BEZIER_VAL_MAX);
+    return a->start_value + ((step * (a->end_value - a->start_value)) >> LV_BEZIER_VAL_SHIFT);
+}
+
 inline constexpr lv_color_t kBackground = LV_COLOR_MAKE(0x10, 0x12, 0x14);
 inline constexpr lv_color_t kPanel = LV_COLOR_MAKE(0x20, 0x24, 0x28);
 inline constexpr lv_color_t kCard = LV_COLOR_MAKE(0x18, 0x1C, 0x20);
