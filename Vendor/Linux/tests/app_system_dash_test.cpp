@@ -308,6 +308,12 @@ random_battery_events(lv_display_t* display, const std::string& output) {
         assert(lv_obj_is_hidden(digits) == !state.battery_valid);
         assert(label(reading, state.battery_valid ? text : "N/A"));
         assert(std::strcmp(lv_label_get_text(unit), state.battery_valid ? "%" : "N/A") == 0);
+        if (state.battery_valid) { // 电量数字与 % 共用基线（两种字体度量不同）。
+            const auto* digit_font = lv_obj_get_style_text_font(digits, LV_PART_MAIN);
+            const auto* unit_font = lv_obj_get_style_text_font(unit, LV_PART_MAIN);
+            assert(object_coords(digits).y2 - lv_obj_get_style_pad_bottom(digits, LV_PART_MAIN) - digit_font->base_line
+                   == object_coords(unit).y2 - unit_font->base_line);
+        }
         assert(label(block, charging ? "CHG" : "BAT"));
         std::snprintf(text, sizeof(text), "%.2f V", state.battery_voltage);
         assert(label(block, state.battery_valid ? text : "N/A"));
