@@ -176,6 +176,92 @@ check_manager() {
            && preload_counts.stale_callbacks == 0);
     assert(lv_obj_get_child_count(screen) == children);
 }
+/** @brief Return the screen child that is neither page root (the transition scrim), or nullptr. */
+lv_obj_t*
+find_scrim(lv_obj_t* screen, const lv_obj_t* first, const lv_obj_t* second) {
+    for (uint32_t i = 0; i < lv_obj_get_child_count(screen); ++i) {
+        auto* child = lv_obj_get_child(screen, static_cast<int32_t>(i));
+        if (child != first && child != second) {
+            return child;
+        }
+    }
+    return nullptr;
+}
+
+/** @brief |actual - expected| within a few pixels/opacity steps of animation timer granularity. */
+bool
+near(int32_t actual, int32_t expected, int32_t tolerance = 6) {
+    return actual >= expected - tolerance && actual <= expected + tolerance;
+}
+
+/** @brief PUSH_* trails the covered page by a third under a scrim limited to the uncovered strip. */
+void
+check_push_scrim() {
+    Counts first_counts, second_counts;
+    auto* screen = lv_screen_active();
+    const auto children = lv_obj_get_child_count(screen);
+    {
+        PageManager manager;
+        auto* first = new ProbePage(first_counts);
+        auto* second = new ProbePage(second_counts);
+        assert(manager.registerPage(first, "First") == Result::OK);
+        assert(manager.registerPage(second, "Second") == Result::OK);
+        manager.setScrimOpa(LV_OPA_50);
+        manager.setGlobalLoadAnim(PAGE_ANIM::PUSH_LEFT, 260, lv_anim_path_linear);
+        assert(manager.push("First") == Result::OK);
+        advance();
+        assert(lv_obj_get_child_count(screen) == children + 1); // The first push has nothing to cover.
+
+        constexpr int32_t width = 294;
+        assert(manager.push("Second") == Result::OK);
+        auto* scrim = find_scrim(screen, first->getRoot(), second->getRoot());
+        assert(scrim && lv_obj_get_index(scrim) + 1 == lv_obj_get_index(second->getRoot()));
+        assert(lv_obj_get_index(first->getRoot()) < lv_obj_get_index(scrim));
+        advance(130);
+        lv_obj_update_layout(screen);
+        const auto covering = lv_obj_get_x(second->getRoot());
+        assert(near(covering, width / 2));
+        assert(near(lv_obj_get_x(first->getRoot()), -width / 3 / 2)); // Parallax: a third of the distance.
+        assert(lv_obj_get_x(scrim) == 0 && near(lv_obj_get_width(scrim), covering, 1)); // Follows the edge.
+        assert(near(lv_obj_get_style_bg_opa(scrim, LV_PART_MAIN), LV_OPA_50 / 2));
+        advance();
+        assert(!find_scrim(screen, first->getRoot(), second->getRoot())); // Deleted when the switch ends.
+        assert(lv_obj_get_x(first->getRoot()) == -width / 3 && lv_obj_get_x(second->getRoot()) == 0);
+
+        assert(manager.pop() == Result::OK);
+        advance(130);
+        lv_obj_update_layout(screen);
+        scrim = find_scrim(screen, first->getRoot(), second->getRoot());
+        assert(scrim && lv_obj_get_index(scrim) + 1 == lv_obj_get_index(second->getRoot()));
+        assert(near(lv_obj_get_x(second->getRoot()), width / 2) && near(lv_obj_get_x(first->getRoot()), -width / 6));
+        assert(near(lv_obj_get_width(scrim), lv_obj_get_x(second->getRoot()), 1));
+        assert(near(lv_obj_get_style_bg_opa(scrim, LV_PART_MAIN), LV_OPA_50 / 2)); // Lifts while uncovering.
+        advance();
+        assert(!find_scrim(screen, first->getRoot(), second->getRoot()));
+        assert(lv_obj_get_x(first->getRoot()) == 0);
+
+        // MOVE_* keeps both pages fully visible, and a zero opacity disables the scrim.
+        manager.setGlobalLoadAnim(PAGE_ANIM::MOVE_LEFT, 260, lv_anim_path_linear);
+        assert(manager.push("Second") == Result::OK);
+        assert(!find_scrim(screen, first->getRoot(), second->getRoot()));
+        advance();
+        assert(manager.pop() == Result::OK);
+        advance();
+        manager.setScrimOpa(LV_OPA_TRANSP);
+        manager.setGlobalLoadAnim(PAGE_ANIM::OVER_TOP, 260, lv_anim_path_linear);
+        assert(manager.push("Second") == Result::OK);
+        assert(!find_scrim(screen, first->getRoot(), second->getRoot()));
+        advance();
+        assert(manager.pop() == Result::OK);
+        advance();
+        manager.setScrimOpa(LV_OPA_50);
+        assert(manager.push("Second") == Result::OK); // OVER_* dims the static page beneath as well.
+        assert(find_scrim(screen, first->getRoot(), second->getRoot()));
+        advance(100);
+    } // Destroying the manager mid-transition must not leave a scrim or page root behind.
+    advance();
+    assert(lv_obj_get_child_count(screen) == children);
+}
 } // namespace
 
 /** @brief Run the framework regression with a headless LVGL display. */
@@ -191,6 +277,7 @@ main() {
     auto* group = lv_group_create();
     lv_group_set_default(group);
     check_manager();
+    check_push_scrim();
     lv_group_set_default(nullptr);
     lv_group_delete(group);
     lv_display_delete(display);

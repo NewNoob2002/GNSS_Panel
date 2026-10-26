@@ -33,6 +33,7 @@ bool App::init(const Options& options) {
     manager_ = std::make_unique<PageManager>();
     manager_->setRootDefaultStyle(&root_style_);
     manager_->setGlobalLoadAnim(PAGE_ANIM::MOVE_LEFT, page::style::kPageTransitionMs, lv_anim_path_ease_out);
+    manager_->setScrimOpa(page::style::kPageScrimOpa);
     if (!AppFactory::installAll(*manager_) || !status_bar_.create(lv_layer_top()))
         return false;
     if (options.battery_warning && !battery_warning_.create(lv_layer_top()))

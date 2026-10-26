@@ -68,11 +68,15 @@
 | --- | --- |
 | Startup | 无页面滑动，开机首屏亮度渐亮 |
 | SystemLoading | 无页面滑动，字标逐字浮现 |
-| Dialplate | 从底部覆盖上推；首页面板与按钮稍晚同向升起（仅开机首次进入播放，返回首页不重播） |
-| WorkSettings / RecordConfig / SystemInfos / SystemDash / StarMap | 首页的子页统一从右侧横向推入，Back 向右退回；SystemDash 电源面板淡入 |
-| SaveConfig | 从底部覆盖进入（覆盖类页面） |
+| Dialplate | 从底部覆盖上推（下方加载页同时压暗）；首页面板与按钮稍晚同向升起（仅开机首次进入播放，返回首页不重播） |
+| WorkSettings / RecordConfig / SystemInfos / SystemDash / StarMap | 视差推入 `PUSH_LEFT`：新页从右侧完整滑入，首页只左移 1/3 并逐渐压暗；Back 反向，首页逐渐提亮。SystemDash 电源面板淡入 |
+| SaveConfig | 从底部覆盖进入 `OVER_TOP`，下方页面同时压暗 |
 
-所有页面切换统一 `style::kPageTransitionMs`（350 ms）、`cubic-bezier(0.2, 0, 0, 1)` 曲线（`style::page_transition_path`），Back 沿同一过渡反向退出。为在性能不足时保持流畅：
+所有页面切换统一 `style::kPageTransitionMs`（350 ms）、`cubic-bezier(0.2, 0, 0, 1)` 曲线（`style::page_transition_path`），Back 沿同一过渡反向退出。
+
+遮罩（`PageManager::setScrimOpa`，应用取 `style::kPageScrimOpa` ≈ 45%）在 `OVER_*`、`PUSH_*` 切屏时临时创建于被覆盖页与覆盖页之间，只铺在覆盖页尚未盖住的条带上，切换结束即删除；它按与页面动画相同的进度自行计算覆盖页位置（LVGL 新动画插在链表头部、先于页面动画执行，读实际坐标会落后一帧）。主机基准 `app_transition_bench`（首页往返三个子页，Release，同机相对值）：`MOVE_LEFT` 89.9 µs/帧，`PUSH_LEFT` 无遮罩 101 µs/帧（被覆盖页在新页下的重绘 +12%），加遮罩 117 µs/帧（混合再 +16%）。`LV_DRAW_SW_CIRCLE_CACHE_SIZE` 4→8 实测无可测差异，保持 4。实机帧率用调试固件的 `LV_USE_PERF_MONITOR` 确认；若 MCU 上切屏掉帧，可把 `kPageScrimOpa` 设为 0（省遮罩）或改回 `MOVE_LEFT`（省视差重绘）。
+
+为在性能不足时保持流畅：
 
 - **不用整页淡入**：整页透明度需要按块渲染到带透明通道的图层再逐像素混合，是 MCU 上最贵的切换；且升级前的 LVGL 8.3 对含全屏子对象的页面（SaveConfig 的背景层）在该图层中绘制错位，表现为切到关机页时一闪花屏（主机逐帧渲染复现，改为滑动后消失）。
 - **创建时间不计入动画**：被弹出的页面会卸载，每次进入都要重新创建；LVGL 会把动画计时器上次运行以来的时间全部记到新动画上，创建耗时会让第一帧直接跳过一大段。`PageManager::switch_to()` 先创建页面，再 `lv_anim_refr_now()`，然后启动切换动画（有回归测试模拟 200 ms 的创建）。

@@ -58,6 +58,11 @@ foreach(page SystemDash Dialplate WorkSettings RecordConfig)
     endforeach()
 endforeach()
 
+# 切屏渲染基准只用于同机相对比较，不注册为测试。
+add_executable(app_transition_bench app_transition_bench.cpp)
+target_link_libraries(app_transition_bench PRIVATE linux::demo_backend)
+target_compile_options(app_transition_bench PRIVATE -Wall -Wextra -Werror)
+
 add_executable(app_deferred_navigation_test app_deferred_navigation_test.cpp)
 target_link_libraries(app_deferred_navigation_test PRIVATE linux::demo_backend)
 target_compile_options(app_deferred_navigation_test PRIVATE -Wall -Wextra -Werror -UNDEBUG)

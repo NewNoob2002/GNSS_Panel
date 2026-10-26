@@ -278,6 +278,9 @@ PageManager::switchTo(PageBase* newNode, bool isEnterAct) {
         if (_pagePrev)
             lv_obj_move_to_index(_pagePrev->_root, -1);
     }
+
+    /* After the page order is final: the scrim sits right beneath the covering page */
+    scrimCreate();
     return RES_TYPE::OK;
 }
 
@@ -438,10 +441,8 @@ void PageManager::switchAnimCreate(PageBase* base)
     // 缓存页可能带着另一轴的退出偏移，进入时只保留本次动画驱动的属性。
     if (base->_context.anim.isEnter) {
         const auto type = getCurrentLoadAnimType();
-        const bool horizontal = type == PAGE_ANIM::OVER_LEFT || type == PAGE_ANIM::OVER_RIGHT
-                                || type == PAGE_ANIM::MOVE_LEFT || type == PAGE_ANIM::MOVE_RIGHT;
-        const bool vertical = type == PAGE_ANIM::OVER_TOP || type == PAGE_ANIM::OVER_BOTTOM
-                              || type == PAGE_ANIM::MOVE_TOP || type == PAGE_ANIM::MOVE_BOTTOM;
+        const bool horizontal = isHorizontalLoadAnim(type);
+        const bool vertical = isVerticalLoadAnim(type);
         if (!horizontal) {
             lv_obj_set_x(base->_root, 0);
         }
