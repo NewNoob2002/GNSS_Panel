@@ -1,5 +1,4 @@
 #include <cstdio>
-#include "FixedFormat.h"
 #include "StartupView.h"
 #include "UI/Common/BatteryStyle.h"
 #include "UI/Common/SettingsStyle.h"
@@ -171,11 +170,9 @@ void StartupView::update(const StartupState& state) {
         char text[24];
         lv_snprintf(text, sizeof(text), "%u", percent);
         settings_style::set_text(ui.bat_charge, text);
-        app::format_fixed(text, sizeof(text), state.battery_voltage, 2, " V");
-        settings_style::set_text(ui.bat_voltage, text);
-    } else {
-        settings_style::set_text(ui.bat_voltage, "N/A");
     }
+    const auto reading = startup_battery_reading(state);
+    settings_style::set_text(ui.bat_voltage, reading.data());
     const bool charging = state.battery_valid && state.charging;
     const auto color = state.battery_valid ? battery::color(percent, charging) : style::kMuted;
     settings_style::set_text(ui.bat_caption, charging ? "CHG" : "BAT");

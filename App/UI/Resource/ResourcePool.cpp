@@ -29,6 +29,7 @@ LV_IMAGE_DECLARE(img_src_ui_stop);
 LV_IMAGE_DECLARE(img_src_ui_power);
 LV_IMAGE_DECLARE(img_src_ui_power_large);
 LV_IMAGE_DECLARE(img_src_ui_wifi);
+LV_IMAGE_DECLARE(img_src_ui_sun_large);
 LV_IMAGE_DECLARE(img_src_ui_location);
 LV_IMAGE_DECLARE(img_src_ui_sd_card);
 LV_IMAGE_DECLARE(img_src_ui_satellite);
@@ -76,6 +77,7 @@ Images::KEY_PAIR images[] = {
     {"ui_power", &img_src_ui_power},
     {"ui_power_large", &img_src_ui_power_large},
     {"ui_wifi", &img_src_ui_wifi},
+        {"ui_sun_large", &img_src_ui_sun_large},
     {"ui_location", &img_src_ui_location},
     {"ui_sd_card", &img_src_ui_sd_card},
     {"ui_satellite", &img_src_ui_satellite},

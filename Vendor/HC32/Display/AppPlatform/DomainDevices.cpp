@@ -5,6 +5,7 @@
 #include "PowerDevice.h"
 #include "StatusDevice.h"
 #include "lvgl.h"
+#include <HAL.h>
 
 namespace {
 class BatteryDevice final : public hal::ReadObject<hal::BatteryState> {
@@ -106,19 +107,31 @@ class WifiDevice final : public hal::WriteObject<hal::WifiState, hal::WifiComman
     BusinessDevice& device_;
 };
 
-class BoardDevice final : public hal::ReadObject<hal::BoardState> {
+class BoardDevice final : public hal::WriteObject<hal::BoardState, hal::BrightnessCommand> {
   public:
     BoardDevice(BusinessDevice& device, StatusDevice& status)
-        : ReadObject(hal::names::Board), device_(device), status_(status) {}
+        : WriteObject(hal::names::Board), device_(device), status_(status) {}
 
     hal::BoardState
     state() override {
         auto value = device_.board(lv_tick_get());
         value.capabilities = status_.capabilities();
+        value.brightness = brightness_;
         return value;
     }
 
+    int
+    execute(const hal::BrightnessCommand& command) override {
+        if (!hal::is_brightness_level(command.percent)) {
+            return RES_PARAM_ERROR;
+        }
+        HAL::Display_SetBrightness(hal::brightness_panel_value(command.percent));
+        brightness_ = command.percent;
+        return RES_OK;
+    }
+
   private:
+    uint8_t brightness_ = 100;
     BusinessDevice& device_;
     StatusDevice& status_;
 };

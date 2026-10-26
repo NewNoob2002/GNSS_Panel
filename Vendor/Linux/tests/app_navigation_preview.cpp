@@ -242,6 +242,34 @@ int main(int argc, char** argv) {
             const auto* loading_logo = resource_pool::get_image("oemLogoParts");
             assert(loading_logo);
             loading_logo = static_cast<const logo_parts_t*>(loading_logo)->parts[0].image;
+            lv_obj_t* loading_root = nullptr;
+            for (uint32_t i = 0; i < lv_obj_get_child_count(lv_screen_active()); ++i) {
+                auto* child = lv_obj_get_child(lv_screen_active(), static_cast<int32_t>(i));
+                auto* page = static_cast<PageBase*>(lv_obj_get_user_data(child));
+                if (page && std::strcmp(page->getName(), "Pages/SystemLoading") == 0) {
+                    loading_root = child;
+                    break;
+                }
+            }
+            assert(loading_root);
+            auto* loading_page = static_cast<PageBase*>(lv_obj_get_user_data(loading_root));
+            assert(loading_page && loading_page->getManager()->isSwitching());
+            assert(loading_page->getLoadAnimType() == PAGE_ANIM::FADE_THROUGH);
+            assert(lv_obj_is_hidden(loading_root));
+            assert(!find_image(lv_screen_active(), loading_logo));
+            advance(150);
+            assert(loading_page->getManager()->isSwitching() && lv_obj_is_hidden(loading_root));
+            assert(lv_obj_get_style_opa(loading_root, LV_PART_MAIN) == LV_OPA_COVER);
+            assert(lv_obj_get_x(loading_root) == 0 && lv_obj_get_y(loading_root) == 0);
+            advance(100);
+            assert(!loading_page->getManager()->isSwitching());
+            assert(!lv_obj_is_hidden(loading_root));
+            assert(lv_obj_get_style_opa(loading_root, LV_PART_MAIN) == LV_OPA_COVER);
+            assert(lv_obj_get_x(loading_root) == 0 && lv_obj_get_y(loading_root) == 0);
+            auto* logo = find_image(lv_screen_active(), loading_logo);
+            assert(logo && lv_obj_get_style_image_opa(logo, LV_PART_MAIN) == LV_OPA_TRANSP);
+            assert(!find_label(lv_screen_active(), i18n::text(i18n::TextId::SystemLoadingTitle)));
+            advance(1000); // Logo 的完整 1300 ms 窗口从 DidAppear 才开始。
             assert(find_image(lv_screen_active(), loading_logo));
             assert(!find_label(lv_screen_active(), i18n::text(i18n::TextId::SystemLoadingTitle)));
             lv_tick_inc(5000); // A stalled host frame must not lose the loading completion request.
@@ -491,6 +519,7 @@ int main(int argc, char** argv) {
             for (const auto phase_ms : {400u, kLogoMs + 300, kLogoMs + 3150}) {
                 advance(300);
                 assert(app.show_page("Pages/SystemLoading"));
+                advance(300); // 先完成纯色遮罩过渡，再计 Logo/自检阶段的展示时间。
                 advance(phase_ms);
                 assert(app.show_page("Pages/SystemInfos")); // Loading stays cached beneath this page.
                 advance(400);
@@ -512,7 +541,8 @@ int main(int argc, char** argv) {
             assert(app.show_page("Pages/SystemDash"));
             lv_tick_inc(500);
             lv_timer_handler();
-            app.on_input(Input::NextFocus); // Wi-Fi 不可用，Language -> Power。
+            app.on_input(Input::NextFocus); // Wi-Fi 不可用，Language -> Brightness -> Power。
+            app.on_input(Input::NextFocus);
             app.on_input(Input::Confirm);
             assert(std::strcmp(app.current_page(), "Pages/SystemDash") == 0);
             app.on_input(Input::Commit); // Shutdown is focused; a double press no longer executes it.

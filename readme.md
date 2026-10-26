@@ -12,6 +12,8 @@
 > 本项目是为小华半导体 (XHSC) HC32F460xE 系列开发的综合性嵌入式软件框架。应用层整体架构参照开源项目 [X-TRACK](https://github.com/FASTSHIFT/X-TRACK)（分层、节点化数据流、页面 MVP、应用组装），并在类型安全、资源占用和可测试性上做了改进，实现了从底层硬件驱动到高层 UI 交互的解耦设计。
 > 核心意义：解决了国产 MCU 在高分 UI 场景下开发效率低、底层驱动与业务逻辑耦合严重的痛点。
 
+X1Pro 与 XBase 当前发布版本为 **3.0.0**，X1 保持 **1.30**；变化见[发布说明](docs/release_notes.md)。
+
 同一份源码构建三类目标：
 
 | 目标 | 说明 |
@@ -42,7 +44,7 @@
 
 ## 😄 实物演示
 
-当前界面（Demo 后端模拟器渲染，294×126 原尺寸放大 2 倍）：Startup 待机、SystemLoading Logo、Dialplate 主页、StarMap 星图、WorkSettings、RecordConfig、SystemInfos、SystemDash。
+界面概览（Demo 后端模拟器渲染，294×126 原尺寸放大 2 倍；静态拼图不反映 3.0.0 的全部调整）：Startup 待机、SystemLoading Logo、Dialplate 主页、StarMap 星图、WorkSettings、RecordConfig、SystemInfos、SystemDash。
 
 ![UI pages](docs/images/ui-pages.png)
 
@@ -111,6 +113,9 @@ python3 tests/check_state_ownership.py .
 - 构建分层与目标命名：[docs/build_architecture.md](docs/build_architecture.md)
 - 应用架构与重构方案：[docs/app_architecture_review.md](docs/app_architecture_review.md)、[App/ARCHITECTURE.md](App/ARCHITECTURE.md)
 - LVGL 9 迁移记录：[docs/lvgl9_migration.md](docs/lvgl9_migration.md)
+- 页面布局与过渡：[docs/ui_style_and_page_review.md](docs/ui_style_and_page_review.md)
+- 待机页充电功率：[docs/battery_charging_power.md](docs/battery_charging_power.md)
+- 发布说明：[docs/release_notes.md](docs/release_notes.md)
 
 ## 🛠 技术深度 (Technical Stack)
 

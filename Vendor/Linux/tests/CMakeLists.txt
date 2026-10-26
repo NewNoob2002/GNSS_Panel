@@ -42,6 +42,11 @@ target_link_libraries(app_spring_test PRIVATE app::ui)
 target_compile_options(app_spring_test PRIVATE -Wall -Wextra -Werror -UNDEBUG)
 add_test(NAME app_spring COMMAND app_spring_test)
 
+add_executable(app_panel_return_test app_panel_return_test.cpp)
+target_link_libraries(app_panel_return_test PRIVATE linux::demo_backend)
+target_compile_options(app_panel_return_test PRIVATE -Wall -Wextra -Werror -UNDEBUG)
+add_test(NAME app_panel_return COMMAND app_panel_return_test)
+
 add_executable(app_focus_preview app_focus_preview.cpp)
 target_link_libraries(app_focus_preview PRIVATE linux::demo_backend)
 target_compile_options(app_focus_preview PRIVATE -Wall -Wextra -Werror -UNDEBUG)
@@ -72,6 +77,11 @@ add_executable(app_status_test app_status_test.cpp)
 target_link_libraries(app_status_test PRIVATE linux::demo_backend app::hal_test_checks)
 target_compile_options(app_status_test PRIVATE -Wall -Wextra -Werror -UNDEBUG)
 add_test(NAME app_status COMMAND app_status_test)
+
+add_executable(app_startup_power_test app_startup_power_test.cpp)
+target_link_libraries(app_startup_power_test PRIVATE linux::demo_backend)
+target_compile_options(app_startup_power_test PRIVATE -Wall -Wextra -Werror -UNDEBUG)
+add_test(NAME app_startup_power COMMAND app_startup_power_test "${CMAKE_BINARY_DIR}/shots")
 
 add_executable(app_mvp_test app_mvp_test.cpp)
 target_link_libraries(app_mvp_test PRIVATE linux::demo_backend)

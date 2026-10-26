@@ -25,6 +25,7 @@ static uint16_t tx_buf[SCREEN_BUFFER_SIZE] __attribute__((aligned(4)));
 static bool flush_active;
 static uint32_t flush_started_ms;
 volatile uint32_t display_dma_timeouts;
+static uint8_t target_brightness = 0xFF;
 
 #if PRODUCT_DISPLAY_BRIGHTNESS_FADE
 static constexpr uint32_t kBrightnessFadeMs = 300U;
@@ -207,6 +208,7 @@ lv_port_disp_init() {
 #endif
         for (;;) {}
     }
+    target_brightness = 0xFF;
 #if PRODUCT_DISPLAY_BRIGHTNESS_FADE
     brightness_done = brightness_started = brightness_polled = first_frame_failed = flush_last = false;
 #endif
@@ -224,18 +226,31 @@ lv_port_reset() {
         for (;;) {}
     }
     screen.fill(0x0000);
+    // 唤醒恢复用户选择，不重复冷启动动画。
 #if PRODUCT_DISPLAY_BRIGHTNESS_FADE
-    /** @brief 唤醒复位保持旧版全亮终态，不重复冷启动动画。 */
-    screen.setBrightness(0xFF);
+    screen.setBrightness(target_brightness);
+    brightness_done = true;
+#else
+    if (target_brightness != 0xFF) {
+        screen.setBrightness(target_brightness);
+    }
+#endif
+}
+
+void
+lv_port_set_brightness(uint8_t value) {
+    wait_flush_idle();
+#if PRODUCT_DISPLAY_BRIGHTNESS_FADE
     brightness_done = true;
 #endif
+    target_brightness = value;
+    screen.setBrightness(value);
 }
 
 #if defined(__CORE_DEBUG)
 /** @brief GDB 手动验证入口；先回收 DMA，再同步设置亮度，不添加面板控制命令。 */
 __attribute__((noinline)) void
 lv_port_debug_brightness(uint8_t value) {
-    wait_flush_idle();
-    screen.setBrightness(value);
+    lv_port_set_brightness(value);
 }
 #endif

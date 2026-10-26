@@ -15,6 +15,7 @@ class Dialplate final : public PageBase {
     void onInstalled() override;
     void onViewLoad() override;
     void onViewWillAppear() override;
+    void onViewDidAppear() override;
     void onViewWillDisappear() override;
     void onViewUnload() override;
 
@@ -25,6 +26,9 @@ class Dialplate final : public PageBase {
     void open_entry(PageId destination);
     static void on_entry_open(void* user_data);
     static void navigate_entry(void* user_data);
+    static void close_after_frame(lv_event_t* event);
+    void cancel_close();
+    lv_display_t* close_display_ = nullptr;
     PageId pending_entry_ = PageId::Invalid;
     DialplateView view_{};
     std::unique_ptr<DialplateModel> model_;

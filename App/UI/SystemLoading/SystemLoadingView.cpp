@@ -147,12 +147,17 @@ void SystemLoadingView::create(lv_obj_t* root, const std::array<i18n::TextId, kS
     logo_.create(root, *logo_parts);
     ui_.logo_container = logo_.container();
     update_text();
-    show_logo();
+    prepare_logo();
+}
+
+void SystemLoadingView::prepare_logo() {
+    lv_obj_set_style_bg_color(lv_obj_get_parent(ui_.logo_container), lv_color_black(), 0);
+    lv_obj_set_hidden(ui_.cont, true);
+    lv_obj_set_hidden(ui_.logo_container, true);
 }
 
 void SystemLoadingView::show_logo() {
-    lv_obj_set_style_bg_color(lv_obj_get_parent(ui_.logo_container), lv_color_black(), 0);
-    lv_obj_set_hidden(ui_.cont, true);
+    prepare_logo();
     logo_.play();
 }
 

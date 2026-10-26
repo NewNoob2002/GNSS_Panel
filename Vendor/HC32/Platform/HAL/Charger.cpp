@@ -173,6 +173,7 @@ HAL::Charger_Protect(BatteryInfo_t& battery) {
 
 void
 HAL::Battery_Sample(BatteryInfo_t& battery) {
+    battery.current_valid = false;
     uint16_t percent, remaining, full, voltage_mv, temp_dk;
     if (!bq40z50ReadRegister16Checked(BQ40Z50_RELATIVE_STATE_OF_CHARGE, &percent)
         || !bq40z50ReadRegister16Checked(BQ40Z50_REMAINING_CAPACITY, &remaining)
@@ -189,6 +190,12 @@ HAL::Battery_Sample(BatteryInfo_t& battery) {
     const float temp_f = temp_dk / 10.0f - 273.15f;
     battery.sample_valid = true;
     battery.last_sample_ms = millis();
+    // 电流只用于功率显示；单独读取失败时保留温度保护所需的有效样本。
+    int16_t current_ma;
+    battery.current_valid = bq40z50ReadAverageCurrentChecked(&current_ma);
+    if (battery.current_valid) {
+        battery.current_ma = current_ma;
+    }
 
     battery.Actual_Percent = percent;
     const uint16_t processed = Power_AdjustPercent(percent);

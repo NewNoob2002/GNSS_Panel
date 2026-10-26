@@ -13,6 +13,9 @@
 #include <cstring>
 
 #include "App.h"
+#include "DataProc.h"
+#include "Def/DP_Settings.h"
+#include "HAL/Def/HAL_Board.h"
 #if SIM_BACKEND_DEMO
 #include "DemoStatus.h"
 #else
@@ -158,6 +161,8 @@ init_system_info() {
     battery.Temp_f = 32.0f;
     battery.Percent_f = 76.0f;
     battery.chargeStatus = notCharge;
+    battery.current_ma = -350;
+    battery.current_valid = true;
     State::Power().ExternalPower = 1;
     report_host_data();
 }
@@ -271,7 +276,10 @@ inject_event(SDL_Keycode key) {
         case SDLK_f: State::Request_ForcedShutdown(); break;
         case SDLK_t: battery.Temp_f += 5.0f; break;
         case SDLK_g: battery.Temp_f -= 5.0f; break;
-        case SDLK_c: battery.chargeStatus = battery.chargeStatus == notCharge ? normalCharge : notCharge; break;
+        case SDLK_c:
+            battery.chargeStatus = battery.chargeStatus == notCharge ? normalCharge : notCharge;
+            battery.current_ma = battery.chargeStatus == notCharge ? -350 : 1600;
+            break;
         case SDLK_b: battery.Percent = battery.Percent >= 10 ? battery.Percent - 10 : 0; break;
         case SDLK_n: battery.Percent = battery.Percent <= 90 ? battery.Percent + 10 : 100; break;
         case SDLK_v:
@@ -366,6 +374,8 @@ main(int argc, char** argv) {
                 uint32_t brightness_step_ms = 0;
                 bool first_frame = true;
                 bool brightness_done = false;
+                uint8_t rendered_brightness = 0;
+                uint8_t target_brightness = 255;
                 while (!stop) {
                     SDL_Event event;
                     while (SDL_PollEvent(&event)) {
@@ -458,12 +468,17 @@ main(int argc, char** argv) {
                         first_frame = false;
                     }
                     const bool brightness_step = !first_frame && !brightness_done && now - brightness_step_ms >= 16;
-                    if (frame.dirty || brightness_step) {
+                    dp::Settings::State settings;
+                    if (dp::Settings::pull(*DataProc::Broker()->mainNode(), settings) == DataNode::RES_OK) {
+                        target_brightness = hal::brightness_panel_value(settings.brightness);
+                    }
+                    if (frame.dirty || brightness_step
+                        || (brightness_done && rendered_brightness != target_brightness)) {
                         const uint32_t elapsed = now - brightness_started_ms;
                         const uint8_t brightness =
                             brightness_done || elapsed >= kBrightnessFadeMs
-                                ? 255
-                                : static_cast<uint8_t>(255U * elapsed * (2U * kBrightnessFadeMs - elapsed)
+                                ? target_brightness
+                                : static_cast<uint8_t>(target_brightness * elapsed * (2U * kBrightnessFadeMs - elapsed)
                                                        / (kBrightnessFadeMs * kBrightnessFadeMs));
                         brightness_done = brightness_done || elapsed >= kBrightnessFadeMs;
                         brightness_step_ms = now;
@@ -476,6 +491,7 @@ main(int argc, char** argv) {
                             break;
                         }
                         SDL_RenderPresent(renderer);
+                        rendered_brightness = brightness;
                         frame.dirty = false;
                     }
                     SDL_Delay(5);

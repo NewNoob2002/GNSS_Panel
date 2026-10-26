@@ -54,6 +54,7 @@ HAL::Power_GetInfo(Power_Monitor_t* info) {
     }
     if (info->batteryInfo.sample_valid && millis() - info->batteryInfo.last_sample_ms > 10000U) {
         info->batteryInfo.sample_valid = false;
+        info->batteryInfo.current_valid = false;
     }
     info->batteryInfo.ChargerDetect = chargerControl.read();
     Charger_Protect(info->batteryInfo);

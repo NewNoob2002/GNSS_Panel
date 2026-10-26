@@ -133,6 +133,7 @@ enum class TextId : size_t {
     Stop,
     CheckingHostLink,
     RoverShort,
+    BrightnessTitle,
     Count
 };
 

@@ -326,6 +326,9 @@ I2C_TransData(CM_I2C_TypeDef*, const uint8_t* data, size_t length, uint32_t time
     return LL_OK;
 }
 
+// 指定单个寄存器读失败，区分可选电流采样失败与整条总线失败。
+inline int fake_receive_failure_register = -1;
+
 inline int32_t
 I2C_MasterReceiveDataAndStop(CM_I2C_TypeDef*, uint8_t* data, uint32_t length, uint32_t timeout) {
     const int32_t result = fake_master_step('G', timeout);
@@ -334,7 +337,7 @@ I2C_MasterReceiveDataAndStop(CM_I2C_TypeDef*, uint8_t* data, uint32_t length, ui
     }
     const uint16_t value = fake_registers[fake_address][fake_register];
     data[0] = value & 255U;
-    if (fake_receive_error) {
+    if (fake_receive_error && (fake_receive_failure_register < 0 || fake_receive_failure_register == fake_register)) {
         return fake_receive_error;
     }
     if (length == 2U) {

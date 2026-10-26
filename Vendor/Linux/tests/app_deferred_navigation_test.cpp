@@ -83,7 +83,9 @@ main() {
         assert(page::id(app.current_page()) == (power ? page::PageId::SystemLoading : page::PageId::SystemInfos));
         if (power) {
             /** @brief Power 优先，嵌套请求等待切换完成后的另一个定时节拍。 */
-            advance(400);
+            advance(200);
+            assert(page::id(app.current_page()) == page::PageId::SystemLoading);
+            advance(200);
             assert(page::id(app.current_page()) == page::PageId::SystemInfos);
         }
         advance(400);

@@ -168,6 +168,9 @@ void SystemDash::clicked(lv_event_t* event) {
     else if (ctrl == SystemDashView::Control::Language) {
         if (!self->model_->toggle_language())
             APP_LOG_E("SystemDash", "language request rejected");
+    } else if (ctrl == SystemDashView::Control::Brightness) {
+        if (!self->model_->cycle_brightness())
+            APP_LOG_E("SystemDash", "brightness request rejected");
     } else if (ctrl == SystemDashView::Control::Wifi) {
         const auto& state = self->model_->state();
         if (state.wifi_available && !state.wifi_pending && !self->model_->set_wifi(!state.wifi_on))

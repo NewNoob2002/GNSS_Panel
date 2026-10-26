@@ -64,6 +64,8 @@ typedef struct BatteryInfo_t {
     uint8_t ChargerPlugCount;
     uint8_t mp2762_cfg0;
     bool sample_valid;
+    int16_t current_ma; // BQ40Z50 AverageCurrent，mA，充电为正。
+    bool current_valid; // 独立于温度/SOC 样本；读取失败或样本过期即失效。
     uint32_t last_sample_ms;
     Charger_Status_t chargeStatus;
 

@@ -111,6 +111,7 @@ PageBase::STATE PageManager::stateLoad(PageBase* base)
     }
 
     base->_root = root_obj;
+    lv_obj_add_event_cb(root_obj, onPageRootDelete, LV_EVENT_DELETE, base);
     base->onViewLoad();
 
     base->onViewDidLoad();
@@ -160,6 +161,26 @@ PageBase::STATE PageManager::stateDidDisappear(PageBase* base)
     } else {
         return PageBase::STATE::UNLOAD;
     }
+}
+
+void
+PageManager::onPageRootDelete(lv_event_t* e) {
+    auto* base = static_cast<PageBase*>(lv_event_get_user_data(e));
+    auto* manager = base->_manager;
+    // 外部删除根时先停止借用控件的回调；正常卸载会提前移除此通知。
+    lv_anim_delete(base->_root, nullptr);
+    base->onViewUnload();
+    base->_root = nullptr;
+    lv_free(base->_context.param.ptr);
+    base->_context.param = {};
+    base->_context.isCached = false;
+    base->_context.anim.isBusy = false;
+    base->_context.state = PageBase::STATE::IDLE;
+    manager->scrimDelete();
+    if (manager->isSwitching()) {
+        manager->switchReqCheck();
+    }
+    base->onViewDidUnload();
 }
 
 PageBase::STATE PageManager::stateUnload(PageBase* base)

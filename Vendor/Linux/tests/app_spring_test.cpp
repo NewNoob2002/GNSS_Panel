@@ -32,15 +32,20 @@ timers() {
 void
 complete_card(const page::SystemDashView& view, lv_obj_t* target) {
     assert(lv_obj_get_style_bg_opa(target, LV_PART_MAIN) == LV_OPA_COVER);
-    assert(lv_obj_get_style_border_width(target, LV_PART_MAIN) == 1);
-    assert(lv_color_to_u32(lv_obj_get_style_border_color(target, LV_PART_MAIN))
-           == lv_color_to_u32(page::style::kBorder));
+    const bool hero = view.control(target) == page::SystemDashView::Control::Brightness;
+    assert(lv_obj_get_style_border_width(target, LV_PART_MAIN) == (hero ? 2 : 1));
     const auto control = view.control(target);
-    // 聚焦的电源动作整块填色：关机红、重启橙；其余卡片为焦点底色。
-    const auto fill = control == page::SystemDashView::Control::Shutdown ? page::style::kDanger
-                      : control == page::SystemDashView::Control::Reboot ? page::style::kAccent
-                                                                         : page::style::kFocus;
-    assert(lv_color_to_u32(lv_obj_get_style_bg_color(target, LV_PART_MAIN)) == lv_color_to_u32(fill));
+    const bool power =
+        control == page::SystemDashView::Control::Shutdown || control == page::SystemDashView::Control::Reboot;
+    const auto tint = control == page::SystemDashView::Control::Shutdown ? page::style::kDanger : page::style::kAccent;
+    assert(lv_color_to_u32(lv_obj_get_style_border_color(target, LV_PART_MAIN))
+           == lv_color_to_u32(power ? tint : page::style::kBorder));
+    if (power) {
+        assert(lv_color_to_u32(lv_obj_get_style_bg_color(target, LV_PART_MAIN)) != lv_color_to_u32(tint));
+    } else {
+        assert(lv_color_to_u32(lv_obj_get_style_bg_color(target, LV_PART_MAIN))
+               == lv_color_to_u32(page::style::kFocus));
+    }
     auto* highlight = view.focus_highlight();
     assert(highlight && !lv_obj_is_hidden(highlight));
     assert(!lv_obj_is_clickable(highlight) && lv_obj_is_ignore_layout(highlight) && lv_obj_is_floating(highlight));
@@ -132,6 +137,57 @@ driver_lifetime() {
     lv_obj_delete(object);
     advance(1000);
     assert(timers() == baseline);
+}
+
+void
+power_hold_geometry() {
+    auto* root = page::style::box(lv_screen_active(), 0, 0, 294, 126);
+    {
+        page::SystemDashView view;
+        view.create(root);
+        view.show_power(true);
+        page::utils::focus_controls(view.controls(), view.default_focus(true));
+        view.resume_focus();
+        for (auto* action : view.power_actions()) {
+            lv_group_focus_obj(action);
+            for (const bool pressed : {false, true}) {
+                lv_obj_set_pressed(action, pressed);
+                for (const int32_t percent : {-10, 0, 25, 50, 100, 120}) {
+                    view.set_hold(action, percent);
+                    lv_obj_update_layout(root);
+                    auto* track = lv_obj_get_child(action, 0);
+                    auto* fill = lv_obj_get_child(track, 0);
+                    auto* caption = lv_obj_get_child(action, 1);
+                    lv_area_t content, actual, text, inner;
+                    lv_obj_get_content_coords(track, &content);
+                    lv_obj_get_coords(fill, &actual);
+                    lv_obj_get_coords(caption, &text);
+                    lv_obj_get_content_coords(action, &inner);
+                    const auto clamped = percent < 0 ? 0 : percent > 100 ? 100 : percent;
+                    assert(lv_obj_get_width(fill) == lv_area_get_width(&content) * clamped / 100);
+                    assert(lv_obj_get_height(track) == 3 && content.y1 > text.y2);
+                    assert(content.x1 >= inner.x1 && content.x2 <= inner.x2 && content.y2 <= inner.y2);
+                    if (clamped > 0) {
+                        assert(actual.x1 == content.x1 && actual.y1 == content.y1 && actual.y2 == content.y2);
+                        assert(actual.x2 <= content.x2);
+                    }
+                    for (auto* other : view.power_actions()) {
+                        if (other != action) {
+                            assert(lv_obj_get_width(lv_obj_get_child(lv_obj_get_child(other, 0), 0)) == 0);
+                        }
+                    }
+                }
+            }
+            lv_obj_set_pressed(action, false);
+        }
+        view.show_power(false);
+        lv_obj_update_layout(root);
+        for (auto* action : view.power_actions()) {
+            assert(lv_obj_get_width(lv_obj_get_child(lv_obj_get_child(action, 0), 0)) == 0);
+        }
+        page::utils::leave_focus_group();
+    }
+    lv_obj_delete(root);
 }
 
 void
@@ -419,6 +475,7 @@ main() {
     lv_group_set_default(group);
     path();
     driver_lifetime();
+    power_hold_geometry();
     focus();
     component();
     rollout_pages();

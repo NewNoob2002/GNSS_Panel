@@ -10,7 +10,7 @@
 
 namespace {
 constexpr int width = 294, height = 126;
-uint16_t frame[width * height], pixels[width * 20];
+uint16_t frame[width * height], background[width * height], pixels[width * 20];
 lv_area_t previous{};
 bool have_previous = false;
 unsigned flushed_pixels = 0;
@@ -57,13 +57,14 @@ advance(unsigned ms) {
 
 /** @brief 从真实 RGB565 帧校验边框存在、外接矩形和四条直边，不能只依赖对象隐藏标志。 */
 unsigned
-check_border(unsigned index, const lv_area_t& expected) {
+check_border(unsigned index, const lv_area_t& expected, int radius) {
     const uint16_t accent = lv_color_to_u16(page::style::kAccent);
     lv_area_t visible{width, height, -1, -1};
     unsigned count = 0;
+    // 与同一 tick 的无边框画面作差，排除主卡图标和百分比的固定橙色。
     for (int y = 0; y < height; ++y) {
-        for (int x = 100; x < width; ++x) {
-            if (frame[y * width + x] != accent) {
+        for (int x = 0; x < width; ++x) {
+            if (frame[y * width + x] != accent || frame[y * width + x] == background[y * width + x]) {
                 continue;
             }
             visible.x1 = std::min(visible.x1, x);
@@ -80,12 +81,12 @@ check_border(unsigned index, const lv_area_t& expected) {
                      expected.y2);
         assert(false && "focus border missing or occluded");
     }
-    /** 圆角留 8 px；四条直边的每个像素均应为覆盖框橙色，不能被卡片盖住。 */
-    for (int x = expected.x1 + 8; x <= expected.x2 - 8; ++x) {
+    /** 按当前控件圆角留白，四条直边都必须完整可见。 */
+    for (int x = expected.x1 + radius; x <= expected.x2 - radius; ++x) {
         assert(frame[expected.y1 * width + x] == accent);
         assert(frame[expected.y2 * width + x] == accent);
     }
-    for (int y = expected.y1 + 8; y <= expected.y2 - 8; ++y) {
+    for (int y = expected.y1 + radius; y <= expected.y2 - radius; ++y) {
         assert(frame[y * width + expected.x1] == accent);
         assert(frame[y * width + expected.x2] == accent);
     }
@@ -100,7 +101,12 @@ capture(lv_display_t* display, const std::string& directory, unsigned index, FIL
     assert(object && "focus overlay must exist in every frame");
     lv_area_t current;
     lv_obj_get_coords(object, &current);
-    const unsigned accent_pixels = check_border(index, current);
+    lv_obj_set_style_border_opa(object, LV_OPA_TRANSP, 0);
+    lv_refr_now(display);
+    std::copy(std::begin(frame), std::end(frame), std::begin(background));
+    lv_obj_set_style_border_opa(object, LV_OPA_COVER, 0);
+    lv_refr_now(display);
+    const unsigned accent_pixels = check_border(index, current, lv_obj_get_style_radius(object, LV_PART_MAIN));
     if (metrics) {
         unsigned area = 0;
         if (have_previous
@@ -163,7 +169,9 @@ main(int argc, char** argv) {
         test_input::status(DemoStatus::sample(16000));
         assert(app.show_page("Pages/SystemDash"));
         advance(600);
-        assert(lv_group_get_obj_count(lv_group_get_default()) == 3);
+        assert(lv_group_get_obj_count(lv_group_get_default()) == 4);
+        assert(lv_obj_get_x(app.focused()) == 8 && lv_obj_get_y(app.focused()) == 28);
+        assert(lv_obj_get_width(app.focused()) == 88 && lv_obj_get_height(app.focused()) == 77);
         unsigned index = 0;
         const auto segment = [&](unsigned duration) {
             for (unsigned elapsed = 0; elapsed < duration; elapsed += 20) {
@@ -172,7 +180,7 @@ main(int argc, char** argv) {
             }
         };
         segment(200);
-        for (unsigned step = 0; step < (rapid ? 9u : 3u); ++step) {
+        for (unsigned step = 0; step < (rapid ? 12u : 4u); ++step) {
             app.on_input(App::InputAction::NextFocus);
             segment(rapid ? 60 : 500);
         }
