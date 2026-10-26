@@ -11,6 +11,7 @@ namespace page {
 /** @brief 系统面板页面状态。 */
 struct SystemDashState {
     i18n::Language language{};
+    uint8_t brightness = 100;
     bool wifi_available = false;
     bool wifi_on = false;
     bool wifi_pending = false;
@@ -28,6 +29,7 @@ class SystemDashModel final : public Model<SystemDashState> {
     bool set_status_bar(bool visible, DataProc::StatusBarStyle style = {});
 
     bool toggle_language();
+    bool cycle_brightness();
     bool set_wifi(bool on);
     bool prepare_power(hal::PowerCommand action);
     bool cancel_power();

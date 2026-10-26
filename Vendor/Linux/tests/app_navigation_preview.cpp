@@ -541,7 +541,8 @@ int main(int argc, char** argv) {
             assert(app.show_page("Pages/SystemDash"));
             lv_tick_inc(500);
             lv_timer_handler();
-            app.on_input(Input::NextFocus); // Wi-Fi 不可用，Language -> Power。
+            app.on_input(Input::NextFocus); // Wi-Fi 不可用，Language -> Brightness -> Power。
+            app.on_input(Input::NextFocus);
             app.on_input(Input::Confirm);
             assert(std::strcmp(app.current_page(), "Pages/SystemDash") == 0);
             app.on_input(Input::Commit); // Shutdown is focused; a double press no longer executes it.

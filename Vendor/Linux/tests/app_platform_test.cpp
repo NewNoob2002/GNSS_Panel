@@ -452,21 +452,21 @@ int main() {
         // Wi-Fi: pending ("...") until the platform reports the applied state.
         assert(app.show_page("Pages/SystemDash"));
         advance(500);
+        app.on_input(App::InputAction::NextFocus); // Brightness -> Language
         app.on_input(App::InputAction::NextFocus); // Language -> Wi-Fi
         assert(focus_text(i18n::text(i18n::TextId::SystemWifiTitle)));
         app.on_input(App::InputAction::Confirm);
         assert(wifi_requests == 1 && requested_wifi && hal_test::snapshot<dp::WiFi>().pending);
         advance(50);
         assert(find_text(lv_screen_active(), "..."));
-        auto* wifi_dot = activity(lv_screen_active());
-        assert(wifi_dot);
+        assert(!activity(lv_screen_active())); // 亮度主卡不创建无意义的状态点。
         app.on_input(App::InputAction::Confirm); // Ignored while pending.
         assert(wifi_requests == 1);
         assert(wifi(true, false));
-        assert(!lv_anim_get(wifi_dot, page::settings_style::pulse));
         advance(50);
         assert(!find_text(lv_screen_active(), "...") && !hal_test::snapshot<dp::WiFi>().pending);
         assert(hal_test::snapshot<dp::WiFi>().on);
+        assert(find_text(lv_screen_active(), i18n::text(i18n::TextId::StatusOn)));
         assert(app.back());
         advance(500);
         assert(on_page("Pages/Dialplate"));
