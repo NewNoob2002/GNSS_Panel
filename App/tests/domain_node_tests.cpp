@@ -130,6 +130,18 @@ int main() {
         assert(dp::Settings::notify(arbitrary,{static_cast<i18n::Language>(99)}) == DataNode::RES_PARAM_ERROR);
         assert(dp::Settings::notify(arbitrary,language) == DataNode::RES_OK);
         assert(dp::Settings::notify(arbitrary,language) == DataNode::RES_OK && publishes[dp::names::Settings] == 1);
+        for (uint8_t percent : {19, 101, 255}) {
+            assert(dp::Settings::notify(arbitrary, {language.language, percent}) == DataNode::RES_PARAM_ERROR);
+            assert(pull<dp::Settings>(arbitrary).brightness == 100 && s.board.brightness == 100);
+        }
+        assert(dp::Settings::notify(arbitrary, {language.language, 20}) == DataNode::RES_OK);
+        assert(pull<dp::Settings>(arbitrary).brightness == 20 && s.board.brightness == 20);
+        const auto brightness_count = publishes[dp::names::Settings];
+        assert(dp::Settings::notify(arbitrary, {language.language, 20}) == DataNode::RES_OK);
+        assert(publishes[dp::names::Settings] == brightness_count);
+        assert(dp::Settings::notify(arbitrary, {i18n::Language::English}) == DataNode::RES_OK);
+        assert(pull<dp::Settings>(arbitrary).brightness == 20 && s.board.brightness == 20);
+        assert(dp::Settings::notify(arbitrary, {language.language, 100}) == DataNode::RES_OK);
         assert(dp::Clock::notify(arbitrary,{{2025,2,29,12,30}}) == DataNode::RES_PARAM_ERROR);
         assert(dp::Clock::notify(arbitrary,{{2000,2,29,23,59}}) == DataNode::RES_OK);
         const auto clock_count = publishes[dp::names::Clock];

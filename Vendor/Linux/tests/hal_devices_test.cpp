@@ -5,6 +5,19 @@
 int
 main() {
     lv_init();
+    // Demo 与 HC32 拒绝相同的非五档命令，状态仍以百分比表示。
+    auto* board = hal_test::device(hal::names::Board);
+    assert(hal_test::read<hal::BoardState>(hal::names::Board).brightness == 100);
+    for (uint8_t percent : {20, 40, 60, 80, 100}) {
+        const int result = hal::write(board, hal::BrightnessCommand{percent});
+        assert(result == DeviceObject::RES_OK);
+        assert(hal_test::read<hal::BoardState>(hal::names::Board).brightness == percent);
+    }
+    for (uint8_t percent : {0, 19, 21, 39, 59, 61, 99, 101, 255}) {
+        const int result = hal::write(board, hal::BrightnessCommand{percent});
+        assert(result == DeviceObject::RES_PARAM_ERROR);
+        assert(hal_test::read<hal::BoardState>(hal::names::Board).brightness == 100);
+    }
     hal_test::shapes();
     hal_test::equality();
     for (uint64_t elapsed : {uint64_t{0}, uint64_t{16000}, uint64_t{480000}, uint64_t{86400000}}) {

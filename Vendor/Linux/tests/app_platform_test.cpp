@@ -8,6 +8,7 @@
 #include "DomainFixture.hpp"
 #include "I18n.h"
 #include "HAL_Manager.h"
+#include "HAL/Def/HAL_Board.h"
 #include "hal_device_checks.h"
 #include "UI/Common/SettingsStyle.h"
 #include "UI/Resource/ResourcePool.h"
@@ -243,6 +244,28 @@ wifi(bool on, bool pending) {
 } // namespace
 
 int main() {
+    // 与 HC32/SDL 共用的感知映射：最低档保底，满档为 0xFF，各档严格递增。
+    constexpr uint8_t panel_values[] = {0x33, 0x53, 0x7F, 0xB8, 0xFF};
+    uint8_t previous = 0;
+    for (unsigned level = 0; level < 5; ++level) {
+        const auto percent = static_cast<uint8_t>((level + 1U) * 20U);
+        const auto value = hal::brightness_panel_value(percent);
+        assert(hal::is_brightness_level(percent));
+        assert(value == panel_values[level] && value > previous);
+        previous = value;
+    }
+    assert(previous == 0xFF);
+    assert(hal::BoardState{}.brightness == 100);
+    assert(hal::BrightnessCommand{}.percent == 100);
+    for (unsigned percent = 0; percent <= 255; ++percent) {
+        const bool expected = percent == 20 || percent == 40 || percent == 60 || percent == 80 || percent == 100;
+        assert(hal::is_brightness_level(static_cast<uint8_t>(percent)) == expected);
+    }
+    constexpr uint8_t fallback[][2] = {{0, 51},   {29, 51},  {30, 83},  {49, 83},  {50, 127},
+                                       {69, 127}, {70, 184}, {89, 184}, {90, 255}, {255, 255}};
+    for (const auto& sample : fallback) {
+        assert(hal::brightness_panel_value(sample[0]) == sample[1]);
+    }
     fixture::source.board.capabilities = {false, false, true, false, false};
     fixture::source.wifi.available = true;
     fixture::source.request_on = request_on;

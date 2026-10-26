@@ -1,6 +1,11 @@
 #include <HAL.h>
 #include "lv_port.h"
 
+void
+HAL::Display_SetBrightness(uint8_t value) {
+    lv_port_set_brightness(value);
+}
+
 #ifdef __CORE_DEBUG
 static void
 lv_log_print(lv_log_level_t, const char* buf) {

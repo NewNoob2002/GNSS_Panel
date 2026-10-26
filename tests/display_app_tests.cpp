@@ -13,6 +13,7 @@
 #include "App.h"
 #include "AppPlatform.h"
 #include "Charger.h"
+#include "HAL/Def/HAL_Board.h"
 #include "I18n.h"
 #include "SystemState.h"
 #include "UI/Common/PageStyle.h"
@@ -30,6 +31,7 @@ int power_on_requests = 0;
 int pin_levels[32] = {};
 int reset_reason = RESET;
 int standby_calls = 0, charger_power_on_calls = 0;
+uint8_t display_brightness = 255;
 bool probe_battery_gauge = true, probe_charger = true; // SystemLoading 重新探测 I2C 时的应答
 uint16_t draw_pixels[kWidth * 20];
 uint32_t peak_used = 0;
@@ -297,6 +299,11 @@ RMU_ClearStatus() {
 
 /** Run the real firmware power monitor before the application update. */
 void
+HAL::Display_SetBrightness(uint8_t value) {
+    display_brightness = value;
+}
+
+void
 HAL::HAL_Update() {
     Power_PowerOffMonitor();
 }
@@ -349,6 +356,31 @@ main() {
     lv_display_set_flush_cb(display, flush);
 
     check_domain_devices();
+    // 五档百分比保持领域语义，真实 Board 命令必须把感知映射值送到显示 HAL。
+    constexpr uint8_t panel_values[] = {0x33, 0x53, 0x7F, 0xB8, 0xFF};
+    auto* board = hal_test::device(hal::names::Board);
+    assert(hal_test::read<hal::BoardState>(hal::names::Board).brightness == 100);
+    for (unsigned level = 0; level < 5; ++level) {
+        const auto percent = static_cast<uint8_t>((level + 1U) * 20U);
+        assert(hal::brightness_panel_value(percent) == panel_values[level]);
+        if (level) {
+            assert(panel_values[level] > panel_values[level - 1]);
+        }
+        const int result = hal::write(board, hal::BrightnessCommand{percent});
+        assert(result == DeviceObject::RES_OK);
+        assert(display_brightness == panel_values[level]);
+        assert(hal_test::read<hal::BoardState>(hal::names::Board).brightness == percent);
+    }
+    assert(display_brightness == 0xFF);
+    for (unsigned percent = 0; percent <= 255; ++percent) {
+        if (percent == 20 || percent == 40 || percent == 60 || percent == 80 || percent == 100) {
+            continue;
+        }
+        const int result = hal::write(board, hal::BrightnessCommand{static_cast<uint8_t>(percent)});
+        assert(result == DeviceObject::RES_PARAM_ERROR);
+        assert(display_brightness == 0xFF);
+        assert(hal_test::read<hal::BoardState>(hal::names::Board).brightness == 100);
+    }
     reset_system_info();
     HAL::Power_Init();
     assert(gpio_read(POWER_CONTROL_PIN) == GPIO_LOW);

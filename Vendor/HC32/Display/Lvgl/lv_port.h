@@ -12,6 +12,8 @@ void lv_port_disp_init();
 void lv_port_disp_poll();
 
 void lv_port_reset();
+/** @brief 应用线程调用；等待 DMA 回收后写 0x51，并保留唤醒后的目标亮度。 */
+void lv_port_set_brightness(uint8_t value);
 #if defined(__CORE_DEBUG)
 /** @brief 仅 Debug：主线程/GDB 调用，等待 DMA 回收后写 0x51；value 为 0..255，禁止 ISR 调用。 */
 void lv_port_debug_brightness(uint8_t value);

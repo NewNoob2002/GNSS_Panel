@@ -47,6 +47,7 @@ bool Key_FunctionPressed();
 void Led_Update();
 /* Dispaly */
 void Display_Init();
+void Display_SetBrightness(uint8_t value);
 } // namespace HAL
 #endif /*__cplusplus*/
 

@@ -67,7 +67,9 @@ inline void shapes() {
     shape<hal::WorkState, hal::WorkCommand>(hal::names::Work, true);
     shape<hal::RecorderState, hal::RecorderCommand>(hal::names::Recorder, true);
     shape<hal::WifiState, hal::WifiCommand>(hal::names::WiFi, true);
-    shape<hal::BoardState>(hal::names::Board);
+    shape<hal::BoardState, hal::BrightnessCommand>(hal::names::Board, true);
+    for (uint8_t percent : {0, 19, 101, 255})
+        assert(hal::write(device(hal::names::Board), hal::BrightnessCommand{percent}) == DeviceObject::RES_PARAM_ERROR);
     auto* init = device(hal::names::Init);
     hal::InitInfo info;
     assert(init->read(&info, sizeof(info)) == DeviceObject::RES_NO_IMPLEMENTED);
@@ -109,6 +111,7 @@ inline void equivalent() {
     assert(!snapshot<dp::Power>().pending && snapshot<dp::Power>().calls == 0);
     assert(!snapshot<dp::Init>().started);
     assert(snapshot<dp::Settings>().language == i18n::get_language());
+    assert(snapshot<dp::Settings>().brightness == read<hal::BoardState>(hal::names::Board).brightness);
     assert(snapshot<dp::Battery>() == read<hal::BatteryState>(hal::names::Battery));
     assert(snapshot<dp::GNSS>() == read<hal::GNSSState>(hal::names::GNSS));
     assert(snapshot<dp::Clock>().clock == read<hal::ClockState>(hal::names::Clock));
@@ -171,6 +174,7 @@ inline void equality() {
     auto fw = board.firmware; fw[14] = 'x'; field(board, &hal::BoardState::firmware, fw);
     field(board, &hal::BoardState::hardware, fw); auto build = board.build; build[22] = 'x';
     field(board, &hal::BoardState::build, build); field(board, &hal::BoardState::uptime_s, uint32_t{1});
+    field(board, &hal::BoardState::brightness, uint8_t{20});
     caps.star_map = true; field(board, &hal::BoardState::capabilities, caps);
 }
 } // namespace hal_test

@@ -11,6 +11,7 @@
 namespace HAL {
 void HAL_Init();
 void HAL_Update();
+void Display_SetBrightness(uint8_t value);
 
 /* Power（Platform/HAL/HAL_Power.cpp） */
 void Power_Init();
