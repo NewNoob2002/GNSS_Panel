@@ -324,10 +324,10 @@ int main(int argc, char** argv) {
                     auto* seconds = find_label(page_root, "8");
                     assert(seconds && lv_obj_get_style_opa(seconds, LV_PART_MAIN) == LV_OPA_COVER);
                 }
-                // Pages slide (no page-level opacity layer): every child of the home page pushes in from the right,
-                // only the save page covers from the bottom.
+                // Pages slide (no page-level opacity layer): every child of the home page pushes in from the right
+                // over a parallax-shifted, scrim-dimmed home; only the save page covers from the bottom.
                 const auto expected_anim =
-                    std::strcmp(page.name, "Pages/SaveConfig") == 0 ? PAGE_ANIM::OVER_TOP : PAGE_ANIM::MOVE_LEFT;
+                    std::strcmp(page.name, "Pages/SaveConfig") == 0 ? PAGE_ANIM::OVER_TOP : PAGE_ANIM::PUSH_LEFT;
                 const auto* controller = static_cast<PageBase*>(lv_obj_get_user_data(page_root));
                 assert(controller && controller->getLoadAnimType() == expected_anim);
                 assert(controller->getLoadAnimType() != PAGE_ANIM::FADE_ON);
@@ -335,7 +335,7 @@ int main(int argc, char** argv) {
                 if (expected_anim == PAGE_ANIM::FADE_ON) {
                     const auto opa = lv_obj_get_style_opa(page_root, LV_PART_MAIN);
                     assert(opa > LV_OPA_TRANSP && opa < LV_OPA_COVER);
-                } else if (expected_anim == PAGE_ANIM::MOVE_LEFT) {
+                } else if (expected_anim == PAGE_ANIM::PUSH_LEFT) {
                     assert(lv_obj_get_x(page_root) > 0 && lv_obj_get_x(page_root) < width_px);
                 } else if (expected_anim == PAGE_ANIM::OVER_BOTTOM) {
                     assert(lv_obj_get_y(page_root) < 0 && lv_obj_get_y(page_root) > -height_px);
@@ -423,7 +423,7 @@ int main(int argc, char** argv) {
                     page_root); // Animation setters dirty layout; getters otherwise see the last frame.
                 if (expected_anim == PAGE_ANIM::FADE_ON) {
                     assert(lv_obj_get_style_opa(page_root, LV_PART_MAIN) < LV_OPA_COVER);
-                } else if (expected_anim == PAGE_ANIM::MOVE_LEFT) {
+                } else if (expected_anim == PAGE_ANIM::PUSH_LEFT) {
                     assert(lv_obj_get_x(page_root) > 0); // Back reverses the direction, not another left wipe.
                 } else if (expected_anim == PAGE_ANIM::OVER_BOTTOM) {
                     assert(lv_obj_get_style_y(page_root, LV_PART_MAIN) < 0);

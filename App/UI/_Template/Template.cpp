@@ -6,7 +6,7 @@
 using namespace page;
 
 void Template::onInstalled() {
-    setLoadAnimType(PAGE_ANIM::MOVE_LEFT);
+    setLoadAnimType(PAGE_ANIM::PUSH_LEFT);
     setLoadAnimTime(style::kPageTransitionMs);
     setLoadAnimPath(style::page_transition_path);
 }

@@ -182,6 +182,18 @@ public:
         lv_anim_path_cb_t path = PAGE_ANIM_PATH_DEFAULT);
 
     /**
+     * @brief  Set the scrim that dims the covered page during OVER_* and PUSH_* transitions
+     * @param  opa: Darkest scrim opacity, reached when the covered page is fully covered; LV_OPA_TRANSP disables it
+     * @retval None
+     * @note   The scrim is a single translucent black fill limited to the uncovered strip (no offscreen layer),
+     *         created per transition and deleted when it ends.
+     */
+    void setScrimOpa(lv_opa_t opa)
+    {
+        _scrimOpa = opa;
+    }
+
+    /**
      * @brief  Set the root parent of the page
      * @param  par: The parent of the root, if it is nullptr, the parent is lv_screen_active()
      * @retval None
@@ -311,6 +323,18 @@ private:
     /* Top layer */
     lv_obj_t* _layerTop;
 
+    /* Transition scrim: geometry follows the covering page along the animated axis */
+    struct
+    {
+        lv_obj_t* obj;
+        bool horizontal;
+        bool darken; // true while covering (push), false while uncovering (pop)
+        int32_t start; // Covering page position at progress 0
+        int32_t end; // Covering page position at progress end
+        int32_t length; // Covering page size along the animated axis
+    } _scrim;
+    lv_opa_t _scrimOpa;
+
     /* Event */
     EVENT_CALLBACK _eventCallback;
     void* _eventUserData;
@@ -413,6 +437,25 @@ private:
      * @retval None
      */
     void switchAnimCreate(PageBase* base);
+
+    /** @brief Whether the animation moves page roots along x (OVER/MOVE/PUSH left and right). */
+    static bool isHorizontalLoadAnim(PAGE_ANIM anim);
+
+    /** @brief Whether the animation moves page roots along y (OVER/MOVE/PUSH top and bottom). */
+    static bool isVerticalLoadAnim(PAGE_ANIM anim);
+
+    /** @brief Create the scrim between the covered and covering page roots, if the current animation covers. */
+    void scrimCreate();
+
+    /** @brief Delete the scrim and its animation, if any. */
+    void scrimDelete();
+
+    /** @brief Place and tint the scrim for progress 0..SCRIM_PROGRESS_MAX. */
+    void scrimUpdate(int32_t progress);
+
+    static void onScrimAnim(lv_anim_t* a, int32_t progress);
+    static void onScrimFinish(lv_anim_t* a);
+    static void onScrimDelete(lv_event_t* e);
 
     /**
      * @brief  Update current animation properties, apply page custom animation

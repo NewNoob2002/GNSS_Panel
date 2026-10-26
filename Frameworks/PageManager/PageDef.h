@@ -47,6 +47,12 @@ enum class PAGE_ANIM {
     MOVE_TOP,
     MOVE_BOTTOM,
 
+    /* New page pushes in fully, the old page follows by a third (parallax) under the scrim */
+    PUSH_LEFT,
+    PUSH_RIGHT,
+    PUSH_TOP,
+    PUSH_BOTTOM,
+
     /* The new interface fades in, the old page fades out */
     FADE_ON,
 };

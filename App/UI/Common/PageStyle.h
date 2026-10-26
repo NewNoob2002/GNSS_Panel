@@ -16,6 +16,9 @@ inline int32_t page_transition_path(const lv_anim_t* a) {
     return a->start_value + ((step * (a->end_value - a->start_value)) >> LV_BEZIER_VAL_SHIFT);
 }
 
+/** @brief 切屏时压暗被覆盖页的遮罩最深不透明度（PUSH_*、OVER_*）；单色混合、无离屏图层，开销远低于整页淡出。 */
+inline constexpr lv_opa_t kPageScrimOpa = 115; // 约 45%
+
 inline constexpr lv_color_t kBackground = LV_COLOR_MAKE(0x10, 0x12, 0x14);
 inline constexpr lv_color_t kPanel = LV_COLOR_MAKE(0x20, 0x24, 0x28);
 inline constexpr lv_color_t kCard = LV_COLOR_MAKE(0x18, 0x1C, 0x20);
