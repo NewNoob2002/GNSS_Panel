@@ -61,7 +61,7 @@ if(NOT TARGET lvgl::lvgl)
 endif()
 add_subdirectory(../Frameworks/PageManager frameworks/pagemanager)
 
-file(GLOB APP_RESOURCES CONFIGURE_DEPENDS "UI/Resource/font/*.c" "UI/Resource/img/*.c" "UI/Resource/symbol/*.c")
+file(GLOB APP_RESOURCES CONFIGURE_DEPENDS "UI/Resource/font/*.c" "UI/Resource/img/*.c")
 add_library(app_dialplate STATIC
     UI/Common/FocusHighlight.cpp
     UI/Common/LogoReveal.cpp

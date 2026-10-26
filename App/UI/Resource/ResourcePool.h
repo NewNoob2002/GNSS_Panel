@@ -1,6 +1,5 @@
 #pragma once
 #include "lvgl.h"
-#include "symbol/symbol_unicode.h"
 
 namespace resource_pool {
 
