@@ -147,6 +147,9 @@ void FocusHighlight::panel_start(const int32_t (&to)[4]) {
     lv_anim_set_path_cb(&animation, style::panel_transition_path);
     lv_anim_set_custom_exec_cb(&animation, on_panel);
     lv_anim_set_completed_cb(&animation, on_panel_done);
+    // 收回起点已在首帧显示；不重复写入 step 0，避免使刷新器再发送一帧静止的满屏面板。
+    if (mode_ == Mode::Closing)
+        lv_anim_set_early_apply(&animation, false);
     if (!lv_anim_start(&animation)) {
         panel_apply(kPanelSteps);
         panel_done();
@@ -165,7 +168,8 @@ void FocusHighlight::panel_apply(int32_t step) {
     const auto rising = static_cast<lv_opa_t>(LV_OPA_COVER * step / kPanelSteps);
     const auto falling = static_cast<lv_opa_t>(LV_OPA_COVER - rising);
     auto* highlight = motion_.object();
-    const bool opening = mode_ == Mode::Opening;
+    // 盖满后的展开尾段仍保持不透明；首页隐藏期间只继续几何插值，不能误走收回的透明度。
+    const bool opening = mode_ == Mode::Opening || mode_ == Mode::Open;
     lv_obj_set_style_bg_opa(highlight, opening ? static_cast<lv_opa_t>(LV_OPA_COVER) : falling, 0);
     lv_obj_set_style_border_opa(highlight, opening ? falling : rising, 0);
     auto* host = lv_obj_get_parent(highlight);

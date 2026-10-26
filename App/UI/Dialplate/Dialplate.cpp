@@ -32,7 +32,6 @@ void Dialplate::onViewWillAppear() {
         app_fatal("Dialplate", "View binding failed");
     utils::focus_controls(controls(), last_focus_ ? last_focus_ : view_.default_focus());
     view_.resume_focus();
-    view_.close_focus(); // 从入口展开返回：面板仍盖着首页，收回到原入口。
     if (entrance_pending_) {
         // Returning from a child slides the page back already; replaying the entrance would double the work.
         entrance_pending_ = false;
@@ -41,7 +40,33 @@ void Dialplate::onViewWillAppear() {
     view_.anim_start();
 }
 
+void Dialplate::onViewDidAppear() {
+    if (!view_.focus_highlight().opened())
+        return;
+    // NONE 的 DidAppear 仍可能早于子页卸载；保留满屏面板，等切换结束后的首帧刷新完成再收回。
+    // 卸载与首帧渲染/发送耗时均不计入 350 ms，不另加延时或额外的静止满屏帧。
+    close_display_ = lv_obj_get_display(getRoot());
+    if (!lv_display_add_event_cb(close_display_, close_after_frame, LV_EVENT_REFR_READY, this))
+        app_fatal("Dialplate", "Return frame binding failed");
+}
+
+void Dialplate::close_after_frame(lv_event_t* event) {
+    auto* self = static_cast<Dialplate*>(lv_event_get_user_data(event));
+    if (self->getManager()->isSwitching())
+        return;
+    self->cancel_close();
+    self->view_.close_focus();
+}
+
+void Dialplate::cancel_close() {
+    if (!close_display_)
+        return;
+    lv_display_remove_event_cb_with_user_data(close_display_, close_after_frame, this);
+    close_display_ = nullptr;
+}
+
 void Dialplate::onViewWillDisappear() {
+    cancel_close();
     // 其他导航抢先离页时放弃尚未执行的入口导航。
     lv_async_call_cancel(navigate_entry, this);
     pending_entry_ = PageId::Invalid;
@@ -51,6 +76,7 @@ void Dialplate::onViewWillDisappear() {
 }
 
 void Dialplate::onViewUnload() {
+    cancel_close();
     lv_async_call_cancel(navigate_entry, this);
     pending_entry_ = PageId::Invalid;
     view_.destroy();

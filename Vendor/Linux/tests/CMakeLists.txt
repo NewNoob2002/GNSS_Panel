@@ -42,6 +42,11 @@ target_link_libraries(app_spring_test PRIVATE app::ui)
 target_compile_options(app_spring_test PRIVATE -Wall -Wextra -Werror -UNDEBUG)
 add_test(NAME app_spring COMMAND app_spring_test)
 
+add_executable(app_panel_return_test app_panel_return_test.cpp)
+target_link_libraries(app_panel_return_test PRIVATE linux::demo_backend)
+target_compile_options(app_panel_return_test PRIVATE -Wall -Wextra -Werror -UNDEBUG)
+add_test(NAME app_panel_return COMMAND app_panel_return_test)
+
 add_executable(app_focus_preview app_focus_preview.cpp)
 target_link_libraries(app_focus_preview PRIVATE linux::demo_backend)
 target_compile_options(app_focus_preview PRIVATE -Wall -Wextra -Werror -UNDEBUG)
