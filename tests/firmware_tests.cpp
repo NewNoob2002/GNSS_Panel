@@ -510,16 +510,37 @@ test_device_failures() {
     fake_registers[0x0b][BQ40Z50_FULL_CHARGE_CAPACITY] = 2000;
     fake_registers[0x0b][BQ40Z50_VOLTAGE] = 7800;
     fake_registers[0x0b][BQ40Z50_TEMPERATURE] = 2982;
+    fake_registers[0x0b][BQ40Z50_AVERAGE_CURRENT] = 1600;
+    // 命令为 0x0B；正负与 int16 边界均按小端补码解码，失败保持输出。
+    int16_t current = 123;
+    assert(!bq40z50ReadAverageCurrentChecked(nullptr));
+    for (int16_t expected : {int16_t{1600}, int16_t{-350}, int16_t{0}, int16_t{INT16_MIN}, int16_t{INT16_MAX}}) {
+        fake_registers[0x0b][0x0B] = static_cast<uint16_t>(expected);
+        assert(bq40z50ReadAverageCurrentChecked(&current) && current == expected);
+    }
+    fake_registers[0x0b][0x0B] = 1600;
     fake_ms = 20000;
     BatteryInfo_t battery = {};
     HAL::Battery_Sample(battery);
     assert(battery.sample_valid && battery.Percent == 50 && battery.Percent_f == 50.0f);
+    assert(battery.current_valid && battery.current_ma == 1600);
     const float voltage = battery.Voltage_f;
+    fake_receive_error = LL_ERR;
+    fake_receive_failure_register = 0x0B;
+    current = 123;
+    assert(!bq40z50ReadAverageCurrentChecked(&current) && current == 123);
+    HAL::Battery_Sample(battery);
+    assert(battery.sample_valid && !battery.current_valid && battery.current_ma == 1600);
+    fake_receive_error = 0;
+    fake_receive_failure_register = -1;
+    fake_registers[0x0b][0x0B] = static_cast<uint16_t>(-350);
+    HAL::Battery_Sample(battery);
+    assert(battery.sample_valid && battery.current_valid && battery.current_ma == -350);
     fake_receive_error = LL_ERR;
     uint16_t value = 0x1234;
     assert(!bq40z50ReadRegister16Checked(BQ40Z50_VOLTAGE, &value) && value == 0x1234);
     HAL::Battery_Sample(battery);
-    assert(!battery.sample_valid && battery.Voltage_f == voltage);
+    assert(!battery.sample_valid && !battery.current_valid && battery.Voltage_f == voltage);
     uint8_t config = 0;
     const uint32_t writes = fake_master_writes;
     assert(!mp2762setChargerEnabled(true, &config));
@@ -528,6 +549,14 @@ test_device_failures() {
     fake_registers[0x0b][BQ40Z50_FULL_CHARGE_CAPACITY] = 0;
     HAL::Battery_Sample(battery);
     assert(!battery.sample_valid && bq40z50getRelativeStateOfCharge_float() == -1.0f);
+    // 无新样本超过 10 s 后，电流有效位也必须失效。
+    auto& power = State::Power();
+    power.batteryInfo = battery;
+    power.batteryInfo.sample_valid = power.batteryInfo.current_valid = true;
+    power.batteryInfo.last_sample_ms = 20000;
+    power.BatteryLastHandleTime = fake_ms = 30001;
+    HAL::Power_GetInfo(&power);
+    assert(!power.batteryInfo.sample_valid && !power.batteryInfo.current_valid);
     fake_io_error = LL_ERR;
     assert(!board_i2c.probe(0x0b));
     fake_io_error = 0;

@@ -21,6 +21,18 @@ bq40z50ReadRegister16Checked(uint8_t reg, uint16_t* value) {
     return true;
 }
 
+bool
+bq40z50ReadAverageCurrentChecked(int16_t* current_ma) {
+    uint16_t raw;
+    if (!current_ma || !bq40z50ReadRegister16Checked(BQ40Z50_AVERAGE_CURRENT, &raw)) {
+        return false;
+    }
+    // 按二进制补码解码，避免超范围 unsigned -> signed 转换依赖编译器实现。
+    *current_ma =
+        static_cast<int16_t>(raw <= 0x7fffU ? static_cast<int32_t>(raw) : static_cast<int32_t>(raw) - 0x10000);
+    return true;
+}
+
 float
 bq40z50getRelativeStateOfCharge_float() {
     uint16_t remaining, full;

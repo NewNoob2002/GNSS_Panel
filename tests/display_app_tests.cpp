@@ -185,6 +185,8 @@ reset_system_info() {
     State::Power().batteryInfo.Percent = 70;
     State::Power().batteryInfo.Voltage_f = 7.8f;
     State::Power().batteryInfo.Temp_f = 30.0f;
+    State::Power().batteryInfo.current_ma = 1600;
+    State::Power().batteryInfo.current_valid = true;
     State::Host().position.coordinate_status = position_fix;
     State::Host().position.satellite_number_used = 12;
     State::Host().online = true; // 主控已在通信：加载页第 5 步立即通过
@@ -485,6 +487,7 @@ main() {
         assert(std::strcmp(record.name.data(), "ABCDEFGHIJKLMNOP") == 0);
         assert(std::strcmp(board.hardware.data(), "V1.5") == 0);
         assert(battery.valid && battery.voltage == 7.8f);
+        assert(battery.current_valid && battery.current_ma == 1600);
     }
 
     // 选择预设仅改草稿，点击 Apply 才下发；发出后留页等待主控读走。

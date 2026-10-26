@@ -161,6 +161,8 @@ init_system_info() {
     battery.Temp_f = 32.0f;
     battery.Percent_f = 76.0f;
     battery.chargeStatus = notCharge;
+    battery.current_ma = -350;
+    battery.current_valid = true;
     State::Power().ExternalPower = 1;
     report_host_data();
 }
@@ -274,7 +276,10 @@ inject_event(SDL_Keycode key) {
         case SDLK_f: State::Request_ForcedShutdown(); break;
         case SDLK_t: battery.Temp_f += 5.0f; break;
         case SDLK_g: battery.Temp_f -= 5.0f; break;
-        case SDLK_c: battery.chargeStatus = battery.chargeStatus == notCharge ? normalCharge : notCharge; break;
+        case SDLK_c:
+            battery.chargeStatus = battery.chargeStatus == notCharge ? normalCharge : notCharge;
+            battery.current_ma = battery.chargeStatus == notCharge ? -350 : 1600;
+            break;
         case SDLK_b: battery.Percent = battery.Percent >= 10 ? battery.Percent - 10 : 0; break;
         case SDLK_n: battery.Percent = battery.Percent <= 90 ? battery.Percent + 10 : 100; break;
         case SDLK_v:

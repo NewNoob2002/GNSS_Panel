@@ -139,6 +139,7 @@ inline void equality() {
     field(b, &hal::BatteryState::gauge_percent, 1.f); field(b, &hal::BatteryState::voltage, 1.f);
     field(b, &hal::BatteryState::temperature_valid, true); field(b, &hal::BatteryState::temperature, 1.f);
     field(b, &hal::BatteryState::charge, hal::ChargeState::Fast); field(b, &hal::BatteryState::external_power, true);
+    field(b, &hal::BatteryState::current_ma, int16_t{-350}); field(b, &hal::BatteryState::current_valid, true);
     hal::GNSSState g;
     field(g, &hal::GNSSState::position_valid, true); field(g, &hal::GNSSState::latitude, 1.);
     field(g, &hal::GNSSState::longitude, 1.); field(g, &hal::GNSSState::altitude, 1.);

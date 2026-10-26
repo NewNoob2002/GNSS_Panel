@@ -122,6 +122,21 @@ int main() {
             dp::names::Recorder,dp::names::WiFi,dp::names::Version}) assert(publishes[name] == 1);
         const auto counts = publishes;
         advance(1000); assert(publishes == counts);
+        // 电流与有效位单独变化也必须发布，重复轮询保持静默。
+        auto battery_count = publishes[dp::names::Battery];
+        s.battery.current_ma = 1600; advance(200);
+        assert(publishes[dp::names::Battery] == ++battery_count);
+        assert(pull<dp::Battery>(arbitrary).current_ma == 1600);
+        s.battery.current_valid = true; advance(200);
+        assert(publishes[dp::names::Battery] == ++battery_count);
+        assert(pull<dp::Battery>(arbitrary).current_valid);
+        s.battery.current_ma = -350; advance(200);
+        assert(publishes[dp::names::Battery] == ++battery_count);
+        assert(pull<dp::Battery>(arbitrary).current_ma == -350);
+        s.battery.current_valid = false; advance(200);
+        assert(publishes[dp::names::Battery] == ++battery_count);
+        assert(!pull<dp::Battery>(arbitrary).current_valid);
+        advance(1000); assert(publishes[dp::names::Battery] == battery_count);
         // 每类载荷都检查精确尺寸；读取不发布，命令不依赖页面名字。
         hal::BatteryState b;
         assert(arbitrary.pull(dp::names::Battery,&b,sizeof(b)-1) == DataNode::RES_SIZE_MISMATCH);

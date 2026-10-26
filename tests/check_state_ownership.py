@@ -7,7 +7,7 @@ import re
 import sys
 from pathlib import Path
 
-ROOT = Path(sys.argv[1]).resolve()
+ROOT = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else Path(__file__).resolve().parent.parent
 OWNERS = {
     "Board": {"Vendor/HC32/Platform/HAL/HAL_I2C.cpp"},
     "Power": {
