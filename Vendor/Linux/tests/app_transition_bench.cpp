@@ -58,31 +58,41 @@ main(int argc, char** argv) {
     for (int i = 0; i < 200; ++i) {
         frame();
     }
-    const char* pages[] = {"Pages/WorkSettings", "Pages/SystemDash", "Pages/SystemInfos"};
     const int rounds = argc > 1 ? std::atoi(argv[1]) : 30;
-    std::vector<double> totals;
-    uint64_t px = 0;
-    int frames = 0;
-    for (int r = 0; r < rounds; ++r) {
-        double total = 0;
-        flushed = 0;
-        frames = 0;
-        for (const char* p : pages) {
-            CHECK(app.show_page(p));
-            for (int i = 0; i < 26; ++i) {
-                total += frame();
-                ++frames;
-            } // 350 ms transition + settle
-            CHECK(app.back());
-            for (int i = 0; i < 26; ++i) {
-                total += frame();
-                ++frames;
+    // 每次进入/返回各计 26 帧（约 420 ms，覆盖 350 ms 切屏与弹簧收敛），各轮取中位数。
+    const auto run = [&](const char* label, auto enter, auto leave, int visits) {
+        std::vector<double> totals;
+        uint64_t px = 0;
+        int frames = 0;
+        for (int r = 0; r < rounds; ++r) {
+            double total = 0;
+            flushed = 0;
+            frames = 0;
+            for (int v = 0; v < visits; ++v) {
+                enter(v);
+                for (int i = 0; i < 26; ++i, ++frames) {
+                    total += frame();
+                }
+                leave();
+                for (int i = 0; i < 26; ++i, ++frames) {
+                    total += frame();
+                }
             }
+            totals.push_back(total);
+            px = flushed;
         }
-        totals.push_back(total);
-        px = flushed;
-    }
-    std::sort(totals.begin(), totals.end());
-    std::printf("frames/round=%d median_us_per_frame=%.1f min=%.1f flushed_px_per_round=%llu (%.1f screens)\n", frames,
-                totals[totals.size() / 2] / frames, totals[0] / frames, (unsigned long long)px, px / double(W * H));
+        std::sort(totals.begin(), totals.end());
+        std::printf(
+            "%-26s frames/round=%d median_us_per_frame=%.1f min=%.1f flushed_px_per_round=%llu (%.1f screens)\n", label,
+            frames, totals[totals.size() / 2] / frames, totals[0] / frames, (unsigned long long)px, px / double(W * H));
+    };
+    const char* pages[] = {"Pages/WorkSettings", "Pages/SystemDash", "Pages/SystemInfos"};
+    run("page anim, 3 pages", [&](int v) { CHECK(app.show_page(pages[v])); }, [&] { CHECK(app.back()); }, 3);
+    run(
+        "page anim, SystemInfos", [&](int) { CHECK(app.show_page("Pages/SystemInfos")); }, [&] { CHECK(app.back()); },
+        1);
+    // 首页默认焦点为信息入口：确认键走入口展开（NONE 切屏），返回再收回。
+    run(
+        "entry expand, SystemInfos", [&](int) { app.on_input(App::InputAction::Confirm); },
+        [&] { app.on_input(App::InputAction::Back); }, 1);
 }

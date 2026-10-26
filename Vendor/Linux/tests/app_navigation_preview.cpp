@@ -33,6 +33,18 @@ static unsigned flushes;
 static size_t peak_nodes;
 static size_t peak_pool;
 
+/** @brief Dialplate 的焦点覆盖框：页面根下唯一的浮动子对象（shared_layer）。 */
+static lv_obj_t*
+find_highlight(lv_obj_t* page_root) {
+    for (uint32_t i = 0; i < lv_obj_get_child_count(page_root); ++i) {
+        auto* child = lv_obj_get_child(page_root, static_cast<int32_t>(i));
+        if (lv_obj_is_floating(child)) {
+            return child;
+        }
+    }
+    return nullptr;
+}
+
 static lv_obj_t* find_label(lv_obj_t* root, const char* text) {
     if (lv_obj_is_hidden(root)) {
         return nullptr;
@@ -263,19 +275,59 @@ int main(int argc, char** argv) {
             assert(app.focused() != initial_focus);
             app.on_input(Input::PreviousFocus);
             assert(app.focused() == initial_focus);
+            auto* home_root = initial_focus;
+            while (lv_obj_get_parent(home_root) != lv_screen_active()) {
+                home_root = lv_obj_get_parent(home_root);
+            }
+            auto* panel = find_highlight(home_root);
+            assert(panel && lv_obj_get_style_bg_opa(panel, LV_PART_MAIN) == LV_OPA_TRANSP);
             app.on_input(Input::Confirm);
-            lv_tick_inc(300);
-            lv_timer_handler();
+            // The focused entry expands over the home page first (spring steps are capped at 64 ms, so deliver
+            // frames), then the page switches without a slide once the panel covers the screen.
+            advance(60);
+            assert(std::strcmp(app.current_page(), "Pages/Dialplate") == 0);
+            assert(lv_obj_get_style_bg_opa(panel, LV_PART_MAIN) == LV_OPA_COVER);
+            assert(object_coords(panel).x2 - object_coords(panel).x1
+                   > object_coords(initial_focus).x2 - object_coords(initial_focus).x1);
+            app.on_input(Input::NextFocus); // Focus is frozen until the navigation happens.
+            assert(app.focused() == initial_focus);
+            advance(240);
             assert(std::strcmp(app.current_page(), "Pages/SystemInfos") == 0);
-            lv_tick_inc(50);
-            lv_timer_handler();
+            advance(50);
             app.on_input(Input::Back);
-            lv_tick_inc(300);
-            lv_timer_handler();
+            advance(10); // Leaving an expanded entry is immediate; the home page then collapses the panel.
             assert(std::strcmp(app.current_page(), "Pages/Dialplate") == 0);
             assert(app.focused() == initial_focus);
-            lv_tick_inc(1500);
-            lv_timer_handler();
+            lv_obj_update_layout(home_root);
+            assert(object_coords(panel).x1 <= 0 && object_coords(panel).x2 >= width_px - 1);
+            advance(1500);
+            lv_obj_update_layout(home_root);
+            const auto collapsed = object_coords(panel), entry = object_coords(initial_focus);
+            assert(collapsed.x1 == entry.x1 && collapsed.y1 == entry.y1 && collapsed.x2 == entry.x2
+                   && collapsed.y2 == entry.y2);
+            assert(lv_obj_get_style_bg_opa(panel, LV_PART_MAIN) == LV_OPA_TRANSP);
+            app.on_input(Input::NextFocus); // Unfrozen again.
+            assert(app.focused() != initial_focus);
+            app.on_input(Input::PreviousFocus);
+            advance(800);
+            // Re-entering while the panel is still collapsing expands again instead of falling back to a slide.
+            app.on_input(Input::Confirm);
+            advance(300);
+            assert(std::strcmp(app.current_page(), "Pages/SystemInfos") == 0);
+            app.on_input(Input::Back);
+            advance(100);
+            assert(lv_obj_get_style_bg_opa(panel, LV_PART_MAIN) < LV_OPA_COVER); // Fading while collapsing.
+            app.on_input(Input::Confirm);
+            advance(300);
+            assert(std::strcmp(app.current_page(), "Pages/SystemInfos") == 0);
+            auto* infos_root = app.focused();
+            while (lv_obj_get_parent(infos_root) != lv_screen_active()) {
+                infos_root = lv_obj_get_parent(infos_root);
+            }
+            assert(lv_obj_get_x(infos_root) == 0); // Switched without the page's own slide.
+            app.on_input(Input::Back);
+            advance(1500);
+            assert(lv_obj_get_style_bg_opa(panel, LV_PART_MAIN) == LV_OPA_TRANSP);
         }
         lv_refr_now(display);
         assert(flushes);

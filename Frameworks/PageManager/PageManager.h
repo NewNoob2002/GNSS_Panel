@@ -118,6 +118,16 @@ public:
     RES_TYPE push(const char* name, const PageBase::PARAM* param = nullptr);
 
     /**
+     * @brief  Enter a new page with a transition chosen by the caller instead of the page's own type
+     * @param  name: The name of the page to enter
+     * @param  anim: Transition for entering this stack entry and for leaving it again (pop / back), e.g. NONE
+     *               when the caller already animated the change itself; GLOBAL keeps the page's own type
+     * @param  param: Parameters passed to the new page
+     * @retval OK on success, otherwise a navigation error or hook rejection.
+     */
+    RES_TYPE pushWithAnim(const char* name, PAGE_ANIM anim, const PageBase::PARAM* param = nullptr);
+
+    /**
      * @brief  Pop the current page
      * @param  None
      * @retval OK on success, otherwise a navigation error or hook rejection.
