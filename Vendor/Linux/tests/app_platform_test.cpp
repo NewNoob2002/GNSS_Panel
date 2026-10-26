@@ -552,7 +552,7 @@ int main() {
         assert(on_page("Pages/SystemLoading"));
         advance(page::SystemLoadingModel::kStepLimitMs);
         assert(on_page("Pages/SystemLoading"));
-        advance(5000);
+        advance(6000); // 包含纯色遮罩过渡结束后才启动的 Logo 计时。
         assert(on_page("Pages/Dialplate"));
         const auto stalled = hal_test::snapshot<dp::Init>().results[4]; // snapshot() returns a copy.
         assert(stalled.status == DataProc::InitializationStatus::Failed

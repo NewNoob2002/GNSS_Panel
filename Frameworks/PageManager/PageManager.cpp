@@ -29,8 +29,8 @@
 
 PageManager::PageManager(PageFactory* factory)
     : _factory(factory), _pageCnt(0), _pagePrev(nullptr), _pageCurrent(nullptr), _animState{}, _rootParent(nullptr),
-      _rootDefaultStyle(nullptr), _layerTop(nullptr), _scrim{}, _scrimOpa(LV_OPA_TRANSP), _eventCallback(nullptr),
-      _eventUserData(nullptr) {
+      _rootDefaultStyle(nullptr), _layerTop(nullptr), _scrim{}, _scrimOpa(LV_OPA_TRANSP),
+      _fadeThroughColor(lv_color_black()), _eventCallback(nullptr), _eventUserData(nullptr) {
     setGlobalLoadAnim(PAGE_ANIM::OVER_LEFT);
 }
 

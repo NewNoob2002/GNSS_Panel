@@ -278,17 +278,19 @@ PageManager::switchTo(PageBase* newNode, bool isEnterAct) {
     /* Move the layer, move the new page to the front */
     if (_animState.isEntering) {
         PAGE_LOG_INFO("Page ENTER is detect, move Page(%s) to foreground", _pageCurrent->_name);
-        if (_pagePrev)
+        if (_pagePrev && _pagePrev->_root) {
             lv_obj_move_to_index(_pagePrev->_root, -1);
+        }
         lv_obj_move_to_index(_pageCurrent->_root, -1);
     } else {
         PAGE_LOG_INFO("Page EXIT is detect, move Page(%s) to foreground", getPagePrevName());
         lv_obj_move_to_index(_pageCurrent->_root, -1);
-        if (_pagePrev)
+        if (_pagePrev && _pagePrev->_root) {
             lv_obj_move_to_index(_pagePrev->_root, -1);
+        }
     }
 
-    /* After the page order is final: the scrim sits right beneath the covering page */
+    /* 页面层级确定后再放置条带或全屏遮罩。 */
     scrimCreate();
     return RES_TYPE::OK;
 }
@@ -428,6 +430,9 @@ void PageManager::onSwitchAnimFinish(lv_anim_t* a)
 
     PAGE_LOG_INFO("Page(%s) anim finish", base->_name);
 
+    if (base->_context.anim.isEnter && manager->getCurrentLoadAnimType() == PAGE_ANIM::FADE_THROUGH) {
+        manager->scrimDelete();
+    }
     manager->stateNext(base);
     base->_context.anim.isBusy = false;
     auto res = manager->switchReqCheck();
@@ -439,7 +444,7 @@ void PageManager::onSwitchAnimFinish(lv_anim_t* a)
 
 void PageManager::switchAnimCreate(PageBase* base)
 {
-    if (!base) {
+    if (!base || !base->_root) {
         return;
     }
 

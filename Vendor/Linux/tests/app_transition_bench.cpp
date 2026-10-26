@@ -53,12 +53,40 @@ main(int argc, char** argv) {
     for (int i = 0; i < 40; ++i) {
         frame();
     }
+    const int rounds = argc > 1 ? std::atoi(argv[1]) : 30;
+    CHECK(rounds > 0);
+    // 开机单色过渡单独计时：19 帧覆盖 300 ms，Logo 在最后一次切换完成后才启动。
+    // 静态基线主动刷新整屏，避免把零脏区的空闲 handler 与实际绘制混为一谈。
+    std::vector<double> startup_idle, startup_fade;
+    for (int r = 0; r < rounds; ++r) {
+        double idle = 0, fade = 0;
+        for (int i = 0; i < 19; ++i) {
+            lv_obj_invalidate(lv_screen_active());
+            idle += frame();
+        }
+        CHECK(app.show_page("Pages/SystemLoading"));
+        for (int i = 0; i < 19; ++i) {
+            fade += frame();
+        }
+        startup_idle.push_back(idle / 19);
+        startup_fade.push_back(fade / 19);
+        CHECK(app.back());
+        for (int i = 0; i < 40; ++i) {
+            frame();
+        }
+    }
+    for (auto* samples : {&startup_idle, &startup_fade}) {
+        std::sort(samples->begin(), samples->end());
+    }
+    std::printf("Startup full redraw        median_us_per_frame=%.1f min=%.1f\n", startup_idle[rounds / 2],
+                startup_idle[0]);
+    std::printf("Startup FADE_THROUGH       median_us_per_frame=%.1f min=%.1f\n", startup_fade[rounds / 2],
+                startup_fade[0]);
     test_input::status(DemoStatus::sample(16000));
     CHECK(app.show_page("Pages/Dialplate"));
     for (int i = 0; i < 200; ++i) {
         frame();
     }
-    const int rounds = argc > 1 ? std::atoi(argv[1]) : 30;
     // 每次进入/返回各计 26 帧（约 420 ms，覆盖 350 ms 切屏与弹簧收敛），各轮取中位数。
     const auto run = [&](const char* label, auto enter, auto leave, int visits) {
         std::vector<double> totals;

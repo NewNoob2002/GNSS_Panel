@@ -2,6 +2,7 @@
 #include <cassert>
 #include <cstring>
 #include "PageManager.h"
+#include "lvgl_private.h"
 
 namespace {
 using Result = PageManager::RES_TYPE;
@@ -10,6 +11,7 @@ struct Counts {
     unsigned destroyed = 0;
     unsigned unloaded = 0;
     unsigned appeared = 0;
+    unsigned active = 0;
     unsigned languages = 0;
     unsigned stale_callbacks = 0;
 };
@@ -37,6 +39,13 @@ class ProbePage final : public PageBase {
         lv_group_focus_obj(getRoot());
         assert(lv_group_get_focused(lv_group_get_default()) == getRoot());
         ++counts_.appeared;
+    }
+
+    /** 页面真正可见之后才允许启动计时或动画。 */
+    void
+    onViewDidAppear() override {
+        assert(!lv_obj_is_hidden(getRoot()));
+        ++counts_.active;
     }
 
     /** @brief Count exactly one unload for each loaded root. */
@@ -176,6 +185,7 @@ check_manager() {
            && preload_counts.stale_callbacks == 0);
     assert(lv_obj_get_child_count(screen) == children);
 }
+
 /** @brief Return the screen child that is neither page root (the transition scrim), or nullptr. */
 lv_obj_t*
 find_scrim(lv_obj_t* screen, const lv_obj_t* first, const lv_obj_t* second) {
@@ -263,6 +273,119 @@ check_push_scrim() {
     assert(lv_obj_get_child_count(screen) == children);
 }
 
+/** 单色遮罩在进入和返回时均覆盖全屏，页面根保持不透明且原位。 */
+void
+check_fade_through() {
+    Counts first_counts, second_counts;
+    auto* screen = lv_screen_active();
+    const auto children = lv_obj_get_child_count(screen);
+    {
+        PageManager manager;
+        auto* first = new ProbePage(first_counts);
+        auto* second = new ProbePage(second_counts);
+        assert(manager.registerPage(first, "First") == Result::OK);
+        assert(manager.registerPage(second, "Second") == Result::OK);
+        second->setCacheEnable(true);
+        manager.setGlobalLoadAnim(PAGE_ANIM::NONE);
+        assert(manager.push("First") == Result::OK);
+        advance();
+        manager.setGlobalLoadAnim(PAGE_ANIM::FADE_THROUGH, 300, lv_anim_path_linear);
+        manager.setScrimOpa(LV_OPA_TRANSP);
+        const auto color = lv_color_hex(0x234567);
+        manager.setFadeThroughColor(color);
+        for (const bool entering : {true, false}) {
+            const auto active = entering ? second_counts.active : first_counts.active;
+            assert((entering ? manager.push("Second") : manager.pop()) == Result::OK);
+            auto* incoming = entering ? second : first;
+            auto* outgoing = entering ? first : second;
+            auto* scrim = find_scrim(screen, first->getRoot(), second->getRoot());
+            assert(scrim && lv_obj_get_index(scrim) > lv_obj_get_index(outgoing->getRoot()));
+            assert(lv_obj_is_hidden(incoming->getRoot()) && !lv_obj_is_hidden(outgoing->getRoot()));
+            assert(incoming->getState() == PageBase::STATE::DID_APPEAR);
+            assert(outgoing->getState() == PageBase::STATE::DID_DISAPPEAR);
+            assert(lv_obj_get_style_bg_opa(scrim, LV_PART_MAIN) == LV_OPA_TRANSP);
+            assert(lv_color_to_u32(lv_obj_get_style_bg_color(scrim, LV_PART_MAIN)) == lv_color_to_u32(color));
+            advance(60);
+            const auto early_opa = lv_obj_get_style_bg_opa(scrim, LV_PART_MAIN);
+            assert(early_opa > LV_OPA_TRANSP && early_opa < 128);
+            advance(90);
+            lv_obj_update_layout(screen);
+            assert(manager.isSwitching() && lv_obj_is_hidden(incoming->getRoot()));
+            // 切换中拒绝新导航，保持现有遮罩与页面生命周期完整。
+            assert(manager.push("First") == Result::ERR_BUSY);
+            assert(manager.pop() == Result::ERR_BUSY);
+            assert((entering ? second_counts.active : first_counts.active) == active);
+            assert(lv_obj_get_x(scrim) == 0 && lv_obj_get_y(scrim) == 0);
+            assert(lv_obj_get_width(scrim) == lv_obj_get_content_width(screen));
+            assert(lv_obj_get_height(scrim) == lv_obj_get_content_height(screen));
+            assert(near(lv_obj_get_style_bg_opa(scrim, LV_PART_MAIN), 128));
+            assert(lv_obj_get_style_bg_opa(scrim, LV_PART_MAIN) > early_opa);
+            for (auto* page : {incoming, outgoing}) {
+                assert(lv_obj_get_x(page->getRoot()) == 0 && lv_obj_get_y(page->getRoot()) == 0);
+                assert(lv_obj_get_style_opa(page->getRoot(), LV_PART_MAIN) == LV_OPA_COVER);
+                assert(lv_obj_get_layer_type(page->getRoot()) == LV_LAYER_TYPE_NONE);
+            }
+            advance(120);
+            assert(manager.isSwitching() && lv_obj_is_hidden(incoming->getRoot()));
+            assert(lv_obj_get_style_bg_opa(scrim, LV_PART_MAIN) > 220);
+            advance(50);
+            assert(!manager.isSwitching() && !lv_obj_is_hidden(incoming->getRoot()));
+            assert(incoming->getState() == PageBase::STATE::ACTIVITY);
+            assert((entering ? second_counts.active : first_counts.active) == active + 1);
+            assert(!find_scrim(screen, first->getRoot(), second->getRoot()));
+        }
+        assert(manager.push("Second") == Result::OK);
+        advance(100);
+    }
+    advance();
+    assert(lv_obj_get_child_count(screen) == children);
+    assert(first_counts.stale_callbacks == 0 && second_counts.stale_callbacks == 0);
+}
+
+/** 外部删除遮罩、进入页或离开页时，不能遗留隐藏根、动画或管理器指针。 */
+void
+check_fade_through_deletion() {
+    auto* screen = lv_screen_active();
+    const auto children = lv_obj_get_child_count(screen);
+    for (unsigned deleted = 0; deleted < 3; ++deleted) {
+        Counts first_counts, second_counts;
+        {
+            PageManager manager;
+            auto* first = new ProbePage(first_counts);
+            auto* second = new ProbePage(second_counts);
+            assert(manager.registerPage(first, "First") == Result::OK);
+            assert(manager.registerPage(second, "Second") == Result::OK);
+            manager.setGlobalLoadAnim(PAGE_ANIM::NONE);
+            assert(manager.push("First") == Result::OK);
+            advance();
+            manager.setGlobalLoadAnim(PAGE_ANIM::FADE_THROUGH, 300, lv_anim_path_linear);
+            assert(manager.push("Second") == Result::OK);
+            advance(100);
+            auto* scrim = find_scrim(screen, first->getRoot(), second->getRoot());
+            assert(scrim);
+            assert(lv_color_to_u32(lv_obj_get_style_bg_color(scrim, LV_PART_MAIN))
+                   == lv_color_to_u32(lv_color_black()));
+            lv_obj_delete(deleted == 0 ? scrim : deleted == 1 ? first->getRoot() : second->getRoot());
+            assert(!find_scrim(screen, first->getRoot(), second->getRoot()));
+            if (second->getRoot()) {
+                assert(!lv_obj_is_hidden(second->getRoot()));
+            }
+            if (deleted != 0) {
+                assert((deleted == 1 ? first : second)->getRoot() == nullptr);
+            }
+            advance();
+            assert(!manager.isSwitching());
+            assert(manager.pop() == Result::OK); // 根被外部删除后仍可返回，必要时重新建页。
+            advance();
+            assert(!manager.isSwitching() && manager.getCurrentPage() == first);
+            assert(first->getRoot() && !lv_obj_is_hidden(first->getRoot()));
+        }
+        advance();
+        assert(lv_obj_get_child_count(screen) == children);
+        assert(first_counts.unloaded == (deleted == 1 ? 2u : 1u) && second_counts.unloaded == 1);
+    }
+}
+
 /** @brief pushWithAnim belongs to the stack entry: it drives entering and leaving, and a plain push resets it. */
 void
 check_push_with_anim() {
@@ -326,6 +449,8 @@ main() {
     lv_group_set_default(group);
     check_manager();
     check_push_scrim();
+    check_fade_through();
+    check_fade_through_deletion();
     check_push_with_anim();
     lv_group_set_default(nullptr);
     lv_group_delete(group);

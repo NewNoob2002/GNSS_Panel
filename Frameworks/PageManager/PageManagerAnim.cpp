@@ -215,6 +215,11 @@ PageManager::RES_TYPE PageManager::getLoadAnimAttr(PAGE_ANIM anim, LOAD_ANIM_ATT
         attr->pop.exit.end = LV_OPA_TRANSP;
         break;
 
+    case PAGE_ANIM::FADE_THROUGH:
+        /* 页面根不动，仍保留动画完成回调推进状态机。 */
+        attr->setter = [](void*, int32_t) {};
+        break;
+
     case PAGE_ANIM::NONE:
         /* Use default NONE */
         break;
@@ -268,7 +273,9 @@ void PageManager::scrimCreate()
 {
     scrimDelete();
     const PAGE_ANIM type = getCurrentLoadAnimType();
-    if (_scrimOpa == LV_OPA_TRANSP || !isCoveringAnim(type) || !_pagePrev || _pagePrev == _pageCurrent) {
+    const bool fadeThrough = type == PAGE_ANIM::FADE_THROUGH;
+    if ((!fadeThrough && (_scrimOpa == LV_OPA_TRANSP || !isCoveringAnim(type))) || !_pagePrev
+        || _pagePrev == _pageCurrent) {
         return;
     }
 
@@ -283,17 +290,20 @@ void PageManager::scrimCreate()
         return;
     }
 
+    _scrim.fadeThrough = fadeThrough;
     _scrim.horizontal = isHorizontalAnim(type);
     _scrim.darken = _animState.isEntering;
-    lv_obj_update_layout(covering->_root);
-    _scrim.length = _scrim.horizontal ? lv_obj_get_width(covering->_root) : lv_obj_get_height(covering->_root);
-    // 遮罩自行按同一进度计算覆盖页位置：LVGL 新动画插在链表头部、先于页面动画执行，读取实际坐标会落后一帧。
-    if (_animState.isEntering) {
-        _scrim.start = attr.push.enter.start;
-        _scrim.end = attr.push.enter.end;
-    } else {
-        _scrim.start = attr.getter(covering->_root);
-        _scrim.end = attr.pop.exit.end;
+    if (!fadeThrough) {
+        lv_obj_update_layout(covering->_root);
+        _scrim.length = _scrim.horizontal ? lv_obj_get_width(covering->_root) : lv_obj_get_height(covering->_root);
+        // 遮罩自行按同一进度计算覆盖页位置：LVGL 新动画插在链表头部、先于页面动画执行，读取实际坐标会落后一帧。
+        if (_animState.isEntering) {
+            _scrim.start = attr.push.enter.start;
+            _scrim.end = attr.push.enter.end;
+        } else {
+            _scrim.start = attr.getter(covering->_root);
+            _scrim.end = attr.pop.exit.end;
+        }
     }
 
     lv_obj_t* scrim = lv_obj_create(getRootParent());
@@ -301,11 +311,13 @@ void PageManager::scrimCreate()
     lv_obj_set_clickable(scrim, false);
     lv_obj_set_scrollable(scrim, false);
     lv_obj_set_ignore_layout(scrim, true);
-    lv_obj_set_style_bg_color(scrim, lv_color_black(), LV_PART_MAIN);
+    lv_obj_set_style_bg_color(scrim, fadeThrough ? _fadeThroughColor : lv_color_black(), LV_PART_MAIN);
     lv_obj_set_style_bg_opa(scrim, LV_OPA_TRANSP, LV_PART_MAIN);
     lv_obj_add_event_cb(scrim, onScrimDelete, LV_EVENT_DELETE, this);
-    /* Directly beneath the covering page, above everything it covers */
-    lv_obj_move_to_index(scrim, lv_obj_get_index(covering->_root));
+    /* 纯色过渡盖住离开页；位移过渡仍放在覆盖页下方。 */
+    if (!fadeThrough) {
+        lv_obj_move_to_index(scrim, lv_obj_get_index(covering->_root));
+    }
     _scrim.obj = scrim;
     scrimUpdate(0);
 
@@ -318,11 +330,19 @@ void PageManager::scrimCreate()
     lv_anim_set_completed_cb(&a, onScrimFinish);
     if (!lv_anim_start(&a)) {
         scrimDelete();
+    } else if (fadeThrough) {
+        lv_obj_set_hidden(_pageCurrent->_root, true);
     }
 }
 
 void PageManager::scrimDelete()
 {
+    if (_scrim.fadeThrough) {
+        if (_pageCurrent && _pageCurrent->_root) {
+            lv_obj_set_hidden(_pageCurrent->_root, false);
+        }
+        _scrim.fadeThrough = false;
+    }
     lv_obj_t* scrim = _scrim.obj;
     if (!scrim) {
         return;
@@ -336,6 +356,12 @@ void PageManager::scrimUpdate(int32_t progress)
 {
     lv_obj_t* scrim = _scrim.obj;
     if (!scrim) {
+        return;
+    }
+    if (_scrim.fadeThrough) {
+        lv_obj_set_pos(scrim, 0, 0);
+        lv_obj_set_size(scrim, lv_pct(100), lv_pct(100));
+        lv_obj_set_style_bg_opa(scrim, (lv_opa_t)(LV_OPA_COVER * progress / SCRIM_PROGRESS_MAX), LV_PART_MAIN);
         return;
     }
     lv_obj_t* parent = getRootParent();
@@ -385,4 +411,5 @@ void PageManager::onScrimDelete(lv_event_t* e)
 {
     auto* manager = static_cast<PageManager*>(lv_event_get_user_data(e));
     manager->_scrim.obj = nullptr;
+    manager->scrimDelete();
 }

@@ -159,6 +159,10 @@ loading(lv_obj_t* root, const std::string& directory) {
         std::array<i18n::TextId, page::SystemLoadingView::kStepCount> titles{};
         titles.fill(i18n::TextId::LoadingConfiguration);
         view.create(root, titles);
+        assert(lv_anim_count_running() == baseline_anims);
+        advance(300); // 创建及切屏准备期间不得提前消费 Logo 时间。
+        assert(lv_anim_count_running() == baseline_anims);
+        view.show_logo();
         for (unsigned ms = 0; ms <= page::SystemLoadingView::kLogoMs; ms += 20) {
             const auto before_flushes = flush_count, before_invalidations = invalidation_count;
             partial_only = oem_logo_parts.recolor && ms >= 240 && ms < 900;

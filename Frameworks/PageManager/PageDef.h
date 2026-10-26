@@ -53,6 +53,9 @@ enum class PAGE_ANIM {
     PUSH_TOP,
     PUSH_BOTTOM,
 
+    /* 单色全屏遮罩渐浓，完成后显示新页；页面根不移动、不做透明度混合。 */
+    FADE_THROUGH,
+
     /* The new interface fades in, the old page fades out */
     FADE_ON,
 };

@@ -5,8 +5,8 @@
 
 namespace page::style {
 
-/** Page transitions slide whole opaque roots (no page-level opacity): a page fade renders the page into an alpha
- * layer chunk by chunk, the most expensive transition on an MCU. */
+/** 切屏只平移不透明页面根，不用整页透明度。
+ * 开机过渡用 FADE_THROUGH 单色遮罩，无离屏图层。 */
 inline constexpr uint16_t kPageTransitionMs = 350;
 
 /** @brief 页面切换曲线 cubic-bezier(0.2, 0, 0, 1)：起步柔和、长减速收尾，替代起步即最快的 ease-out。 */

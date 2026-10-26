@@ -700,7 +700,7 @@ saveconfig_scenarios(lv_display_t* display, const std::string& output) {
                 assert(app.init());
                 advance(400);
                 product_start();
-                advance(7000);
+                advance(8000); // 包含开机淡入和首页入场。
                 assert(std::strcmp(app.current_page(), "Pages/Dialplate") == 0);
                 assert(app.show_page("Pages/SystemDash"));
                 advance(600);
