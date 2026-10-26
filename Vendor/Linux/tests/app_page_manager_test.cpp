@@ -262,6 +262,54 @@ check_push_scrim() {
     advance();
     assert(lv_obj_get_child_count(screen) == children);
 }
+
+/** @brief pushWithAnim belongs to the stack entry: it drives entering and leaving, and a plain push resets it. */
+void
+check_push_with_anim() {
+    Counts first_counts, second_counts, third_counts;
+    auto* screen = lv_screen_active();
+    const auto children = lv_obj_get_child_count(screen);
+    {
+        PageManager manager;
+        auto* first = new ProbePage(first_counts);
+        auto* second = new ProbePage(second_counts);
+        auto* third = new ProbePage(third_counts);
+        assert(manager.registerPage(first, "First") == Result::OK);
+        assert(manager.registerPage(second, "Second") == Result::OK);
+        assert(manager.registerPage(third, "Third") == Result::OK);
+        manager.setScrimOpa(LV_OPA_50);
+        manager.setGlobalLoadAnim(PAGE_ANIM::PUSH_LEFT, 260, lv_anim_path_linear);
+        assert(manager.push("First") == Result::OK);
+        advance();
+
+        assert(manager.pushWithAnim("Second", PAGE_ANIM::NONE) == Result::OK);
+        assert(!find_scrim(screen, first->getRoot(), second->getRoot())); // NONE never covers.
+        advance(20);
+        assert(!manager.isSwitching() && lv_obj_get_x(second->getRoot()) == 0);
+        assert(lv_obj_get_x(first->getRoot()) == 0); // No parallax offset left on the page beneath.
+
+        // A child with the page's own type in between does not lose Second's override.
+        assert(manager.push("Third") == Result::OK);
+        advance(130);
+        assert(lv_obj_get_x(third->getRoot()) > 0 && lv_obj_get_x(third->getRoot()) < 294);
+        advance();
+        assert(manager.pop() == Result::OK);
+        advance();
+        assert(manager.pop() == Result::OK); // Leaves Second the way it entered: at once.
+        advance(20);
+        assert(!manager.isSwitching() && manager.getCurrentPage() == first);
+        assert(lv_obj_get_x(first->getRoot()) == 0);
+
+        assert(manager.push("Second") == Result::OK); // Plain push: the page's own (global) type again.
+        advance(130);
+        assert(manager.isSwitching() && lv_obj_get_x(second->getRoot()) > 0);
+        advance();
+        assert(manager.pop() == Result::OK);
+        advance();
+    }
+    advance();
+    assert(lv_obj_get_child_count(screen) == children);
+}
 } // namespace
 
 /** @brief Run the framework regression with a headless LVGL display. */
@@ -278,6 +326,7 @@ main() {
     lv_group_set_default(group);
     check_manager();
     check_push_scrim();
+    check_push_with_anim();
     lv_group_set_default(nullptr);
     lv_group_delete(group);
     lv_display_delete(display);

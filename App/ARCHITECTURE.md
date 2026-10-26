@@ -63,7 +63,7 @@ OEM 配置由 App 层的 `OEM` CMake 缓存变量选择（默认 `singularxyz`�
 
 PageManager 拥有已注册页面；导航结果必须显式比较 `PageManager::RES_TYPE::OK`（值为 0）。各页使用 350 ms 位移过渡（首页子页为视差推入 `PUSH_LEFT`，覆盖类切屏由 PageManager 临时创建压暗遮罩），建页耗时不计入动画；根对象异步删除前清理动画、控件与外部样式引用。双键输入和 SDL 输入各用既有归一化路径，页面成员通过 getter 访问。
 
-所有 DataNode、设备、输入、定时器和 LVGL 操作只在应用线程执行。SystemDash、Dialplate、WorkSettings、RecordConfig 显式启用 `UI/Common/FocusHighlight`：单定时器驱动上层透明边框，控件保留自身背景与普通边框，连续切换保留速度；入场、恢复、语言、尺寸及父容器改变直接对齐（Dialplate 以 `shared_layer` 把覆盖框固定在页面根层，卫星图标与按钮行之间跨容器切换也保速过渡；其余页面覆盖框随控件父容器滚动、裁剪与动画），滚动按真实偏移对齐，按下/禁用时隐藏覆盖框，离页停止，卸载解除对象及父容器事件和 observer。覆盖框沿用 250 ms、bounce 0.15，匹配控件圆角；渐变卡片保留原 2 px 底边框以保持填充取样不变。SystemInfos 的整页滚动/收窄单侧边线、StarMap 的无边框整页焦点、Startup 的 hold 进度环保持原绘制。DataBroker 最多注册 32 个外部节点和 32 个独立时钟定时器；Publish/Notify/Pull 同步完成，禁止中断/后台线程直接分发或保存载荷指针。发布时使用地址加注册序号快照，可在回调中解除订阅或删除订阅者，禁止销毁当前发布者或 Broker。
+所有 DataNode、设备、输入、定时器和 LVGL 操作只在应用线程执行。SystemDash、Dialplate、WorkSettings、RecordConfig 显式启用 `UI/Common/FocusHighlight`：单定时器驱动上层透明边框，控件保留自身背景与普通边框，连续切换保留速度；入场、恢复、语言、尺寸及父容器改变直接对齐（Dialplate 以 `shared_layer` 把覆盖框固定在页面根层，卫星图标与按钮行之间跨容器切换也保速过渡；其余页面覆盖框随控件父容器滚动、裁剪与动画），滚动按真实偏移对齐，按下时覆盖框向内挤压（每边最多 4/3 px）、松开回弹，禁用时隐藏覆盖框，离页停止（并解冻焦点组），卸载解除对象及父容器事件和 observer。覆盖框沿用 250 ms、bounce 0.15，四轴共用一组参数（位置与尺寸分速会让贴边控件切换时越出屏幕），匹配控件圆角；`open()` 把覆盖框展开为不透明面板盖住宿主（不用弹簧：缓入缓出曲线，约 350 ms 盖满即回调），`close()` 用 350 ms 收回并淡出填充，收回途中可再次展开；渐变卡片保留原 2 px 底边框以保持填充取样不变。SystemInfos 的整页滚动/收窄单侧边线、StarMap 的无边框整页焦点、Startup 的 hold 进度环保持原绘制。DataBroker 最多注册 32 个外部节点和 32 个独立时钟定时器；Publish/Notify/Pull 同步完成，禁止中断/后台线程直接分发或保存载荷指针。发布时使用地址加注册序号快照，可在回调中解除订阅或删除订阅者，禁止销毁当前发布者或 Broker。
 
 初始化先注入单调毫秒时钟 `DataProc_Init(clock)`，再创建页面；主循环运行平台更新、`App::update()`（即 DataProc_RunLoop）和 `lv_timer_handler()`。销毁先停止导航定时器、销毁页面和组件，再逆序销毁领域节点；Broker 必须比全部节点和定时器存活更久。HC32 的标准 `new` 仍由平台映射到 LVGL 池，Frameworks 不选择分配器。
 

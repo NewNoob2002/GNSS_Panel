@@ -49,6 +49,17 @@ complete_card(const page::SystemDashView& view, lv_obj_t* target) {
            == static_cast<int32_t>(lv_obj_get_child_count(lv_obj_get_parent(highlight))) - 1);
 }
 
+/** @brief 覆盖框严格位于控件内且居中（按下挤压）。 */
+void
+squeezed(lv_obj_t* highlight, lv_obj_t* target) {
+    lv_obj_update_layout(target);
+    lv_area_t actual, outer;
+    lv_obj_get_coords(highlight, &actual);
+    lv_obj_get_coords(target, &outer);
+    assert(actual.x1 > outer.x1 && actual.y1 > outer.y1 && actual.x2 < outer.x2 && actual.y2 < outer.y2);
+    assert(actual.x1 - outer.x1 == outer.x2 - actual.x2 && actual.y1 - outer.y1 == outer.y2 - actual.y2);
+}
+
 void
 aligned(const page::SystemDashView& view, lv_obj_t* target) {
     complete_card(view, target);
@@ -176,11 +187,15 @@ focus() {
         aligned(view, target);
         lv_obj_set_pressed(target, true);
         lv_obj_send_event(target, LV_EVENT_PRESSED, nullptr);
-        assert(lv_obj_is_hidden(view.focus_highlight()));
+        /** 按下时覆盖框保持可见并向内挤压，松开回弹到控件。 */
+        assert(!lv_obj_is_hidden(view.focus_highlight()));
         assert(lv_obj_get_style_bg_opa(target, LV_PART_MAIN) == LV_OPA_COVER);
         assert(lv_obj_get_style_border_opa(target, LV_PART_MAIN) == LV_OPA_COVER);
+        advance(800);
+        squeezed(view.focus_highlight(), target);
         lv_obj_set_pressed(target, false);
         lv_obj_send_event(target, LV_EVENT_RELEASED, nullptr);
+        advance(800);
         aligned(view, target);
         view.stop();
         page::utils::leave_focus_group();
@@ -240,11 +255,17 @@ component() {
         focus.resume();
         assert(focus.object() && !focus.motion().running());
         lv_obj_set_pressed(a, true);
-        assert(lv_obj_is_hidden(focus.object()));
-        assert(lv_obj_get_style_border_width(a, LV_PART_MAIN) == 2);
+        lv_obj_send_event(a, LV_EVENT_PRESSED, nullptr);
+        // 按下：控件只保留普通边框，橙框由覆盖框向内挤压表现。
+        assert(!lv_obj_is_hidden(focus.object()));
+        assert(lv_obj_get_style_border_width(a, LV_PART_MAIN) == 1);
         assert(lv_color_to_u32(lv_obj_get_style_border_color(a, LV_PART_MAIN))
-               == lv_color_to_u32(page::style::kAccent));
+               == lv_color_to_u32(page::style::kBorder));
+        advance(800);
+        squeezed(focus.object(), a);
         lv_obj_set_pressed(a, false);
+        lv_obj_send_event(a, LV_EVENT_RELEASED, nullptr);
+        advance(800);
         assert(!lv_obj_is_hidden(focus.object()));
         lv_obj_set_disabled(a, true);
         assert(lv_obj_is_hidden(focus.object()));

@@ -73,6 +73,7 @@ PageManager::RES_TYPE PageManager::replace(const char* name, const PageBase::PAR
 
     /* Synchronous automatic cache configuration */
     base->_context.isDisableAutoCache = base->_context.reqDisableAutoCache;
+    base->_context.anim.navType = PAGE_ANIM::GLOBAL;
 
     /* Remove current page */
     _pageStack.pop();
@@ -87,6 +88,11 @@ PageManager::RES_TYPE PageManager::replace(const char* name, const PageBase::PAR
 }
 
 PageManager::RES_TYPE PageManager::push(const char* name, const PageBase::PARAM* param)
+{
+    return pushWithAnim(name, PAGE_ANIM::GLOBAL, param);
+}
+
+PageManager::RES_TYPE PageManager::pushWithAnim(const char* name, PAGE_ANIM anim, const PageBase::PARAM* param)
 {
     if (!name) {
         return RES_TYPE::ERR_PARAM;
@@ -124,6 +130,9 @@ PageManager::RES_TYPE PageManager::push(const char* name, const PageBase::PARAM*
 
     /* Synchronous automatic cache configuration */
     base->_context.isDisableAutoCache = base->_context.reqDisableAutoCache;
+
+    /* The chosen transition belongs to this stack entry: it is reused when the page is left again */
+    base->_context.anim.navType = anim;
 
     /* Push into the stack */
     _pageStack.push(base);
@@ -322,6 +331,7 @@ PageManager::resetRoot(const char* name) {
     _pageCurrent = _pagePrev = nullptr;
     PageBase* base = findPageInPool(name);
     base->_context.isDisableAutoCache = base->_context.reqDisableAutoCache;
+    base->_context.anim.navType = PAGE_ANIM::GLOBAL;
     _pageStack.push(base);
     return switchTo(base, true);
 }
@@ -519,6 +529,10 @@ void PageManager::switchAnimTypeUpdate(PageBase* base)
         PAGE_LOG_INFO("Page(%s) custom anim.type set = %d", base->_name,
                       static_cast<int>(base->_context.anim.attr.type));
         _animState.current = base->_context.anim.attr;
+    }
+    if (base->_context.anim.navType != PAGE_ANIM::GLOBAL) {
+        PAGE_LOG_INFO("Page(%s) navigation anim.type = %d", base->_name, static_cast<int>(base->_context.anim.navType));
+        _animState.current.type = base->_context.anim.navType;
     }
 }
 
