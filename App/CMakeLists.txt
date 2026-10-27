@@ -6,6 +6,10 @@ endif()
 
 add_subdirectory(Utils/Spring)
 
+# 日志接口头单独成目标，平台可只取接口而自行提供实现（如 HC32 release 的空实现）。
+add_library(app_log_headers INTERFACE)
+add_library(app::log_headers ALIAS app_log_headers)
+target_include_directories(app_log_headers INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/Utils/Log")
 add_library(app_log STATIC Utils/Log/Log.cpp)
 add_subdirectory(../Frameworks/DataBroker frameworks/databroker)
 add_subdirectory(../Frameworks/DeviceManager frameworks/devicemanager)
@@ -41,7 +45,7 @@ add_library(app::log ALIAS app_log)
 add_library(app::framework ALIAS app_framework)
 add_library(app::i18n ALIAS app_i18n)
 add_library(app::core ALIAS app_core)
-target_include_directories(app_log PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/Utils/Log")
+target_link_libraries(app_log PUBLIC app::log_headers)
 target_include_directories(app_i18n PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/Service/i18n"
     "${APP_OEM_DIR}/generated")
 target_include_directories(app_core PUBLIC

@@ -41,10 +41,11 @@ static pthread_mutex_t output_lock = PTHREAD_MUTEX_INITIALIZER;
 #include <inttypes.h>
 #include <stdio.h>
 #include <delay.h>
-#if defined(__CORE_DEBUG)
+#if defined(HC32_LOG_OUTPUT_RTT)
 #include "SEGGER_RTT.h"
+#elif defined(HC32_LOG_OUTPUT_UART)
+#include "usart.h"
 #endif
-//#include "usart.h"
 #endif
 
 char buf[32];
@@ -61,12 +62,12 @@ elog_port_init(void) {
     output_lock = CreateMutex(NULL, FALSE, NULL);
 #elif defined(__linux__)
     pthread_mutex_init(&output_lock, NULL);
-#elif defined(__CORE_DEBUG)
-#ifdef SEGGER_RTT_H
+#elif defined(HC32_LOG_OUTPUT_RTT)
     SEGGER_RTT_Init();
-#else
-    usart_init();
-#endif
+#elif defined(HC32_LOG_OUTPUT_UART)
+    if (!usart_init()) {
+        return (ElogErrCode)1;
+    }
 #endif //_WIN32
     return result;
 }
@@ -101,12 +102,10 @@ elog_port_output(const char* log, size_t size) {
 #elif defined(__linux__)
     fwrite(log, 1, size, stdout);
     fflush(stdout);
-#elif defined(__CORE_DEBUG)
-#ifdef SEGGER_RTT_H
+#elif defined(HC32_LOG_OUTPUT_RTT)
     SEGGER_RTT_Write(0, log, size);
-#else
-    usart_write_buffer(log, size);
-#endif
+#elif defined(HC32_LOG_OUTPUT_UART)
+    usart_write_buffer((const uint8_t*)log, size);
 #else
     (void)log;
     (void)size;

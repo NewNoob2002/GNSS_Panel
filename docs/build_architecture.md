@@ -9,7 +9,7 @@
 | 层 | 目录 | 目标（ALIAS 命名） | 允许依赖 |
 |---|---|---|---|
 | L0 选项 | `cmake/` | `proj::options`（语言标准、告警、`-fno-exceptions/-fno-rtti` 等，按平台定义） | — |
-| L1 第三方组件 | `External/lvgl`、各平台 `Libraries/` 中的第三方库 | `lvgl::lvgl`、`lvgl::demos`（上游 CMake）、`hc32::segger_rtt`、`hc32::easylogger`、`hc32::multibutton`、`hc32::parser`、`hc32::millis_task` | L0；需要平台端口的库通过 `*_port` INTERFACE 目标注入（如 easylogger 的输出端口） |
+| L1 第三方组件 | `External/lvgl`、`External/spdlog`、各平台 `Libraries/` 中的第三方库 | `lvgl::lvgl`、`lvgl::demos`、`spdlog::spdlog`（上游 CMake）、`hc32::segger_rtt`、`hc32::easylogger`、`hc32::multibutton`、`hc32::parser`、`hc32::millis_task` | L0；需要平台端口的库通过 `*_port` INTERFACE 目标注入（如 easylogger 的输出端口） |
 | L2 框架 | `Frameworks/*` | `fw::databroker`、`fw::devicemanager`、`fw::resourcemanager`（INTERFACE）、`fw::pagemanager` | L0、L1（只有 `fw::pagemanager` 可以依赖 `lvgl::lvgl`），以及 `app::log`（日志宏桥接，见 4.3） |
 | L3 应用 | `App/` | `app::log`、`app::i18n`、`app::core`（无 LVGL）、`app::spring`（无 LVGL）、`app::lv_spring`、`app::ui`（页面、资源、组件） | L0–L2；`app::core` 不得依赖 `lvgl::lvgl`、`fw::pagemanager`；同层弹簧依赖仅 `app::ui → app::lv_spring → app::spring` |
 | L4 平台 | `Vendor/<Platform>/` | 见第 2 节 | L0–L3；只依赖本平台目标，不得依赖其他 `Vendor/` 平台，第 3 节的共享子集除外 |
@@ -40,6 +40,9 @@
 模拟器 Board 后端与主机测试需要复用 HC32 中可在主机编译的部分，包括 `State`、电源策略（`HAL_Power.cpp`、`PowerPolicy.h`）和 `AppPlatform` 设备对象。这些部分在 `Vendor/HC32/cmake/portable.cmake` 中定义成目标：`hc32::state`、`hc32::power_policy`、`hc32::app_platform`。HC32 固件、`Vendor/Simulator`、`tests/` 都 `include()` 这个文件并链接上述目标，不再各自按路径编译 HC32 源文件。硬件相关部分由各端用自己的实现或 fake 替换，替换方式是链接不同的 INTERFACE/OBJECT 目标，不靠调整 include 路径顺序来覆盖。
 
 ## 4. 规则
+
+`Vendor/HostLog` 的 L4 `host::log` 是 Linux/Simulator 共用的日志适配器，启动时安装同步 sink，只有这两个平台可以链接 `host::log` 和 `External/spdlog` 的 `spdlog::spdlog`（完整上游 v1.17.0，MIT，版本与来源见适配器 CMake）；HC32 禁止包含或链接 spdlog。
+`GNSS_LOG_LEVEL=debug|info|warn|error|off` 设置应用最小日志级别（默认 INFO，无效值保留当前值），`GNSS_LOG_COLOR=always|never` 可覆盖默认终端自动颜色；每条已投递消息同步刷新，保证默认 `app_fatal` 在 abort 前完成输出。
 
 1. **依赖向下、无环**：只能按第 1、2 节的表链接；同层例外必须写进本表。
 2. **头文件可见性**：每个目标只把自己的公开头文件目录设为 `PUBLIC`/`INTERFACE`，实现细节用 `PRIVATE`。禁止在全局使用 `include_directories()`，禁止把仓库根目录或上级目录（`..`）作为包含路径。头文件统一按组件目录包含，例如 `#include "DataBroker.h"`。

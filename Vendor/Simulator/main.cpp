@@ -13,6 +13,7 @@
 #include <cstring>
 
 #include "App.h"
+#include "HostLog.h"
 #include "DataProc.h"
 #include "Def/DP_Settings.h"
 #include "HAL/Def/HAL_Board.h"
@@ -298,6 +299,7 @@ inject_event(SDL_Keycode key) {
 
 int
 main(int argc, char** argv) {
+    host_log_init();
     CliOptions options{};
     if (!parse_args(argc, argv, options)) {
         return EXIT_FAILURE;

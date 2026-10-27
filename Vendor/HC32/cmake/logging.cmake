@@ -1,0 +1,18 @@
+# MCU 日志仅存在于 Debug；缓存值保留以便同一产品切换配置。
+set(HC32_LOG_OUTPUT "RTT" CACHE STRING "Debug log output: RTT, UART or NONE")
+set_property(CACHE HC32_LOG_OUTPUT PROPERTY STRINGS RTT UART NONE)
+set(outputs RTT UART NONE)
+if(NOT HC32_LOG_OUTPUT IN_LIST outputs)
+    message(FATAL_ERROR "Unknown HC32_LOG_OUTPUT '${HC32_LOG_OUTPUT}'; use RTT, UART or NONE")
+endif()
+option(HC32_LOG_COLOR "Enable ANSI level colours in Debug logs" ON)
+set(HC32_LOG_ENABLED FALSE)
+if(CMAKE_BUILD_TYPE STREQUAL "Debug" AND NOT HC32_LOG_OUTPUT STREQUAL "NONE")
+    set(HC32_LOG_ENABLED TRUE)
+    target_compile_definitions(project_options INTERFACE HC32_LOG_ENABLED
+        HC32_LOG_OUTPUT_${HC32_LOG_OUTPUT} HC32_LOG_COLOR=$<BOOL:${HC32_LOG_COLOR}>)
+elseif(NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
+    message(STATUS "HC32 logging disabled: ${CMAKE_BUILD_TYPE}; HC32_LOG_OUTPUT/COLOR ignored outside Debug")
+else()
+    message(STATUS "HC32 Debug logging disabled: HC32_LOG_OUTPUT=NONE")
+endif()

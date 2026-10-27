@@ -22,7 +22,9 @@ Enter/middle click and the Startup pointer target request power-on after a compl
 - Smoke: `python3 tests/simulator_smoke.py build/simulator-x1pro/bin/main`.
 - Host regressions: `ctest --test-dir build/host-tests --output-on-failure`.
 
-SDL2 development files are required. `.clangd` uses `build/simulator-x1pro/compile_commands.json`; configure `simulator-x1pro` before opening simulator sources in the editor.
+SDL2 development files are required. 应用日志经共享 `host::log`/spdlog 输出；`GNSS_LOG_LEVEL=debug|info|warn|error|off` 选择最小级别（默认 INFO），`GNSS_LOG_COLOR=always|never` 覆盖默认终端自动颜色，例如 `GNSS_LOG_LEVEL=debug GNSS_LOG_COLOR=always build/sim-demo/bin/main`。
+
+`.clangd` uses `build/simulator-x1pro/compile_commands.json`; configure `simulator-x1pro` before opening simulator sources in the editor.
 
 ## Ownership
 

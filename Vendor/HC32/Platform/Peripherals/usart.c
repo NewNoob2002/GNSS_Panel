@@ -1,50 +1,58 @@
 #include "usart.h"
-#include <stdbool.h>
-#include <string.h>
+#include <hc32_ll.h>
+#include "board_pins.h"
 
 static bool usart_initialized = false;
 
-void
-usart_init() {
-    stc_usart_uart_init_t stcUartInit;
-
-    STRUCT_ZERO(stcUartInit);
-    /* Configure USART RX/TX pin. */
-    GPIO_SetFunc(USART_RX_PORT, USART_RX_PIN, USART_RX_GPIO_FUNC);
-    GPIO_SetFunc(USART_TX_PORT, USART_TX_PIN, USART_TX_GPIO_FUNC);
-    /* Enable peripheral clock */
-    USART_FCG_ENABLE();
-
-    /* Initialize UART. */
-    (void)USART_UART_StructInit(&stcUartInit);
-    stcUartInit.u32ClockDiv = USART_CLK_DIV4;
-    stcUartInit.u32Baudrate = 921600UL;
-    stcUartInit.u32OverSampleBit = USART_OVER_SAMPLE_8BIT;
-    USART_UART_Init(USART_UNIT, &stcUartInit, NULL);
-    USART_FuncCmd(USART_UNIT, (USART_TX), ENABLE);
-
+bool
+usart_init(void) {
+    stc_usart_uart_init_t config;
+    if (__get_IPSR() != 0U) {
+        return false;
+    }
+    GPIO_SetFunc(CONFIG_DEBUG_UART_TX_PORT, CONFIG_DEBUG_UART_TX_PIN, CONFIG_DEBUG_UART_TX_FUNC);
+    FCG_Fcg1PeriphClockCmd(FCG1_PERIPH_USART1, ENABLE);
+    if (USART_UART_StructInit(&config) != LL_OK) {
+        return false;
+    }
+    config.u32ClockDiv = USART_CLK_DIV4;
+    config.u32Baudrate = CONFIG_DEBUG_UART_BAUD;
+    config.u32OverSampleBit = USART_OVER_SAMPLE_8BIT;
+    config.u32DataWidth = USART_DATA_WIDTH_8BIT;
+    config.u32StopBit = USART_STOPBIT_1BIT;
+    config.u32Parity = USART_PARITY_NONE;
+    if (USART_UART_Init(CM_USART1, &config, NULL) != LL_OK) {
+        return false;
+    }
+    USART_FuncCmd(CM_USART1, USART_TX, ENABLE);
     usart_initialized = true;
+    return true;
 }
 
 int
 usart_write(int ch) {
-    if (!usart_initialized) {
+    if (!usart_initialized || __get_IPSR() != 0U) {
         return 0;
     }
-    while (RESET == USART_GetStatus(USART_UNIT, USART_FLAG_TX_EMPTY)) {}
-    USART_WriteData(USART_UNIT, ch);
+    // 不依赖 SysTick/中断推进，外设异常时也能退出。
+    uint32_t timeout = 100000U;
+    while (RESET == USART_GetStatus(CM_USART1, USART_FLAG_TX_EMPTY)) {
+        if (--timeout == 0U) {
+            return 0;
+        }
+    }
+    USART_WriteData(CM_USART1, (uint16_t)ch);
     return 1;
 }
 
 size_t
 usart_write_buffer(const uint8_t* buffer, size_t size) {
-    size_t n = 0;
-    while (size--) {
-        if (usart_write(*buffer++)) {
-            n++;
-        } else {
-            break;
-        }
+    size_t written = 0;
+    if (!buffer) {
+        return 0;
     }
-    return n;
+    while (written < size && usart_write(buffer[written])) {
+        ++written;
+    }
+    return written;
 }

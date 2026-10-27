@@ -42,6 +42,7 @@ if(RK3506_LVGL_DEMO)
     add_subdirectory(demo)
 else()
     add_subdirectory("${SHARED_APP_DIR}" shared_app)
+    add_subdirectory("${REPO_ROOT}/Vendor/HostLog" host_log)
     add_subdirectory(Backends/Demo)
 
     # Standalone utilities and application entrypoints

@@ -1,6 +1,7 @@
 #define _POSIX_C_SOURCE 200809L
 
 #include "App.h"
+#include "HostLog.h"
 #include "DemoStatus.h"
 extern "C" {
 #include "lv_display.h"
@@ -38,6 +39,7 @@ static std::uint64_t milliseconds() {
 }
 
 int main(int argc, char** argv) {
+    host_log_init();
     const bool display_only = argc > 1 && std::strcmp(argv[1], "--display-only") == 0;
     const char* page = display_only && argc > 3 && std::strcmp(argv[2], "--page") == 0 ? argv[3] : nullptr;
     const int first = page ? 4 : display_only ? 2 : 1;
