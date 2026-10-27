@@ -50,6 +50,7 @@ target_include_directories(test_gpio_fakes INTERFACE
 target_link_libraries(test_gpio_fakes INTERFACE proj::options)
 
 # 实例化各产品测试目标
+set(HC32_BUILD_LOG_TESTS TRUE)
 hc32_add_portable("x1pro_" "X1Pro" test_fakes DRIVERS DISPLAY)
 hc32_add_portable("x1pro_disp_" "X1Pro" test_display_fakes DISPLAY)
 hc32_add_portable("x1pro_spi_" "X1Pro" test_spi_fakes SPI)
@@ -142,6 +143,16 @@ linux_add_page_manager_test(page_manager_tests)
 
 include(${ROOT}/App/tests/targets.cmake)
 app_add_core_test(app_core_test)
+
+# HC32 日志桥接与发布版禁用回归
+add_subdirectory(${HC32}/Libraries/easylogger hc32_easylogger)
+add_executable(hc32_log_sink_tests hc32_log_sink_tests.cpp)
+target_link_libraries(hc32_log_sink_tests PRIVATE app::log hc32::app_log_headers hc32::easylogger_headers)
+add_test(NAME hc32_log_sink_tests COMMAND hc32_log_sink_tests)
+
+add_executable(hc32_log_disabled_tests hc32_log_disabled_tests.cpp)
+target_link_libraries(hc32_log_disabled_tests PRIVATE hc32::app_log_disabled proj::options)
+add_test(NAME hc32_log_disabled_tests COMMAND hc32_log_disabled_tests)
 
 # 7. Display app integration tests
 foreach(product X1Pro XBase)

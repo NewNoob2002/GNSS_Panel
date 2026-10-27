@@ -4,6 +4,21 @@
 
 当时保留裸机主循环、MillisTaskManager、LVGL 8.3.11 和页面框架，集中修复通信、内存、电源与生命周期问题。没有修改相邻 Bootloader 工作区及其已有未提交改动。
 
+## 当前 HC32 调试日志
+
+MCU 日志仅在 `CMAKE_BUILD_TYPE=Debug` 时启用；`x1-debug`、`x1pro-debug`、`xbase-debug`（含兼容的 `gcc-debug`）默认 `HC32_LOG_OUTPUT=RTT`、`HC32_LOG_COLOR=ON`。例如：
+
+```sh
+cmake --preset x1pro-debug -DHC32_LOG_OUTPUT=UART -DHC32_LOG_COLOR=OFF
+cmake --build --preset x1pro-debug
+```
+
+`HC32_LOG_OUTPUT` 接受 `RTT`、`UART`、`NONE`，未知值在配置时拒绝；每个产品的构建目录独立保存选项。`NONE` 完全禁用 MCU/App 日志。所有 `*-release`/`gcc-release` 均不编译或链接 EasyLogger、日志端口和 SEGGER RTT；即使指定 RTT/UART，也会打印禁用提示并忽略这两个日志选项。发布版的 `APP_LOG_*` 不求值参数，直接调用 App 日志 API 也不会引入 stdio 格式化；`app_fatal` 仍执行软件复位。
+
+RTT 使用 J-Link RTT Viewer 的通道 0，缓冲满时按 SEGGER 的非阻塞配置丢弃日志。UART 沿用原生 `Peripherals/usart.h/.c` 原有 USART1 配置：**PA12/TX、921600 baud、8N1、无流控**，与 USB 转串口的 RX/GND 相连；原 PA11/RX 不再配置为串口功能，因为日志只有发送。参数集中在 `Platform/Config/board_pins.h` 的 `CONFIG_DEBUG_UART_*`。UART 发送轮询 TX_EMPTY、有界超时，ISR 中直接丢弃，不能作为中断日志通道；EasyLogger/App 日志仅允许主循环调用。
+
+ANSI 等级颜色默认开启：ASSERT 洋红、ERROR 红、WARN 黄、INFO 青、DEBUG 绿、VERBOSE 蓝。使用支持 ANSI 的 RTT Viewer/串口终端查看；不支持 ANSI 时设 `-DHC32_LOG_COLOR=OFF`。HAL 初始化 EasyLogger 后，X1Pro/XBase 的 `App_Init` 安装平台 sink，按 DEBUG/INFO/WARN/ERROR 映射等级并保留 App 模块名作为 tag；X1 没有共享 App。
+
 ## 与当前 Boot 的同步
 
 参考相邻 `HC32F460xE_Bootloader/docs/i2c_slave_contract.md` 及 `Drivers/BSP/Src/bsp_i2c_slave.c`：

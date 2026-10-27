@@ -3,9 +3,10 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#if defined(__CORE_DEBUG)
+#if defined(HC32_LOG_OUTPUT_RTT)
 #include "SEGGER_RTT.h"
-//#include "usart.h"
+#elif defined(HC32_LOG_OUTPUT_UART)
+#include "usart.h"
 #endif
 
 // pi-lens-ignore: identifier
@@ -94,12 +95,12 @@ _sbrk(int incr) {
 int
 _write(int file, char* ptr, int len) {
     (void)file;
-#if defined(__CORE_DEBUG)
-#ifdef SEGGER_RTT_H
+#if defined(HC32_LOG_OUTPUT_RTT)
     SEGGER_RTT_Write(0, ptr, len);
-#else
-    usart_write_buffer(log, size);
-#endif
+#elif defined(HC32_LOG_OUTPUT_UART)
+    if (len > 0) {
+        return (int)usart_write_buffer((const uint8_t*)ptr, (size_t)len);
+    }
 #else
     ((void)ptr);
     ((void)len);

@@ -3,6 +3,12 @@
 // 主板引脚与外设分配：三个产品共用同一主板（V1.3/V1.5 仅充电芯片不同，见 HAL::Charger）。
 // 由 mcu_config.h 在读入 product_config.h 之后包含（显示相关部分取决于 PRODUCT_HAS_DISPLAY）。
 
+/* 调试串口：沿用原 usart.h 的 USART1 PA12/TX、PA11/RX；日志仅发送，不占用 RX。 */
+#define CONFIG_DEBUG_UART_TX_PORT GPIO_PORT_A
+#define CONFIG_DEBUG_UART_TX_PIN GPIO_PIN_12
+#define CONFIG_DEBUG_UART_TX_FUNC GPIO_FUNC_32
+#define CONFIG_DEBUG_UART_BAUD 921600UL
+
 /*POWER*/
 #define POWER_CONTROL_PIN      PB3
 #define WATCHDOG_FEED_PIN      PA6
