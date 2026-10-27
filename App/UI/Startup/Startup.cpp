@@ -32,7 +32,7 @@ void Startup::onViewWillAppear() {
 void Startup::onViewDidAppear() {
     status_timer_ = lv_timer_create(on_status_timeout, 10000, this);
     if (!status_timer_)
-        LV_LOG_ERROR("Startup: status delay timer allocation failed");
+        APP_LOG_E("Startup", "status delay timer allocation failed");
 }
 
 void Startup::cancel_status_timer() {
@@ -89,7 +89,7 @@ void Startup::hold_event(lv_event_t* event) {
         if (self->timer_)
             self->view_.start_hold_anim(hold_ms);
         else
-            LV_LOG_ERROR("Startup: hold timer allocation failed");
+            APP_LOG_E("Startup", "hold timer allocation failed");
     } else if (self->timer_ || !self->model_->state().powered_on) {
         // Released early, or the platform has not confirmed power-on yet: the hold restarts from zero.
         self->cancel_timer();

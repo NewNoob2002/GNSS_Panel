@@ -42,7 +42,18 @@
 ## 4. 规则
 
 `Vendor/HostLog` 的 L4 `host::log` 是 Linux/Simulator 共用的日志适配器，启动时安装同步 sink，只有这两个平台可以链接 `host::log` 和 `External/spdlog` 的 `spdlog::spdlog`（完整上游 v1.17.0，MIT，版本与来源见适配器 CMake）；HC32 禁止包含或链接 spdlog。
-`GNSS_LOG_LEVEL=debug|info|warn|error|off` 设置应用最小日志级别（默认 INFO，无效值保留当前值），`GNSS_LOG_COLOR=always|never` 可覆盖默认终端自动颜色；每条已投递消息同步刷新，保证默认 `app_fatal` 在 abort 前完成输出。
+`GNSS_LOG_LEVEL=debug|info|warn|error|off` 设置运行时最小日志级别（无效值保留当前值），`GNSS_LOG_COLOR=always|never` 可覆盖默认终端自动颜色；每条已投递消息同步刷新，保证默认 `app_fatal` 在 abort 前完成输出。`app::log_headers` 根据构建配置传播数值 `APP_LOG_COMPILE_LEVEL`（DEBUG=0、INFO=1），`APP_LOG_DEFAULT_LEVEL` 默认与其一致；Release 的 DEBUG 宏不求值实参，直接 API 调用也不能绕过编译下限。未指定构建类型时采用 INFO 策略。
+
+| 平台 | 构建类型 | 默认运行时级别 | 编译裁剪 | 输出 |
+|---|---|---|---|---|
+| Linux / Simulator | Debug（含未指定构建类型） | DEBUG | 无；LVGL INFO 起（TRACE 为逐次分配/定时器调度，不编译） | app log → `host::log`/spdlog，同步 stdout |
+| Linux / Simulator | Release / RelWithDebInfo / MinSizeRel | INFO | App DEBUG；LVGL TRACE/INFO | 同上，环境变量仅能打开仍编译保留的级别 |
+| HC32 | Debug，RTT/UART | DEBUG，可用 `HC32_APP_LOG_LEVEL` 调整 | App 无；LVGL 保持 WARN 起 | app log → EasyLogger → RTT/UART |
+| HC32 | 非 Debug 或 `HC32_LOG_OUTPUT=NONE` | OFF | 全部 App 日志与 LVGL 日志 | 无 EasyLogger、RTT 或日志 stdio 格式化 |
+
+App、DataProc、UI 与四个 Frameworks 共用此入口，模块名保留为 `DataBroker`、`DeviceManager`、`PageManager`、`ResourceManager` 等。INFO 只记录应用/供应节点/页面安装汇总、导航与电源/充电状态变化；逐对象注册、订阅、资源回退、状态机、动画细节使用 DEBUG。DeviceManager 使用固定设备表，没有动态注册/容量接口；初始化失败为 ERROR，空名称查找为 WARN，允许的缺失设备探测为 DEBUG。错误和分配失败保留 WARN/ERROR。Broker 主节点可能跨越平台 sink 的静态构造/析构生命周期，因此主节点自身的创建/销毁不输出日志；供应节点和页面节点的 DEBUG 细节仍保留。
+
+LVGL 内部通过 `Utils/lv_ext/LvglLog.h` 注册同一回调，使用 `LVGL` 模块名，Debug 编译 INFO 起，TRACE/INFO 映射 DEBUG（含对象创建细节），WARN/ERROR 保持原等级，USER 映射 INFO。平台 `lv_init()` 后、创建显示/应用之前安装回调，关闭 `LV_LOG_PRINTF`，去掉末尾换行并以固定格式传递原文；HC32 的回调安装前先接入 EasyLogger sink。真正的 CLI 用法、模拟器操作提示和随机种子仍直接输出。
 
 1. **依赖向下、无环**：只能按第 1、2 节的表链接；同层例外必须写进本表。
 2. **头文件可见性**：每个目标只把自己的公开头文件目录设为 `PUBLIC`/`INTERFACE`，实现细节用 `PRIVATE`。禁止在全局使用 `include_directories()`，禁止把仓库根目录或上级目录（`..`）作为包含路径。头文件统一按组件目录包含，例如 `#include "DataBroker.h"`。

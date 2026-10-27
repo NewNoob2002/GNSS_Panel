@@ -13,24 +13,40 @@
 
 int
 main() {
-    assert(setenv("GNSS_LOG_LEVEL", "debug", 1) == 0);
+    assert(unsetenv("GNSS_LOG_LEVEL") == 0);
     auto ring = std::make_shared<spdlog::sinks::ringbuffer_sink_mt>(16);
     host_log_init(ring);
+    assert(app_log_get_level() == APP_LOG_DEFAULT_LEVEL);
+#if APP_LOG_BUILD_DEBUG
+    static_assert(APP_LOG_COMPILE_LEVEL == APP_LOG_DEBUG);
     assert(app_log_get_level() == APP_LOG_DEBUG);
-    APP_LOG_D("Test", "value=%d %s", 42, "{literal}");
+#else
+    static_assert(APP_LOG_COMPILE_LEVEL == APP_LOG_INFO);
+    assert(app_log_get_level() == APP_LOG_INFO);
+#endif
+    assert(setenv("GNSS_LOG_LEVEL", "debug", 1) == 0);
+    host_log_init(ring);
+    assert(app_log_get_level() == APP_LOG_DEBUG);
+    int evaluated = 0;
+    APP_LOG_D("Test", "value=%d %s", ++evaluated, "{literal}");
+    assert(evaluated == (APP_LOG_COMPILE_LEVEL == APP_LOG_DEBUG ? 1 : 0));
     APP_LOG_I("Test", "info");
     APP_LOG_W("Test", "warning");
     APP_LOG_E("Test", "error");
     auto raw = ring->last_raw();
-    assert(raw.size() == 4);
+    assert(raw.size() == 4 - APP_LOG_COMPILE_LEVEL);
     constexpr spdlog::level::level_enum expected[] = {spdlog::level::debug, spdlog::level::info, spdlog::level::warn,
                                                       spdlog::level::err};
     for (unsigned i = 0; i < raw.size(); ++i) {
-        assert(raw[i].level == expected[i]);
+        assert(raw[i].level == expected[i + APP_LOG_COMPILE_LEVEL]);
         assert(raw[i].logger_name == "app");
     }
+#if APP_LOG_COMPILE_LEVEL == 0
     assert(std::regex_match(ring->last_formatted()[0],
-                            std::regex(R"(\[\d{2}:\d{2}:\d{2}\.\d{3}\] \[debug\] \[Test\] value=42 \{literal\}\n)")));
+                            std::regex(R"(\[\d{2}:\d{2}:\d{2}\.\d{3}\] \[debug\] \[Test\] value=1 \{literal\}\n)")));
+#else
+    assert(ring->last_formatted()[0].find("[info] [Test] info\n") != std::string::npos);
+#endif
 
     // 逐档验证环境变量过滤，并确认运行时降回 DEBUG 不会被 spdlog 二次丢弃。
     constexpr const char* names[] = {"debug", "info", "warn", "error", "off"};
@@ -39,12 +55,16 @@ main() {
         ring = std::make_shared<spdlog::sinks::ringbuffer_sink_mt>(16);
         host_log_init(ring);
         for (unsigned level = 0; level < 4; ++level) {
-            assert(app_log_write(static_cast<AppLogLevel>(level), "Filter", "message") == (level >= minimum));
+            assert(app_log_write(static_cast<AppLogLevel>(level), "Filter", "message")
+                   == (level >= minimum && static_cast<int>(level) >= APP_LOG_COMPILE_LEVEL));
         }
-        assert(ring->last_raw().size() == (minimum < 4 ? 4 - minimum : 0));
+        const unsigned effective = minimum > APP_LOG_COMPILE_LEVEL ? minimum : APP_LOG_COMPILE_LEVEL;
+        assert(ring->last_raw().size() == (effective < 4 ? 4 - effective : 0));
         assert(app_log_set_level(APP_LOG_DEBUG));
-        assert(APP_LOG_D("Filter", "runtime debug") == 1);
+        assert(APP_LOG_D("Filter", "runtime debug") == (APP_LOG_COMPILE_LEVEL == APP_LOG_DEBUG));
+#if APP_LOG_COMPILE_LEVEL == 0
         assert(ring->last_raw().back().level == spdlog::level::debug);
+#endif
     }
     assert(setenv("GNSS_LOG_LEVEL", "invalid", 1) == 0);
     assert(app_log_set_level(APP_LOG_WARN));

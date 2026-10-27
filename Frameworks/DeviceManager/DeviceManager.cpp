@@ -22,37 +22,43 @@
  */
 
 #include "DeviceManager.h"
-#include "DeviceObject.h"
 #include <string.h>
+#include "DeviceObject.h"
+#include "Log.h"
 
-DeviceManager::DeviceManager(DeviceObject** devArray, size_t len)
-{
+DeviceManager::DeviceManager(DeviceObject** devArray, size_t len) {
     _devArray = devArray;
     _devArrayLen = len;
 }
 
-DeviceManager::~DeviceManager()
-{
-}
+DeviceManager::~DeviceManager() {}
 
-void DeviceManager::init(InitFinishCallback_t callback)
-{
+void
+DeviceManager::init(InitFinishCallback_t callback) {
     for (size_t i = 0; i < _devArrayLen; i++) {
         DeviceObject* dev = _devArray[i];
         int retval = dev->init();
+        if (retval < DeviceObject::RES_OK) {
+            APP_LOG_E("DeviceManager", "device %s init failed: %d", dev->getName(), retval);
+        }
         if (callback) {
             callback(this, dev, retval);
         }
     }
 }
 
-DeviceObject* DeviceManager::getDevice(const char* name)
-{
+DeviceObject*
+DeviceManager::getDevice(const char* name) {
+    if (!name) {
+        APP_LOG_W("DeviceManager", "lookup with null name");
+        return nullptr;
+    }
     for (size_t i = 0; i < _devArrayLen; i++) {
         DeviceObject* dev = _devArray[i];
         if (strcmp(name, dev->getName()) == 0) {
             return dev;
         }
     }
+    APP_LOG_D("DeviceManager", "device %s not found", name);
     return nullptr;
 }

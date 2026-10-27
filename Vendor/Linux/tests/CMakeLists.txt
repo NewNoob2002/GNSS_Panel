@@ -1,7 +1,13 @@
 add_executable(host_log_test host_log_test.cpp)
 target_link_libraries(host_log_test PRIVATE host::log)
+target_compile_definitions(host_log_test PRIVATE APP_LOG_BUILD_DEBUG=$<IF:$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>,$<CONFIG:MinSizeRel>>,0,1>)
 target_compile_options(host_log_test PRIVATE -Wall -Wextra -Werror -UNDEBUG)
 add_test(NAME host_log COMMAND host_log_test)
+
+add_executable(lvgl_log_test lvgl_log_test.cpp)
+target_link_libraries(lvgl_log_test PRIVATE app::ui)
+target_compile_options(lvgl_log_test PRIVATE -Wall -Wextra -Werror -UNDEBUG)
+add_test(NAME lvgl_log COMMAND lvgl_log_test)
 
 add_executable(display_protocol_test display_protocol_test.c)
 target_link_libraries(display_protocol_test PRIVATE linux::display)

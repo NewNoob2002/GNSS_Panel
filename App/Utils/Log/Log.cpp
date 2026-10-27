@@ -5,7 +5,7 @@
 #include <cstring>
 
 namespace {
-AppLogLevel minimum = APP_LOG_INFO;
+AppLogLevel minimum = static_cast<AppLogLevel>(APP_LOG_DEFAULT_LEVEL);
 AppLogSink output = nullptr;
 void* output_context = nullptr;
 bool delivering = false;
@@ -29,6 +29,10 @@ void app_log_set_sink(AppLogSink sink, void* context) {
     output_context = context;
 }
 int app_log_write(AppLogLevel level, const char* module, const char* format, ...) {
+#if APP_LOG_COMPILE_LEVEL > 0
+    if (level < APP_LOG_COMPILE_LEVEL)
+        return 0;
+#endif
     if (level < APP_LOG_DEBUG || level >= APP_LOG_OFF || level < minimum || !module || !format || delivering)
         return 0;
     char message[256];

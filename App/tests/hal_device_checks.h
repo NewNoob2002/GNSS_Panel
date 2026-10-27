@@ -1,4 +1,5 @@
 #pragma once
+#include <array>
 #include <cassert>
 #include <cstring>
 #include "DataProc.h"
@@ -77,10 +78,12 @@ inline void shapes() {
     assert(init->ioctl(hal::kInitializationInfo, &info, sizeof(info) - 1) == DeviceObject::RES_PARAM_ERROR);
     assert(init->ioctl(hal::kInitializationInfo, &info, sizeof(info) + 1) == DeviceObject::RES_PARAM_ERROR);
     assert(init->ioctl(hal::kInitializationInfo, nullptr, sizeof(info)) == DeviceObject::RES_PARAM_ERROR);
+    // 畸形编码仍携带其声明的完整缓冲，避免优化器把拒绝路径误判为越界复制。
+    std::array<char, sizeof(hal::InitPoll) + 1> invalid_payload{};
     for (uint32_t mask : {1U << 30, 1U << 16, 1U << 8, 1U}) {
         const uint32_t cmd = hal::kInitializationInfo ^ mask;
         const size_t size = (cmd >> 16) & 0x3fffU;
-        assert(init->ioctl(cmd, &info, size) == DeviceObject::RES_UNSUPPORT);
+        assert(init->ioctl(cmd, invalid_payload.data(), size) == DeviceObject::RES_UNSUPPORT);
     }
     info.step = hal::kInitializationStepCount;
     assert(hal::ioctl(init, hal::kInitializationInfo, info) == DeviceObject::RES_PARAM_ERROR);
@@ -91,7 +94,7 @@ inline void shapes() {
     for (uint32_t mask : {1U << 30, 1U << 16, 1U << 8, 1U}) {
         const uint32_t cmd = hal::kPollInitialization ^ mask;
         const size_t size = (cmd >> 16) & 0x3fffU;
-        assert(init->ioctl(cmd, &poll, size) == DeviceObject::RES_UNSUPPORT);
+        assert(init->ioctl(cmd, invalid_payload.data(), size) == DeviceObject::RES_UNSUPPORT);
     }
     assert(hal::write(device(hal::names::Power), static_cast<hal::PowerCommand>(99)) == DeviceObject::RES_PARAM_ERROR);
     const hal::WorkCommand invalid_work[] = {{static_cast<hal::WorkTarget>(99), 0, 1},

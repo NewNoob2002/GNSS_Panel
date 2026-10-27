@@ -5,9 +5,17 @@ extern "C" {
 #endif
 
 typedef enum { APP_LOG_DEBUG, APP_LOG_INFO, APP_LOG_WARN, APP_LOG_ERROR, APP_LOG_OFF } AppLogLevel;
+
+/* 数值与 AppLogLevel 对齐，供预处理器裁剪；独立使用接口时保留全部级别。 */
+#ifndef APP_LOG_COMPILE_LEVEL
+#define APP_LOG_COMPILE_LEVEL 0
+#endif
+#ifndef APP_LOG_DEFAULT_LEVEL
+#define APP_LOG_DEFAULT_LEVEL APP_LOG_COMPILE_LEVEL
+#endif
 /** Sink runs synchronously. Strings are borrowed for this call only; do not recursively log.
  * APIs are LVGL/main-thread-only, not ISR-safe or a concurrent logging transport.
- * Never log credentials or sensitive payloads. Default sink writes to stderr, default level INFO.
+ * Never log credentials or sensitive payloads. Default sink writes to stderr; CMake selects the default level.
  */
 typedef void (*AppLogSink)(AppLogLevel level, const char* module, const char* message, void* context);
 int app_log_set_level(AppLogLevel level); /* 0 for invalid level, 1 for success. */
@@ -33,7 +41,26 @@ void app_fatal(const char* module, const char* reason);
 }
 #endif
 
+/* 保留日志宏的投递结果，裁剪后也可用于条件判断且不求值实参。 */
+static inline int app_log_compiled_out(void) { return 0; }
+
+#if APP_LOG_COMPILE_LEVEL <= 0
 #define APP_LOG_D(module, ...) app_log_write(APP_LOG_DEBUG, module, __VA_ARGS__)
+#else
+#define APP_LOG_D(...) app_log_compiled_out()
+#endif
+#if APP_LOG_COMPILE_LEVEL <= 1
 #define APP_LOG_I(module, ...) app_log_write(APP_LOG_INFO, module, __VA_ARGS__)
+#else
+#define APP_LOG_I(...) app_log_compiled_out()
+#endif
+#if APP_LOG_COMPILE_LEVEL <= 2
 #define APP_LOG_W(module, ...) app_log_write(APP_LOG_WARN, module, __VA_ARGS__)
+#else
+#define APP_LOG_W(...) app_log_compiled_out()
+#endif
+#if APP_LOG_COMPILE_LEVEL <= 3
 #define APP_LOG_E(module, ...) app_log_write(APP_LOG_ERROR, module, __VA_ARGS__)
+#else
+#define APP_LOG_E(...) app_log_compiled_out()
+#endif

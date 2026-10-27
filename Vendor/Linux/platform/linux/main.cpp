@@ -1,8 +1,9 @@
 #define _POSIX_C_SOURCE 200809L
 
 #include "App.h"
-#include "HostLog.h"
 #include "DemoStatus.h"
+#include "HostLog.h"
+#include "Utils/lv_ext/LvglLog.h"
 extern "C" {
 #include "lv_display.h"
 #include "lv_tick_posix.h"
@@ -66,58 +67,60 @@ int main(int argc, char** argv) {
             event_device = argv[first + 3];
     }
     if (chunk < 4 || chunk % 2) {
-        std::fprintf(stderr, "EVEN_CHUNK_BYTES must be an even value from 4 to 32768\n");
+        APP_LOG_E("Linux", "EVEN_CHUNK_BYTES must be an even value from 4 to 32768");
         return EXIT_FAILURE;
     }
     struct sigaction action{};
     action.sa_handler = on_signal;
     sigemptyset(&action.sa_mask);
     if (sigaction(SIGINT, &action, nullptr) < 0 || sigaction(SIGTERM, &action, nullptr) < 0) {
-        std::perror("sigaction");
+        APP_LOG_E("Linux", "sigaction: %s", std::strerror(errno));
         return EXIT_FAILURE;
     }
     // 先打开 evdev，避免屏初始化后才发现输入设备不可用。
     int button_fd = display_only ? -1 : linux_button_open(event_device);
     if (!display_only && button_fd < 0) {
-        std::perror(event_device);
+        APP_LOG_E("Linux", "%s: %s", event_device, std::strerror(errno));
         return EXIT_FAILURE;
     }
     linux_display io;
     Rm690a0 screen;
     if (linux_display_open(&io, &screen, argv[first], argv[first + 1], speed, chunk) < 0) {
-        std::perror("display open");
+        APP_LOG_E("Linux", "display open: %s", std::strerror(errno));
         if (button_fd >= 0)
             close(button_fd);
         return EXIT_FAILURE;
     }
     int result = EXIT_FAILURE;
     if (rm_init(&screen) < 0) {
-        std::perror("RM690A0 init");
+        APP_LOG_E("Linux", "RM690A0 init: %s", std::strerror(errno));
     } else if (!stop) {
         lv_init();
+        app_lvgl_log_init();
+        APP_LOG_I("Linux", "display and LVGL initialized");
         lv_tick_set_cb(lv_tick_posix_ms);
         panel_display port{};
         if (lv_display_register(&port, &screen) < 0) {
-            std::perror("LVGL display");
+            APP_LOG_E("Linux", "LVGL display: %s", std::strerror(errno));
         } else {
             {
                 DemoStatus::configure(lv_tick_get);
                 App app;
                 if (!app.init()) {
-                    std::fprintf(stderr, "App init failed\n");
+                    APP_LOG_E("Linux", "App init failed");
                 } else {
                     if (page) {
                         lv_delay_ms(50);
                         lv_timer_handler();
                     }
                     if (page && !app.show_page(page)) {
-                        std::fprintf(stderr, "Unknown or unavailable page: %s\n", page);
+                        APP_LOG_E("Linux", "Unknown or unavailable page: %s", page);
                     } else {
                         std::uint64_t last = milliseconds();
                         while (!stop && !port.error) {
                             std::uint64_t now = milliseconds();
                             if (!now || now < last) {
-                                std::fprintf(stderr, "monotonic clock failed\n");
+                                APP_LOG_E("Linux", "monotonic clock failed");
                                 break;
                             }
                             last = now;
@@ -144,7 +147,7 @@ int main(int argc, char** argv) {
                                 }
                                 if (read_failed) {
                                     app.cancel_input();
-                                    std::perror("evdev read");
+                                    APP_LOG_E("Linux", "evdev read: %s", std::strerror(errno));
                                     break;
                                 }
                                 app.poll_keys(now);
@@ -153,7 +156,7 @@ int main(int argc, char** argv) {
                             lv_timer_handler();
                             timespec wait{0, 5000000};
                             if (nanosleep(&wait, nullptr) < 0 && errno != EINTR) {
-                                std::perror("nanosleep");
+                                APP_LOG_E("Linux", "nanosleep: %s", std::strerror(errno));
                                 break;
                             }
                         }
@@ -164,17 +167,17 @@ int main(int argc, char** argv) {
             }
             if (port.error) {
                 errno = port.error;
-                std::perror("display flush");
+                APP_LOG_E("Linux", "display flush: %s", std::strerror(errno));
             }
             lv_display_delete(port.display);
         }
     }
     if (linux_display_close(&io) < 0) {
-        std::perror("display close");
+        APP_LOG_E("Linux", "display close: %s", std::strerror(errno));
         result = EXIT_FAILURE;
     }
     if (button_fd >= 0 && close(button_fd) < 0) {
-        std::perror("button close");
+        APP_LOG_E("Linux", "button close: %s", std::strerror(errno));
         result = EXIT_FAILURE;
     }
     return result;
