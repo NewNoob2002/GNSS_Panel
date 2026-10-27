@@ -36,7 +36,7 @@ void SaveConfig::onViewDidAppear() {
         lv_anim_start(view_.progress_animation());
     timer_ = lv_timer_create(on_timeout, lv_anim_get_playtime(view_.progress_animation()) + 500, this);
     if (!timer_)
-        LV_LOG_ERROR("SaveConfig: preview timer allocation failed");
+        APP_LOG_E("SaveConfig", "preview timer allocation failed");
 }
 
 void SaveConfig::cancel_timer() {
@@ -51,7 +51,7 @@ void SaveConfig::onViewWillDisappear() {
     view_.unbind();
     cancel_timer();
     if (model_->state().power_pending && !model_->cancel_power())
-        LV_LOG_ERROR("SaveConfig: cancellation failed");
+        APP_LOG_E("SaveConfig", "cancellation failed");
     utils::leave_focus_group();
 }
 
@@ -73,11 +73,11 @@ void SaveConfig::on_timeout(lv_timer_t* timer) {
     if (!request.power_pending)
         return; // Platform shutdown: the platform reports standby (App returns to Startup).
     if (!self->model_->finish_power()) {
-        LV_LOG_ERROR("SaveConfig: power service failed");
+        APP_LOG_E("SaveConfig", "power service failed");
         return;
     }
     // Off ends with the platform's standby report (App resets to Startup); Reboot resumes the working root.
     if (request.power_action == hal::PowerCommand::Reboot
         && self->getManager()->backHome() != PageManager::RES_TYPE::OK)
-        LV_LOG_WARN("SaveConfig: return to the working root rejected");
+        APP_LOG_W("SaveConfig", "return to the working root rejected");
 }

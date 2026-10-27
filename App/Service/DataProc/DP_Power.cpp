@@ -1,5 +1,6 @@
 #include "Node.h"
 #include "Def/DP_Power.h"
+#include "Log.h"
 #include "HAL/Def/HAL_Board.h"
 #include <limits>
 namespace {
@@ -67,6 +68,10 @@ private:
     uint64_t executed_token_ = 0;
     /** @brief 所有电源写入统一记录上升沿，重复值及确认消费不会再次触发。 */
     void commit(dp::PowerState next) {
+        if (!(next.platform == state_.platform)) {
+            APP_LOG_I("Power", "on=%d standby=%d shutting_down=%d cause=%u", next.platform.powered_on,
+                      next.platform.standby, next.platform.shutting_down, static_cast<unsigned>(next.platform.cause));
+        }
         if (next.platform.standby && !state_.platform.standby) {
             next.navigation.standby = true;
             next.navigation.shutdown = next.navigation.power_on = false;

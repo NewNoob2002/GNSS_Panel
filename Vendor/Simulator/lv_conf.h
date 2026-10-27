@@ -127,6 +127,12 @@
 #define LV_USE_BIDI 1
 #define LV_USE_ARABIC_PERSIAN_CHARS 1
 #define LV_USE_LOG 1
+#define LV_LOG_PRINTF                             0
+#if APP_LOG_BUILD_DEBUG
+#define LV_LOG_LEVEL LV_LOG_LEVEL_INFO
+#else
+#define LV_LOG_LEVEL LV_LOG_LEVEL_WARN
+#endif
 #define LV_USE_SYSMON 1
 #define LV_USE_PERF_MONITOR 1
 

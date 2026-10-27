@@ -39,6 +39,7 @@ include(${REPO_ROOT}/cmake/options.cmake)
 # 上游目标负责收集 LVGL 源文件，模拟器仅指定自己的配置。
 include(${REPO_ROOT}/cmake/lvgl.cmake)
 project_add_lvgl("${CMAKE_CURRENT_SOURCE_DIR}/lv_conf.h")
+target_compile_definitions(lvgl PUBLIC APP_LOG_BUILD_DEBUG=$<IF:$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>,$<CONFIG:MinSizeRel>>,0,1>)
 add_library(sim::lvgl ALIAS lvgl)
 add_subdirectory(${REPO_ROOT}/App shared-app)
 add_subdirectory(${REPO_ROOT}/Vendor/HostLog host_log)
@@ -77,7 +78,7 @@ else()
     target_include_directories(sim_hardware_port INTERFACE
         ${CMAKE_CURRENT_SOURCE_DIR}/HAL
     )
-    target_link_libraries(sim_hardware_port INTERFACE proj::options)
+    target_link_libraries(sim_hardware_port INTERFACE proj::options app::log)
 
     include(${HC32_DIR}/cmake/portable.cmake)
     hc32_add_portable("" ${SIM_PRODUCT} sim::hardware_port DISPLAY)

@@ -17,7 +17,9 @@ cmake --build --preset x1pro-debug
 
 RTT 使用 J-Link RTT Viewer 的通道 0，缓冲满时按 SEGGER 的非阻塞配置丢弃日志。UART 沿用原生 `Peripherals/usart.h/.c` 原有 USART1 配置：**PA12/TX、921600 baud、8N1、无流控**，与 USB 转串口的 RX/GND 相连；原 PA11/RX 不再配置为串口功能，因为日志只有发送。参数集中在 `Platform/Config/board_pins.h` 的 `CONFIG_DEBUG_UART_*`。UART 发送轮询 TX_EMPTY、有界超时，ISR 中直接丢弃，不能作为中断日志通道；EasyLogger/App 日志仅允许主循环调用。
 
-ANSI 等级颜色默认开启：ASSERT 洋红、ERROR 红、WARN 黄、INFO 青、DEBUG 绿、VERBOSE 蓝。使用支持 ANSI 的 RTT Viewer/串口终端查看；不支持 ANSI 时设 `-DHC32_LOG_COLOR=OFF`。HAL 初始化 EasyLogger 后，X1Pro/XBase 的 `App_Init` 安装平台 sink，按 DEBUG/INFO/WARN/ERROR 映射等级并保留 App 模块名作为 tag；X1 没有共享 App。
+ANSI 等级颜色默认开启：ASSERT 洋红、ERROR 红、WARN 黄、INFO 青、DEBUG 绿、VERBOSE 蓝。使用支持 ANSI 的 RTT Viewer/串口终端查看；不支持 ANSI 时设 `-DHC32_LOG_COLOR=OFF`。HAL 初始化 EasyLogger 后，X1Pro/XBase 的显示初始化先安装平台 sink 与共享 LVGL 回调，`App_Init` 沿用同一 sink；按 DEBUG/INFO/WARN/ERROR 映射等级并保留 App 模块名作为 tag。X1 没有共享 App。
+
+App 默认运行时下限为 DEBUG，可用 `-DHC32_APP_LOG_LEVEL=DEBUG|INFO|WARN|ERROR|OFF` 调整，未知值在配置时拒绝。逐对象、订阅及页面动画已经归入 DEBUG；电源/充电变化仅在值变化时输出 INFO。MCU 的 LVGL 内部保持原有 WARN 下限，防止 TRACE/对象创建消息占满非阻塞 RTT 缓冲；这些消息也统一以 `LVGL` tag 进入 app log，不再经过 `CORE_DEBUG_PRINTF` 丢失等级。全平台构建策略表见 [构建架构](build_architecture.md#4-规则)。Release/`NONE` 仍强制裁剪所有日志实参，使用空 App API 实现，LVGL 日志关闭；不会因新增宏或错误日志恢复 stdio 格式化、EasyLogger 或 RTT 依赖。
 
 ## 与当前 Boot 的同步
 

@@ -105,13 +105,20 @@
 #define LV_MEM_SIZE (128U * 1024U)
 #define LV_DEF_REFR_PERIOD 16
 
+/* 日志与屏上监控独立，Debug 日志统一交给 app log 回调。 */
+#define LV_USE_LOG 1
+#define LV_LOG_PRINTF 0
+#if APP_LOG_BUILD_DEBUG
+#define LV_LOG_LEVEL LV_LOG_LEVEL_INFO
+#else
+#define LV_LOG_LEVEL LV_LOG_LEVEL_WARN
+#endif
+
 /* 监控仅在调试固件启用，不改变发布版界面。 */
 #ifdef __CORE_DEBUG
-#define LV_USE_LOG 1
 #define LV_USE_SYSMON 1
 #define LV_USE_PERF_MONITOR 1
 #else
-#define LV_USE_LOG 0
 #define LV_USE_SYSMON 0
 #define LV_USE_PERF_MONITOR 0
 #endif

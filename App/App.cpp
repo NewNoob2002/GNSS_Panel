@@ -8,6 +8,7 @@
 App::App() = default;
 
 bool App::init(const Options& options) {
+    APP_LOG_I("Application", "initializing");
     resource_pool::init();
     if (!DataProc_Init(lv_tick_get))
         return false;
@@ -39,7 +40,10 @@ bool App::init(const Options& options) {
     if (options.battery_warning && !battery_warning_.create(lv_layer_top()))
         return false;
     navigator_ = std::make_unique<page::AppNavigator>(*manager_, group_, battery_warning_);
-    return navigator_->init();
+    if (!navigator_->init())
+        return false;
+    APP_LOG_I("Application", "initialized");
+    return true;
 }
 
 void App::update() {
@@ -62,6 +66,7 @@ App::~App() {
     }
     if (style_ready_)
         lv_style_reset(&root_style_);
+    APP_LOG_I("Application", "stopped");
 }
 
 void App::on_input(InputAction action) {

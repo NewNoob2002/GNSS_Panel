@@ -1,6 +1,7 @@
 #include "ResourcePool.h"
 #include "ResourceManager.h"
 #include "LogoParts.h"
+#include "RM_Log.h"
 #include <cstring>
 
 extern "C" {
@@ -97,7 +98,10 @@ Images image_(images, sizeof(images) / sizeof(images[0]), same_name, nullptr);
 }
 
 /** 静态资源表无需运行期注册，保留原初始化入口。 */
-void resource_pool::init() {}
+void resource_pool::init() {
+    RM_LOG_INFO("static resources ready: %zu fonts, %zu images", sizeof(fonts) / sizeof(fonts[0]),
+                sizeof(images) / sizeof(images[0]));
+}
 /** 查找字体；未知名称返回 LV_FONT_DEFAULT，保持原接口。 */
 lv_font_t* resource_pool::get_font(const char* name) {
     return const_cast<lv_font_t*>(*font_.get(name));

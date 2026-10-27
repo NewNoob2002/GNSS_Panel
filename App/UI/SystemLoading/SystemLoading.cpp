@@ -39,7 +39,7 @@ void SystemLoading::onViewDidAppear() {
     // Logo 动画和完成计时都从页面真正可见后开始，包括主机长帧。
     timer_ = lv_timer_create(on_timeout, SystemLoadingView::kLogoMs, this);
     if (!timer_)
-        LV_LOG_ERROR("SystemLoading: preview timer allocation failed");
+        APP_LOG_E("SystemLoading", "preview timer allocation failed");
 }
 
 void SystemLoading::cancel_timer() {
@@ -125,5 +125,5 @@ void SystemLoading::on_timeout(lv_timer_t* timer) {
     lv_timer_delete(timer);
     APP_LOG_I("SystemLoading", "window=Dialplate%s", self->demo_tag());
     if (self->getManager()->replace(page::name(PageId::Dialplate)) != PageManager::RES_TYPE::OK)
-        LV_LOG_WARN("SystemLoading: preview transition rejected");
+        APP_LOG_W("SystemLoading", "preview transition rejected");
 }

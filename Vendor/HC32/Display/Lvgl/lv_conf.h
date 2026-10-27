@@ -108,6 +108,9 @@
 /* 监控仅在调试固件启用，不改变发布版界面。 */
 #ifdef __CORE_DEBUG
 #define LV_USE_LOG 1
+#define LV_LOG_PRINTF        0
+/* MCU 保持 WARN 下限，避免逐帧 TRACE 占满 RTT 非阻塞缓冲。 */
+#define LV_LOG_LEVEL         LV_LOG_LEVEL_WARN
 #define LV_LOG_USE_FILE_LINE 0
 #define LV_USE_SYSMON 1
 #define LV_USE_PERF_MONITOR 1

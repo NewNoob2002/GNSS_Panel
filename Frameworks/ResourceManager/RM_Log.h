@@ -23,18 +23,10 @@
 #ifndef __RM_LOG_H
 #define __RM_LOG_H
 
-#define RESOURCE_MANAGER_USE_LOG 1
+#include "Log.h"
 
-#if !defined(ARDUINO) && RESOURCE_MANAGER_USE_LOG
-#include <stdio.h>
-#  define _RM_LOG(format, ...)      printf("[RM]" format "\r\n", ##__VA_ARGS__)
-#  define RM_LOG_INFO(format, ...)  //_RM_LOG("[Info] " format, ##__VA_ARGS__)
-#  define RM_LOG_WARN(format, ...)  _RM_LOG("[Warn] " format, ##__VA_ARGS__)
-#  define RM_LOG_ERROR(format, ...) _RM_LOG("[Error] " format, ##__VA_ARGS__)
-#else
-#  define RM_LOG_INFO(...)
-#  define RM_LOG_WARN(...)
-#  define RM_LOG_ERROR(...)
-#endif
+#define RM_LOG_INFO(...)  APP_LOG_D("ResourceManager", __VA_ARGS__)
+#define RM_LOG_WARN(...)  APP_LOG_W("ResourceManager", __VA_ARGS__)
+#define RM_LOG_ERROR(...) APP_LOG_E("ResourceManager", __VA_ARGS__)
 
 #endif

@@ -22,7 +22,9 @@ else()
     project_add_lvgl("${CMAKE_CURRENT_SOURCE_DIR}/config/lv_conf.h")
 endif()
 add_library(lvgl960 ALIAS lvgl)
-target_compile_definitions(lvgl PUBLIC $<$<BOOL:${RK3506_DEBUG_MONITOR}>:__CORE_DEBUG>)
+target_compile_definitions(lvgl PUBLIC
+    APP_LOG_BUILD_DEBUG=$<IF:$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>,$<CONFIG:MinSizeRel>>,0,1>
+    $<$<BOOL:${RK3506_DEBUG_MONITOR}>:__CORE_DEBUG>)
 if(RK3506_LVGL_DEMO)
     set(RK3506_LVGL_DEMO_REFRESH_MS 8 CACHE STRING "LVGL demo refresh period in ms")
     set(RK3506_LVGL_DEMO_DRAW_DIVISOR 4 CACHE STRING "LVGL demo draw buffer fraction denominator")

@@ -10,6 +10,9 @@ add_subdirectory(Utils/Spring)
 add_library(app_log_headers INTERFACE)
 add_library(app::log_headers ALIAS app_log_headers)
 target_include_directories(app_log_headers INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/Utils/Log")
+# Release 类配置不保留逐对象/逐帧 DEBUG 实参；未指定构建类型按开发构建保留全部级别。默认运行时级别与编译下限一致。
+target_compile_definitions(app_log_headers INTERFACE
+    APP_LOG_COMPILE_LEVEL=$<IF:$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>,$<CONFIG:MinSizeRel>>,1,0>)
 add_library(app_log STATIC Utils/Log/Log.cpp)
 add_subdirectory(../Frameworks/DataBroker frameworks/databroker)
 add_subdirectory(../Frameworks/DeviceManager frameworks/devicemanager)

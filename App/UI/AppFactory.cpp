@@ -1,5 +1,6 @@
 #include "AppFactory.h"
 #include "PageId.h"
+#include "Log.h"
 #include <cstring>
 #include "Page.h"
 #include "Def/DP_Version.h"
@@ -27,6 +28,7 @@ bool has_star_map() {
 
 bool install(PageManager& manager, PageBase* page, const char* name) {
     if (manager.registerPage(page, name) != PageManager::RES_TYPE::OK) {
+        APP_LOG_E("PageManager", "page installation failed: %s", name);
         delete page;
         return false;
     }
@@ -56,10 +58,15 @@ page::PageId page::id(const char* route) {
 }
 
 bool AppFactory::installAll(PageManager& manager) {
+    [[maybe_unused]] unsigned installed = 0;
 #define PAGE_DEF(Name, InstallPredicate) \
-    if (InstallPredicate() && !install(manager, new page::Name, page::name(page::PageId::Name))) \
-        return false;
+    if (InstallPredicate()) { \
+        if (!install(manager, new page::Name, page::name(page::PageId::Name))) \
+            return false; \
+        ++installed; \
+    }
 #include "PageList.inc"
 #undef PAGE_DEF
+    APP_LOG_I("PageManager", "pages installed: %u", installed);
     return true;
 }

@@ -1,4 +1,6 @@
 #pragma once
+#undef APP_LOG_COMPILE_LEVEL
+#define APP_LOG_COMPILE_LEVEL 4
 #include "Log.h"
 
 // 发布固件及 NONE 模式不求值日志参数，也不引入格式化实现。

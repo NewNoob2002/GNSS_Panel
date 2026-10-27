@@ -5,8 +5,10 @@
  * @brief Debug and assertion macros for Simulator platform.
  */
 
+#include "Log.h"
+
 #ifndef CORE_DEBUG_PRINTF
-#define CORE_DEBUG_PRINTF(fmt, ...)
+#define CORE_DEBUG_PRINTF(...) APP_LOG_D("HAL", __VA_ARGS__)
 #endif
 
 #ifndef CORE_ASSERT
