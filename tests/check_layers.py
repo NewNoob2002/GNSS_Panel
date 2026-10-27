@@ -52,6 +52,7 @@ DIRECTORY_LAYER_MAP: List[Tuple[str, Tuple[int, Optional[int]]]] = [
 
     # L1 第三方库与移植目标
     ("External/lvgl", (LAYER_L1, None)),
+    ("External/spdlog", (LAYER_L1, None)),
     ("Vendor/HC32/Libraries", (LAYER_L1, None)),
 
     # L2 跨平台框架
@@ -82,6 +83,9 @@ DIRECTORY_LAYER_MAP: List[Tuple[str, Tuple[int, Optional[int]]]] = [
     # L5 HC32 产品与固件可执行目标
     ("Vendor/HC32/Products", (LAYER_L5, None)),
     ("Vendor/HC32", (LAYER_L5, None)),
+
+    # Linux/Simulator 共用的主机日志适配器
+    ("Vendor/HostLog", (LAYER_L4, None)),
 
     # Linux 平台目标与测试
     ("Vendor/Linux/platform/linux", (LAYER_L5, None)),
@@ -329,6 +333,12 @@ def check_build_directory(bdir: str, repo_root: str) -> List[str]:
         def_dir = get_target_def_dir(t, cm_source, repo_root)
         rel_def = os.path.relpath(def_dir, repo_root)
 
+        if rel_def.startswith("Vendor/HC32"):
+            for cg in t.get("compileGroups", []):
+                if any("/External/spdlog" in inc["path"].replace("\\", "/")
+                       for inc in cg.get("includes", [])):
+                    errors.append(f"[{bname}] 违规: HC32 目标 {t_name} 包含了 spdlog 头文件目录")
+
         layer, sublayer = map_directory_to_layer(rel_def, t_name, t_type)
         if layer is None:
             errors.append(f"[{bname}] 违规: 目标 {t_name} 的定义目录 '{rel_def}' 不在分层目录映射表中")
@@ -413,6 +423,12 @@ def check_build_directory(bdir: str, repo_root: str) -> List[str]:
                 continue
             dst_id = dst["id"]
             dst_name = dst["name"]
+            src_dir = os.path.relpath(get_target_def_dir(t, cm_source, repo_root), repo_root).replace(os.sep, "/") + "/"
+            dst_dir = os.path.relpath(get_target_def_dir(dst, cm_source, repo_root), repo_root).replace(os.sep, "/") + "/"
+            # 主机日志只能由 Linux/Simulator 及适配器自身使用；固件禁止直接或经中间目标引入。
+            if (dst_dir.startswith(("External/spdlog/", "Vendor/HostLog/"))
+                    and not src_dir.startswith(("Vendor/Linux/", "Vendor/Simulator/", "Vendor/HostLog/", "External/spdlog/"))):
+                errors.append(f"[{bname}] 违规: 非主机平台目标 {src_name} 依赖了主机日志 {dst_name}")
             if dst_id not in tgt_classification:
                 continue
             dst_layer, dst_sub = tgt_classification[dst_id]

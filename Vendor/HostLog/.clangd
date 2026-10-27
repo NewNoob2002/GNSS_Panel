@@ -1,0 +1,4 @@
+# 共享主机日志不使用 HC32 的交叉编译数据库。
+CompileFlags:
+  CompilationDatabase: ../../build/linux-host
+  Compiler: c++
