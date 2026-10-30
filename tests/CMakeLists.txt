@@ -138,7 +138,7 @@ target_link_libraries(lvgl PUBLIC proj::options)
 
 add_subdirectory(${ROOT}/App shared-app)
 
-include(${ROOT}/Vendor/Linux/tests/portable.cmake)
+include(${ROOT}/Vendor/Linux/Apps/Display/tests/portable.cmake)
 linux_add_page_manager_test(page_manager_tests)
 
 include(${ROOT}/App/tests/targets.cmake)

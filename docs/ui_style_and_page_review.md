@@ -61,7 +61,7 @@
 
 工作、记录保留左侧图形主卡和右侧参数/操作卡，系统页采用左侧亮度主卡与右侧三行网格，主卡五段短线显示档位；共用原生 16/32 px 图标，工作、记录另有渐变、网络连接图形与状态点。控件每隔 40 ms 依次从下方 6 px 上移进入（只做位移、不做透明度，避免与页面滑动叠加的逐控件混合开销），数值变化时短淡入；只有主控等待或记录进行时状态点持续呼吸，离页和销毁时停止。正常状态不增加操作说明文字，错误、等待、确认等业务反馈保留。
 
-`Vendor/Linux/tools/generate_ui_icons.py` 保存原创矢量路径并用已有 ImageMagick 生成原生尺寸 alpha 资源（16/32 px 按各自网格单独设计）。渲染先 8 倍超采样再按整数倍盒式平均得到真实像素覆盖率（不用会产生振铃灰边的 Lanczos 缩放），2 单位描边、方头斜接，使横竖线落在整像素上；覆盖率再经过渡带收紧（45° 小块拼成的卫星图标用更窄的过渡带）。自检包含像素数量、亮度、首页图标墨量，以及半透明像素不超过有效像素一半的清晰度检查。未引入外部图标下载依赖，固件运行时不缩放图标；亮度主卡使用独立的 32 px `ui_sun_large`，首页系统入口继续使用齿轮。SystemInfos 的 6 张信息卡图标为单色白图，运行时统一着色，已无损转为 A8（只存透明度，体积为原 RGB565A8 的 1/3）。
+`Vendor/Linux/Apps/Display/tools/generate_ui_icons.py` 保存原创矢量路径并用已有 ImageMagick 生成原生尺寸 alpha 资源（16/32 px 按各自网格单独设计）。渲染先 8 倍超采样再按整数倍盒式平均得到真实像素覆盖率（不用会产生振铃灰边的 Lanczos 缩放），2 单位描边、方头斜接，使横竖线落在整像素上；覆盖率再经过渡带收紧（45° 小块拼成的卫星图标用更窄的过渡带）。自检包含像素数量、亮度、首页图标墨量，以及半透明像素不超过有效像素一半的清晰度检查。未引入外部图标下载依赖，固件运行时不缩放图标；亮度主卡使用独立的 32 px `ui_sun_large`，首页系统入口继续使用齿轮。SystemInfos 的 6 张信息卡图标为单色白图，运行时统一着色，已无损转为 A8（只存透明度，体积为原 RGB565A8 的 1/3）。
 
 状态栏分左右两组按内容紧凑排列：左为卫星图标与卫星数、定位箭头与定位状态，中为时钟，右为 SD、Wi-Fi、电池与电量，数值统一 18 号字，电池槽内宽 20 px。图标全部为生成的 alpha 图片（替代原 `statusbar` 字体符号），由 recolor 着色。充电时电池条从当前电量扫到满（起点最多为槽宽 4/5，满电时仍可见扫动）、停留 0.3 s 后循环，电量变化时从新起点重启。SD 图标跟随平台上报的录制状态：变化时先上移滑出状态栏，在栏外换色，再回弹滑入；录制中蓝色闪烁，未录制为静止白色，快速往返以最后一次上报为准。状态栏、首页与设置页刷新只在值变化时调用 LVGL，空闲时不再周期性重绘。
 
@@ -111,9 +111,9 @@
 在仓库根目录运行（可从空构建目录开始，仅需 CMake、Ninja、主机 C/C++ 编译器及 Python 3.9+）：
 
 ```bash
-python3 Vendor/Linux/tools/generate_doc_previews.py
+python3 Vendor/Linux/Apps/Display/tools/generate_doc_previews.py
 # 或指定 OEM 与独立构建目录：
-python3 Vendor/Linux/tools/generate_doc_previews.py --oem neutral
+python3 Vendor/Linux/Apps/Display/tools/generate_doc_previews.py --oem neutral
 ```
 
 工具默认采用中立白牌 OEM（`--oem neutral`，独立构建目录 `build/doc-previews-neutral`），支持通过 `--oem <name>`（从 `App/UI/Resource/oem/` 校验）生成其他 OEM 的预览。工具自动按 `linux-host` preset、指定 OEM 配置并构建三个既有回归程序：`app_system_dash_test` 输出加载、星图、信息、设置和确认窗，`app_startup_power_test` 输出英俄充电待机，`app_focus_rollout_preview` 的 `Dialplate stills en` 模式输出首页。原始 PPM 与日志保留在对应构建目录的 `doc-preview/`，Python 标准库 `struct/zlib` 负责拼图与 PNG 编码，只更新 `docs/images/` 的四个同名文件，不依赖 SDL 窗口或外部图像包。早期 `08a653d2` 提交只保存了八页拼图，没有保留拼图脚本；此工具补全可复现命令。

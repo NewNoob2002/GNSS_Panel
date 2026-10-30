@@ -1,6 +1,6 @@
 // 统一 PC SDL 模拟器入口：共享应用（App/）+ 可选后端：
 // - SIM_BACKEND=Board（默认）：HC32 平台层（Vendor/HC32/Display/AppPlatform）+ 模拟 HAL（运行固件 PowerPolicy）
-// - SIM_BACKEND=Demo：Linux 演示后端（Vendor/Linux/Backends/Demo，支持 --random-status [seed]）
+// - SIM_BACKEND=Demo：Linux 演示后端（Vendor/Linux/Apps/Display/Backends/Demo，支持 --random-status [seed]）
 // 窗口 294×126，1:1 像素。
 #define SDL_MAIN_HANDLED
 #include <SDL.h>

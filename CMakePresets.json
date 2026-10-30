@@ -122,7 +122,9 @@
             "binaryDir": "${sourceDir}/build/linux-host",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
-                "PLATFORM": "Linux"
+                "PLATFORM": "Linux",
+                "LINUX_APP_DISPLAY": "ON",
+                "LINUX_APP_SURVEY": "ON"
             }
         }
     ],

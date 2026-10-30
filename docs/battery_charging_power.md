@@ -24,6 +24,6 @@ X1Pro/XBase 在面板 MCU 上直接读取电池状态。`display_protocol.cpp` /
 - `tests/firmware_tests.cpp`：fake I2C 覆盖 AverageCurrent 命令、小端有符号解码、int16 边界、空指针、总线/单寄存器读取失败、恢复和样本过期。
 - `tests/display_app_tests.cpp`：X1Pro/XBase 本地电池电流映射；`tests/check_state_ownership.py` 检查状态写入者。
 - `App/tests/domain_node_tests.cpp`：电流与有效位变化单独发布，重复样本不发布；`hal_device_checks.h` 覆盖新增字段的相等比较。
-- `Vendor/Linux/tests/app_startup_power_test.cpp`：实际 Startup 页面验证充电功率、49/50 mA 阈值、负值/无效值回退、停止充电、整数边界、非有限电压、文本变化去重和英俄文布局，并在传入目录输出 PPM 截图。
+- `Vendor/Linux/Apps/Display/tests/app_startup_power_test.cpp`：实际 Startup 页面验证充电功率、49/50 mA 阈值、负值/无效值回退、停止充电、整数边界、非有限电压、文本变化去重和英俄文布局，并在传入目录输出 PPM 截图。
 
 主机测试与编译不能替代实机验证；BQ40Z50 采样时序、校准精度和实际充电曲线尚需在硬件上确认。

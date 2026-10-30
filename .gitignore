@@ -20,7 +20,7 @@ Vendor/Simulator/bin/
 .vscode/ipch/
 Vendor/Simulator/.idea/
 
-# Vendor/Linux/tests/oem_presets.py 运行时在 oem/ 下创建的临时客户目录
+# Vendor/Linux/Apps/Display/tests/oem_presets.py 运行时在 oem/ 下创建的临时客户目录
 App/UI/Resource/oem/test-preset-*/
 
 # Python 字节码缓存（运行 tests/ 与资源工具脚本时生成）

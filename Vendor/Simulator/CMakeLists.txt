@@ -45,7 +45,7 @@ add_subdirectory(${REPO_ROOT}/App shared-app)
 add_subdirectory(${REPO_ROOT}/Vendor/HostLog host_log)
 
 if(SIM_BACKEND STREQUAL "Demo")
-    add_subdirectory(${REPO_ROOT}/Vendor/Linux/Backends/Demo demo_backend)
+    add_subdirectory(${REPO_ROOT}/Vendor/Linux/Apps/Display/Backends/Demo demo_backend)
 
     add_executable(main main.cpp)
     add_executable(sim::main ALIAS main)

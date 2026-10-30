@@ -1,6 +1,6 @@
 # 共享应用架构
 
-HC32、RK3506（`Vendor/Linux`）和 SDL 模拟器（`Vendor/Simulator`）共用本仓库的 `App/`、`Frameworks/`，不从外部仓库同步。架构参照 X-TRACK `dev_lvgl_v9` 的领域节点与页面 MVP，保留本项目的同步调用、板级时序和页面交互。
+HC32、RK3506 显示应用（`Vendor/Linux/Apps/Display`）和 SDL 模拟器（`Vendor/Simulator`）共用本仓库的 `App/`、`Frameworks/`，不从外部仓库同步。架构参照 X-TRACK `dev_lvgl_v9` 的领域节点与页面 MVP，保留本项目的同步调用、板级时序和页面交互。
 
 ## 目录与依赖
 
@@ -47,7 +47,7 @@ HC32、RK3506（`Vendor/Linux`）和 SDL 模拟器（`Vendor/Simulator`）共用
 
 平台持有九个静态 DeviceObject：Power、Battery、GNSS、Clock、Work、Recorder、WiFi、Board、Init。设备寿命覆盖应用，初始化只标记可用；未知命令、错误方向/尺寸和非零尺寸空指针均拒绝，外部缓冲区按值拷贝，不假设对齐。
 
-HC32 的 BusinessDevice 仅负责细领域采样与协议映射，不注册为设备；选项下标和协议码转换只在此处，写入只经 `State::Request_*`，读取有效请求经 `State::Effective_*`，revision 采样与确认仍属于显示协议。StatusDevice 是 InitSteps/Board 的平台能力及初始化辅助对象，不承担聚合发布。Board 模拟器编译同一实现；Linux 和 Demo 模拟器共用 `Backends/Demo` 单一模型，真实 Linux 业务仍待接入。
+HC32 的 BusinessDevice 仅负责细领域采样与协议映射，不注册为设备；选项下标和协议码转换只在此处，写入只经 `State::Request_*`，读取有效请求经 `State::Effective_*`，revision 采样与确认仍属于显示协议。StatusDevice 是 InitSteps/Board 的平台能力及初始化辅助对象，不承担聚合发布。Board 模拟器编译同一实现；Linux 和 Demo 模拟器共用 `Vendor/Linux/Apps/Display/Backends/Demo` 单一模型，真实 Linux 业务仍待接入。
 
 ## 页面与执行时序
 
@@ -77,4 +77,4 @@ PageManager 拥有已注册页面；导航结果必须显式比较 `PageManager:
 
 ## 验证
 
-`App/tests` 无 LVGL，覆盖框架生命周期、容量、同步边界、计时器、领域发布/命令、Clock 日期与 Init 查询/留存；`tests` 验证 HC32 协议映射、pending/revision、平台时序与 LVGL 池；Linux 测试验证页面 MVP、导航/输入、双语布局和截图，新增 `app_startup_power_test` 覆盖功率/电压回退，`app_panel_return_test` 覆盖慢卸载与慢首帧后的完整收回；`app_page_manager_test` 覆盖纯色过渡、配置颜色和销毁清理，`app_system_dash_test` 覆盖亮度档位、网格及 Wi-Fi 焦点。`app_transition_bench` 包含纯色过渡/入口展开/视差推入对比，仅手动执行，不计入 CTest。`uv run --with pillow python3 -B Vendor/Linux/tests/oem_presets.py` 用临时客户配置将全部 Linux 测试分别跑在四种预设下，共用一个增量构建目录避免重复编译 LVGL；该脚本不注册进默认 CTest，避免递归调用。构建与检查命令见根 `AGENTS.md`；CMake 层级和自有源码包含规则由 `tests/check_layers.py` 检查，HC32 状态单写者由 `check_state_ownership.py` 检查。
+`App/tests` 无 LVGL，覆盖框架生命周期、容量、同步边界、计时器、领域发布/命令、Clock 日期与 Init 查询/留存；`tests` 验证 HC32 协议映射、pending/revision、平台时序与 LVGL 池；Linux 测试验证页面 MVP、导航/输入、双语布局和截图，新增 `app_startup_power_test` 覆盖功率/电压回退，`app_panel_return_test` 覆盖慢卸载与慢首帧后的完整收回；`app_page_manager_test` 覆盖纯色过渡、配置颜色和销毁清理，`app_system_dash_test` 覆盖亮度档位、网格及 Wi-Fi 焦点。`app_transition_bench` 包含纯色过渡/入口展开/视差推入对比，仅手动执行，不计入 CTest。`uv run --with pillow python3 -B Vendor/Linux/Apps/Display/tests/oem_presets.py` 用临时客户配置将全部 Linux 测试分别跑在四种预设下，共用一个增量构建目录避免重复编译 LVGL；该脚本不注册进默认 CTest，避免递归调用。构建与检查命令见根 `AGENTS.md`；CMake 层级和自有源码包含规则由 `tests/check_layers.py` 检查，HC32 状态单写者由 `check_state_ownership.py` 检查。

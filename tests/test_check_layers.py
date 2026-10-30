@@ -14,7 +14,7 @@ class ParentIncludeTests(unittest.TestCase):
         """自有代码报错，第三方与构建目录不参与扫描。"""
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            for name in ("App/test.cpp", "Frameworks/test.hpp", "Vendor/Linux/test.c",
+            for name in ("App/test.cpp", "Frameworks/test.hpp", "Vendor/Linux/Apps/Survey/main.cpp",
                          "External/test.c", "build/test.c", "Vendor/HC32/Libraries/a/test.c",
                          "Vendor/HC32/Platform/DDL/test.c", "Vendor/HC32/Platform/CMSIS/test.c",
                          "App/build/test.c"):
@@ -31,7 +31,7 @@ class ParentIncludeTests(unittest.TestCase):
             root = Path(directory)
             for filename, include in (
                     ("App/UI/StatusBar/StatusBar.h", "../../Utils/lv_anim_label/numberFlow.h"),
-                    ("Vendor/Linux/tests/linux_button_test.c", "../platform/linux_button.h")):
+                    ("Vendor/Linux/Apps/Display/tests/linux_button_test.c", "../Platform/linux_button.h")):
                 path = root / filename
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(f'#include "{include}"\n')

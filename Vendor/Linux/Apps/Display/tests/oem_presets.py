@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """用四个临时 OEM 运行全部 Linux 测试；复用一个构建目录，只编译一次 LVGL。
 
-uv run --with pillow python3 -B Vendor/Linux/tests/oem_presets.py \
+uv run --with pillow python3 -B Vendor/Linux/Apps/Display/tests/oem_presets.py \
     --build-dir build/oem-presets --log-dir /tmp/oem-presets
 不加入默认 CTest（防止递归）；临时客户退出时删除，配置和生成物保留在日志目录。
 """
@@ -16,7 +16,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parents[3]
+REPO = Path(__file__).resolve().parents[5]
 sys.path.insert(0, str(REPO / 'App/UI/Resource/tools'))
 oem_build = importlib.import_module('oem_build')
 

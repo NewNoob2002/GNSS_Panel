@@ -2,11 +2,11 @@
 """重绘共享 UI 原生尺寸图标，需要已有的 ImageMagick，不在固件运行时缩放。
 
 仓库根目录用法：
-    python3 Vendor/Linux/tools/generate_ui_icons.py             # 默认 v9 A8，写入正式 img
-    python3 Vendor/Linux/tools/generate_ui_icons.py --v9        # 与默认行为相同
-    python3 Vendor/Linux/tools/generate_ui_icons.py --v9 --format RGB565A8 --output-dir build/icons-v9-rgb
-    python3 Vendor/Linux/tools/generate_ui_icons.py --v9 --output-dir build/icons-v9
-    uv run Vendor/Linux/tools/generate_ui_icons.py --only sun  # 仅生成太阳的 16/32 px 资源
+    python3 Vendor/Linux/Apps/Display/tools/generate_ui_icons.py             # 默认 v9 A8，写入正式 img
+    python3 Vendor/Linux/Apps/Display/tools/generate_ui_icons.py --v9        # 与默认行为相同
+    python3 Vendor/Linux/Apps/Display/tools/generate_ui_icons.py --v9 --format RGB565A8 --output-dir build/icons-v9-rgb
+    python3 Vendor/Linux/Apps/Display/tools/generate_ui_icons.py --v9 --output-dir build/icons-v9
+    uv run Vendor/Linux/Apps/Display/tools/generate_ui_icons.py --only sun  # 仅生成太阳的 16/32 px 资源
 
 v9 复用 App/UI/Resource/tools/convert_images_v9.py 的编码和回读校验；
 保留覆盖率、墨量及半透明像素比例自检。默认保留 A8 遮罩，颜色由主题 recolor 提供；
@@ -18,7 +18,7 @@ import math
 import subprocess
 import sys
 
-ROOT = Path(__file__).resolve().parents[3] / "App/UI/Resource/img"
+ROOT = Path(__file__).resolve().parents[5] / "App/UI/Resource/img"
 FILL = 'fill="white" stroke="none"'
 
 

@@ -2,9 +2,9 @@
 """用现有无窗口 LVGL 回归生成文档 PNG；仅依赖 CMake、主机编译器和 Python 标准库。
 
 仓库根目录用法：
-    python3 Vendor/Linux/tools/generate_doc_previews.py
-    python3 Vendor/Linux/tools/generate_doc_previews.py --oem neutral
-    python3 Vendor/Linux/tools/generate_doc_previews.py --oem singularxyz --build-dir build/doc-previews-singularxyz
+    python3 Vendor/Linux/Apps/Display/tools/generate_doc_previews.py
+    python3 Vendor/Linux/Apps/Display/tools/generate_doc_previews.py --oem neutral
+    python3 Vendor/Linux/Apps/Display/tools/generate_doc_previews.py --oem singularxyz --build-dir build/doc-previews-singularxyz
 
 原始 PPM 和回归日志保存在构建目录，docs/images 只写入四张 PNG。
 """
@@ -15,7 +15,7 @@ import subprocess
 import zlib
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[3]
+ROOT = Path(__file__).resolve().parents[5]
 OEM_ROOT = ROOT / "App/UI/Resource/oem"
 NATIVE_WIDTH, NATIVE_HEIGHT = 294, 126
 SCALE = 2
@@ -145,7 +145,7 @@ def main() -> None:
     run("cmake", "--build", str(build), "--parallel", "4", "--target", *targets)
     shots = build / "doc-preview"
     shots.mkdir(exist_ok=True)
-    executables = build / "Vendor/Linux/tests"
+    executables = build / "Vendor/Linux/Apps/Display/tests"
     render(executables / targets[0], shots / "pages")
     render(executables / targets[1], shots / "startup")
     render(executables / targets[2], shots / "dialplate", "Dialplate", "stills", "en")

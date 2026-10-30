@@ -97,17 +97,23 @@ flowchart TD
 ├── Vendor/
 │   ├── HC32/                   HC32F460xE 固件
 │   ├── Simulator/              唯一 PC SDL2 模拟器（SIM_BACKEND=Board|Demo）
-│   └── Linux/                  RK3506 Linux 端口
-│       ├── CMakeLists.txt
-│       ├── Backends/Demo/      Linux 演示业务后端（DemoStatus、SimulatedSystem）
-│       ├── board/rk3506j/      已记录接线与 P1 硬件检查
-│       ├── config/             lv_conf.h 与 POSIX tick
-│       ├── demo/               独立 benchmark 入口与 FPS/CPU 统计
-│       ├── display/            RM690A0 协议与 LVGL 显示 port
-│       ├── docker/             编译镜像与环境检查
-│       ├── docs/               原始资料、计划、HC32 迁移摘要、构建说明
-│       ├── platform/           Linux SPI/GPIO/evdev 适配与 rk3506_app 入口
-│       └── tests/              屏协议、Linux IO 与显示回归检查
+│   └── Linux/                  Linux 应用编排
+│       ├── CMakeLists.txt       公共设置与两个应用开关
+│       ├── Apps/
+│       │   ├── Display/         RK3506 屏幕应用（共享 App 与 LVGL）
+│       │   │   ├── main.cpp     rk3506_app 入口
+│       │   │   ├── Panel/       RM690A0 协议与 LVGL 显示 port
+│       │   │   ├── Platform/    Linux SPI/GPIO/evdev 适配
+│       │   │   ├── Backends/Demo/ 显示侧演示数据源
+│       │   │   ├── config/      lv_conf.h 与 POSIX tick
+│       │   │   ├── Diagnostics/ 基线、按键探测与显示诊断
+│       │   │   ├── demo/        独立 benchmark
+│       │   │   ├── tools/       UI 资源工具
+│       │   │   └── tests/       屏协议、Linux IO 与显示回归
+│       │   └── Survey/          独立逻辑应用；规划及边界见其 README
+│       ├── board/rk3506j/       已记录接线与 P1 硬件检查
+│       ├── docker/              编译镜像与环境检查
+│       └── docs/                历史资料、计划、迁移摘要与构建说明
 └── build/                      本仓库构建产物，不入版本库
 ```
 

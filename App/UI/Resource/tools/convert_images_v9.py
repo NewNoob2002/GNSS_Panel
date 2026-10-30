@@ -59,7 +59,7 @@ alpha 必须精确相等，颜色在 RGB565 精度下必须相等（``A8`` 只�
 
 * A8 覆盖只保留透明度；必须在调用处设置单一可见颜色的 image_recolor。
 
-``Vendor/Linux/tools/generate_ui_icons.py --v9`` 复用本脚本的编码器与校验，默认输出 A8；
+``Vendor/Linux/Apps/Display/tools/generate_ui_icons.py --v9`` 复用本脚本的编码器与校验，默认输出 A8；
 ``--v9 --format RGB565A8`` 可显式生成带白色 RGB565 平面的图标。
 """
 from __future__ import annotations
