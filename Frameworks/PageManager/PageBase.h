@@ -260,6 +260,7 @@ private:
             bool isEnter; /* Animation enter or exit */
             bool isBusy; /* Animation is busy */
             ANIM_ATTR attr; /* Animation properties */
+            PAGE_ANIM navType; /* Type chosen by pushWithAnim for this stack entry; GLOBAL = use attr */
         } anim;
 
         lv_dir_t backGestureDir; /* Back gesture direction */

@@ -8,6 +8,7 @@
 #include "DomainFixture.hpp"
 #include "I18n.h"
 #include "HAL_Manager.h"
+#include "HAL/Def/HAL_Board.h"
 #include "hal_device_checks.h"
 #include "UI/Common/SettingsStyle.h"
 #include "UI/Resource/ResourcePool.h"
@@ -243,6 +244,28 @@ wifi(bool on, bool pending) {
 } // namespace
 
 int main() {
+    // 与 HC32/SDL 共用的感知映射：最低档保底，满档为 0xFF，各档严格递增。
+    constexpr uint8_t panel_values[] = {0x33, 0x53, 0x7F, 0xB8, 0xFF};
+    uint8_t previous = 0;
+    for (unsigned level = 0; level < 5; ++level) {
+        const auto percent = static_cast<uint8_t>((level + 1U) * 20U);
+        const auto value = hal::brightness_panel_value(percent);
+        assert(hal::is_brightness_level(percent));
+        assert(value == panel_values[level] && value > previous);
+        previous = value;
+    }
+    assert(previous == 0xFF);
+    assert(hal::BoardState{}.brightness == 100);
+    assert(hal::BrightnessCommand{}.percent == 100);
+    for (unsigned percent = 0; percent <= 255; ++percent) {
+        const bool expected = percent == 20 || percent == 40 || percent == 60 || percent == 80 || percent == 100;
+        assert(hal::is_brightness_level(static_cast<uint8_t>(percent)) == expected);
+    }
+    constexpr uint8_t fallback[][2] = {{0, 51},   {29, 51},  {30, 83},  {49, 83},  {50, 127},
+                                       {69, 127}, {70, 184}, {89, 184}, {90, 255}, {255, 255}};
+    for (const auto& sample : fallback) {
+        assert(hal::brightness_panel_value(sample[0]) == sample[1]);
+    }
     fixture::source.board.capabilities = {false, false, true, false, false};
     fixture::source.wifi.available = true;
     fixture::source.request_on = request_on;
@@ -330,7 +353,7 @@ int main() {
         advance(500);
         assert(find_text(lv_screen_active(), "22.543096\n114.057865\n8.25 m"));
         assert(find_text(lv_screen_active(), "AP-X1PRO-TEST\nOFF\n10.0.0.7"));
-        assert(find_text(lv_screen_active(), "64.5%\n7.71 V\n31.0 C"));
+        assert(find_text(lv_screen_active(), "64.5%\n7.71 V\n31.0 °C"));
         assert(find_text(lv_screen_active(), "V2.4.4\n01:02:05\n0\n2026-10-19"));
         assert(find_text(lv_screen_active(), i18n::text(i18n::TextId::WorkModeBase)));
         assert(app.back());
@@ -429,21 +452,21 @@ int main() {
         // Wi-Fi: pending ("...") until the platform reports the applied state.
         assert(app.show_page("Pages/SystemDash"));
         advance(500);
+        app.on_input(App::InputAction::NextFocus); // Brightness -> Language
         app.on_input(App::InputAction::NextFocus); // Language -> Wi-Fi
         assert(focus_text(i18n::text(i18n::TextId::SystemWifiTitle)));
         app.on_input(App::InputAction::Confirm);
         assert(wifi_requests == 1 && requested_wifi && hal_test::snapshot<dp::WiFi>().pending);
         advance(50);
         assert(find_text(lv_screen_active(), "..."));
-        auto* wifi_dot = activity(lv_screen_active());
-        assert(wifi_dot);
+        assert(!activity(lv_screen_active())); // 亮度主卡不创建无意义的状态点。
         app.on_input(App::InputAction::Confirm); // Ignored while pending.
         assert(wifi_requests == 1);
         assert(wifi(true, false));
-        assert(!lv_anim_get(wifi_dot, page::settings_style::pulse));
         advance(50);
         assert(!find_text(lv_screen_active(), "...") && !hal_test::snapshot<dp::WiFi>().pending);
         assert(hal_test::snapshot<dp::WiFi>().on);
+        assert(find_text(lv_screen_active(), i18n::text(i18n::TextId::StatusOn)));
         assert(app.back());
         advance(500);
         assert(on_page("Pages/Dialplate"));
@@ -552,7 +575,7 @@ int main() {
         assert(on_page("Pages/SystemLoading"));
         advance(page::SystemLoadingModel::kStepLimitMs);
         assert(on_page("Pages/SystemLoading"));
-        advance(5000);
+        advance(6000); // 包含纯色遮罩过渡结束后才启动的 Logo 计时。
         assert(on_page("Pages/Dialplate"));
         const auto stalled = hal_test::snapshot<dp::Init>().results[4]; // snapshot() returns a copy.
         assert(stalled.status == DataProc::InitializationStatus::Failed

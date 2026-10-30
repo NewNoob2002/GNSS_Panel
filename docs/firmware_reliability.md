@@ -1,6 +1,25 @@
 # 固件可靠性修复与验证
 
-本轮保留现有裸机主循环、MillisTaskManager、LVGL 8.3.11 和页面框架，集中修复通信、内存、电源与生命周期问题。没有修改相邻 Bootloader 工作区及其已有未提交改动。
+本文是 LVGL 9 迁移前的可靠性修复与板上验证记录，保留当时的镜像、测试和资源数据，不代表 3.0.0 的部署或验收。当前使用 LVGL 9.6.0、DataBroker 和领域设备架构，见 [App/ARCHITECTURE.md](../App/ARCHITECTURE.md) 与[发布说明](release_notes.md)。
+
+当时保留裸机主循环、MillisTaskManager、LVGL 8.3.11 和页面框架，集中修复通信、内存、电源与生命周期问题。没有修改相邻 Bootloader 工作区及其已有未提交改动。
+
+## 当前 HC32 调试日志
+
+MCU 日志仅在 `CMAKE_BUILD_TYPE=Debug` 时启用；`x1-debug`、`x1pro-debug`、`xbase-debug`（含兼容的 `gcc-debug`）默认 `HC32_LOG_OUTPUT=RTT`、`HC32_LOG_COLOR=ON`。例如：
+
+```sh
+cmake --preset x1pro-debug -DHC32_LOG_OUTPUT=UART -DHC32_LOG_COLOR=OFF
+cmake --build --preset x1pro-debug
+```
+
+`HC32_LOG_OUTPUT` 接受 `RTT`、`UART`、`NONE`，未知值在配置时拒绝；每个产品的构建目录独立保存选项。`NONE` 完全禁用 MCU/App 日志。所有 `*-release`/`gcc-release` 均不编译或链接 EasyLogger、日志端口和 SEGGER RTT；即使指定 RTT/UART，也会打印禁用提示并忽略这两个日志选项。发布版的 `APP_LOG_*` 不求值参数，直接调用 App 日志 API 也不会引入 stdio 格式化；`app_fatal` 仍执行软件复位。
+
+RTT 使用 J-Link RTT Viewer 的通道 0，缓冲满时按 SEGGER 的非阻塞配置丢弃日志。UART 沿用原生 `Peripherals/usart.h/.c` 原有 USART1 配置：**PA12/TX、921600 baud、8N1、无流控**，与 USB 转串口的 RX/GND 相连；原 PA11/RX 不再配置为串口功能，因为日志只有发送。参数集中在 `Platform/Config/board_pins.h` 的 `CONFIG_DEBUG_UART_*`。UART 发送轮询 TX_EMPTY、有界超时，ISR 中直接丢弃，不能作为中断日志通道；EasyLogger/App 日志仅允许主循环调用。
+
+ANSI 等级颜色默认开启：ASSERT 洋红、ERROR 红、WARN 黄、INFO 青、DEBUG 绿、VERBOSE 蓝。使用支持 ANSI 的 RTT Viewer/串口终端查看；不支持 ANSI 时设 `-DHC32_LOG_COLOR=OFF`。HAL 初始化 EasyLogger 后，X1Pro/XBase 的显示初始化先安装平台 sink 与共享 LVGL 回调，`App_Init` 沿用同一 sink；按 DEBUG/INFO/WARN/ERROR 映射等级并保留 App 模块名作为 tag。X1 没有共享 App。
+
+App 默认运行时下限为 DEBUG，可用 `-DHC32_APP_LOG_LEVEL=DEBUG|INFO|WARN|ERROR|OFF` 调整，未知值在配置时拒绝。逐对象、订阅及页面动画已经归入 DEBUG；电源/充电变化仅在值变化时输出 INFO。MCU 的 LVGL 内部保持原有 WARN 下限，防止 TRACE/对象创建消息占满非阻塞 RTT 缓冲；这些消息也统一以 `LVGL` tag 进入 app log，不再经过 `CORE_DEBUG_PRINTF` 丢失等级。全平台构建策略表见 [构建架构](build_architecture.md#4-规则)。Release/`NONE` 仍强制裁剪所有日志实参，使用空 App API 实现，LVGL 日志关闭；不会因新增宏或错误日志恢复 stdio 格式化、EasyLogger 或 RTT 依赖。
 
 ## 与当前 Boot 的同步
 
@@ -28,7 +47,7 @@ App Flash 范围已改为 `[0x8000, 0x7A000)`，与 Boot 的 32 KiB 分区、元
 - 校验位置数值、布尔值及帧长度；限制版本字段复制和界面中的定长字符串显示；IP 使用无符号字节。
 - `0x04=1` 在响应完整读出后进入非阻塞的软件复位延时，继续服务通信和看门狗。
 - 关机确认：主控完整读出含关机标志的 `0x02`（INFO2），或发送 `0x05=1` 且 ACK 完整读出，均进入八秒断电延时；首次关机请求起二十秒兜底，重复确认不延长，强制关机可立即执行。（`0x02` 确认为 2026-10-19 按旧版 X1Pro/XBase 语义恢复。）
-- 电源控制独立于 LVGL 动画回调；开机长按由 HAL 时间判定，UI 显示和页面切换跟随状态。
+- 电源控制独立于 LVGL 动画回调；当时开机长按由 HAL 时间判定，UI 显示和页面切换跟随状态；现带屏产品由 Startup 完成 2 s 长按后请求平台开机，X1 仍由 HAL 判定。
 - 低电量计时从 LED 更新迁入电源策略，按实际连续时间判断；采样无效、充电或条件恢复时重置；包含 0% 电量。
 - BQ/MP 寄存器读取显式检查完整字节数，失败不发布部分结果；采样状态与最后成功时间分开记录；避免零容量除法。
 - I²C2 的错误出口统一 STOP、ACK 恢复及外设关闭；`I2cMaster` 的 `write`/`writeRead`/`probe` 以 `bool` 返回事务是否完整成功。
@@ -77,7 +96,7 @@ ctest --test-dir build/host-tests --output-on-failure
 | Debug | 389084 B / 456 KiB | 173792 B / 188 KiB | 18720 B |
 | Release | 331360 B / 456 KiB | 171224 B / 188 KiB | 21288 B |
 
-128 KiB 的 LVGL 池还供 C++ 对象使用，其内部峰值和碎片不能从链接报告推导；栈的运行峰值也未做全场景测量。
+96 KiB 的 LVGL 池还供 C++ 对象使用，其内部峰值和碎片不能从链接报告推导；栈的运行峰值也未做全场景测量。
 
 ## 板上验证记录
 
@@ -98,7 +117,7 @@ Release 已通过 Commander 下载、全 BIN verify 和独立会话逐字节回�
 | 镜像 | BIN SHA-256 |
 | --- | --- |
 | Debug | `f707c8c182063b5a891c9baf34a0d08caa528907015d08a0e64e841bd7b9c58a` |
-| Release，当前部署 | `9b609ee0b5871c0ae29e09ca80a9099cdbe4789db0ae66e8cb4abb9e7dd6441d` |
+| Release，本记录部署 | `9b609ee0b5871c0ae29e09ca80a9099cdbe4789db0ae66e8cb4abb9e7dd6441d` |
 
 详细运行快照为 `build/validation/debug-final.json` 和 `release-final.json`，原始下载与运行日志保存在同目录。初次启动采样因 Linux 尚未开始轮询而失败的日志也保留；后续等待主控启动后重新采样，不把初次失败写成通过。
 

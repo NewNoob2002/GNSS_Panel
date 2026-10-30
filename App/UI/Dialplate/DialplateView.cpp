@@ -1,4 +1,5 @@
 #include "DialplateView.h"
+#include "I18n.h"
 #include "Log.h"
 #include "UI/Resource/ResourcePool.h"
 #include "UI/Common/PageStyle.h"
@@ -300,7 +301,9 @@ void DialplateView::update(const DialplateState& device) {
     const auto mode_color = device.work_valid ? active_color : style::kMuted;
     settings_style::set_image(ui.top_info.mode_img, device.work_valid && !rover ? "ui_base" : "ui_rover");
     settings_style::set_recolor(ui.top_info.mode_img, mode_color);
-    settings_style::set_text(ui.top_info.mode_label, device.work_valid ? (rover ? "ROVER" : "BASE") : "--");
+    settings_style::set_text(ui.top_info.mode_label,
+                             device.work_valid ? i18n::text(rover ? i18n::TextId::RoverShort : i18n::TextId::PositionBase)
+                                               : "--");
     settings_style::set_text_color(ui.top_info.mode_label, mode_color);
     settings_style::set_border_color(ui.top_info.mode_card, device.work_valid
                                                                 ? lv_color_mix(active_color, style::kCard, LV_OPA_30)
@@ -308,9 +311,10 @@ void DialplateView::update(const DialplateState& device) {
 
     const auto radio_color = radio_on ? active_color : style::kMuted;
     settings_style::set_recolor(ui.top_info.radio_img, radio_color);
+    // RX/TX 是电台通用缩写，不随语言变化。
     settings_style::set_text(ui.top_info.radio_label, !device.work_valid ? "--"
                                                       : radio_on         ? (rover ? "RX" : "TX")
-                                                                         : "OFF");
+                                                                         : i18n::text(i18n::TextId::StatusOff));
     settings_style::set_text_color(ui.top_info.radio_label, radio_color);
     settings_style::set_border_color(ui.top_info.radio_card,
                                      radio_on ? lv_color_mix(active_color, style::kCard, LV_OPA_30) : style::kBorder);

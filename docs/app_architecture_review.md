@@ -3,6 +3,8 @@
 参考：FASTSHIFT/X-TRACK `dev_lvgl_v9`，提交 `28b0e90`（`Firmware/X-TRACK/App`、`Frameworks`）。对比对象：`dev2` `2906f1e`。
 目标：整体架构参照 X-TRACK，组件在其基础上优化、扩展；界面外观与交互不变（九页截图逐字节一致），HC32 RAM/flash 预算不倒退。
 
+本文保留阶段 3.7 重构前的问题、初稿和实施记录；“现状”列及截图不变约束均针对当时基线。当前实现以 [App/ARCHITECTURE.md](../App/ARCHITECTURE.md) 为准，后续 UI、亮度和电池数据扩展见 [3.0.0 发布说明](release_notes.md)。
+
 ## 1. 复审结论（按影响排序）
 
 | # | 问题 | 现状（证据） | 参考做法 |
@@ -111,4 +113,4 @@ App/
 - **3.7e**：页面 Model 继承 DataNode 并只订阅所需领域，Page 处理生命周期与输入，View 通过 LVGL 9 subject/observer 更新；StatusBar、BatteryWarning 自治。未引入参考仓库的 Binding/lv_msg，StatusBar 外观入口保留在 UI 组件，不增加同名领域节点。
 - **3.7f**：删除 Status/System/Device 聚合、200 ms 兼容定时重发、SystemService、ModelUtils、粗快照与命令；`hal::manager()` 成为正式平台注册入口，PowerObject 归 HAL。Init 节点提供类型化同步元数据/轮询查询，UI 不再直接包含 HAL，失败继续与原有时序保持；日期校验归 Clock。测试迁为领域/HAL 断言，分层检查增加 UI→HAL 禁令，AGENTS、ARCHITECTURE、SOURCE 同步更新。
 
-最终结构为十个领域节点加 Button/PageNavi，共十二个 provider、九个 HAL 细设备；与初稿相比未拆独立 Storage 节点，存储字段归 Recorder。HC32 运行时 State 及 revision 确认契约、同步应用线程分发、九页外观与交互继续保留。
+最终结构为十个领域节点加 Button/PageNavi，共十二个 provider、九个 HAL 细设备；与初稿相比未拆独立 Storage 节点，存储字段归 Recorder。阶段 3.7 完成时，HC32 运行时 State 及 revision 确认契约、同步应用线程分发、九页外观与交互保持不变。

@@ -132,6 +132,8 @@ enum class TextId : size_t {
     InfoBrowseHint,
     Stop,
     CheckingHostLink,
+    RoverShort,
+    BrightnessTitle,
     Count
 };
 

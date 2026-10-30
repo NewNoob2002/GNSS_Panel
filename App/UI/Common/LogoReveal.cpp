@@ -1,4 +1,5 @@
 #include "LogoReveal.h"
+#include "Log.h"
 #include <algorithm>
 #include "PageStyle.h"
 
@@ -67,7 +68,7 @@ void LogoReveal::play() {
     lv_anim_set_path_cb(&animation, [](const lv_anim_t* anim) { return anim->act_time; });
     if (!lv_anim_start(&animation)) {
         apply(timeline_.total_ms);
-        LV_LOG_ERROR("LogoReveal: animation allocation failed; applied endpoint");
+        APP_LOG_E("LogoReveal", "animation allocation failed; applied endpoint");
     }
 }
 

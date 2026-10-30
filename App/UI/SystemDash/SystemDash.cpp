@@ -7,7 +7,7 @@
 using namespace page;
 
 void SystemDash::onInstalled() {
-    setLoadAnimType(PAGE_ANIM::OVER_BOTTOM);
+    setLoadAnimType(PAGE_ANIM::PUSH_LEFT);
     setLoadAnimTime(style::kPageTransitionMs);
     setLoadAnimPath(style::page_transition_path);
 }
@@ -25,7 +25,7 @@ void SystemDash::onViewLoad() {
 }
 
 void SystemDash::onViewWillAppear() {
-    model_->set_status_bar(false);
+    model_->set_status_bar(true);
     view_.apply_language();
     if (!view_.bind(model_->subject()))
         app_fatal("SystemDash", "View binding failed");
@@ -168,6 +168,9 @@ void SystemDash::clicked(lv_event_t* event) {
     else if (ctrl == SystemDashView::Control::Language) {
         if (!self->model_->toggle_language())
             APP_LOG_E("SystemDash", "language request rejected");
+    } else if (ctrl == SystemDashView::Control::Brightness) {
+        if (!self->model_->cycle_brightness())
+            APP_LOG_E("SystemDash", "brightness request rejected");
     } else if (ctrl == SystemDashView::Control::Wifi) {
         const auto& state = self->model_->state();
         if (state.wifi_available && !state.wifi_pending && !self->model_->set_wifi(!state.wifi_on))

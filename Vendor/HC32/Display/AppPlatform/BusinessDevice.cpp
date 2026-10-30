@@ -50,8 +50,16 @@ BusinessDevice::battery() {
     const auto charge = battery.chargeStatus == fastCharge     ? hal::ChargeState::Fast
                         : battery.chargeStatus == normalCharge ? hal::ChargeState::Normal
                                                                : hal::ChargeState::NotCharging;
-    return {battery.sample_valid, battery.Percent, battery.Percent_f,       battery.Voltage_f, battery.sample_valid,
-            battery.Temp_f,       charge,          power.ExternalPower == 1};
+    return {battery.sample_valid,
+            battery.Percent,
+            battery.Percent_f,
+            battery.Voltage_f,
+            battery.sample_valid,
+            battery.Temp_f,
+            charge,
+            power.ExternalPower == 1,
+            battery.current_ma,
+            battery.sample_valid && battery.current_valid};
 }
 
 hal::GNSSState

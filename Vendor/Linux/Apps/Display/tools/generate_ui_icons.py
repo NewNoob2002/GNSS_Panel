@@ -6,6 +6,7 @@
     python3 Vendor/Linux/Apps/Display/tools/generate_ui_icons.py --v9        # 与默认行为相同
     python3 Vendor/Linux/Apps/Display/tools/generate_ui_icons.py --v9 --format RGB565A8 --output-dir build/icons-v9-rgb
     python3 Vendor/Linux/Apps/Display/tools/generate_ui_icons.py --v9 --output-dir build/icons-v9
+    uv run Vendor/Linux/Apps/Display/tools/generate_ui_icons.py --only sun  # 仅生成太阳的 16/32 px 资源
 
 v9 复用 App/UI/Resource/tools/convert_images_v9.py 的编码和回读校验；
 保留覆盖率、墨量及半透明像素比例自检。默认保留 A8 遮罩，颜色由主题 recolor 提供；
@@ -64,6 +65,9 @@ PATHS = {
     "work": {16: rects((1, 2, 14, 2), (4, 1, 4, 4), (1, 7, 14, 2), (9, 6, 4, 4), (1, 12, 14, 2), (5, 11, 4, 4))},
     "record": dict.fromkeys((16, 32), '<path d="M2 2h9l3 3v9H2z"/>' + rects((5, 3, 5, 3), (5, 10, 6, 2))),
     "settings": dict.fromkeys((16, 32), gear()),
+    "sun": dict.fromkeys((16, 32), f'<circle cx="8" cy="8" r="3" {FILL}/>'
+                         '<path d="M8 1v1M8 14v1M1 8h1M14 8h1M3 3l.75.75M12.25 12.25L13 13'
+                         'M3 13l.75-.75M12.25 3.75L13 3" stroke-linecap="round"/>'),
     "base": dict.fromkeys((16, 32), BASE),
     "rover": dict.fromkeys((16, 32), ROVER),
     # 首页电台卡只画天线本体，收发波形由页面在两侧绘制，二者不重叠。
@@ -90,7 +94,7 @@ SUPERSAMPLE = 8
 # 覆盖率低于 LOW 的淡边清零、高于 HIGH 的补满，只在两者之间保留过渡，避免小尺寸发虚。
 LOW, HIGH = 48, 208
 # 45° 小块拼成的图形在 16 px 用更窄的过渡带，近似像素画的整齐台阶，否则各块会糊成团。
-SHARP = {"ui_satellite": (110, 146)}
+SHARP = {"ui_satellite": (110, 146), "ui_sun": (110, 146)}
 
 
 def render(path: str, size: int, low: int = LOW, high: int = HIGH) -> bytes:
@@ -115,6 +119,7 @@ def main() -> None:
     parser.add_argument("--v9", action="store_true", default=True, help="兼容显式开关；默认输出 v9")
     parser.add_argument("--format", choices=("A8", "RGB565A8"), help="v9 目标格式（默认 A8）")
     parser.add_argument("--output-dir", type=Path, help="输出目录，默认 App/UI/Resource/img")
+    parser.add_argument("--only", choices=PATHS, help="仅写入指定图标的全部原生尺寸，其他资源仅校验")
     args = parser.parse_args()
     v9_format = args.format or "A8"
     output = (args.output_dir or ROOT).resolve()
@@ -137,7 +142,8 @@ def main() -> None:
             errors = verify_text([original], source)
             if errors:
                 raise RuntimeError("; ".join(errors))
-            pending[f"{symbol}.c"] = (source, original)
+            if not args.only or name == args.only:
+                pending[f"{symbol}.c"] = (source, original)
     # 首页四个图标必须同尺寸且具有接近基准的有效墨量，避免再出现过小、发灰的入口。
     reference = sum(images["ui_info"])
     for name in ("work", "record", "settings"):
@@ -157,7 +163,7 @@ def main() -> None:
             if errors:
                 raise RuntimeError("; ".join(errors))
     mode = f"v9 {v9_format}" if args.v9 else "alpha"
-    print(f"Generated and checked {len(images)} native-size {mode} icons.")
+    print(f"Generated {len(pending)} and checked {len(images)} native-size {mode} icons.")
 
 
 if __name__ == "__main__":

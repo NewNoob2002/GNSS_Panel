@@ -5,8 +5,10 @@
 | 产品 | 来源分支 | 屏幕 | 版本 | 镜像前缀 | Preset |
 |---|---|---|---|---|---|
 | X1 | `X1_Panel_dev`（1.30） | 无，按键 + LED | 1.30 | `MCU_LED` | `x1-debug` / `x1-release` |
-| X1Pro | `newFrameworkX1pro` | AMOLED 294×126，LVGL | 2.4.4 | `MCU_PRO` | `x1pro-*`（`gcc-*` 为别名） |
-| XBase | `newFrameworkXbase`（2.4.6） | 同 X1Pro | 2.4.6 | `MCU_XBASE` | `xbase-*` |
+| X1Pro | `newFrameworkX1pro` | AMOLED 294×126，LVGL | 3.0.0 | `MCU_PRO` | `x1pro-*`（`gcc-*` 为别名） |
+| XBase | `newFrameworkXbase`（2.4.6） | 同 X1Pro | 3.0.0 | `MCU_XBASE` | `xbase-*` |
+
+版本由各产品 `product.cmake` 单一提供：固件目标为 `<镜像前缀>_<版本>.elf`，生成头文件将其保存为 `SOFTWARE_VERSION "V<版本>"`；Board 模拟器用 `[0-9.]+` 正则读取同一值。3.0.0 对应 `V3.0.0`（6 字节），可装入运行时 16 字节及 INFO1 协议 10 字节软件版本字段，无须改变报文布局。发布变化见[发布说明](release_notes.md)。
 
 ## 目录与依赖
 
@@ -42,10 +44,10 @@ HC32、Simulator、Linux 与 `tests/` 共用 `cmake/lvgl.cmake` 的 `project_add
 
 ## 产品差异放在哪里
 
-共享构建与架构边界见 [App/ARCHITECTURE.md](../App/ARCHITECTURE.md)：`app::framework` / `app::core` 不依赖 LVGL，`app::ui` 是 UI；固件、主机测试、模拟器与 Linux 端口复用同一个 `App/CMakeLists.txt`。平台通过 `proj::options` 和 `lvgl::lvgl` 提供编译选项与显示库（见 [CMake 分层构建架构](build_architecture.md)）。`app::framework` 汇总组件自有目标中的 DataBroker/DeviceManager，ResourceManager 使用静态数组模板；DataNode 同步分发，最多 32 个节点、32 个独立时钟定时器。资源池与页面外观不变，LVGL 为 9.6.0，页面管理由加固后的 `Frameworks/PageManager` 编译为 `app_page_manager`，统一拥有页面池、预加载和根栈重置；导航返回值显式与 `RES_TYPE::OK` 比较，页面使用 getter 与 lowerCamelCase 生命周期。`App/` 与 `Frameworks/` 直接在本仓库修改；平台相关行为放在 `Vendor/<平台>`。
+共享构建与架构边界见 [App/ARCHITECTURE.md](../App/ARCHITECTURE.md)：`app::framework` / `app::core` 不依赖 LVGL，`app::ui` 是 UI；固件、主机测试、模拟器与 Linux 端口复用同一个 `App/CMakeLists.txt`。平台通过 `proj::options` 和 `lvgl::lvgl` 提供编译选项与显示库（见 [CMake 分层构建架构](build_architecture.md)）。`app::framework` 汇总组件自有目标中的 DataBroker/DeviceManager，ResourceManager 使用静态数组模板；DataNode 同步分发，最多 32 个节点、32 个独立时钟定时器。资源池公开接口保持不变，当前页面外观见[页面结构与视觉规则](ui_style_and_page_review.md)，LVGL 为 9.6.0，页面管理由加固后的 `Frameworks/PageManager` 编译为 `app_page_manager`，统一拥有页面池、预加载和根栈重置；导航返回值显式与 `RES_TYPE::OK` 比较，页面使用 getter 与 lowerCamelCase 生命周期。`App/` 与 `Frameworks/` 直接在本仓库修改；平台相关行为放在 `Vendor/<平台>`。
 
 1. **功能开关**：`Vendor/HC32/Products/<产品>/product_config.h` 中的 `PRODUCT_*` 宏，经 `mcu_config.h` 被所有源码看到。带屏产品缺少任一开关时 `mcu_config.h` 直接报错，避免 `#if` 未定义被当作 0。
-2. **弱符号扩展点**（`Vendor/HC32/Platform/HAL/HAL.h`）：`Power_ProductInit`、`Power_ProductUpdate`、`Power_AdjustPercent`、`Key_ProductInit`、`Key_ProductUpdate`。默认无动作，产品源码覆盖（X1：电量补偿、MultiButton 按键动作）。
+2. **弱符号扩展点**（`Vendor/HC32/Platform/HAL/port/HAL.h`）：`Power_ProductInit`、`Power_ProductUpdate`、`Power_AdjustPercent`、`Key_ProductInit`、`Key_ProductUpdate`。默认无动作，产品源码覆盖（X1：电量补偿、MultiButton 按键动作）。
 3. **协议表**：帧校验、ACK 编码、“完整读出后才生效”在 `Vendor/HC32/Comm/panel_protocol.cpp`；产品实现 `panel_protocol_packets()`。X1 见 `Vendor/HC32/Products/X1/x1_protocol.cpp`，X1Pro/XBase 共用 `Vendor/HC32/Display/display_protocol.cpp`。
    每种报文的载荷是一个 packed 结构体（通用的 `PanelInfoPayload`/`PanelStatusPayload`/`PanelSetAck`/`PanelFlagRequest` 在 `panel_protocol.h`，带屏专用的 `Display*Payload` 在 `display_protocol.h`），用 `static_assert` 固定长度与关键偏移；处理函数用 `panel_request<T>()` 读请求、`panel_write()` 写响应（按值拷贝，不做指针转换）。新增字段时改结构体并更新断言，报文长度与表项都取 `sizeof`。`tests/firmware_tests.cpp` 的 `test_wire_offsets` 按协议偏移直接检查字节，结构体改错会在这里失败。
 4. **产品专属源码**：放在产品目录并在其 `CMakeLists.txt` 中加入 `hc32_product`。
@@ -65,7 +67,7 @@ HC32、Simulator、Linux 与 `tests/` 共用 `cmake/lvgl.cmake` 的 `project_add
 
 `PRODUCT_DISPLAY_X_SHIFT`：X1Pro 外壳遮挡屏幕左缘，`lv_port_disp.cpp` 刷新时把画面在玻璃上整体右移 4 px，右侧移出的 4 列（各页面右侧留白）不发送，左缘保持黑色；RM690A0 窗口须 2 像素对齐，故只能取偶数。已在 X1Pro 实机确认显示正常。
 
-XBase 的差异取自其分支相对分叉点的产品级改动（无星图/过温告警页、关机页无 Wi-Fi、录制类型/间隔不可调、协议无 0x0B/0x0D）。该分支中其余页面改动为代码整理，未合入。
+XBase 的差异取自其分支相对分叉点的产品级改动（无星图/过温告警页、系统页 Wi-Fi 不可控时置灰、录制类型/间隔不可调、协议无 0x0B/0x0D）。该分支中其余页面改动为代码整理，未合入。
 
 ### 新增一个产品
 
@@ -98,18 +100,18 @@ XBase 的差异取自其分支相对分叉点的产品级改动（无星图/过�
 | 电池与充电监控 | `Vendor/HC32/Platform/HAL/HAL_Battery.cpp` | BQ40Z50 采样、充电保护与控制、片内温度、看门狗（仅固件与主机测试） |
 | `HoldTimer` | `Vendor/HC32/Platform/HAL/HoldTimer.h` | 按住计时；Function 键 2.5 s 强制关机（`HAL_Key.cpp`，三产品共用） |
 | `BlinkLed` | `Vendor/HC32/Platform/HAL/BlinkLed.h` | 固定周期闪烁的指示灯 |
-| `StatusDevice` / `PowerDevice` / `BusinessDevice` | `Vendor/HC32/Display/AppPlatform/` | DeviceManager 注册名为 Status/Power/Device，按值读取快照、写入业务请求和精确尺寸 ioctl；状态在对象内，Board 模拟器复用实现 |
+| `DomainDevices` / `PowerDevice` / `BusinessDevice` / `StatusDevice` | `Vendor/HC32/Display/AppPlatform/` | 通过 `hal::manager()` 注册 Power、Battery、GNSS、Clock、Work、Recorder、WiFi、Board、Init 九个细设备；BusinessDevice 只做领域采样/命令映射，StatusDevice 提供能力与初始化辅助，二者不以旧聚合名注册；Board 模拟器复用实现 |
 
 ### 常见扩展
 
 - **新的主板版本或充电方案**：在 `Charger.cpp` 增加一个 `HAL::Charger` 实现，并在 `Charger_Get()` 中按检测结果返回；电源与 LED 代码不需要改。
-- **新的业务数据或命令（带屏）**：共享接口在 `App/` 增加（`DeviceSnapshot`/`DeviceRequest`），在 `BusinessDevice::snapshot()/execute()` 中映射：读 `systemInfo.host` 或 `State::Effective_*()`，写经 `State::Request_*()`；主控上报的新字段加到 `HostReport_t` 并在 `display_protocol.cpp` 收发。
+- **新的业务数据或命令（带屏）**：共享接口在 `App/Service/HAL/Def/` 的对应领域状态/命令中增加，经 DataProc 暴露给 UI；在 `BusinessDevice` 的对应采样函数和 `execute()` 中映射：读 `systemInfo.host` 或 `State::Effective_*()`，写经 `State::Request_*()`；主控上报的新字段加到 `HostReport_t` 并在 `display_protocol.cpp` 收发。
 - **产品专属按键动作**：实现 `HAL::Key_ProductInit()/Key_ProductUpdate()`；强制关机等共用行为不要复制。
 
 ## 产品行为约定
 
 - **上电等待与电源保持**（三产品共用引脚）：普通上电时 `Power_Init()` 将 `POWER_CONTROL_PIN` 配置为输出 LOW，确认开机后才拉 HIGH，给 Linux 主板供电并锁存电源。Type-C 独立供电给 MCU，等待期间主板保持断电；电池供电时 MCU 仅靠按住 Power 键维持，确认前松开不得锁存。带屏产品仅在 Startup 完成 2 s 长按后，经 LVGL 线程调用 `HAL::Power_RequestOn()`，`Power_OnCheck()` 随后退出等待并恢复输出；原始键电平长按不能开机。X1 仍由 HAL 原始键电平长按 2 s 决定。软件复位（SWRF）例外：初始化立即拉 HIGH 并自动开机，保留 Boot 与 `app_fatal` 的直接恢复契约。
-- **外部供电关机驻留**（三产品共用 HAL）：断电延时到期后若 MCU 仍有电，清除关机请求、熄灭电源/功能灯、继续充电，置 `ShutdownComplete`。带屏产品由 AppPlatform 上报待机，共享应用重置页面栈回到 Startup；仅当 Startup 完成 2 s 长按后调用 `HAL::Power_RequestOn()` 才原地开机，原始键电平长按不能恢复。X1 保留 HAL 原始电源键长按 2 s 恢复。恢复时重置电源策略、清除主控上报数据（电池采样、器件在线与版本保留）、拉高电源保持与指示灯；带屏后端成功返回后，SystemService 同步发布 `powered_on`，进入 SystemLoading，PowerDevice 幂等补报。关机进行中拒绝开机请求。不使用软件复位开机：Boot 保留 SWRF 会直接开机，且升级窗口会停留约 1 s。
+- **外部供电关机驻留**（三产品共用 HAL）：断电延时到期后若 MCU 仍有电，清除关机请求、熄灭电源/功能灯、继续充电，置 `ShutdownComplete`。带屏产品由 AppPlatform 上报待机，共享应用重置页面栈回到 Startup；仅当 Startup 完成 2 s 长按后调用 `HAL::Power_RequestOn()` 才原地开机，原始键电平长按不能恢复。X1 保留 HAL 原始电源键长按 2 s 恢复。恢复时重置电源策略、清除主控上报数据（电池采样、器件在线与版本保留）、拉高电源保持与指示灯；带屏后端成功返回后，`dp::Power` 同步发布 `powered_on` 与导航边沿，由 AppNavigator 进入 SystemLoading；后续 PowerDevice 采样不重复生成边沿。关机进行中拒绝开机请求。不使用软件复位开机：Boot 保留 SWRF 会直接开机，且升级窗口会停留约 1 s。
 - **电量计不可用时充电**：电量计从未识别时交由充电芯片保护继续充电；在线但样本失效/过期时禁止充电。
 - **关机确认**：主控完整读出含关机标志的状态帧（X1Pro/XBase 为 INFO2 `0x02`，X1 为 CTRL `0x02`）即确认，8 s 后断电；X1Pro/XBase 也接受 `0x05`（n=1）。均未确认时从首次请求起 20 s 兜底。
 
@@ -126,6 +128,15 @@ XBase 的差异取自其分支相对分叉点的产品级改动（无星图/过�
 
 片内 512 KiB：Boot 32 KiB | App 456 KiB（`0x8000..0x79FFF`）| 元数据 A/B 各 8 KiB | App 参数 8 KiB。
 
+3.0.0 默认 OEM（singularxyz）Release 实测如下；本次未重测 X1 和 Debug，构建与测试结果见[发布说明](release_notes.md)。
+
+| 产品 | text + data / App 剩余 |
+|---|---|
+| X1Pro | 309,900 B / 153.4 KiB |
+| XBase | 309,456 B / 153.8 KiB |
+
+以下为阶段 3.3 的历史基线，非 3.0.0 体积：
+
 | 产品 | Release 占用 / 剩余 | Debug 占用 / 剩余 |
 |---|---|---|
 | X1 | 25,816 B / 430.8 KiB | 38,428 B / 418.5 KiB |
@@ -133,9 +144,9 @@ XBase 的差异取自其分支相对分叉点的产品级改动（无星图/过�
 | XBase | 415,056 B / 50.7 KiB | 452,260 B / 14.3 KiB |
 
 带屏产品的 debug 仅将 LVGL 源码设为 `-Os`（保留调试符号），App 和平台代码继续使用 `-Og`。
-三端以整数坐标运行 LVGL；应用通过标准库格式化温度、电压和坐标，HC32 显式链接 newlib 浮点格式化支持。
+三端以整数坐标运行 LVGL；应用通过 `app::format_fixed` 格式化温度、电压和坐标，HC32 不再强制链接 newlib 浮点格式化。
 上表按 `text + data` 统计，Flash 总预算为 456 KiB；RAM 真实余量按 `__RamEnd - __StackTop` 计算，
-带屏产品 release 为 22,128 B，debug 为 19,488 B。
+上述历史基线的带屏产品 release 为 22,128 B，debug 为 19,488 B。
 
 ## 待确认事项
 

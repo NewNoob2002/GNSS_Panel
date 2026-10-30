@@ -30,21 +30,22 @@ int StatusBarModel::onEvent(EventParam_t* event) {
 }
 
 void StatusBarModel::commit(StatusBarState next) {
+    // 定位状态色取自公共调色板：无解/演示=危险红，基准站=信息蓝，单点/浮点=进度黄，固定=正常绿。
     i18n::TextId position = i18n::TextId::PositionNone;
-    uint32_t color = 0xf44336;
+    lv_color_t color = style::kDanger;
     if (mode_ == hal::WorkMode::Base) {
         position = i18n::TextId::PositionBase;
-        color = 0x2196f3;
+        color = style::kInfo;
     } else {
         switch (fix_) {
-        case hal::FixStatus::Single: position = i18n::TextId::PositionSingle; color = 0xffeb3b; break;
-        case hal::FixStatus::Float: position = i18n::TextId::PositionFloat; color = 0xffeb3b; break;
-        case hal::FixStatus::Fixed: position = i18n::TextId::PositionFix; color = 0x4caf50; break;
+        case hal::FixStatus::Single: position = i18n::TextId::PositionSingle; color = style::kHighlight; break;
+        case hal::FixStatus::Float: position = i18n::TextId::PositionFloat; color = style::kHighlight; break;
+        case hal::FixStatus::Fixed: position = i18n::TextId::PositionFix; color = style::kSuccess; break;
         default: break;
         }
     }
     next.position = simulated_ ? "DEMO" : i18n::text(position);
-    next.position_color = lv_color_hex(simulated_ ? 0xf44336 : color);
+    next.position_color = simulated_ ? style::kDanger : color;
     const auto values = [](const StatusBarState& s) {
         return std::tie(s.satellites, s.satellites_valid, s.hour, s.minute, s.second, s.clock_valid, s.recording,
                         s.wifi, s.battery_percent, s.battery_valid, s.charging);

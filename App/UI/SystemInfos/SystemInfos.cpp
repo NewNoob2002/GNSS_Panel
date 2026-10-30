@@ -7,7 +7,7 @@
 using namespace page;
 
 void SystemInfos::onInstalled() {
-    setLoadAnimType(PAGE_ANIM::MOVE_TOP);
+    setLoadAnimType(PAGE_ANIM::PUSH_LEFT);
     setLoadAnimTime(style::kPageTransitionMs);
     setLoadAnimPath(style::page_transition_path);
 }

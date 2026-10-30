@@ -114,6 +114,26 @@ class DemoWifi final : public hal::WriteObject<hal::WifiState, hal::WifiCommand>
     }
 };
 
+class DemoBoard final : public hal::WriteObject<hal::BoardState, hal::BrightnessCommand> {
+  public:
+    DemoBoard() : WriteObject(hal::names::Board) {}
+
+    hal::BoardState
+    state() override {
+        demo::refresh();
+        return demo::model().board;
+    }
+
+    int
+    execute(const hal::BrightnessCommand& command) override {
+        if (!hal::is_brightness_level(command.percent)) {
+            return RES_PARAM_ERROR;
+        }
+        demo::model().board.brightness = command.percent;
+        return RES_OK;
+    }
+};
+
 class DemoInit final : public hal::InitObject {
   public:
     void
@@ -151,7 +171,7 @@ hal::manager() {
     static DemoWork work;
     static DemoRecorder recorder;
     static DemoWifi wifi;
-    static DemoRead<hal::BoardState, &demo::Model::board> board(hal::names::Board);
+    static DemoBoard board;
     static DemoInit init;
     static DeviceObject* list[] = {&power, &battery, &gnss, &clock, &work, &recorder, &wifi, &board, &init};
     static DeviceManager manager(list, sizeof(list) / sizeof(list[0]));

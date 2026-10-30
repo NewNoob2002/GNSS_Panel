@@ -1,8 +1,6 @@
 // HC32 平台入口：通过静态 DeviceManager 连接九个细设备，保留主循环及 HAL 时序。
 #include "AppPlatform.h"
 
-#include <cstdio>
-
 #include <HAL.h>
 #include "App.h"
 #include "BusinessDevice.h"
@@ -12,6 +10,9 @@
 #include "StatusDevice.h"
 #include "HAL_Manager.h"
 #include "mcu_config.h"
+#if defined(HC32_LOG_ENABLED)
+#include "AppLogSink.h"
+#endif
 
 namespace {
 
@@ -28,21 +29,6 @@ Devices objects;
 uint32_t
 now_ms() {
     return lv_tick_get();
-}
-
-void
-log_sink(AppLogLevel level, const char* module, const char* message, void*) {
-    static const char* const names[] = {"D", "I", "W", "E"};
-#if defined(LVGL_SIMULATOR)
-    std::printf("[%s][%s] %s\n", names[level], module, message);
-#else
-    // Release 构建中 CORE_DEBUG_PRINTF 为空，日志不占串口。
-    CORE_DEBUG_PRINTF("[%s][%s] %s", names[level], module, message);
-    (void)names;
-    (void)level;
-    (void)module;
-    (void)message;
-#endif
 }
 
 } // namespace
@@ -69,7 +55,12 @@ StatusDevice::capabilities() {
 // 单片机上无法 abort：记录原因后软件复位。Boot 保留 SWRF，复位后直接开机。
 void
 app_fatal(const char* module, const char* reason) {
+#if defined(HC32_LOG_ENABLED)
     app_log_write(APP_LOG_ERROR, module ? module : "App", "fatal: %s; resetting", reason ? reason : "unknown");
+#else
+    (void)module;
+    (void)reason;
+#endif
     HAL_NVIC_SystemReset();
     while (true) {}
 }
@@ -79,7 +70,10 @@ app_fatal(const char* module, const char* reason) {
 
 void
 App_Init() {
-    app_log_set_sink(log_sink, nullptr);
+    // 模拟器沿用 main() 已安装的 host::log（spdlog）sink，这里不覆盖。
+#if !defined(LVGL_SIMULATOR) && defined(HC32_LOG_ENABLED)
+    app_log_set_sink(hc32_app_log_sink, nullptr);
+#endif
     objects = Devices{};
     app = new App;
     if (!app->init({.battery_warning = PRODUCT_PAGE_BATTERY_WARNING != 0})) {

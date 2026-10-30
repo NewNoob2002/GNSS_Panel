@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdint>
 
 namespace hal {
 /** @brief 充电状态，与平台充电策略的三种状态对应。 */
@@ -13,10 +14,13 @@ struct BatteryState {
     float temperature = 0; ///< °C。
     ChargeState charge{};
     bool external_power = false;
+    int16_t current_ma = 0; ///< 电量计平均电流，mA，充电为正。
+    bool current_valid = false;
     bool operator==(const BatteryState& v) const {
         return valid == v.valid && level_percent == v.level_percent && gauge_percent == v.gauge_percent
             && voltage == v.voltage && temperature_valid == v.temperature_valid && temperature == v.temperature
-            && charge == v.charge && external_power == v.external_power;
+            && charge == v.charge && external_power == v.external_power
+            && current_ma == v.current_ma && current_valid == v.current_valid;
     }
     bool operator!=(const BatteryState& v) const { return !(*this == v); }
 };

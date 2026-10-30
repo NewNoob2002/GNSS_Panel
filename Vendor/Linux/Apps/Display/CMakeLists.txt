@@ -18,7 +18,9 @@ else()
     project_add_lvgl("${CMAKE_CURRENT_SOURCE_DIR}/config/lv_conf.h")
 endif()
 add_library(lvgl960 ALIAS lvgl)
-target_compile_definitions(lvgl PUBLIC $<$<BOOL:${RK3506_DEBUG_MONITOR}>:__CORE_DEBUG>)
+target_compile_definitions(lvgl PUBLIC
+    APP_LOG_BUILD_DEBUG=$<IF:$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>,$<CONFIG:MinSizeRel>>,0,1>
+    $<$<BOOL:${RK3506_DEBUG_MONITOR}>:__CORE_DEBUG>)
 if(RK3506_LVGL_DEMO)
     set(RK3506_LVGL_DEMO_REFRESH_MS 8 CACHE STRING "LVGL demo refresh period in ms")
     set(RK3506_LVGL_DEMO_DRAW_DIVISOR 4 CACHE STRING "LVGL demo draw buffer fraction denominator")
@@ -36,6 +38,7 @@ if(RK3506_LVGL_DEMO)
     add_subdirectory(demo)
 else()
     add_subdirectory("${SHARED_APP_DIR}" shared_app)
+    add_subdirectory("${REPO_ROOT}/Vendor/HostLog" host_log)
     add_subdirectory(Backends/Demo)
 
     # Standalone utilities and application entrypoints
@@ -50,7 +53,7 @@ else()
     if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         add_executable(rk3506_app main.cpp)
         add_executable(linux::app ALIAS rk3506_app)
-        target_link_libraries(rk3506_app PRIVATE linux::demo_backend linux::display linux::button linux::display_io)
+        target_link_libraries(rk3506_app PRIVATE linux::demo_backend linux::display linux::button linux::display_io host::log)
         target_compile_options(rk3506_app PRIVATE -Wall -Wextra -Werror)
 
         add_executable(button_probe Diagnostics/button_probe.c)

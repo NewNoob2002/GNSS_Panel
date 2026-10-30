@@ -8,11 +8,13 @@
 #include "DemoStatus.h"
 #include "DomainTestInput.hpp"
 #include "Log.h"
-#include "hal_device_checks.h"
+#include "UI/Common/BatteryStyle.h"
 #include "UI/Common/PageStyle.h"
 #include "UI/Common/SettingsStyle.h"
 #include "UI/SaveConfig/SaveConfigView.h"
+#include "UI/SystemDash/SystemDashView.h"
 #include "UI/SystemLoading/SystemLoadingView.h"
+#include "hal_device_checks.h"
 #include "lvgl_private.h"
 
 namespace {
@@ -307,6 +309,12 @@ random_battery_events(lv_display_t* display, const std::string& output) {
         assert(lv_obj_is_hidden(digits) == !state.battery_valid);
         assert(label(reading, state.battery_valid ? text : "N/A"));
         assert(std::strcmp(lv_label_get_text(unit), state.battery_valid ? "%" : "N/A") == 0);
+        if (state.battery_valid) { // 电量数字与 % 共用基线（两种字体度量不同）。
+            const auto* digit_font = lv_obj_get_style_text_font(digits, LV_PART_MAIN);
+            const auto* unit_font = lv_obj_get_style_text_font(unit, LV_PART_MAIN);
+            assert(object_coords(digits).y2 - lv_obj_get_style_pad_bottom(digits, LV_PART_MAIN) - digit_font->base_line
+                   == object_coords(unit).y2 - unit_font->base_line);
+        }
         assert(label(block, charging ? "CHG" : "BAT"));
         std::snprintf(text, sizeof(text), "%.2f V", state.battery_voltage);
         assert(label(block, state.battery_valid ? text : "N/A"));
@@ -339,7 +347,8 @@ random_battery_events(lv_display_t* display, const std::string& output) {
             const auto target = state.battery_valid ? full_width * percent / 100 : 0;
             auto* animation = lv_anim_get(current, nullptr);
             if (charging) {
-                assert(animation && animation->start_value == 0 && animation->end_value == full_width);
+                assert(animation && animation->start_value == page::battery::charge_start(full_width, percent)
+                       && animation->end_value == full_width);
                 assert(animation->reverse_duration == 0 && !animation->reverse_play_in_progress);
                 assert(lv_obj_get_width(current) >= 0 && lv_obj_get_width(current) <= full_width);
             } else {
@@ -374,7 +383,7 @@ random_battery_events(lv_display_t* display, const std::string& output) {
             check();
         }
     }
-    // At full actual charge, both slots still animate from zero and the number stays 100.
+    // At full actual charge, both slots still sweep (from 4/5 of the slot) and the number stays 100.
     advance(10000); // Let Startup's idle timer expose StatusBar for the joint captures.
     state.battery_percent = 100;
     state.charging = false;
@@ -383,18 +392,21 @@ random_battery_events(lv_display_t* display, const std::string& output) {
     test_input::status(state);
     lv_obj_update_layout(lv_screen_active());
     lv_obj_update_layout(lv_layer_top());
-    assert(lv_obj_get_width(fill) == 0 && lv_obj_get_width(status_fill) == 0);
+    const auto start = page::battery::charge_start(kStartupBatteryWidth, 100);
+    const auto status_start = page::battery::charge_start(kStatusBatteryWidth, 100);
+    assert(lv_obj_get_width(fill) == start && lv_obj_get_width(status_fill) == status_start);
     capture(display, output, "Startup-StatusBar-charge-empty", on_screen(label(lv_layer_top(), "DEMO")), 0);
     advance(600);
-    assert(lv_obj_get_width(fill) >= kStartupBatteryWidth * 45 / 100
-           && lv_obj_get_width(fill) <= kStartupBatteryWidth * 55 / 100);
-    assert(lv_obj_get_width(status_fill) >= 9 && lv_obj_get_width(status_fill) <= 11);
+    assert(lv_obj_get_width(fill) >= start + (kStartupBatteryWidth - start) * 45 / 100
+           && lv_obj_get_width(fill) <= start + (kStartupBatteryWidth - start) * 55 / 100);
+    assert(lv_obj_get_width(status_fill) > status_start && lv_obj_get_width(status_fill) < kStatusBatteryWidth);
     capture(display, output, "Startup-StatusBar-charge-half", on_screen(label(lv_layer_top(), "DEMO")), 0);
     advance(650);
     assert(lv_obj_get_width(fill) == kStartupBatteryWidth && lv_obj_get_width(status_fill) == kStatusBatteryWidth);
     capture(display, output, "Startup-StatusBar-charge-full", on_screen(label(lv_layer_top(), "DEMO")), 0);
     advance(350);
-    assert(lv_obj_get_width(fill) < kStartupBatteryWidth / 6 && lv_obj_get_width(status_fill) < 3);
+    assert(lv_obj_get_width(fill) >= start && lv_obj_get_width(fill) < start + (kStartupBatteryWidth - start) / 6);
+    assert(lv_obj_get_width(status_fill) >= status_start && lv_obj_get_width(status_fill) < status_start + 2);
     auto* reading = lv_obj_get_child(lv_obj_get_parent(lv_obj_get_parent(fill)), 2);
     assert(label(reading, "100") && label(reading, "%"));
     capture(display, output, "Startup-StatusBar-charge-reset", on_screen(label(lv_layer_top(), "DEMO")), 0);
@@ -428,7 +440,7 @@ random_battery_events(lv_display_t* display, const std::string& output) {
             previous_width = current_width;
         }
         if (state.charging)
-            assert(moved && status_moved && saw_reset); // Grow from empty to full and restart, even at 100%.
+            assert(moved && status_moved && saw_reset); // Sweep from the level to full and restart, even at 100%.
         if (event < 4)
             capture(display, output, "Startup-random-42-" + std::to_string(event),
                     on_screen(label(lv_layer_top(), "DEMO")), 0);
@@ -456,7 +468,8 @@ random_battery_events(lv_display_t* display, const std::string& output) {
     check();
     state.charging = false;
     check();
-    std::puts("Startup/StatusBar random events: seed=42, 128 events, matching colors and 0-100% charging verified");
+    std::puts(
+        "Startup/StatusBar random events: seed=42, 128 events, matching colors and level-to-full charging verified");
 }
 
 void
@@ -551,6 +564,15 @@ boot_sequence(lv_display_t* display, const std::string& output, const std::strin
 void focused(i18n::TextId id) {
     assert(active->focused() && label(active->focused(), i18n::text(id)));
 }
+
+/** 返回按钮只有图标：按其图标资源识别焦点。 */
+void
+focused_back() {
+    auto* focus = active->focused();
+    assert(focus && lv_obj_get_child_count(focus) == 1);
+    auto* icon = lv_obj_get_child(focus, 0);
+    assert(lv_obj_check_type(icon, &lv_image_class) && lv_image_get_src(icon) == resource_pool::get_image("ui_back"));
+}
 void check_form_labels(lv_obj_t* obj) {
     if (lv_obj_is_hidden(obj)) {
         return;
@@ -572,9 +594,144 @@ void check_form_labels(lv_obj_t* obj) {
         check_form_labels(lv_obj_get_child(obj, static_cast<int32_t>(i)));
     }
 }
-void choose(i18n::TextId id) {
-    for (unsigned i = 0; i < 8 && !label(active->focused(), i18n::text(id)); ++i)
+
+/** @brief 五段亮度条在标题下居中，整档及异常快照均映射到最近档。 */
+void
+check_brightness_hero(lv_obj_t* tile, uint8_t percent) {
+    assert(tile && lv_obj_get_child_count(tile) == 7);
+    lv_obj_update_layout(tile);
+    auto* icon = lv_obj_get_child(tile, 0);
+    assert(lv_image_get_src(icon) == resource_pool::get_image("ui_sun_large"));
+    assert(lv_color_eq(lv_obj_get_style_image_recolor(icon, LV_PART_MAIN), page::style::kAccent));
+    auto* title = lv_obj_get_child(tile, 1);
+    assert(lv_obj_check_type(title, &lv_label_class));
+    assert(object_coords(title).y1 > object_coords(icon).y2);
+    assert(!label(tile, "%"));
+    const unsigned rounded = (static_cast<unsigned>(percent) + 10) / 20;
+    const unsigned expected = rounded < 1 ? 1 : rounded > 5 ? 5 : rounded;
+    unsigned filled = 0;
+    for (unsigned i = 0; i < 5; ++i) {
+        auto* segment = lv_obj_get_child(tile, static_cast<int32_t>(i + 2));
+        assert(lv_obj_check_type(segment, &lv_obj_class));
+        assert(!lv_obj_is_clickable(segment) && !lv_obj_get_group(segment));
+        assert(lv_obj_get_width(segment) == 10 && lv_obj_get_height(segment) == 4);
+        assert(lv_obj_get_style_radius(segment, LV_PART_MAIN) == 2);
+        assert(lv_obj_get_style_bg_opa(segment, LV_PART_MAIN) == LV_OPA_COVER);
+        const auto area = object_coords(segment);
+        const auto bounds = object_coords(tile);
+        assert(area.x1 > bounds.x1 + 2 && area.x2 < bounds.x2 - 2);
+        assert(area.y1 > object_coords(title).y2 && area.y2 < bounds.y2 - 2);
+        assert(area.x1 - bounds.x1 == 11 + static_cast<int>(i) * 14);
+        assert(area.y1 - bounds.y1 == 61);
+        const bool on = lv_color_eq(lv_obj_get_style_bg_color(segment, LV_PART_MAIN), page::style::kAccent);
+        assert(on == (i < expected));
+        filled += on;
+        if (!on) {
+            assert(lv_color_eq(lv_obj_get_style_bg_color(segment, LV_PART_MAIN),
+                               lv_color_mix(page::style::kAccent, page::style::kCard, 48)));
+        }
+    }
+    assert(filled == expected);
+    const auto first = object_coords(lv_obj_get_child(tile, 2));
+    const auto last = object_coords(lv_obj_get_child(tile, 6));
+    assert(first.x1 - object_coords(tile).x1 == object_coords(tile).x2 - last.x2);
+}
+
+/** @brief 入场从主卡开始错峰；能力变化保留原对象及焦点驱动。 */
+void
+check_system_dash_reveal() {
+    auto* root = page::style::box(lv_screen_active(), 0, 0, width, height);
+    page::SystemDashView view;
+    view.create(root);
+    auto* highlight = view.focus_highlight();
+    const auto& ui = view.widgets();
+    page::SystemDashState state;
+    for (bool available : {false, true, false}) {
+        state.wifi_available = available;
+        view.update(state);
+        view.appear();
+        unsigned delay = 0;
+        for (auto* object : {ui.brightness, ui.language, ui.wifi, ui.power, ui.back}) {
+            auto* animation = lv_anim_get(object, page::settings_style::move_in);
+            assert(animation && animation->act_time == -static_cast<int32_t>(delay));
+            delay += 40;
+        }
+        assert(!lv_obj_is_hidden(ui.wifi) && lv_obj_is_disabled(ui.wifi) == !available);
+        assert(view.focus_highlight() == highlight);
+        const auto segments = std::array<lv_obj_t*, 5>{
+            lv_obj_get_child(ui.brightness, 2), lv_obj_get_child(ui.brightness, 3), lv_obj_get_child(ui.brightness, 4),
+            lv_obj_get_child(ui.brightness, 5), lv_obj_get_child(ui.brightness, 6)};
+        for (uint8_t percent : {20, 40, 60, 80, 100, 0, 1, 29, 30, 49, 50, 69, 70, 89, 90, 99, 255}) {
+            state.brightness = percent;
+            view.update(state);
+            check_brightness_hero(ui.brightness, percent);
+            for (unsigned i = 0; i < segments.size(); ++i) {
+                assert(lv_obj_get_child(ui.brightness, static_cast<int32_t>(i + 2)) == segments[i]);
+            }
+        }
+    }
+    view.destroy();
+    lv_obj_delete(root);
+}
+
+/** @brief 能力切换不改变共享设置网格；禁用 Wi-Fi 始终可见且跳过焦点导航。 */
+void
+check_system_dash_grid(bool wifi_available) {
+    auto* language = lv_obj_get_parent(label(lv_screen_active(), i18n::text(i18n::TextId::LanguageTitle)));
+    auto* root = lv_obj_get_parent(language);
+    auto* brightness = lv_obj_get_parent(label(root, i18n::text(i18n::TextId::BrightnessTitle)));
+    auto* wifi = lv_obj_get_parent(label(root, i18n::text(i18n::TextId::SystemWifiTitle)));
+    auto* power = lv_obj_get_parent(label(root, i18n::text(i18n::TextId::PowerTitle)));
+    auto* back = lv_obj_get_child(root, 4);
+    lv_obj_update_layout(root);
+    assert(!lv_obj_is_hidden(wifi) && lv_obj_is_disabled(wifi) == !wifi_available);
+    assert(lv_group_get_obj_count(lv_group_get_default()) == (wifi_available ? 5u : 4u));
+    assert(lv_obj_get_group(wifi) == (wifi_available ? lv_group_get_default() : nullptr));
+    const auto geometry = [](lv_obj_t* object, int x, int y, int w, int h) {
+        assert(lv_obj_get_x(object) == x && lv_obj_get_y(object) == y);
+        assert(lv_obj_get_width(object) == w && lv_obj_get_height(object) == h);
+    };
+    geometry(brightness, 8, 28, 88, 77);
+    geometry(language, 102, 28, 186, 23);
+    geometry(wifi, 102, 55, 186, 23);
+    geometry(power, 102, 82, 138, 23);
+    geometry(back, 246, 82, 42, 23);
+    assert(object_coords(wifi).y1 - object_coords(language).y2 - 1 == 4);
+    assert(object_coords(power).y1 - object_coords(wifi).y2 - 1 == 4);
+    assert(object_coords(back).x1 - object_coords(power).x2 - 1 == 6);
+    for (auto* row : {language, wifi, power}) {
+        auto* title = lv_obj_get_child(row, 0);
+        auto* icon = lv_obj_get_child(row, 1);
+        assert(object_coords(title).x1 - object_coords(icon).x2 - 1 >= 4);
+        if (row != power) {
+            auto* value = lv_obj_get_child(row, 2);
+            assert(object_coords(value).x1 - object_coords(title).x2 - 1 >= 6);
+        }
+    }
+    assert(lv_obj_get_child_count(back) == 1);
+    assert(lv_image_get_src(lv_obj_get_child(back, 0)) == resource_pool::get_image("ui_back"));
+    check_brightness_hero(brightness, hal_test::snapshot<dp::Settings>().brightness);
+    check_layout(root);
+    check_form_labels(root);
+    auto* selected = active->focused();
+    lv_group_focus_obj(brightness);
+    for (auto* row : {brightness, language, wifi, power, back}) {
+        if (lv_obj_is_disabled(row)) {
+            continue;
+        }
+        assert(active->focused() == row);
+        lv_group_focus_next(lv_group_get_default());
+    }
+    assert(active->focused() == brightness);
+    lv_group_focus_obj(selected);
+    advance(400);
+}
+
+void
+choose(i18n::TextId id) {
+    for (unsigned i = 0; i < 8 && !label(active->focused(), i18n::text(id)); ++i) {
         input(App::InputAction::NextFocus);
+    }
     focused(id);
 }
 /** Check opaque content stays below the status bar, allowing only the thin battery slot's border. */
@@ -679,7 +836,7 @@ saveconfig_scenarios(lv_display_t* display, const std::string& output) {
                 assert(app.init());
                 advance(400);
                 product_start();
-                advance(7000);
+                advance(8000); // 包含开机淡入和首页入场。
                 assert(std::strcmp(app.current_page(), "Pages/Dialplate") == 0);
                 assert(app.show_page("Pages/SystemDash"));
                 advance(600);
@@ -830,6 +987,7 @@ int main(int argc, char** argv) {
     lv_display_set_buffers(display, pixels, NULL, sizeof(pixels), LV_DISPLAY_RENDER_MODE_PARTIAL);
     lv_display_set_flush_cb(display, flush);
     assert(display);
+    check_system_dash_reveal();
     {
         demo::model().power = {};
         App app;
@@ -871,8 +1029,38 @@ int main(int argc, char** argv) {
         input(App::InputAction::Confirm);
         assert(std::strcmp(app.current_page(), "Pages/SystemDash") == 0);
         assert(!app.show_page("Pages/Shutdown"));
-        focused(i18n::TextId::LanguageTitle);
+        focused(i18n::TextId::BrightnessTitle);
         assert(!app.show_page("Pages/SystemSettings"));
+        choose(i18n::TextId::BrightnessTitle);
+        for (uint8_t percent : {20, 40, 60, 80, 100, 20}) {
+            input(App::InputAction::Confirm);
+            assert(hal_test::snapshot<dp::Settings>().brightness == percent);
+            assert(demo::model().board.brightness == percent);
+            check_brightness_hero(app.focused(), percent);
+        }
+        // Board 只接受整档；直接发布外部快照，单独验证 UI 对非整档值的恢复能力。
+        assert(dp::Settings::notify(*DataProc::Broker()->mainNode(), {i18n::get_language(), 99}) != DataNode::RES_OK);
+        assert(hal_test::snapshot<dp::Settings>().brightness == 20);
+        const dp::Settings::State off_step{i18n::get_language(), 99};
+        auto* settings = DataProc::Broker()->search(dp::names::Settings);
+        assert(settings && settings->publish(&off_step, sizeof(off_step)) == DataNode::RES_OK);
+        check_brightness_hero(app.focused(), 99);
+        input(App::InputAction::Confirm);
+        assert(hal_test::snapshot<dp::Settings>().brightness == 100);
+        check_brightness_hero(app.focused(), 100);
+        input(App::InputAction::Confirm);
+        assert(hal_test::snapshot<dp::Settings>().brightness == 20);
+        check_brightness_hero(app.focused(), 20);
+        assert(app.back());
+        advance(600);
+        assert(app.show_page("Pages/SystemDash"));
+        advance(600);
+        check_brightness_hero(lv_obj_get_parent(label(lv_screen_active(), i18n::text(i18n::TextId::BrightnessTitle))),
+                             20);
+        choose(i18n::TextId::BrightnessTitle);
+        for (unsigned i = 0; i < 4; ++i) {
+            input(App::InputAction::Confirm);
+        }
         for (auto language : {i18n::Language::English, i18n::Language::Russian}) {
             choose(i18n::TextId::LanguageTitle);
             if (i18n::get_language() != language) {
@@ -881,41 +1069,86 @@ int main(int argc, char** argv) {
             assert(i18n::get_language() == language);
             const std::string suffix = language == i18n::Language::English ? "-en" : "-ru";
             focused(i18n::TextId::LanguageTitle);
-            assert(lv_group_get_obj_count(lv_group_get_default()) == 3); // Disabled Wi-Fi is skipped.
-            capture(display, output, "SystemDash" + suffix, false);
-            auto* wifi = label(lv_screen_active(), i18n::text(i18n::TextId::SystemWifiTitle));
-            assert(wifi && lv_obj_is_disabled(lv_obj_get_parent(wifi)));
+            assert(dp::Settings::notify(*DataProc::Broker()->mainNode(), {language, 60}) == DataNode::RES_OK);
+            check_system_dash_grid(false);
+            capture(display, output, "SystemDash-wifi-unavailable" + suffix);
+            auto* language_row = app.focused();
+            auto* root = lv_obj_get_parent(language_row);
+            auto* wifi_row = lv_obj_get_child(root, 2);
+            const auto children = lv_obj_get_child_count(root);
+            assert(label(root, i18n::text(i18n::TextId::SystemWifiTitle)));
+            // 能力经 HAL -> WiFi provider -> Model observer 异步到达，原对象更新禁用态。
+            demo::model().wifi.available = true;
+            advance(600);
+            check_system_dash_grid(true);
+            assert(app.focused() == language_row && lv_obj_get_child(root, 2) == wifi_row);
+            assert(lv_obj_get_child_count(root) == children);
+            capture(display, output, "SystemDash-wifi-available" + suffix);
+            choose(i18n::TextId::BrightnessTitle);
+            capture(display, output, "SystemDash-hero-focused" + suffix);
+            // 英俄两种语言均保留 Wi-Fi 可用、主卡聚焦及未聚焦的 60%/100% 截图。
+            for (uint8_t percent : {60, 100}) {
+                assert(dp::Settings::notify(*DataProc::Broker()->mainNode(), {language, percent}) == DataNode::RES_OK);
+                choose(i18n::TextId::LanguageTitle);
+                capture(display, output, "SystemDash-wifi-available-" + std::to_string(percent) + suffix);
+                choose(i18n::TextId::BrightnessTitle);
+                check_brightness_hero(app.focused(), percent);
+                capture(display, output, "SystemDash-hero-focused-" + std::to_string(percent) + suffix);
+            }
+            choose(i18n::TextId::LanguageTitle);
+            product_click(App::Key::Function);
+            focused(i18n::TextId::SystemWifiTitle);
+            demo::model().wifi.available = false; // 当前焦点行即将禁用。
+            advance(600);
+            focused(i18n::TextId::BrightnessTitle);
+            check_system_dash_grid(false);
+            assert(!lv_obj_is_focused(wifi_row) && !lv_obj_get_group(wifi_row));
+            choose(i18n::TextId::LanguageTitle);
+            capture(display, output, "SystemDash" + suffix);
             assert(!label(lv_screen_active(), i18n::text(i18n::TextId::DateTimeTitle)));
             product_click(App::Key::Function);
             focused(i18n::TextId::PowerTitle);
             product_backlog_click(App::Key::Function);
-            focused(i18n::TextId::Back);
+            focused_back();
             product_click(App::Key::Power);
             assert(std::strcmp(app.current_page(), "Pages/Dialplate") == 0);
             assert(!hal_test::snapshot<dp::Power>().pending && hal_test::snapshot<dp::Power>().calls == 0);
             advance(600);
             assert(on_screen(label(lv_layer_top(), "DEMO")));
             product_click(App::Key::Power); // Home remembers the System entry.
-            focused(i18n::TextId::LanguageTitle);
-            product_click(App::Key::Function);
-            focused(i18n::TextId::PowerTitle);
+            choose(i18n::TextId::PowerTitle);
             input(App::InputAction::Confirm);
             focused(i18n::TextId::ShutdownAction); // No Cancel button: a short press dismisses.
+            assert(lv_color_to_u32(lv_obj_get_style_border_color(app.focused(), LV_PART_MAIN))
+                   == lv_color_to_u32(page::style::kDanger));
             assert(lv_color_to_u32(lv_obj_get_style_bg_color(app.focused(), LV_PART_MAIN))
-                   == lv_color_to_u32(page::style::kDanger)); // Red when focused.
+                   != lv_color_to_u32(page::style::kDanger)); // 深色底、语义色细边框。
             assert(lv_group_get_obj_count(lv_group_get_default()) == 2);
-            capture(display, output, "Power" + suffix, false);
+            auto* shutdown = app.focused();
+            auto* reboot_text = label(lv_screen_active(), i18n::text(i18n::TextId::RebootAction));
+            assert(lv_color_to_u32(lv_obj_get_style_text_color(reboot_text, LV_PART_MAIN))
+                   == lv_color_to_u32(lv_color_mix(page::style::kText, page::style::kMuted, 160)));
+            assert(lv_color_to_u32(lv_obj_get_style_text_color(lv_obj_get_child(shutdown, 1), LV_PART_MAIN))
+                   == lv_color_to_u32(page::style::kText));
+            demo::model().wifi.available = true;
+            advance(600);
+            assert(app.focused() == shutdown && lv_group_get_obj_count(lv_group_get_default()) == 2);
+            demo::model().wifi.available = false;
+            advance(600);
+            assert(app.focused() == shutdown && lv_group_get_obj_count(lv_group_get_default()) == 2);
+            check_form_labels(lv_obj_get_parent(shutdown));
+            capture(display, output, "Power" + suffix);
             input(App::InputAction::NextFocus);
             focused(i18n::TextId::RebootAction);
             app.on_input(App::InputAction::Press); // Half a hold: the bar shows progress.
             advance(1000);
-            capture(display, output, "Power-Hold" + suffix, false);
+            capture(display, output, "Power-Hold" + suffix);
             app.on_input(App::InputAction::Release); // Released early: closes, nothing prepared.
             advance(400);
             assert(std::strcmp(app.current_page(), "Pages/SystemDash") == 0
                    && hal_test::snapshot<dp::Power>().calls == 0 && !hal_test::snapshot<dp::Power>().pending);
             focused(i18n::TextId::PowerTitle);
-            assert(!on_screen(label(lv_layer_top(), "DEMO")));
+            assert(on_screen(label(lv_layer_top(), "DEMO"))); // SystemDash 与其他设置页一样显示状态栏。
             assert(app.show_page("Pages/SystemInfos"));
             advance(400);
             assert(label(lv_screen_active(), "31.230400\n121.473700\n12.50 m")); // Simulated Device data.
@@ -958,7 +1191,7 @@ int main(int argc, char** argv) {
             assert(lv_group_get_obj_count(lv_group_get_default()) == 7);
             capture(display, output, "SystemInfos-Reopen" + suffix, false);
             product_click(App::Key::Power); // 根页也可点击返回。
-            assert(!on_screen(label(lv_layer_top(), "DEMO")));
+            assert(on_screen(label(lv_layer_top(), "DEMO"))); // 返回 SystemDash，状态栏保持显示。
             assert(app.show_page("Pages/StarMap"));
             advance(600);
             assert(app.focused() && lv_obj_is_focused(app.focused()));
@@ -1059,7 +1292,7 @@ int main(int argc, char** argv) {
         }
         input(App::InputAction::Back);
         advance(400);
-        assert(!on_screen(label(lv_layer_top(), "DEMO")));
+        assert(on_screen(label(lv_layer_top(), "DEMO"))); // Back on SystemDash, which shows the bar.
         input(App::InputAction::Back);
         advance(300);
         assert(std::strcmp(app.current_page(), "Pages/Dialplate") == 0 && !app.back());
@@ -1145,8 +1378,7 @@ int main(int argc, char** argv) {
                 }
                 check_form_labels(root);
                 capture(display, output,
-                        std::string(page + 6) + (language == i18n::Language::English ? "-new-en" : "-new-ru"),
-                        std::strcmp(page, "Pages/SystemDash") != 0);
+                        std::string(page + 6) + (language == i18n::Language::English ? "-new-en" : "-new-ru"));
                 if (std::strcmp(page, "Pages/WorkSettings") == 0) {
                     input(App::InputAction::Confirm); // Rover -> Base
                     input(App::InputAction::Confirm); // Base -> Network

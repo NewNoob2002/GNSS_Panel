@@ -9,9 +9,9 @@
 using namespace page;
 
 void SystemLoading::onInstalled() {
-    setLoadAnimType(PAGE_ANIM::NONE);
-    setLoadAnimTime(style::kPageTransitionMs);
-    setLoadAnimPath(style::page_transition_path);
+    setLoadAnimType(PAGE_ANIM::FADE_THROUGH);
+    setLoadAnimTime(300);
+    setLoadAnimPath(style::panel_transition_path);
 }
 
 void SystemLoading::onViewLoad() {
@@ -30,15 +30,16 @@ void SystemLoading::onViewWillAppear() {
     phase_ = Phase::Logo;
     step_ = 0;
     model_->begin_initialization(); // Report reset failures are logged; startup remains non-blocking.
-    view_.show_logo();
-    APP_LOG_I("SystemLoading", "window=Logo%s", demo_tag());
+    view_.prepare_logo();
 }
 
 void SystemLoading::onViewDidAppear() {
-    // Start completion timing after the page transition, including a stalled host frame.
+    view_.show_logo();
+    APP_LOG_I("SystemLoading", "window=Logo%s", demo_tag());
+    // Logo 动画和完成计时都从页面真正可见后开始，包括主机长帧。
     timer_ = lv_timer_create(on_timeout, SystemLoadingView::kLogoMs, this);
     if (!timer_)
-        LV_LOG_ERROR("SystemLoading: preview timer allocation failed");
+        APP_LOG_E("SystemLoading", "preview timer allocation failed");
 }
 
 void SystemLoading::cancel_timer() {
@@ -124,5 +125,5 @@ void SystemLoading::on_timeout(lv_timer_t* timer) {
     lv_timer_delete(timer);
     APP_LOG_I("SystemLoading", "window=Dialplate%s", self->demo_tag());
     if (self->getManager()->replace(page::name(PageId::Dialplate)) != PageManager::RES_TYPE::OK)
-        LV_LOG_WARN("SystemLoading: preview transition rejected");
+        APP_LOG_W("SystemLoading", "preview transition rejected");
 }

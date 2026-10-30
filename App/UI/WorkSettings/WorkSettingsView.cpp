@@ -13,7 +13,8 @@ void WorkSettingsView::create(lv_obj_t* root) {
     preset_text_ = style::label(ui.preset, font, 4, 44, 80);
     lv_obj_set_style_text_align(preset_text_, LV_TEXT_ALIGN_CENTER, 0);
     status_dot_ = settings_style::dot(ui.preset, 41, 68);
-    style::accent(ui.preset, 32, 3, 24);
+    // 顶部装饰条跟随预设颜色，避免与橙色焦点框混淆。
+    mode_bar_ = style::accent(ui.preset, 32, 3, 24);
     ui.protocol = style::box(root, 102, 28, 186, 23, true);
     ui.channel = style::box(root, 102, 55, 186, 23, true);
     ui.apply = style::box(root, 102, 82, 138, 23, true);
@@ -109,6 +110,8 @@ bool WorkSettingsView::update(const WorkSettingsState& state) {
     const auto color = target == hal::WorkTarget::Rover ? style::kSuccess : style::kInfo;
     settings_style::set_image(mode_icon_, image);
     settings_style::set_recolor(mode_icon_, color);
+    if (lv_color_to_u32(lv_obj_get_style_bg_color(mode_bar_, LV_PART_MAIN)) != lv_color_to_u32(color))
+        lv_obj_set_style_bg_color(mode_bar_, color, 0);
     settings_style::activity(status_dot_, pending, pending ? style::kAccent : color);
     char value[64];
     i18n::option_text(TextId::WorkRadioProtocolOptions, state.protocol, value, sizeof(value));

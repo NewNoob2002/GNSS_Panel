@@ -80,6 +80,16 @@ public:
         return source.request_wifi && source.request_wifi(c.on) ? RES_OK : RES_UNSUPPORT;
     }
 };
+class Board final : public hal::WriteObject<hal::BoardState, hal::BrightnessCommand> {
+public:
+    Board() : WriteObject(hal::names::Board) {}
+    hal::BoardState state() override { return source.board; }
+    int execute(const hal::BrightnessCommand& c) override {
+        if (c.percent < 20 || c.percent > 100) return RES_PARAM_ERROR;
+        source.board.brightness = c.percent;
+        return RES_OK;
+    }
+};
 class Init final : public hal::InitObject {
 public:
     void info(hal::InitInfo& v) override {
@@ -97,7 +107,7 @@ inline DeviceManager& devices() {
     static Read<hal::GNSSState> gnss(hal::names::GNSS, source.gnss);
     static Read<hal::ClockState> clock(hal::names::Clock, source.clock);
     static Work work; static Recorder recorder; static Wifi wifi;
-    static Read<hal::BoardState> board(hal::names::Board, source.board); static Init init;
+    static Board board; static Init init;
     static DeviceObject* list[] = {&power,&battery,&gnss,&clock,&work,&recorder,&wifi,&board,&init};
     static DeviceManager manager(list,9);
     static const bool initialized = (manager.init(),true); (void)initialized;

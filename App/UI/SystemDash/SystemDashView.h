@@ -8,7 +8,7 @@
 namespace page {
 class SystemDashView {
   public:
-    enum class Control { Language, Wifi, Power, Back, Shutdown, Reboot, None };
+    enum class Control { Language, Wifi, Brightness, Power, Back, Shutdown, Reboot, None };
 
     void create(lv_obj_t* root, bool reboot_available = true);
     void destroy();
@@ -25,7 +25,7 @@ class SystemDashView {
     void unbind();
 
     void apply_language();
-    void update(const SystemDashState& state) const;
+    void update(const SystemDashState& state);
     void show_power(bool visible);
     /** Hold-to-confirm progress 0..100 inside button (shutdown or reboot); 0 clears both. */
     void set_hold(lv_obj_t* button, int32_t percent) const;
@@ -39,14 +39,14 @@ class SystemDashView {
     lv_obj_t* default_focus(bool power_dialog) const { return power_dialog ? ui.shutdown : ui.power; }
     std::array<lv_obj_t*, 2> power_actions() const { return {ui.shutdown, reboot_available_ ? ui.reboot : nullptr}; }
 
-    std::array<lv_obj_t*, 4> controls() const;
-    std::array<lv_obj_t*, 6> all_controls() const;
+    std::array<lv_obj_t*, 5> controls() const;
+    std::array<lv_obj_t*, 7> all_controls() const;
 
     const auto& widgets() const { return ui; }
 
   private:
     struct {
-        lv_obj_t *language{}, *wifi{}, *power{}, *back{}, *overlay{}, *shutdown{}, *reboot{};
+        lv_obj_t *language{}, *wifi{}, *brightness{}, *power{}, *back{}, *overlay{}, *shutdown{}, *reboot{};
     } ui;
 
     FocusHighlight focus_{};
@@ -60,8 +60,9 @@ class SystemDashView {
     };
     std::array<Caption, 10> captions_{};
     unsigned caption_count_ = 0;
-    bool power_open_ = false, reboot_available_ = true;
-    lv_obj_t *language_value_{}, *wifi_value_{}, *hero_{}, *status_dot_{};
+    bool power_open_ = false, reboot_available_ = true, wifi_available_ = false;
+    lv_obj_t *language_value_{}, *wifi_value_{}, *wifi_caption_{}, *wifi_icon_{};
+    std::array<lv_obj_t*, 5> brightness_segments_{};
     lv_obj_t* hold_fill_[2]{}; // Shutdown, reboot.
     lv_obj_t* caption(lv_obj_t* parent, i18n::TextId id, int x, int y, int width);
 };

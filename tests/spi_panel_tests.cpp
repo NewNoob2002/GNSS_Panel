@@ -352,7 +352,6 @@ expectedPanelInit(bool dmaInit) {
     return expected;
 }
 
-#if PRODUCT_DISPLAY_BRIGHTNESS_FADE
 /** @brief 当前 trace 中全部线上字节，供亮度命令断言使用。 */
 static std::vector<uint32_t>
 bytes() {
@@ -371,7 +370,6 @@ brightnessTrace(uint8_t value) {
     return {{"gpio", PB14, 0}, {"gpio", PB1, 0}, {"spi", ENABLE},  {"byte", 0x51},
             {"gpio", PB1, 1},  {"byte", value},  {"gpio", PB14, 1}};
 }
-#endif
 
 /** 用真实 LVGL 注册的驱动执行 flush，验证窗口和 DMA，不运行 UI 定时器。 */
 static void
@@ -539,6 +537,28 @@ main() {
     lv_port_disp_poll();
     assert((bytes() == std::vector<uint32_t>{0x51, 0xFF}));
 #endif
+
+    // 设置亮度先回收在途 DMA；后续轮询和屏幕唤醒不能恢复全亮。
+    flush({0, 0, 1, 1});
+    trace.clear();
+    pollStep = 100;
+    lv_port_set_brightness(51);
+    pollStep = 0;
+    auto brightness_change = std::vector<Event>{{"channel", DISABLE}, {"spi", DISABLE}, {"gpio", PB14, 1}};
+    const auto dim = brightnessTrace(51);
+    brightness_change.insert(brightness_change.end(), dim.begin(), dim.end());
+    expectTrace(brightness_change);
+    assert((bytes() == std::vector<uint32_t>{0x51, 51}));
+    trace.clear();
+    nowMs += 1000;
+    lv_port_disp_poll();
+    assert(trace.empty());
+    lv_port_reset();
+    auto dim_reset = expectedPanelInit(false);
+    auto restore = brightnessTrace(51);
+    restore.erase(restore.begin() + 2); // fill 后 SPI 已使能。
+    dim_reset.insert(dim_reset.end(), restore.begin(), restore.end());
+    expectTrace(dim_reset);
 
     trace.clear();
     uint8_t byte = 0;

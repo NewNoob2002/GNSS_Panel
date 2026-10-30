@@ -23,8 +23,8 @@
 #include "PageLog.h"
 #include "PageManager.h"
 
-void PageManager::stateNext(PageBase* base)
-{
+void
+PageManager::stateNext(PageBase* base) {
     if (!base) {
         return;
     }
@@ -32,54 +32,46 @@ void PageManager::stateNext(PageBase* base)
     sendEvent(EVENT_TYPE::PAGE_STATE_CHANGED, (void*)&base->_context.state);
 
     switch (base->_context.state) {
-    case PageBase::STATE::IDLE:
-        PAGE_LOG_INFO("Page(%s) state idle", base->_name);
-        break;
+        case PageBase::STATE::IDLE: PAGE_LOG_DEBUG("Page(%s) state idle", base->_name); break;
 
-    case PageBase::STATE::LOAD:
-        base->_context.state = stateLoad(base);
-        stateNext(base);
-        break;
-
-    case PageBase::STATE::WILL_APPEAR:
-        base->_context.state = stateWillAppear(base);
-        break;
-
-    case PageBase::STATE::DID_APPEAR:
-        base->_context.state = stateDidAppear(base);
-        PAGE_LOG_INFO("Page(%s) state active", base->_name);
-        break;
-
-    case PageBase::STATE::ACTIVITY:
-        PAGE_LOG_INFO("Page(%s) state active break", base->_name);
-        base->_context.state = PageBase::STATE::WILL_DISAPPEAR;
-        stateNext(base);
-        break;
-
-    case PageBase::STATE::WILL_DISAPPEAR:
-        base->_context.state = stateWillDisappear(base);
-        break;
-
-    case PageBase::STATE::DID_DISAPPEAR:
-        base->_context.state = stateDidDisappear(base);
-        if (base->_context.state == PageBase::STATE::UNLOAD) {
+        case PageBase::STATE::LOAD:
+            base->_context.state = stateLoad(base);
             stateNext(base);
-        }
-        break;
+            break;
 
-    case PageBase::STATE::UNLOAD:
-        base->_context.state = stateUnload(base);
-        break;
+        case PageBase::STATE::WILL_APPEAR: base->_context.state = stateWillAppear(base); break;
 
-    default:
-        PAGE_LOG_ERROR("Page(%s) state[%d] was NOT FOUND!", base->_name, static_cast<int>(base->_context.state));
-        break;
+        case PageBase::STATE::DID_APPEAR:
+            base->_context.state = stateDidAppear(base);
+            PAGE_LOG_DEBUG("Page(%s) state active", base->_name);
+            break;
+
+        case PageBase::STATE::ACTIVITY:
+            PAGE_LOG_DEBUG("Page(%s) state active break", base->_name);
+            base->_context.state = PageBase::STATE::WILL_DISAPPEAR;
+            stateNext(base);
+            break;
+
+        case PageBase::STATE::WILL_DISAPPEAR: base->_context.state = stateWillDisappear(base); break;
+
+        case PageBase::STATE::DID_DISAPPEAR:
+            base->_context.state = stateDidDisappear(base);
+            if (base->_context.state == PageBase::STATE::UNLOAD) {
+                stateNext(base);
+            }
+            break;
+
+        case PageBase::STATE::UNLOAD: base->_context.state = stateUnload(base); break;
+
+        default:
+            PAGE_LOG_ERROR("Page(%s) state[%d] was NOT FOUND!", base->_name, static_cast<int>(base->_context.state));
+            break;
     }
 }
 
-PageBase::STATE PageManager::stateLoad(PageBase* base)
-{
-    PAGE_LOG_INFO("Page(%s) state load", base->_name);
+PageBase::STATE
+PageManager::stateLoad(PageBase* base) {
+    PAGE_LOG_DEBUG("Page(%s) state load", base->_name);
 
     if (base->_root != nullptr) {
         PAGE_LOG_ERROR("Page(%s) root must be nullptr", base->_name);
@@ -102,8 +94,7 @@ PageBase::STATE PageManager::stateLoad(PageBase* base)
                     self->getManager()->pop();
                 }
             },
-            LV_EVENT_GESTURE,
-            base);
+            LV_EVENT_GESTURE, base);
     }
 
     if (_rootDefaultStyle) {
@@ -111,60 +102,81 @@ PageBase::STATE PageManager::stateLoad(PageBase* base)
     }
 
     base->_root = root_obj;
+    lv_obj_add_event_cb(root_obj, onPageRootDelete, LV_EVENT_DELETE, base);
     base->onViewLoad();
 
     base->onViewDidLoad();
 
     if (base->_context.isDisableAutoCache) {
-        PAGE_LOG_INFO("Page(%s) disable auto cache, reqEnableCache = %d", base->_name, base->_context.reqEnableCache);
+        PAGE_LOG_DEBUG("Page(%s) disable auto cache, reqEnableCache = %d", base->_name, base->_context.reqEnableCache);
         base->_context.isCached = base->_context.reqEnableCache;
     } else {
-        PAGE_LOG_INFO("Page(%s) AUTO cached", base->_name);
+        PAGE_LOG_DEBUG("Page(%s) AUTO cached", base->_name);
         base->_context.isCached = true;
     }
 
     return PageBase::STATE::WILL_APPEAR;
 }
 
-PageBase::STATE PageManager::stateWillAppear(PageBase* base)
-{
-    PAGE_LOG_INFO("Page(%s) state will appear", base->_name);
+PageBase::STATE
+PageManager::stateWillAppear(PageBase* base) {
+    PAGE_LOG_DEBUG("Page(%s) state will appear", base->_name);
     // 缓存页必须先可见，willAppear 中对根对象的聚焦才会生效。
     lv_obj_set_hidden(base->_root, false);
     base->onViewWillAppear();
     return PageBase::STATE::DID_APPEAR;
 }
 
-PageBase::STATE PageManager::stateDidAppear(PageBase* base)
-{
-    PAGE_LOG_INFO("Page(%s) state did appear", base->_name);
+PageBase::STATE
+PageManager::stateDidAppear(PageBase* base) {
+    PAGE_LOG_DEBUG("Page(%s) state did appear", base->_name);
     base->onViewDidAppear();
     return PageBase::STATE::ACTIVITY;
 }
 
-PageBase::STATE PageManager::stateWillDisappear(PageBase* base)
-{
-    PAGE_LOG_INFO("Page(%s) state will disappear", base->_name);
+PageBase::STATE
+PageManager::stateWillDisappear(PageBase* base) {
+    PAGE_LOG_DEBUG("Page(%s) state will disappear", base->_name);
     base->onViewWillDisappear();
     return PageBase::STATE::DID_DISAPPEAR;
 }
 
-PageBase::STATE PageManager::stateDidDisappear(PageBase* base)
-{
-    PAGE_LOG_INFO("Page(%s) state did disappear", base->_name);
+PageBase::STATE
+PageManager::stateDidDisappear(PageBase* base) {
+    PAGE_LOG_DEBUG("Page(%s) state did disappear", base->_name);
     lv_obj_set_hidden(base->_root, true);
     base->onViewDidDisappear();
     if (base->_context.isCached) {
-        PAGE_LOG_INFO("Page(%s) has cached", base->_name);
+        PAGE_LOG_DEBUG("Page(%s) has cached", base->_name);
         return PageBase::STATE::WILL_APPEAR;
     } else {
         return PageBase::STATE::UNLOAD;
     }
 }
 
-PageBase::STATE PageManager::stateUnload(PageBase* base)
-{
-    PAGE_LOG_INFO("Page(%s) state unload", base->_name);
+void
+PageManager::onPageRootDelete(lv_event_t* e) {
+    auto* base = static_cast<PageBase*>(lv_event_get_user_data(e));
+    auto* manager = base->_manager;
+    // 外部删除根时先停止借用控件的回调；正常卸载会提前移除此通知。
+    lv_anim_delete(base->_root, nullptr);
+    base->onViewUnload();
+    base->_root = nullptr;
+    lv_free(base->_context.param.ptr);
+    base->_context.param = {};
+    base->_context.isCached = false;
+    base->_context.anim.isBusy = false;
+    base->_context.state = PageBase::STATE::IDLE;
+    manager->scrimDelete();
+    if (manager->isSwitching()) {
+        manager->switchReqCheck();
+    }
+    base->onViewDidUnload();
+}
+
+PageBase::STATE
+PageManager::stateUnload(PageBase* base) {
+    PAGE_LOG_DEBUG("Page(%s) state unload", base->_name);
     if (!base->_root) {
         PAGE_LOG_WARN("Page is unloaded!");
         return PageBase::STATE::IDLE;
@@ -174,8 +186,8 @@ PageBase::STATE PageManager::stateUnload(PageBase* base)
     base->_context.anim.isBusy = false;
     base->onViewUnload();
     if (base->_context.param.ptr != nullptr) {
-        PAGE_LOG_INFO("Page(%s) free param(%p)[%lu]", base->_name, base->_context.param.ptr,
-                      static_cast<unsigned long>(base->_context.param.size));
+        PAGE_LOG_DEBUG("Page(%s) free param(%p)[%lu]", base->_name, base->_context.param.ptr,
+                       static_cast<unsigned long>(base->_context.param.size));
         lv_free(base->_context.param.ptr);
         base->_context.param.ptr = nullptr;
         base->_context.param.size = 0;

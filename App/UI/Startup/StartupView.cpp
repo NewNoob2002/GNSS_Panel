@@ -1,5 +1,4 @@
 #include <cstdio>
-#include "FixedFormat.h"
 #include "StartupView.h"
 #include "UI/Common/BatteryStyle.h"
 #include "UI/Common/SettingsStyle.h"
@@ -45,8 +44,8 @@ void StartupView::create(lv_obj_t* root) {
     lv_obj_set_flex_align(reading, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_START);
     lv_obj_set_style_pad_column(reading, 2, 0);
     ui.bat_charge = style::label(reading, font_digits, 0, 0, LV_SIZE_CONTENT);
-    // Rajdhani's baseline is six pixels lower than Oswald's at the same line height.
-    lv_obj_set_style_pad_bottom(ui.bat_charge, 6, 0);
+    // 两行底部对齐后按字体基线差补偿，使 % 与数字落在同一基线；取自字体度量，字体重新生成后自动跟随。
+    lv_obj_set_style_pad_bottom(ui.bat_charge, font_main->base_line - font_digits->base_line, 0);
     lv_label_set_text(ui.bat_charge, "0");
     ui.bat_unit = style::label(reading, font_main, 0, 0, LV_SIZE_CONTENT);
     lv_obj_set_style_text_color(ui.bat_unit, style::kMuted, 0);
@@ -171,11 +170,9 @@ void StartupView::update(const StartupState& state) {
         char text[24];
         lv_snprintf(text, sizeof(text), "%u", percent);
         settings_style::set_text(ui.bat_charge, text);
-        app::format_fixed(text, sizeof(text), state.battery_voltage, 2, " V");
-        settings_style::set_text(ui.bat_voltage, text);
-    } else {
-        settings_style::set_text(ui.bat_voltage, "N/A");
     }
+    const auto reading = startup_battery_reading(state);
+    settings_style::set_text(ui.bat_voltage, reading.data());
     const bool charging = state.battery_valid && state.charging;
     const auto color = state.battery_valid ? battery::color(percent, charging) : style::kMuted;
     settings_style::set_text(ui.bat_caption, charging ? "CHG" : "BAT");

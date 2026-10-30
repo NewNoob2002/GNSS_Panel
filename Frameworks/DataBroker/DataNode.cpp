@@ -36,12 +36,16 @@ DataNode::DataNode(const char* id, DataBroker* broker, void* userData)
       _timer(nullptr) {
     _registered = _broker && _broker->add(this);
 
-    DN_LOG_INFO("DataNode[%s] created", _ID);
+    // Broker 主节点可能处于静态构造/析构期，日志 sink 此时尚未安装或已销毁。
+    if (!_broker || this != _broker->mainNode()) {
+        DN_LOG_INFO("DataNode[%s] created", _ID);
+    }
 }
 
-DataNode::~DataNode()
-{
-    DN_LOG_INFO("DataNode[%s] deleting...", _ID);
+DataNode::~DataNode() {
+    if (!_broker || this != _broker->mainNode()) {
+        DN_LOG_INFO("DataNode[%s] deleting...", _ID);
+    }
 
     /* Delete timer */
     if (_timer) {
@@ -63,11 +67,13 @@ DataNode::~DataNode()
     if (_registered) {
         _broker->remove(this);
     }
-    DN_LOG_INFO("DataNode[%s] deleted", _ID);
+    if (!_broker || this != _broker->mainNode()) {
+        DN_LOG_INFO("DataNode[%s] deleted", _ID);
+    }
 }
 
-const DataNode* DataNode::subscribe(const char* pubID)
-{
+const DataNode*
+DataNode::subscribe(const char* pubID) {
     if (!_registered || !pubID || !*pubID) {
         return nullptr;
     }
@@ -107,8 +113,8 @@ const DataNode* DataNode::subscribe(const char* pubID)
     return pub;
 }
 
-bool DataNode::unsubscribe(const char* pubID)
-{
+bool
+DataNode::unsubscribe(const char* pubID) {
     if (!_registered || !pubID || !*pubID) {
         return false;
     }
@@ -128,8 +134,8 @@ bool DataNode::unsubscribe(const char* pubID)
     return true;
 }
 
-int DataNode::publish(const void* data_p, size_t size)
-{
+int
+DataNode::publish(const void* data_p, size_t size) {
     if (!_registered || !data_p || !size) {
         return RES_PARAM_ERROR;
     }
@@ -157,8 +163,8 @@ int DataNode::publish(const void* data_p, size_t size)
     return result;
 }
 
-int DataNode::pull(const char* pubID, void* data_p, size_t size)
-{
+int
+DataNode::pull(const char* pubID, void* data_p, size_t size) {
     if (!_registered || !pubID || !*pubID || !data_p || !size) {
         return RES_PARAM_ERROR;
     }
@@ -170,8 +176,8 @@ int DataNode::pull(const char* pubID, void* data_p, size_t size)
     return pull(pub, data_p, size);
 }
 
-int DataNode::pull(const DataNode* pub, void* data_p, size_t size)
-{
+int
+DataNode::pull(const DataNode* pub, void* data_p, size_t size) {
     if (!_registered || !pub || !data_p || !size) {
         return RES_PARAM_ERROR;
     }
@@ -179,18 +185,18 @@ int DataNode::pull(const DataNode* pub, void* data_p, size_t size)
         return RES_NOT_FOUND;
     }
 
-    DN_LOG_INFO("sub[%s] pull << data(%p)[%zu] << pub[%s] ...",
-        _ID, data_p, size, pub->_ID);
-
     EventParam_t param(this, pub, EVENT_PULL, data_p, size);
     int ret = sendEvent((DataNode*)pub, &param);
 
-    DN_LOG_INFO("pull done: %d", ret);
+    // pull 由各节点逐帧轮询，成功路径不记录，避免淹没 DEBUG。
+    if (ret != RES_OK) {
+        DN_LOG_INFO("sub[%s] pull << pub[%s] failed: %d", _ID, pub->_ID, ret);
+    }
     return ret;
 }
 
-int DataNode::notify(const char* pubID, const void* data_p, size_t size)
-{
+int
+DataNode::notify(const char* pubID, const void* data_p, size_t size) {
     if (!_registered || !pubID || !*pubID || !data_p || !size) {
         return RES_PARAM_ERROR;
     }
@@ -203,8 +209,8 @@ int DataNode::notify(const char* pubID, const void* data_p, size_t size)
     return notify(pub, data_p, size);
 }
 
-int DataNode::notify(const DataNode* pub, const void* data_p, size_t size)
-{
+int
+DataNode::notify(const DataNode* pub, const void* data_p, size_t size) {
     if (!_registered || !pub || !data_p || !size) {
         return RES_PARAM_ERROR;
     }
@@ -212,8 +218,7 @@ int DataNode::notify(const DataNode* pub, const void* data_p, size_t size)
         return RES_NOT_FOUND;
     }
 
-    DN_LOG_INFO("sub[%s] notify >> data(%p)[%zu] >> pub[%s] ...",
-        _ID, data_p, size, pub->_ID);
+    DN_LOG_INFO("sub[%s] notify >> data(%p)[%zu] >> pub[%s] ...", _ID, data_p, size, pub->_ID);
 
     EventParam_t param(this, pub, EVENT_NOTIFY, (void*)data_p, size);
     int ret = sendEvent((DataNode*)pub, &param);
@@ -223,19 +228,19 @@ int DataNode::notify(const DataNode* pub, const void* data_p, size_t size)
     return ret;
 }
 
-void DataNode::setEventCallback(EventCallback_t callback, uint32_t eventFilter)
-{
+void
+DataNode::setEventCallback(EventCallback_t callback, uint32_t eventFilter) {
     _eventCallback = callback;
     _eventFilterMask = eventFilter;
 }
 
-void DataNode::setEventFilter(uint32_t eventFilter)
-{
+void
+DataNode::setEventFilter(uint32_t eventFilter) {
     _eventFilterMask = eventFilter;
 }
 
-int DataNode::onEvent(EventParam_t* param)
-{
+int
+DataNode::onEvent(EventParam_t* param) {
     if (!_eventCallback) {
         DN_LOG_INFO("DataNode[%s] not register callback", _ID);
         return RES_NO_CALLBACK;
@@ -244,8 +249,8 @@ int DataNode::onEvent(EventParam_t* param)
     return _eventCallback(this, param);
 }
 
-int DataNode::sendEvent(DataNode* node, EventParam_t* param)
-{
+int
+DataNode::sendEvent(DataNode* node, EventParam_t* param) {
     if (!(node->_eventFilterMask & param->event)) {
         return RES_UNSUPPORTED_REQUEST;
     }
@@ -253,16 +258,16 @@ int DataNode::sendEvent(DataNode* node, EventParam_t* param)
     return node->onEvent(param);
 }
 
-void DataNode::timerCallbackHandler(DataTimer* timer)
-{
+void
+DataNode::timerCallbackHandler(DataTimer* timer) {
     auto instance = (DataNode*)timer->getUserData();
 
     EventParam_t param(instance, instance, EVENT_TIMER, nullptr, 0);
     instance->sendEvent(instance, &param);
 }
 
-void DataNode::startTimer(uint32_t period)
-{
+void
+DataNode::startTimer(uint32_t period) {
     if (!_registered) {
         return;
     }
@@ -285,13 +290,13 @@ void DataNode::startTimer(uint32_t period)
     }
 }
 
-void DataNode::setTimerPeriod(uint32_t period)
-{
+void
+DataNode::setTimerPeriod(uint32_t period) {
     startTimer(period);
 }
 
-void DataNode::resetTimer()
-{
+void
+DataNode::resetTimer() {
     if (!_timer) {
         DN_LOG_ERROR("Timer not created");
         return;
@@ -300,8 +305,8 @@ void DataNode::resetTimer()
     _timer->reset();
 }
 
-void DataNode::stopTimer()
-{
+void
+DataNode::stopTimer() {
     if (!_timer) {
         return;
     }
@@ -311,12 +316,12 @@ void DataNode::stopTimer()
     DN_LOG_INFO("DataNode[%s] timer stop", _ID);
 }
 
-size_t DataNode::getPublishersNumber()
-{
+size_t
+DataNode::getPublishersNumber() {
     return std::count_if(_publishers.begin(), _publishers.end(), [](const DataNode* n) { return n != nullptr; });
 }
 
-size_t DataNode::getSubscribersNumber()
-{
+size_t
+DataNode::getSubscribersNumber() {
     return std::count_if(_subscribers.begin(), _subscribers.end(), [](const DataNode* n) { return n != nullptr; });
 }

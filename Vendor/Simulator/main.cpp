@@ -13,6 +13,11 @@
 #include <cstring>
 
 #include "App.h"
+#include "DataProc.h"
+#include "Def/DP_Settings.h"
+#include "HAL/Def/HAL_Board.h"
+#include "HostLog.h"
+#include "Utils/lv_ext/LvglLog.h"
 #if SIM_BACKEND_DEMO
 #include "DemoStatus.h"
 #else
@@ -158,6 +163,8 @@ init_system_info() {
     battery.Temp_f = 32.0f;
     battery.Percent_f = 76.0f;
     battery.chargeStatus = notCharge;
+    battery.current_ma = -350;
+    battery.current_valid = true;
     State::Power().ExternalPower = 1;
     report_host_data();
 }
@@ -222,7 +229,7 @@ simulate_host(uint32_t now) {
         } else if (systemInfo.power.panel_power_on && now - offline_since >= 3000) {
             offline_since = 0;
             report_host_data();
-            std::printf("[sim] host: online again\n");
+            APP_LOG_I("Sim", "host: online again");
         }
     }
     const PanelRequest_t& request = systemInfo.request;
@@ -231,7 +238,7 @@ simulate_host(uint32_t now) {
         State::Confirm_Wifi(State::Wifi_Revision());
         wifi_since = now;
         wifi_applying = true;
-        std::printf("[sim] host: wifi set %s\n", request.wifi_on ? "on" : "off");
+        APP_LOG_I("Sim", "host: wifi set %s", request.wifi_on ? "on" : "off");
     }
     if (wifi_applying && now - wifi_since >= 1000) {
         wifi_applying = false;
@@ -240,18 +247,18 @@ simulate_host(uint32_t now) {
     if (request.work_pending) {
         State::Confirm_Work(State::Work_Revision());
         const WorkConfig_t& work = host.work;
-        std::printf("[sim] host: work mode %d, radio %s, protocol %u, channel %u, ntrip server %d\n", work.work_mode,
-                    work.radio_status ? "on" : "off", work.radio_protocol, work.radio_channel, work.NtripServer_status);
+        APP_LOG_I("Sim", "host: work mode %d, radio %s, protocol %u, channel %u, ntrip server %d", work.work_mode,
+                  work.radio_status ? "on" : "off", work.radio_protocol, work.radio_channel, work.NtripServer_status);
     }
     if (request.record_op || request.record_settings_pending) {
         State::Confirm_Record(State::Record_Revision(), true);
         const RecordInfo_t& record = host.record;
-        std::printf("[sim] host: record %s, type %u, interval 0x%02x\n", record.record_status ? "start" : "stop",
-                    record.record_type, record.record_interval);
+        APP_LOG_I("Sim", "host: record %s, type %u, interval 0x%02x", record.record_status ? "start" : "stop",
+                  record.record_type, record.record_interval);
     }
     if (systemInfo.power.poweroff_flag) {
         State::Host_ShutdownAcknowledged();
-        std::printf("[sim] host: shutdown acknowledged\n");
+        APP_LOG_I("Sim", "host: shutdown acknowledged");
     }
     if (now - last_stars >= 1000) {
         last_stars = now;
@@ -271,35 +278,39 @@ inject_event(SDL_Keycode key) {
         case SDLK_f: State::Request_ForcedShutdown(); break;
         case SDLK_t: battery.Temp_f += 5.0f; break;
         case SDLK_g: battery.Temp_f -= 5.0f; break;
-        case SDLK_c: battery.chargeStatus = battery.chargeStatus == notCharge ? normalCharge : notCharge; break;
+        case SDLK_c:
+            battery.chargeStatus = battery.chargeStatus == notCharge ? normalCharge : notCharge;
+            battery.current_ma = battery.chargeStatus == notCharge ? -350 : 1600;
+            break;
         case SDLK_b: battery.Percent = battery.Percent >= 10 ? battery.Percent - 10 : 0; break;
         case SDLK_n: battery.Percent = battery.Percent <= 90 ? battery.Percent + 10 : 100; break;
         case SDLK_v:
             set_board(!systemInfo.board.online_device.mp2762);
-            std::printf("[sim] board %s\n", systemInfo.board.hardware_version);
+            APP_LOG_I("Sim", "board %s", systemInfo.board.hardware_version);
             return;
         default: return;
     }
     battery.Percent_f = battery.Percent; // SystemInfos 显示浮点电量
-    std::printf("[sim] temperature %.1f C, battery %u%%, charging %d, shutdown flags host=%d low=%d forced=%d\n",
-                static_cast<double>(battery.Temp_f), battery.Percent, battery.chargeStatus != notCharge,
-                power.LinuxPowerOff, power.LowBatteryPowerOff, power.Force_ShutDown);
+    APP_LOG_I("Sim", "temperature %.1f C, battery %u%%, charging %d, shutdown flags host=%d low=%d forced=%d",
+              static_cast<double>(battery.Temp_f), battery.Percent, battery.chargeStatus != notCharge,
+              power.LinuxPowerOff, power.LowBatteryPowerOff, power.Force_ShutDown);
 }
 #endif
 } // namespace
 
 int
 main(int argc, char** argv) {
+    host_log_init();
     CliOptions options{};
     if (!parse_args(argc, argv, options)) {
         return EXIT_FAILURE;
     }
     if (std::signal(SIGINT, on_signal) == SIG_ERR || std::signal(SIGTERM, on_signal) == SIG_ERR) {
-        std::perror("signal");
+        APP_LOG_E("Sim", "signal: %s", std::strerror(errno));
         return EXIT_FAILURE;
     }
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0) {
-        std::fprintf(stderr, "SDL init: %s\n", SDL_GetError());
+        APP_LOG_E("Sim", "SDL init: %s", SDL_GetError());
         return EXIT_FAILURE;
     }
 #if SIM_BACKEND_DEMO
@@ -315,9 +326,11 @@ main(int argc, char** argv) {
                  : nullptr;
     int result = EXIT_FAILURE;
     if (!texture) {
-        std::fprintf(stderr, "SDL window: %s\n", SDL_GetError());
+        APP_LOG_E("Sim", "SDL window: %s", SDL_GetError());
     } else {
         lv_init();
+        app_lvgl_log_init();
+        APP_LOG_I("Sim", "SDL and LVGL initialized");
         lv_tick_set_cb(SDL_GetTicks);
         static Frame frame;
         static uint16_t buffer[kWidth * 20];
@@ -340,14 +353,14 @@ main(int argc, char** argv) {
         }
 
         if (!indev) {
-            std::fprintf(stderr, "LVGL display/pointer init failed\n");
+            APP_LOG_E("Sim", "LVGL display/pointer init failed");
         } else {
 #if SIM_BACKEND_DEMO
             DemoStatus::configure(lv_tick_get, options.random_status, options.seed);
             App demo_app;
             App* app = demo_app.init() ? &demo_app : nullptr;
             if (!app) {
-                std::fprintf(stderr, "App init failed\n");
+                APP_LOG_E("Sim", "App init failed");
             } else {
                 print_controls(options);
 #else
@@ -366,6 +379,8 @@ main(int argc, char** argv) {
                 uint32_t brightness_step_ms = 0;
                 bool first_frame = true;
                 bool brightness_done = false;
+                uint8_t rendered_brightness = 0;
+                uint8_t target_brightness = 255;
                 while (!stop) {
                     SDL_Event event;
                     while (SDL_PollEvent(&event)) {
@@ -458,12 +473,17 @@ main(int argc, char** argv) {
                         first_frame = false;
                     }
                     const bool brightness_step = !first_frame && !brightness_done && now - brightness_step_ms >= 16;
-                    if (frame.dirty || brightness_step) {
+                    dp::Settings::State settings;
+                    if (dp::Settings::pull(*DataProc::Broker()->mainNode(), settings) == DataNode::RES_OK) {
+                        target_brightness = hal::brightness_panel_value(settings.brightness);
+                    }
+                    if (frame.dirty || brightness_step
+                        || (brightness_done && rendered_brightness != target_brightness)) {
                         const uint32_t elapsed = now - brightness_started_ms;
                         const uint8_t brightness =
                             brightness_done || elapsed >= kBrightnessFadeMs
-                                ? 255
-                                : static_cast<uint8_t>(255U * elapsed * (2U * kBrightnessFadeMs - elapsed)
+                                ? target_brightness
+                                : static_cast<uint8_t>(target_brightness * elapsed * (2U * kBrightnessFadeMs - elapsed)
                                                        / (kBrightnessFadeMs * kBrightnessFadeMs));
                         brightness_done = brightness_done || elapsed >= kBrightnessFadeMs;
                         brightness_step_ms = now;
@@ -471,11 +491,12 @@ main(int argc, char** argv) {
                             || SDL_UpdateTexture(texture, nullptr, frame.pixels.data(), kWidth * 4) != 0
                             || SDL_RenderClear(renderer) != 0
                             || SDL_RenderCopy(renderer, texture, nullptr, nullptr) != 0) {
-                            std::fprintf(stderr, "SDL render: %s\n", SDL_GetError());
+                            APP_LOG_E("Sim", "SDL render: %s", SDL_GetError());
                             result = EXIT_FAILURE;
                             break;
                         }
                         SDL_RenderPresent(renderer);
+                        rendered_brightness = brightness;
                         frame.dirty = false;
                     }
                     SDL_Delay(5);

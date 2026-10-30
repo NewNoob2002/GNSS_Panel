@@ -5,6 +5,7 @@
 #include "DialplateModel.h"
 #include "Utils/lv_anim_label/numberFlow.h"
 #include "UI/Common/FocusHighlight.h"
+#include "UI/Common/PageStyle.h"
 #include "lvgl.h"
 
 namespace page {
@@ -66,6 +67,12 @@ class DialplateView {
 
     /** @brief 进入及恢复直接对齐，后续焦点切换保速。 */
     void resume_focus();
+    /** @brief 从焦点入口展开为页面背景色面板盖住首页，静止后调用 done；无覆盖框（独立预览）时返回 false。 */
+    bool open_focus(FocusHighlight::DoneCallback done, void* user_data) {
+        return focus_.open(style::kBackground, done, user_data);
+    }
+    /** @brief 返回首页时把展开面板收回到原入口；未展开时无操作。 */
+    void close_focus() { focus_.close(); }
     const FocusHighlight& focus_highlight() const { return focus_; }
     void appear_anim_start(bool reverse = false) const;
     /** 页面出现/离开时开关电台波形与工作模式（基站播发/移动站测点）动效；实际运行与否还取决于设备状态。 */

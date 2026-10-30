@@ -43,7 +43,7 @@ Charger& Charger_Get();
 /** 电池温度保护：过温或电量计在线但样本无效时禁止充电，否则允许。 */
 void Charger_Protect(BatteryInfo_t& battery);
 
-/** 读取 BQ40Z50 电量计；任一寄存器读取失败或数值无效时 sample_valid = false，其余字段保持。 */
+/** 读取 BQ40Z50；温度/SOC/电压失败时 sample_valid=false，电流独立标记 current_valid，其余字段保持。 */
 void Battery_Sample(BatteryInfo_t& battery);
 
 } // namespace HAL

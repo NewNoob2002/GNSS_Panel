@@ -21,6 +21,11 @@ bool SystemDashModel::toggle_language() {
     return dp::Settings::notify(*this, {next}) == RES_OK;
 }
 
+bool SystemDashModel::cycle_brightness() {
+    const auto next = static_cast<uint8_t>(state_.brightness >= 100 ? 20 : (state_.brightness / 20 + 1) * 20);
+    return dp::Settings::notify(*this, {state_.language, next}) == RES_OK;
+}
+
 bool SystemDashModel::set_wifi(bool on) {
     return dp::WiFi::notify(*this, {on}) == RES_OK;
 }
@@ -60,9 +65,10 @@ int SystemDashModel::onEvent(EventParam_t* event) {
 }
 
 void SystemDashModel::apply(const dp::Settings::State& value) {
-    if (state_.language == value.language)
+    if (state_.language == value.language && state_.brightness == value.brightness)
         return;
     state_.language = value.language;
+    state_.brightness = value.brightness;
     changed();
 }
 

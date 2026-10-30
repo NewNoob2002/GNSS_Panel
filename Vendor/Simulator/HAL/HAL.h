@@ -3,14 +3,15 @@
 // 并屏蔽固件 HAL.h 的硬件依赖）；电池、充电与按键由 main.cpp 模拟。
 #define __HAL_H // 固件 HAL.h 的包含保护：在模拟器中不展开
 
-#include <cstdio>
+#include "Log.h"
 #include "mcu_config.h"
 
-#define CORE_DEBUG_PRINTF(fmt, ...) std::printf("[HAL] " fmt "\n", ##__VA_ARGS__)
+#define CORE_DEBUG_PRINTF(...) APP_LOG_D("HAL", __VA_ARGS__)
 
 namespace HAL {
 void HAL_Init();
 void HAL_Update();
+void Display_SetBrightness(uint8_t value);
 
 /* Power（Platform/HAL/HAL_Power.cpp） */
 void Power_Init();

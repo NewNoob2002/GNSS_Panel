@@ -20,12 +20,12 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+#include <string.h>
 #include "PageLog.h"
 #include "PageManager.h"
-#include <string.h>
 
-PageManager::RES_TYPE PageManager::replace(const char* name, const PageBase::PARAM* param)
-{
+PageManager::RES_TYPE
+PageManager::replace(const char* name, const PageBase::PARAM* param) {
     if (!name) {
         return RES_TYPE::ERR_PARAM;
     }
@@ -73,6 +73,7 @@ PageManager::RES_TYPE PageManager::replace(const char* name, const PageBase::PAR
 
     /* Synchronous automatic cache configuration */
     base->_context.isDisableAutoCache = base->_context.reqDisableAutoCache;
+    base->_context.anim.navType = PAGE_ANIM::GLOBAL;
 
     /* Remove current page */
     _pageStack.pop();
@@ -86,8 +87,13 @@ PageManager::RES_TYPE PageManager::replace(const char* name, const PageBase::PAR
     return switchTo(base, true);
 }
 
-PageManager::RES_TYPE PageManager::push(const char* name, const PageBase::PARAM* param)
-{
+PageManager::RES_TYPE
+PageManager::push(const char* name, const PageBase::PARAM* param) {
+    return pushWithAnim(name, PAGE_ANIM::GLOBAL, param);
+}
+
+PageManager::RES_TYPE
+PageManager::pushWithAnim(const char* name, PAGE_ANIM anim, const PageBase::PARAM* param) {
     if (!name) {
         return RES_TYPE::ERR_PARAM;
     }
@@ -125,6 +131,9 @@ PageManager::RES_TYPE PageManager::push(const char* name, const PageBase::PARAM*
     /* Synchronous automatic cache configuration */
     base->_context.isDisableAutoCache = base->_context.reqDisableAutoCache;
 
+    /* The chosen transition belongs to this stack entry: it is reused when the page is left again */
+    base->_context.anim.navType = anim;
+
     /* Push into the stack */
     _pageStack.push(base);
 
@@ -134,8 +143,8 @@ PageManager::RES_TYPE PageManager::push(const char* name, const PageBase::PARAM*
     return switchTo(base, true);
 }
 
-PageManager::RES_TYPE PageManager::pop()
-{
+PageManager::RES_TYPE
+PageManager::pop() {
     /* Precheck event hook */
     auto res = sendEvent(EVENT_TYPE::PAGE_POP);
     if (res != RES_TYPE::OK) {
@@ -163,7 +172,7 @@ PageManager::RES_TYPE PageManager::pop()
 
     /* Whether to turn off automatic cache */
     if (!top->_context.isDisableAutoCache) {
-        PAGE_LOG_INFO("Page(%s) has auto cache, cache disabled", top->_name);
+        PAGE_LOG_DEBUG("Page(%s) has auto cache, cache disabled", top->_name);
         top->_context.isCached = false;
     }
 
@@ -226,7 +235,7 @@ PageManager::switchTo(PageBase* newNode, bool isEnterAct) {
     /* If the current page has a cache */
     if (_pageCurrent->_context.isCached) {
         /* Direct display, no need to load */
-        PAGE_LOG_INFO("Page(%s) has cached, appear driectly", _pageCurrent->_name);
+        PAGE_LOG_DEBUG("Page(%s) has cached, appear driectly", _pageCurrent->_name);
         _pageCurrent->_context.state = PageBase::STATE::WILL_APPEAR;
     } else {
         /* Load page */
@@ -268,16 +277,21 @@ PageManager::switchTo(PageBase* newNode, bool isEnterAct) {
 
     /* Move the layer, move the new page to the front */
     if (_animState.isEntering) {
-        PAGE_LOG_INFO("Page ENTER is detect, move Page(%s) to foreground", _pageCurrent->_name);
-        if (_pagePrev)
+        PAGE_LOG_DEBUG("Page ENTER is detect, move Page(%s) to foreground", _pageCurrent->_name);
+        if (_pagePrev && _pagePrev->_root) {
             lv_obj_move_to_index(_pagePrev->_root, -1);
+        }
         lv_obj_move_to_index(_pageCurrent->_root, -1);
     } else {
-        PAGE_LOG_INFO("Page EXIT is detect, move Page(%s) to foreground", getPagePrevName());
+        PAGE_LOG_DEBUG("Page EXIT is detect, move Page(%s) to foreground", getPagePrevName());
         lv_obj_move_to_index(_pageCurrent->_root, -1);
-        if (_pagePrev)
+        if (_pagePrev && _pagePrev->_root) {
             lv_obj_move_to_index(_pagePrev->_root, -1);
+        }
     }
+
+    /* 页面层级确定后再放置条带或全屏遮罩。 */
+    scrimCreate();
     return RES_TYPE::OK;
 }
 
@@ -288,10 +302,10 @@ PageManager::forceUnload(PageBase* base) {
         return RES_TYPE::ERR_PARAM;
     }
 
-    PAGE_LOG_INFO("Page(%s) Fource unloading...", base->_name);
+    PAGE_LOG_DEBUG("Page(%s) Fource unloading...", base->_name);
 
     if (base->_context.state == PageBase::STATE::ACTIVITY) {
-        PAGE_LOG_INFO("Page state is ACTIVITY, Disappearing...");
+        PAGE_LOG_DEBUG("Page state is ACTIVITY, Disappearing...");
         base->onViewWillDisappear();
         base->onViewDidDisappear();
     }
@@ -315,10 +329,12 @@ PageManager::resetRoot(const char* name) {
     if (res != RES_TYPE::OK) {
         return res;
     }
+    PAGE_LOG_INFO("Page(%s) reset root", name);
     clearStack();
     _pageCurrent = _pagePrev = nullptr;
     PageBase* base = findPageInPool(name);
     base->_context.isDisableAutoCache = base->_context.reqDisableAutoCache;
+    base->_context.anim.navType = PAGE_ANIM::GLOBAL;
     _pageStack.push(base);
     return switchTo(base, true);
 }
@@ -346,8 +362,8 @@ PageManager::preload(const char* name) {
     return RES_TYPE::OK;
 }
 
-PageManager::RES_TYPE PageManager::backHome()
-{
+PageManager::RES_TYPE
+PageManager::backHome() {
     /* Precheck event hook */
     auto res = sendEvent(EVENT_TYPE::PAGE_BACK_HOME);
     if (res != RES_TYPE::OK) {
@@ -372,49 +388,50 @@ PageManager::RES_TYPE PageManager::backHome()
     return switchTo(home, false);
 }
 
-PageManager::RES_TYPE PageManager::switchAnimStateCheck()
-{
+PageManager::RES_TYPE
+PageManager::switchAnimStateCheck() {
     if (_animState.isSwitchReq || _animState.isBusy) {
-        PAGE_LOG_WARN(
-            "Page switch busy[AnimState.isSwitchReq = %d,"
-            "AnimState.isBusy = %d],"
-            "request ignored",
-            _animState.isSwitchReq,
-            _animState.isBusy);
+        PAGE_LOG_WARN("Page switch busy[AnimState.isSwitchReq = %d,"
+                      "AnimState.isBusy = %d],"
+                      "request ignored",
+                      _animState.isSwitchReq, _animState.isBusy);
         return RES_TYPE::ERR_BUSY;
     }
 
     return RES_TYPE::OK;
 }
 
-PageManager::RES_TYPE PageManager::switchReqCheck()
-{
+PageManager::RES_TYPE
+PageManager::switchReqCheck() {
     auto res = RES_TYPE::ERR_BUSY;
     bool lastNodeBusy = _pagePrev && _pagePrev->_context.anim.isBusy;
 
     if (!_pageCurrent->_context.anim.isBusy && !lastNodeBusy) {
-        PAGE_LOG_INFO("----Page switch was all finished----");
+        PAGE_LOG_DEBUG("----Page switch was all finished----");
         _animState.isSwitchReq = false;
         res = RES_TYPE::OK;
         _pagePrev = _pageCurrent;
     } else {
         if (_pageCurrent->_context.anim.isBusy) {
-            PAGE_LOG_WARN("Page PageCurrent(%s) is busy", _pageCurrent->_name);
+            PAGE_LOG_DEBUG("Page PageCurrent(%s) is busy", _pageCurrent->_name);
         } else {
-            PAGE_LOG_WARN("Page PagePrev(%s) is busy", getPagePrevName());
+            PAGE_LOG_DEBUG("Page PagePrev(%s) is busy", getPagePrevName());
         }
     }
 
     return res;
 }
 
-void PageManager::onSwitchAnimFinish(lv_anim_t* a)
-{
+void
+PageManager::onSwitchAnimFinish(lv_anim_t* a) {
     auto base = (PageBase*)lv_anim_get_user_data(a);
     auto manager = base->_manager;
 
-    PAGE_LOG_INFO("Page(%s) anim finish", base->_name);
+    PAGE_LOG_DEBUG("Page(%s) anim finish", base->_name);
 
+    if (base->_context.anim.isEnter && manager->getCurrentLoadAnimType() == PAGE_ANIM::FADE_THROUGH) {
+        manager->scrimDelete();
+    }
     manager->stateNext(base);
     base->_context.anim.isBusy = false;
     auto res = manager->switchReqCheck();
@@ -424,9 +441,9 @@ void PageManager::onSwitchAnimFinish(lv_anim_t* a)
     }
 }
 
-void PageManager::switchAnimCreate(PageBase* base)
-{
-    if (!base) {
+void
+PageManager::switchAnimCreate(PageBase* base) {
+    if (!base || !base->_root) {
         return;
     }
 
@@ -438,10 +455,8 @@ void PageManager::switchAnimCreate(PageBase* base)
     // 缓存页可能带着另一轴的退出偏移，进入时只保留本次动画驱动的属性。
     if (base->_context.anim.isEnter) {
         const auto type = getCurrentLoadAnimType();
-        const bool horizontal = type == PAGE_ANIM::OVER_LEFT || type == PAGE_ANIM::OVER_RIGHT
-                                || type == PAGE_ANIM::MOVE_LEFT || type == PAGE_ANIM::MOVE_RIGHT;
-        const bool vertical = type == PAGE_ANIM::OVER_TOP || type == PAGE_ANIM::OVER_BOTTOM
-                              || type == PAGE_ANIM::MOVE_TOP || type == PAGE_ANIM::MOVE_BOTTOM;
+        const bool horizontal = isHorizontalLoadAnim(type);
+        const bool vertical = isVerticalLoadAnim(type);
         if (!horizontal) {
             lv_obj_set_x(base->_root, 0);
         }
@@ -468,30 +483,18 @@ void PageManager::switchAnimCreate(PageBase* base)
 
     if (_animState.isEntering) {
         if (base->_context.anim.isEnter) {
-            lv_anim_set_values(
-                &a,
-                animAttr.push.enter.start,
-                animAttr.push.enter.end);
+            lv_anim_set_values(&a, animAttr.push.enter.start, animAttr.push.enter.end);
         } else /* Exit */
         {
-            lv_anim_set_values(
-                &a,
-                start,
-                animAttr.push.exit.end);
+            lv_anim_set_values(&a, start, animAttr.push.exit.end);
         }
     } else /* Pop */
     {
         if (base->_context.anim.isEnter) {
-            lv_anim_set_values(
-                &a,
-                animAttr.pop.enter.start,
-                animAttr.pop.enter.end);
+            lv_anim_set_values(&a, animAttr.pop.enter.start, animAttr.pop.enter.end);
         } else /* Exit */
         {
-            lv_anim_set_values(
-                &a,
-                start,
-                animAttr.pop.exit.end);
+            lv_anim_set_values(&a, start, animAttr.pop.exit.end);
         }
     }
 
@@ -499,30 +502,35 @@ void PageManager::switchAnimCreate(PageBase* base)
     base->_context.anim.isBusy = true;
 }
 
-void PageManager::setGlobalLoadAnim(PAGE_ANIM anim, uint32_t time, lv_anim_path_cb_t path)
-{
+void
+PageManager::setGlobalLoadAnim(PAGE_ANIM anim, uint32_t time, lv_anim_path_cb_t path) {
     _animState.global.type = anim;
     _animState.global.duration = time;
     _animState.global.path = path ? path : lv_anim_path_linear;
 
-    PAGE_LOG_INFO("Set global load anim type = %d", static_cast<int>(anim));
+    PAGE_LOG_DEBUG("Set global load anim type = %d", static_cast<int>(anim));
 }
 
-void PageManager::switchAnimTypeUpdate(PageBase* base)
-{
+void
+PageManager::switchAnimTypeUpdate(PageBase* base) {
     if (base->_context.anim.attr.type == PAGE_ANIM::GLOBAL) {
-        PAGE_LOG_INFO("Page(%s) anim.type was not set, use AnimState.global.type = %d", base->_name,
-                      static_cast<int>(_animState.global.type));
+        PAGE_LOG_DEBUG("Page(%s) anim.type was not set, use AnimState.global.type = %d", base->_name,
+                       static_cast<int>(_animState.global.type));
         _animState.current = _animState.global;
     } else {
-        PAGE_LOG_INFO("Page(%s) custom anim.type set = %d", base->_name,
-                      static_cast<int>(base->_context.anim.attr.type));
+        PAGE_LOG_DEBUG("Page(%s) custom anim.type set = %d", base->_name,
+                       static_cast<int>(base->_context.anim.attr.type));
         _animState.current = base->_context.anim.attr;
+    }
+    if (base->_context.anim.navType != PAGE_ANIM::GLOBAL) {
+        PAGE_LOG_DEBUG("Page(%s) navigation anim.type = %d", base->_name,
+                       static_cast<int>(base->_context.anim.navType));
+        _animState.current.type = base->_context.anim.navType;
     }
 }
 
-void PageManager::animDefaultInit(lv_anim_t* a)
-{
+void
+PageManager::animDefaultInit(lv_anim_t* a) {
     lv_anim_init(a);
 
     uint32_t time = (getCurrentLoadAnimType() == PAGE_ANIM::NONE) ? 0 : _animState.current.duration;

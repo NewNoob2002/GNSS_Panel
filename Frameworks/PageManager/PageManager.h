@@ -118,6 +118,16 @@ public:
     RES_TYPE push(const char* name, const PageBase::PARAM* param = nullptr);
 
     /**
+     * @brief  Enter a new page with a transition chosen by the caller instead of the page's own type
+     * @param  name: The name of the page to enter
+     * @param  anim: Transition for entering this stack entry and for leaving it again (pop / back), e.g. NONE
+     *               when the caller already animated the change itself; GLOBAL keeps the page's own type
+     * @param  param: Parameters passed to the new page
+     * @retval OK on success, otherwise a navigation error or hook rejection.
+     */
+    RES_TYPE pushWithAnim(const char* name, PAGE_ANIM anim, const PageBase::PARAM* param = nullptr);
+
+    /**
      * @brief  Pop the current page
      * @param  None
      * @retval OK on success, otherwise a navigation error or hook rejection.
@@ -180,6 +190,24 @@ public:
         PAGE_ANIM anim,
         uint32_t time = PAGE_ANIM_TIME_DEFAULT,
         lv_anim_path_cb_t path = PAGE_ANIM_PATH_DEFAULT);
+
+    /**
+     * @brief  Set the scrim that dims the covered page during OVER_* and PUSH_* transitions
+     * @param  opa: Darkest scrim opacity, reached when the covered page is fully covered; LV_OPA_TRANSP disables it
+     * @retval None
+     * @note   The scrim is a single translucent black fill limited to the uncovered strip (no offscreen layer),
+     *         created per transition and deleted when it ends.
+     */
+    void setScrimOpa(lv_opa_t opa)
+    {
+        _scrimOpa = opa;
+    }
+
+    /** @brief FADE_THROUGH 的全屏遮罩颜色，默认黑色，不受 setScrimOpa 影响。 */
+    void
+    setFadeThroughColor(lv_color_t color) {
+        _fadeThroughColor = color;
+    }
 
     /**
      * @brief  Set the root parent of the page
@@ -311,6 +339,20 @@ private:
     /* Top layer */
     lv_obj_t* _layerTop;
 
+    /* 复用切屏遮罩：位移过渡覆盖条带，FADE_THROUGH 覆盖全屏。 */
+    struct
+    {
+        lv_obj_t* obj;
+        bool fadeThrough;
+        bool horizontal;
+        bool darken; // true while covering (push), false while uncovering (pop)
+        int32_t start; // Covering page position at progress 0
+        int32_t end; // Covering page position at progress end
+        int32_t length; // Covering page size along the animated axis
+    } _scrim;
+    lv_opa_t _scrimOpa;
+    lv_color_t _fadeThroughColor;
+
     /* Event */
     EVENT_CALLBACK _eventCallback;
     void* _eventUserData;
@@ -413,6 +455,26 @@ private:
      * @retval None
      */
     void switchAnimCreate(PageBase* base);
+
+    /** @brief Whether the animation moves page roots along x (OVER/MOVE/PUSH left and right). */
+    static bool isHorizontalLoadAnim(PAGE_ANIM anim);
+
+    /** @brief Whether the animation moves page roots along y (OVER/MOVE/PUSH top and bottom). */
+    static bool isVerticalLoadAnim(PAGE_ANIM anim);
+
+    /** @brief Create the strip or full-screen scrim for the current transition. */
+    void scrimCreate();
+
+    /** @brief Delete the scrim and its animation, if any. */
+    void scrimDelete();
+
+    /** @brief Place and tint the scrim for progress 0..SCRIM_PROGRESS_MAX. */
+    void scrimUpdate(int32_t progress);
+
+    static void onScrimAnim(lv_anim_t* a, int32_t progress);
+    static void onScrimFinish(lv_anim_t* a);
+    static void onScrimDelete(lv_event_t* e);
+    static void onPageRootDelete(lv_event_t* e);
 
     /**
      * @brief  Update current animation properties, apply page custom animation

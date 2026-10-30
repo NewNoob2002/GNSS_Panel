@@ -13,6 +13,7 @@
 #include "App.h"
 #include "AppPlatform.h"
 #include "Charger.h"
+#include "HAL/Def/HAL_Board.h"
 #include "I18n.h"
 #include "SystemState.h"
 #include "UI/Common/PageStyle.h"
@@ -30,6 +31,7 @@ int power_on_requests = 0;
 int pin_levels[32] = {};
 int reset_reason = RESET;
 int standby_calls = 0, charger_power_on_calls = 0;
+uint8_t display_brightness = 255;
 bool probe_battery_gauge = true, probe_charger = true; // SystemLoading 重新探测 I2C 时的应答
 uint16_t draw_pixels[kWidth * 20];
 uint32_t peak_used = 0;
@@ -119,6 +121,28 @@ find_image(lv_obj_t* root, const void* source) {
     return nullptr;
 }
 
+// 固件设备路径也以五个短线反馈亮度，不能残留百分比文字。
+void
+check_brightness_segments(lv_obj_t* hero, unsigned filled) {
+    assert(lv_obj_get_child_count(hero) == 7 && !find_text(hero, "%"));
+    lv_obj_update_layout(hero);
+    lv_area_t bounds, title;
+    lv_obj_get_coords(hero, &bounds);
+    lv_obj_get_coords(lv_obj_get_child(hero, 1), &title);
+    unsigned actual = 0;
+    for (unsigned i = 0; i < 5; ++i) {
+        auto* segment = lv_obj_get_child(hero, static_cast<int32_t>(i + 2));
+        assert(lv_obj_get_width(segment) == 10 && lv_obj_get_height(segment) == 4);
+        lv_area_t area;
+        lv_obj_get_coords(segment, &area);
+        assert(area.x1 > bounds.x1 && area.x2 < bounds.x2 && area.y1 > title.y2 && area.y2 < bounds.y2);
+        const bool on = lv_color_eq(lv_obj_get_style_bg_color(segment, LV_PART_MAIN), page::style::kAccent);
+        assert(on == (i < filled));
+        actual += on;
+    }
+    assert(actual == filled);
+}
+
 // 待机页开机进度环的当前值（%）。
 int
 startup_progress(lv_obj_t* root) {
@@ -161,6 +185,8 @@ reset_system_info() {
     State::Power().batteryInfo.Percent = 70;
     State::Power().batteryInfo.Voltage_f = 7.8f;
     State::Power().batteryInfo.Temp_f = 30.0f;
+    State::Power().batteryInfo.current_ma = 1600;
+    State::Power().batteryInfo.current_valid = true;
     State::Host().position.coordinate_status = position_fix;
     State::Host().position.satellite_number_used = 12;
     State::Host().online = true; // 主控已在通信：加载页第 5 步立即通过
@@ -297,6 +323,11 @@ RMU_ClearStatus() {
 
 /** Run the real firmware power monitor before the application update. */
 void
+HAL::Display_SetBrightness(uint8_t value) {
+    display_brightness = value;
+}
+
+void
 HAL::HAL_Update() {
     Power_PowerOffMonitor();
 }
@@ -349,6 +380,31 @@ main() {
     lv_display_set_flush_cb(display, flush);
 
     check_domain_devices();
+    // 五档百分比保持领域语义，真实 Board 命令必须把感知映射值送到显示 HAL。
+    constexpr uint8_t panel_values[] = {0x33, 0x53, 0x7F, 0xB8, 0xFF};
+    auto* board = hal_test::device(hal::names::Board);
+    assert(hal_test::read<hal::BoardState>(hal::names::Board).brightness == 100);
+    for (unsigned level = 0; level < 5; ++level) {
+        const auto percent = static_cast<uint8_t>((level + 1U) * 20U);
+        assert(hal::brightness_panel_value(percent) == panel_values[level]);
+        if (level) {
+            assert(panel_values[level] > panel_values[level - 1]);
+        }
+        const int result = hal::write(board, hal::BrightnessCommand{percent});
+        assert(result == DeviceObject::RES_OK);
+        assert(display_brightness == panel_values[level]);
+        assert(hal_test::read<hal::BoardState>(hal::names::Board).brightness == percent);
+    }
+    assert(display_brightness == 0xFF);
+    for (unsigned percent = 0; percent <= 255; ++percent) {
+        if (percent == 20 || percent == 40 || percent == 60 || percent == 80 || percent == 100) {
+            continue;
+        }
+        const int result = hal::write(board, hal::BrightnessCommand{static_cast<uint8_t>(percent)});
+        assert(result == DeviceObject::RES_PARAM_ERROR);
+        assert(display_brightness == 0xFF);
+        assert(hal_test::read<hal::BoardState>(hal::names::Board).brightness == 100);
+    }
     reset_system_info();
     HAL::Power_Init();
     assert(gpio_read(POWER_CONTROL_PIN) == GPIO_LOW);
@@ -431,6 +487,7 @@ main() {
         assert(std::strcmp(record.name.data(), "ABCDEFGHIJKLMNOP") == 0);
         assert(std::strcmp(board.hardware.data(), "V1.5") == 0);
         assert(battery.valid && battery.voltage == 7.8f);
+        assert(battery.current_valid && battery.current_ma == 1600);
     }
 
     // 选择预设仅改草稿，点击 Apply 才下发；发出后留页等待主控读走。
@@ -522,6 +579,28 @@ main() {
     run(800);
     assert(on_page("Pages/Dialplate"));
 
+    // 亮度通过真实页面与 Board 设备到达显示 HAL，返回页面后保持设置。
+    assert(App_Get()->show_page("Pages/SystemDash"));
+    run(800);
+    choose(i18n::TextId::BrightnessTitle);
+    for (uint8_t percent : {20, 40, 60, 80, 100, 20}) {
+        App_Get()->on_input(App::InputAction::Confirm);
+        assert(hal_test::snapshot<dp::Settings>().brightness == percent);
+        assert(display_brightness == panel_values[percent / 20U - 1U]);
+        check_brightness_segments(App_Get()->focused(), percent / 20U);
+    }
+    assert(App_Get()->back());
+    run(800);
+    assert(App_Get()->show_page("Pages/SystemDash"));
+    run(800);
+    choose(i18n::TextId::BrightnessTitle);
+    auto* brightness_hero = App_Get()->focused();
+    assert(lv_obj_get_x(brightness_hero) == 8 && lv_obj_get_y(brightness_hero) == 28);
+    assert(lv_obj_get_width(brightness_hero) == 88 && lv_obj_get_height(brightness_hero) == 77);
+    check_brightness_segments(brightness_hero, 1);
+    assert(App_Get()->back());
+    run(800);
+
     // Wi-Fi：发出设定后显示 "..."，主控回报一致后结束；主控不回报时 15 s 后放弃等待。
     assert(hal_test::snapshot<dp::WiFi>().available == (PRODUCT_SHUTDOWN_WIFI_BUTTON != 0));
     // 无论能否切换，主控回报的状态都要显示。
@@ -535,7 +614,7 @@ main() {
         auto& wifi = host.wifi;
         assert(App_Get()->show_page("Pages/SystemDash"));
         run(800);
-        App_Get()->on_input(App::InputAction::NextFocus); // Language -> Wi-Fi
+        choose(i18n::TextId::SystemWifiTitle);
         App_Get()->on_input(App::InputAction::Confirm);
         assert(request.wifi_on == On_Off_Status_ON && request.wifi_pending);
         run(50);

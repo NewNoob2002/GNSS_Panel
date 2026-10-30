@@ -1,4 +1,5 @@
 #include "SystemLoadingView.h"
+#include "Log.h"
 #include <cstdio>
 #include <cstring>
 #include <initializer_list>
@@ -53,7 +54,7 @@ void spin_gear(lv_obj_t* gear) {
     lv_anim_set_exec_cb(&anim, rotate_gear);
     lv_anim_set_repeat_count(&anim, LV_ANIM_REPEAT_INFINITE);
     if (!lv_anim_start(&anim))
-        LV_LOG_WARN("SystemLoading: gear animation allocation failed");
+        APP_LOG_W("SystemLoading", "gear animation allocation failed");
 }
 void animate(lv_obj_t* obj, lv_anim_exec_xcb_t exec, int32_t from, int32_t to, uint32_t time_ms,
              lv_anim_completed_cb_t finished = nullptr) {
@@ -69,7 +70,7 @@ void animate(lv_obj_t* obj, lv_anim_exec_xcb_t exec, int32_t from, int32_t to, u
         exec(obj, to);
         if (finished)
             finished(&anim);
-        LV_LOG_ERROR("SystemLoading: animation allocation failed; applied endpoint");
+        APP_LOG_E("SystemLoading", "animation allocation failed; applied endpoint");
     }
 }
 } // namespace
@@ -147,12 +148,17 @@ void SystemLoadingView::create(lv_obj_t* root, const std::array<i18n::TextId, kS
     logo_.create(root, *logo_parts);
     ui_.logo_container = logo_.container();
     update_text();
-    show_logo();
+    prepare_logo();
+}
+
+void SystemLoadingView::prepare_logo() {
+    lv_obj_set_style_bg_color(lv_obj_get_parent(ui_.logo_container), lv_color_black(), 0);
+    lv_obj_set_hidden(ui_.cont, true);
+    lv_obj_set_hidden(ui_.logo_container, true);
 }
 
 void SystemLoadingView::show_logo() {
-    lv_obj_set_style_bg_color(lv_obj_get_parent(ui_.logo_container), lv_color_black(), 0);
-    lv_obj_set_hidden(ui_.cont, true);
+    prepare_logo();
     logo_.play();
 }
 
@@ -181,7 +187,7 @@ void SystemLoadingView::show_initialization() {
 
 void SystemLoadingView::begin_step(unsigned step) {
     if (step >= kStepCount) {
-        LV_LOG_ERROR("SystemLoading: invalid step");
+        APP_LOG_E("SystemLoading", "invalid step %u", step);
         return;
     }
     step_ = static_cast<int>(step + 1);
@@ -197,7 +203,7 @@ void SystemLoadingView::begin_step(unsigned step) {
 
 void SystemLoadingView::finish_step(unsigned step, bool success) {
     if (step >= kStepCount) {
-        LV_LOG_ERROR("SystemLoading: invalid step");
+        APP_LOG_E("SystemLoading", "invalid step %u", step);
         return;
     }
     if (!success)

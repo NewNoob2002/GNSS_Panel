@@ -49,6 +49,6 @@ class WorkSettingsView {
     lv_observer_t* observer_ = nullptr;
 
     lv_obj_t *preset_text_{}, *protocol_text_{}, *channel_text_{}, *apply_text_{}, *feedback_{};
-    lv_obj_t *mode_icon_{}, *network_card_{}, *status_dot_{};
+    lv_obj_t *mode_icon_{}, *mode_bar_{}, *network_card_{}, *status_dot_{};
 };
 } // namespace page

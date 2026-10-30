@@ -45,7 +45,7 @@ class RecordConfigView {
     static void on_state(lv_observer_t* observer, lv_subject_t* subject);
     lv_observer_t* observer_ = nullptr;
 
-    lv_obj_t *state_{}, *space_{}, *type_text_{}, *interval_text_{}, *record_text_{}, *back_text_{}, *feedback_{};
+    lv_obj_t *state_{}, *space_{}, *type_text_{}, *interval_text_{}, *record_text_{}, *feedback_{};
     lv_obj_t *hero_{}, *status_dot_{}, *record_icon_{};
 };
 } // namespace page

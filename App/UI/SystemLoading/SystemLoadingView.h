@@ -19,6 +19,8 @@ class SystemLoadingView {
     void create(lv_obj_t* root, const std::array<i18n::TextId, kStepCount>& titles);
     /** UI thread: cancel child animations before hiding/unloading; the page root still owns the widgets. */
     void destroy();
+    /** 准备黑底和静态初态，不启动 Logo 时钟。 */
+    void prepare_logo();
     void show_logo();
     void show_initialization();
     /** Step 0..4 started: headline and active node; the bar only advances when the step finishes. */

@@ -53,7 +53,9 @@ apply(uint64_t time) {
                  s.battery_temperature_valid,
                  s.battery_temperature,
                  s.charging ? hal::ChargeState::Normal : hal::ChargeState::NotCharging,
-                 false};
+                 false,
+                 static_cast<int16_t>(s.charging ? 1600 : -350),
+                 s.battery_valid};
     m.gnss.satellites_used = s.satellites;
     m.clock = {s.clock_valid, s.hour, s.minute, s.second, hal::ClockSource::Uptime, time};
     m.wifi.on = s.wifi;

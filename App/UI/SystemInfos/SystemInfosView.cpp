@@ -9,6 +9,11 @@ using namespace page;
 
 #define ITEM_HEIGHT_MIN (LV_VER_RES - 8)
 #define ITEM_PAD        4
+// 标题卡聚焦宽度与左右两列位置（px）：标题卡 10..94，字段名 100..176，数值 176..284（右侧留给滚动条）。
+#define ICON_FOCUS_WIDTH 84
+#define INFO_X           100
+#define DATA_X           176
+#define DATA_WIDTH       108
 
 void SystemInfosView::create(lv_obj_t* root) {
     root_ = root;
@@ -115,13 +120,17 @@ void SystemInfosView::style_init() {
     lv_style_set_height(&style_.icon, ITEM_HEIGHT_MIN);
     lv_style_set_bg_color(&style_.icon, style::kCard);
     lv_style_set_bg_opa(&style_.icon, LV_OPA_COVER);
+    lv_style_set_radius(&style_.icon, 10);
     lv_style_set_text_font(&style_.icon, resource_pool::get_font("oswaldBold_18"));
     lv_style_set_text_color(&style_.icon, style::kText);
 
+    // 聚焦时收窄为左侧标题卡，与设置页主卡一致：渐变底 + 2 px 橙色焦点框。
     lv_style_init(&style_.focus);
-    lv_style_set_width(&style_.focus, 70);
+    lv_style_set_width(&style_.focus, ICON_FOCUS_WIDTH);
     lv_style_set_height(&style_.focus, ITEM_HEIGHT_MIN - 16);
-    lv_style_set_border_side(&style_.focus, LV_BORDER_SIDE_RIGHT);
+    lv_style_set_bg_color(&style_.focus, style::kPanel);
+    lv_style_set_bg_grad_color(&style_.focus, style::kCard);
+    lv_style_set_bg_grad_dir(&style_.focus, LV_GRAD_DIR_VER);
     lv_style_set_border_width(&style_.focus, 2);
     lv_style_set_border_color(&style_.focus, style::kAccent);
 
@@ -177,6 +186,9 @@ void SystemInfosView::item_create(item_t* item, lv_obj_t* par, const char* name,
     lv_obj_t* img = lv_image_create(icon);
     lv_obj_enable_style_refresh(false);
     lv_image_set_src(img, resource_pool::get_image(img_src));
+    // 白色 alpha 图标按设置页信息色着色。
+    lv_obj_set_style_image_recolor(img, style::kInfo, 0);
+    lv_obj_set_style_image_recolor_opa(img, LV_OPA_COVER, 0);
 
     lv_obj_t* label = lv_label_create(icon);
     lv_obj_enable_style_refresh(false);
@@ -192,7 +204,7 @@ void SystemInfosView::item_create(item_t* item, lv_obj_t* par, const char* name,
     lv_obj_enable_style_refresh(false);
     lv_label_set_text(info_label, infos);
     lv_obj_add_style(info_label, &style_.info, 0);
-    lv_obj_align(info_label, LV_ALIGN_LEFT_MID, 85, 0);
+    lv_obj_align(info_label, LV_ALIGN_LEFT_MID, INFO_X, 0);
     item->label_info = info_label;
 
     /* datas */
@@ -200,9 +212,9 @@ void SystemInfosView::item_create(item_t* item, lv_obj_t* par, const char* name,
     lv_obj_remove_style_all(data_label);
     lv_obj_enable_style_refresh(false);
     lv_label_set_text(data_label, "");
-    lv_obj_set_width(data_label, 111);
+    lv_obj_set_width(data_label, DATA_WIDTH);
     lv_obj_add_style(data_label, &style_.data, 0);
-    lv_obj_align(data_label, LV_ALIGN_LEFT_MID, 175, 0);
+    lv_obj_align(data_label, LV_ALIGN_LEFT_MID, DATA_X, 0);
     item->label_data = data_label;
 
     auto* demo = page::style::mark_demo(lv_label_create(cont));
@@ -272,20 +284,23 @@ void SystemInfosView::update(const SystemInfosState& state) const {
                               : state.battery.charge == hal::ChargeState::NotCharging ? TextId::BatteryNotCharge
                               : state.battery.charge == hal::ChargeState::Fast        ? TextId::BatteryFastCharge
                                                                                     : TextId::BatteryNormalCharge;
-        app_label_set_text_fmt(ui.battery.label_data, "%s%%\n%s V\n%s C\n%s",
+        app_label_set_text_fmt(ui.battery.label_data, "%s%%\n%s V\n%s °C\n%s",
                               app::Fixed(state.battery.gauge_percent, 1).c_str(), app::Fixed(state.battery.voltage, 2).c_str(),
                               app::Fixed(state.battery.temperature, 1).c_str(), i18n::text(charge));
     } else {
         app_label_set_text_fmt(ui.battery.label_data, "%s\n%s\n%s\n%s", na, na, na, na);
     }
-    if (state.recorder.valid && state.recorder.recording) {
+    // 剩余空间与格式/间隔在停止时同样有效（与记录页一致）；文件名只在录制中有意义。
+    if (state.recorder.valid) {
         char type[16], interval[16];
         option_text(TextId::RecordTypeOptions, state.recorder.type, type, sizeof(type));
         option_text(TextId::RecordIntervalOptions, state.recorder.interval, interval, sizeof(interval));
-        app_label_set_text_fmt(ui.storage.label_data, "%s\n%s\n%s MB\n%s\n%s", on_off(true), state.recorder.name.data(),
-                              app::Fixed(state.recorder.space_mb, 1).c_str(), type, interval);
+        const bool named = state.recorder.recording && state.recorder.name[0];
+        app_label_set_text_fmt(ui.storage.label_data, "%s\n%s\n%s MB\n%s\n%s", on_off(state.recorder.recording),
+                              named ? state.recorder.name.data() : "-",
+                              app::Fixed(state.recorder.space_mb, 0).c_str(), type, interval);
     } else {
-        app_label_set_text_fmt(ui.storage.label_data, "%s\n-\n-\n-\n-", state.recorder.valid ? on_off(false) : na);
+        app_label_set_text_fmt(ui.storage.label_data, "%s\n%s\n%s\n%s\n%s", na, na, na, na, na);
     }
     unsigned errors = 0;
     for (const auto& result : state.init.results)

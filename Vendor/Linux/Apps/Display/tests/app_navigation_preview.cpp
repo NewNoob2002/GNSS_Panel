@@ -33,6 +33,18 @@ static unsigned flushes;
 static size_t peak_nodes;
 static size_t peak_pool;
 
+/** @brief Dialplate 的焦点覆盖框：页面根下唯一的浮动子对象（shared_layer）。 */
+static lv_obj_t*
+find_highlight(lv_obj_t* page_root) {
+    for (uint32_t i = 0; i < lv_obj_get_child_count(page_root); ++i) {
+        auto* child = lv_obj_get_child(page_root, static_cast<int32_t>(i));
+        if (lv_obj_is_floating(child)) {
+            return child;
+        }
+    }
+    return nullptr;
+}
+
 static lv_obj_t* find_label(lv_obj_t* root, const char* text) {
     if (lv_obj_is_hidden(root)) {
         return nullptr;
@@ -230,6 +242,34 @@ int main(int argc, char** argv) {
             const auto* loading_logo = resource_pool::get_image("oemLogoParts");
             assert(loading_logo);
             loading_logo = static_cast<const logo_parts_t*>(loading_logo)->parts[0].image;
+            lv_obj_t* loading_root = nullptr;
+            for (uint32_t i = 0; i < lv_obj_get_child_count(lv_screen_active()); ++i) {
+                auto* child = lv_obj_get_child(lv_screen_active(), static_cast<int32_t>(i));
+                auto* page = static_cast<PageBase*>(lv_obj_get_user_data(child));
+                if (page && std::strcmp(page->getName(), "Pages/SystemLoading") == 0) {
+                    loading_root = child;
+                    break;
+                }
+            }
+            assert(loading_root);
+            auto* loading_page = static_cast<PageBase*>(lv_obj_get_user_data(loading_root));
+            assert(loading_page && loading_page->getManager()->isSwitching());
+            assert(loading_page->getLoadAnimType() == PAGE_ANIM::FADE_THROUGH);
+            assert(lv_obj_is_hidden(loading_root));
+            assert(!find_image(lv_screen_active(), loading_logo));
+            advance(150);
+            assert(loading_page->getManager()->isSwitching() && lv_obj_is_hidden(loading_root));
+            assert(lv_obj_get_style_opa(loading_root, LV_PART_MAIN) == LV_OPA_COVER);
+            assert(lv_obj_get_x(loading_root) == 0 && lv_obj_get_y(loading_root) == 0);
+            advance(100);
+            assert(!loading_page->getManager()->isSwitching());
+            assert(!lv_obj_is_hidden(loading_root));
+            assert(lv_obj_get_style_opa(loading_root, LV_PART_MAIN) == LV_OPA_COVER);
+            assert(lv_obj_get_x(loading_root) == 0 && lv_obj_get_y(loading_root) == 0);
+            auto* logo = find_image(lv_screen_active(), loading_logo);
+            assert(logo && lv_obj_get_style_image_opa(logo, LV_PART_MAIN) == LV_OPA_TRANSP);
+            assert(!find_label(lv_screen_active(), i18n::text(i18n::TextId::SystemLoadingTitle)));
+            advance(1000); // Logo 的完整 1300 ms 窗口从 DidAppear 才开始。
             assert(find_image(lv_screen_active(), loading_logo));
             assert(!find_label(lv_screen_active(), i18n::text(i18n::TextId::SystemLoadingTitle)));
             lv_tick_inc(5000); // A stalled host frame must not lose the loading completion request.
@@ -263,19 +303,61 @@ int main(int argc, char** argv) {
             assert(app.focused() != initial_focus);
             app.on_input(Input::PreviousFocus);
             assert(app.focused() == initial_focus);
+            auto* home_root = initial_focus;
+            while (lv_obj_get_parent(home_root) != lv_screen_active()) {
+                home_root = lv_obj_get_parent(home_root);
+            }
+            auto* panel = find_highlight(home_root);
+            assert(panel && lv_obj_get_style_bg_opa(panel, LV_PART_MAIN) == LV_OPA_TRANSP);
             app.on_input(Input::Confirm);
-            lv_tick_inc(300);
-            lv_timer_handler();
+            // The focused entry expands over the home page with the page transition's 350 ms curve (deliver frames),
+            // then the page switches without a slide once the panel covers the screen.
+            advance(60);
+            assert(std::strcmp(app.current_page(), "Pages/Dialplate") == 0);
+            assert(lv_obj_get_style_bg_opa(panel, LV_PART_MAIN) == LV_OPA_COVER);
+            assert(object_coords(panel).x2 - object_coords(panel).x1
+                   > object_coords(initial_focus).x2 - object_coords(initial_focus).x1);
+            app.on_input(Input::NextFocus); // Focus is frozen until the navigation happens.
+            assert(app.focused() == initial_focus);
+            advance(240);
+            assert(std::strcmp(app.current_page(), "Pages/Dialplate") == 0); // Not before the 350 ms expansion.
+            advance(100);
             assert(std::strcmp(app.current_page(), "Pages/SystemInfos") == 0);
-            lv_tick_inc(50);
-            lv_timer_handler();
+            advance(50);
             app.on_input(Input::Back);
-            lv_tick_inc(300);
-            lv_timer_handler();
+            advance(10); // Leaving an expanded entry is immediate; the home page then collapses the panel.
             assert(std::strcmp(app.current_page(), "Pages/Dialplate") == 0);
             assert(app.focused() == initial_focus);
-            lv_tick_inc(1500);
-            lv_timer_handler();
+            lv_obj_update_layout(home_root);
+            assert(object_coords(panel).x1 <= 0 && object_coords(panel).x2 >= width_px - 1);
+            advance(1500);
+            lv_obj_update_layout(home_root);
+            const auto collapsed = object_coords(panel), entry = object_coords(initial_focus);
+            assert(collapsed.x1 == entry.x1 && collapsed.y1 == entry.y1 && collapsed.x2 == entry.x2
+                   && collapsed.y2 == entry.y2);
+            assert(lv_obj_get_style_bg_opa(panel, LV_PART_MAIN) == LV_OPA_TRANSP);
+            app.on_input(Input::NextFocus); // Unfrozen again.
+            assert(app.focused() != initial_focus);
+            app.on_input(Input::PreviousFocus);
+            advance(800);
+            // Re-entering while the panel is still collapsing expands again instead of falling back to a slide.
+            app.on_input(Input::Confirm);
+            advance(400);
+            assert(std::strcmp(app.current_page(), "Pages/SystemInfos") == 0);
+            app.on_input(Input::Back);
+            advance(100);
+            assert(lv_obj_get_style_bg_opa(panel, LV_PART_MAIN) < LV_OPA_COVER); // Fading while collapsing.
+            app.on_input(Input::Confirm);
+            advance(400);
+            assert(std::strcmp(app.current_page(), "Pages/SystemInfos") == 0);
+            auto* infos_root = app.focused();
+            while (lv_obj_get_parent(infos_root) != lv_screen_active()) {
+                infos_root = lv_obj_get_parent(infos_root);
+            }
+            assert(lv_obj_get_x(infos_root) == 0); // Switched without the page's own slide.
+            app.on_input(Input::Back);
+            advance(1500);
+            assert(lv_obj_get_style_bg_opa(panel, LV_PART_MAIN) == LV_OPA_TRANSP);
         }
         lv_refr_now(display);
         assert(flushes);
@@ -324,14 +406,10 @@ int main(int argc, char** argv) {
                     auto* seconds = find_label(page_root, "8");
                     assert(seconds && lv_obj_get_style_opa(seconds, LV_PART_MAIN) == LV_OPA_COVER);
                 }
-                // Pages slide (no page-level opacity layer): info pages vertically, the save page over the top.
+                // Pages slide (no page-level opacity layer): every child of the home page pushes in from the right
+                // over a parallax-shifted, scrim-dimmed home; only the save page covers from the bottom.
                 const auto expected_anim =
-                    std::strcmp(page.name, "Pages/StarMap") == 0 || std::strcmp(page.name, "Pages/SystemInfos") == 0
-                        ? PAGE_ANIM::MOVE_TOP
-                    : std::strcmp(page.name, "Pages/SaveConfig") == 0   ? PAGE_ANIM::OVER_TOP
-                    : std::strcmp(page.name, "Pages/RecordConfig") == 0 ? PAGE_ANIM::OVER_TOP
-                    : std::strcmp(page.name, "Pages/SystemDash") == 0   ? PAGE_ANIM::OVER_BOTTOM
-                                                                        : PAGE_ANIM::MOVE_LEFT;
+                    std::strcmp(page.name, "Pages/SaveConfig") == 0 ? PAGE_ANIM::OVER_TOP : PAGE_ANIM::PUSH_LEFT;
                 const auto* controller = static_cast<PageBase*>(lv_obj_get_user_data(page_root));
                 assert(controller && controller->getLoadAnimType() == expected_anim);
                 assert(controller->getLoadAnimType() != PAGE_ANIM::FADE_ON);
@@ -339,7 +417,7 @@ int main(int argc, char** argv) {
                 if (expected_anim == PAGE_ANIM::FADE_ON) {
                     const auto opa = lv_obj_get_style_opa(page_root, LV_PART_MAIN);
                     assert(opa > LV_OPA_TRANSP && opa < LV_OPA_COVER);
-                } else if (expected_anim == PAGE_ANIM::MOVE_LEFT) {
+                } else if (expected_anim == PAGE_ANIM::PUSH_LEFT) {
                     assert(lv_obj_get_x(page_root) > 0 && lv_obj_get_x(page_root) < width_px);
                 } else if (expected_anim == PAGE_ANIM::OVER_BOTTOM) {
                     assert(lv_obj_get_y(page_root) < 0 && lv_obj_get_y(page_root) > -height_px);
@@ -357,7 +435,7 @@ int main(int argc, char** argv) {
                 const bool system_dash = std::strcmp(page.name, "Pages/SystemDash") == 0;
                 const bool star_map = std::strcmp(page.name, "Pages/StarMap") == 0;
                 auto* position = find_label(lv_layer_top(), "DEMO");
-                assert(position && (object_coords(position).y2 >= 0) == !(infos || system_dash));
+                assert(position && (object_coords(position).y2 >= 0) == !infos);
                 if (work || record || infos || system_dash || star_map) {
                     lv_obj_t* first = app.focused();
                     assert(first);
@@ -427,7 +505,7 @@ int main(int argc, char** argv) {
                     page_root); // Animation setters dirty layout; getters otherwise see the last frame.
                 if (expected_anim == PAGE_ANIM::FADE_ON) {
                     assert(lv_obj_get_style_opa(page_root, LV_PART_MAIN) < LV_OPA_COVER);
-                } else if (expected_anim == PAGE_ANIM::MOVE_LEFT) {
+                } else if (expected_anim == PAGE_ANIM::PUSH_LEFT) {
                     assert(lv_obj_get_x(page_root) > 0); // Back reverses the direction, not another left wipe.
                 } else if (expected_anim == PAGE_ANIM::OVER_BOTTOM) {
                     assert(lv_obj_get_style_y(page_root, LV_PART_MAIN) < 0);
@@ -441,6 +519,7 @@ int main(int argc, char** argv) {
             for (const auto phase_ms : {400u, kLogoMs + 300, kLogoMs + 3150}) {
                 advance(300);
                 assert(app.show_page("Pages/SystemLoading"));
+                advance(300); // 先完成纯色遮罩过渡，再计 Logo/自检阶段的展示时间。
                 advance(phase_ms);
                 assert(app.show_page("Pages/SystemInfos")); // Loading stays cached beneath this page.
                 advance(400);
@@ -462,7 +541,8 @@ int main(int argc, char** argv) {
             assert(app.show_page("Pages/SystemDash"));
             lv_tick_inc(500);
             lv_timer_handler();
-            app.on_input(Input::NextFocus); // Wi-Fi 不可用，Language -> Power。
+            app.on_input(Input::NextFocus); // Wi-Fi 不可用，Language -> Brightness -> Power。
+            app.on_input(Input::NextFocus);
             app.on_input(Input::Confirm);
             assert(std::strcmp(app.current_page(), "Pages/SystemDash") == 0);
             app.on_input(Input::Commit); // Shutdown is focused; a double press no longer executes it.
