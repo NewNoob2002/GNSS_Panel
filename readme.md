@@ -18,7 +18,7 @@
 |---|---|
 | HC32 固件 | `X1`（无屏，`MCU_LED`）、`X1Pro`（带屏，`MCU_PRO`）、`XBase`（带屏，`MCU_XBASE`） |
 | PC 模拟器 | SDL2，`Board` 后端（编译 HC32 平台层，模拟 X1Pro/XBase）或 `Demo` 后端 |
-| Linux 端口 | RK3506 显示端口、演示后端与主机测试 |
+| Linux 端口 | `Apps/Display` 屏幕应用（RK3506 显示端口、演示后端与主机测试）、`Apps/Survey` 独立逻辑应用 |
 
 ---
 
@@ -61,7 +61,7 @@
 ├── Vendor            # 平台实现层
 │   ├── HC32          #   HC32F460xE 固件（Platform、Libraries、Comm、Display、Products）
 │   ├── Simulator     #   PC 端 SDL2 模拟器（SIM_BACKEND=Board|Demo，SIM_PRODUCT=X1Pro|XBase）
-│   └── Linux         #   RK3506 Linux 端口、演示后端与 Linux 主机测试
+│   └── Linux         #   Apps/Display 屏幕应用、Apps/Survey 逻辑应用
 ├── cmake             # 工具链文件与公共编译选项（配合根目录 CMakePresets.json）
 ├── docs              # 架构、产品结构、构建与迁移文档
 └── tests             # HC32 主机回归测试（协议、传输、电源、显示应用、各产品协议表、分层检查）

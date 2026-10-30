@@ -47,11 +47,11 @@
 
 ## 代码与协议边界
 
-- `Vendor/Linux/display/rm690a0.c`：初始化、坐标检查、0x2A/0x2B/0x2C、像素分段。参数越界在发送前拒绝；传输失败使屏状态失效，后续写入被拒绝，必须重新初始化。
-- `Vendor/Linux/platform/linux_display.c`：SPI mode 3、8 bit、MSB first、硬件 CS；GPIO1 的 DC=22、RESET=20 以同一 line handle 申请。使用目标内核已启用的 GPIO CDEV v1，无新增 libgpiod 依赖。
-- `Vendor/Linux/display/lv_display.c`：保留原软件旋转、rounder 及两块 9261 像素缓冲。像素已由 LVGL 按线上顺序生成，协议层不再交换字节。不分配全屏影子缓冲。
-- `Vendor/Linux/display_test.c`：显示测试图、单调时钟、SIGINT/SIGTERM 退出；不接业务、按键或整机电源。
-- `Vendor/Linux/tests/`：协议屏模型、逐处故障注入、Linux 系统调用替身。测试使用全屏数组作断言依据，生产驱动没有该数组。
+- `Vendor/Linux/Apps/Display/Panel/rm690a0.c`：初始化、坐标检查、0x2A/0x2B/0x2C、像素分段。参数越界在发送前拒绝；传输失败使屏状态失效，后续写入被拒绝，必须重新初始化。
+- `Vendor/Linux/Apps/Display/Platform/linux_display.c`：SPI mode 3、8 bit、MSB first、硬件 CS；GPIO1 的 DC=22、RESET=20 以同一 line handle 申请。使用目标内核已启用的 GPIO CDEV v1，无新增 libgpiod 依赖。
+- `Vendor/Linux/Apps/Display/Panel/lv_display.c`：保留原软件旋转、rounder 及两块 9261 像素缓冲。像素已由 LVGL 按线上顺序生成，协议层不再交换字节。不分配全屏影子缓冲。
+- `Vendor/Linux/Apps/Display/Diagnostics/display_test.c`：显示测试图、单调时钟、SIGINT/SIGTERM 退出；不接业务、按键或整机电源。
+- `Vendor/Linux/Apps/Display/tests/`：协议屏模型、逐处故障注入、Linux 系统调用替身。测试使用全屏数组作断言依据，生产驱动没有该数组。
 
 初始化数据依据 HC32 `Vendor/HC32/Libraries/Adafruit-ST7735-Library/Adafruit_ST7789.cpp` 的 `generic_RM690A0`，源提交及调用链见 [迁移摘要](HC32_MIGRATION.md)。新实现未复制 Arduino/HC32 传输代码；原工程未修改。
 
@@ -89,13 +89,13 @@ cmake -S Vendor/Linux -B out/p3/arm \
   -DCMAKE_TOOLCHAIN_FILE="$br_host/share/buildroot/toolchainfile.cmake" \
   -DCMAKE_BUILD_TYPE=Release
 cmake --build out/p3/arm -j8
-qemu-arm-static -L "$br_target" out/p3/arm/lvgl_baseline
-qemu-arm-static -L "$br_target" out/p3/arm/display_protocol_test
-qemu-arm-static -L "$br_target" out/p3/arm/linux_display_test
-"$br_host/bin/arm-buildroot-linux-gnueabihf-readelf" -h -l -d out/p3/arm/display_test
+qemu-arm-static -L "$br_target" out/p3/arm/Apps/Display/lvgl_baseline
+qemu-arm-static -L "$br_target" out/p3/arm/Apps/Display/tests/display_protocol_test
+qemu-arm-static -L "$br_target" out/p3/arm/Apps/Display/tests/linux_display_test
+"$br_host/bin/arm-buildroot-linux-gnueabihf-readelf" -h -l -d out/p3/arm/Apps/Display/display_test
 ```
 
-产物：`out/p3/arm/display_test`，Buildroot GCC 12.4.0，ARM32 EABI5 hard-float，加载器 `/lib/ld-linux-armhf.so.3`。QEMU 只证明 ABI、协议与软件错误路径，不能模拟真实 SPI/GPIO 时序或屏幕响应。构建日志在 `out/p3/host-build.log`、`out/p3/arm-build.log`。
+产物：`out/p3/arm/Apps/Display/display_test`，Buildroot GCC 12.4.0，ARM32 EABI5 hard-float，加载器 `/lib/ld-linux-armhf.so.3`。QEMU 只证明 ABI、协议与软件错误路径，不能模拟真实 SPI/GPIO 时序或屏幕响应。构建日志在 `out/p3/host-build.log`、`out/p3/arm-build.log`。
 
 ## 待上板验收
 

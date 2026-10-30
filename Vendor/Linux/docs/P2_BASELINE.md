@@ -100,8 +100,8 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy \
 源代码与配置归属：
 
 - `Vendor/Linux/CMakeLists.txt`：C11/C++17、私有 lvgl8311 静态库、离线检查目标。
-- `Vendor/Linux/config/lv_conf.h`：原 MCU 配置，未修改。
-- `Vendor/Linux/baseline.c`：无设备 IO 的基础绘制检查；小缓冲用于触发多次 flush，不是实屏 port。
+- `Vendor/Linux/Apps/Display/config/lv_conf.h`：原 MCU 配置，未修改。
+- `Vendor/Linux/Apps/Display/Diagnostics/baseline.c`：无设备 IO 的基础绘制检查；小缓冲用于触发多次 flush，不是实屏 port。
 - `External/lvgl/`：原 MCU 的 lvgl.h/src；来源和校验见 `App/SOURCE.md`。
 
 主机端（容器内）：
@@ -122,9 +122,9 @@ cmake -S Vendor/Linux -B out/p2/lvgl-arm \
   -DCMAKE_TOOLCHAIN_FILE="$br_host/share/buildroot/toolchainfile.cmake" \
   -DCMAKE_BUILD_TYPE=Release
 cmake --build out/p2/lvgl-arm -j4
-file out/p2/lvgl-arm/lvgl_baseline
-"$br_host/bin/arm-buildroot-linux-gnueabihf-readelf" -h -A -l -d out/p2/lvgl-arm/lvgl_baseline
-qemu-arm-static -L "$br_host/arm-buildroot-linux-gnueabihf/sysroot" out/p2/lvgl-arm/lvgl_baseline
+file out/p2/lvgl-arm/Apps/Display/lvgl_baseline
+"$br_host/bin/arm-buildroot-linux-gnueabihf-readelf" -h -A -l -d out/p2/lvgl-arm/Apps/Display/lvgl_baseline
+qemu-arm-static -L "$br_host/arm-buildroot-linux-gnueabihf/sysroot" out/p2/lvgl-arm/Apps/Display/lvgl_baseline
 ~~~
 
 QEMU 用户态执行仅检查目标 ABI、加载器和基础程序运行；不能验证 SPI/GPIO/板端调度或显示效果。

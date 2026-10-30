@@ -91,7 +91,7 @@
 
 ### 5.3 DataCenter → DataBroker
 
-语义基本对应（Account ↔ DataNode、Publish/Pull/Notify 同步分发、`EventParam_t` 栈上构造），差异：DataNode 无 PingPongBuffer（`Commit+Publish` 改为 `publish(data, size)`）、无订阅者时 publish 返回 OK、重复订阅返回已有指针、重写 `onEvent` 时默认事件掩码为 0。`App/` 中约 28 个文件、189 处用法，另有 `Vendor/Linux/tests` 中 25 处。
+语义基本对应（Account ↔ DataNode、Publish/Pull/Notify 同步分发、`EventParam_t` 栈上构造），差异：DataNode 无 PingPongBuffer（`Commit+Publish` 改为 `publish(data, size)`）、无订阅者时 publish 返回 OK、重复订阅返回已有指针、重写 `onEvent` 时默认事件掩码为 0。`App/` 中约 28 个文件、189 处用法，另有 `Vendor/Linux/Apps/Display/tests` 中 25 处。
 
 `App/tests/core_tests.cpp` 覆盖的行为在 DataBroker 中**不成立**的项目（需先加固框架）：
 

@@ -7,7 +7,7 @@ This is the unified SDL2 simulator (`Vendor/Simulator`) for the repository. It l
 It supports two backends selected by the `SIM_BACKEND` CMake cache variable:
 
 - `Board` (default): simulates HC32 `X1Pro` or `XBase` (`SIM_PRODUCT=X1Pro|XBase`) using `../HC32/Display/AppPlatform/`, `HAL/` (virtual GPIO, time and no-op charger), and the firmware `../HC32/Platform/HAL/HAL_Power.cpp` (with `HAL/HAL.h` force-included).
-- `Demo`: links the Linux demo backend (`../Linux/Backends/Demo`) and supports `--random-status [seed]` on the command line.
+- `Demo`: links the Linux demo backend (`../Linux/Apps/Display/Backends/Demo`) and supports `--random-status [seed]` on the command line.
 
 `main.cpp` owns SDL, pointer/keyboard input, SIGINT/SIGTERM cleanup, CLI argument validation, and backend-specific status/host updates.
 

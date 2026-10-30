@@ -39,6 +39,10 @@
 
 模拟器 Board 后端与主机测试需要复用 HC32 中可在主机编译的部分，包括 `State`、电源策略（`HAL_Power.cpp`、`PowerPolicy.h`）和 `AppPlatform` 设备对象。这些部分在 `Vendor/HC32/cmake/portable.cmake` 中定义成目标：`hc32::state`、`hc32::power_policy`、`hc32::app_platform`。HC32 固件、`Vendor/Simulator`、`tests/` 都 `include()` 这个文件并链接上述目标，不再各自按路径编译 HC32 源文件。硬件相关部分由各端用自己的实现或 fake 替换，替换方式是链接不同的 INTERFACE/OBJECT 目标，不靠调整 include 路径顺序来覆盖。
 
+Linux 的 `Vendor/Linux/CMakeLists.txt` 用 `LINUX_APP_DISPLAY`、`LINUX_APP_SURVEY`（默认均为 ON）编排两个应用。`Apps/Display/` 保留 RK3506 屏幕程序与原目标名：`Panel/`、`Platform/`、`Backends/Demo/` 属于 L4；入口、诊断、benchmark 和测试属于 L5。SDL Demo 继续链接此处的 `linux::demo_backend`，主机回归通过此处的 `tests/portable.cmake` 复用页面管理测试。
+
+`Apps/Survey/` 是独立逻辑应用（L5），当前只提供一次性启动入口和 CTest 冒烟；仅依赖标准库，不链接 LVGL、共享 App、Frameworks 或 Display。关闭 Display 后可独立构建，先面向 EG25-G、再移植 RK3506。业务模块和待确认边界见 [Survey README](../Vendor/Linux/Apps/Survey/README.md)；两个应用的数据接缝与协议尚未确定。
+
 ## 4. 规则
 
 1. **依赖向下、无环**：只能按第 1、2 节的表链接；同层例外必须写进本表。

@@ -84,12 +84,13 @@ DIRECTORY_LAYER_MAP: List[Tuple[str, Tuple[int, Optional[int]]]] = [
     ("Vendor/HC32", (LAYER_L5, None)),
 
     # Linux 平台目标与测试
-    ("Vendor/Linux/platform/linux", (LAYER_L5, None)),
-    ("Vendor/Linux/demo", (LAYER_L5, None)),
-    ("Vendor/Linux/tests", (LAYER_L5, None)),
-    ("Vendor/Linux/platform", (LAYER_L4, None)),
-    ("Vendor/Linux/display", (LAYER_L4, None)),
-    ("Vendor/Linux/Backends/Demo", (LAYER_L4, None)),
+    ("Vendor/Linux/Apps/Display/demo", (LAYER_L5, None)),
+    ("Vendor/Linux/Apps/Display/tests", (LAYER_L5, None)),
+    ("Vendor/Linux/Apps/Display/Platform", (LAYER_L4, None)),
+    ("Vendor/Linux/Apps/Display/Panel", (LAYER_L4, None)),
+    ("Vendor/Linux/Apps/Display/Backends/Demo", (LAYER_L4, None)),
+    ("Vendor/Linux/Apps/Display", (LAYER_L5, None)),
+    ("Vendor/Linux/Apps/Survey", (LAYER_L5, None)),
     ("Vendor/Linux", (LAYER_L5, None)),
 
     # Simulator 平台目标
@@ -403,6 +404,14 @@ def check_build_directory(bdir: str, repo_root: str) -> List[str]:
     for t in tgt_map.values():
         src_id = t["id"]
         src_name = t["name"]
+
+        # 强规则：Survey 须在无屏平台独立构建，不得依赖任何工程内目标
+        if src_name == "survey_app":
+            for dep in t.get("dependencies", []):
+                dst = tgt_map.get(dep["id"])
+                if dst:
+                    errors.append(f"[{bname}] 违规: survey_app 依赖了工程目标: {dst['name']}")
+
         if src_id not in tgt_classification:
             continue
         src_layer, src_sub = tgt_classification[src_id]

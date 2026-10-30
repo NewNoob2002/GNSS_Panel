@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <time.h>
 #include <unistd.h>
-#include "platform/linux_button.h"
+#include "linux_button.h"
 
 static const char* action_name(int action) {
     switch (action) {

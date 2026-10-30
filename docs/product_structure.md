@@ -26,7 +26,7 @@ Vendor/HC32/
   Products/<产品>/        product.cmake、product_config.h、产品专属源码
   cmake/portable.cmake    跨平台便携目标定义，供固件、模拟器与主机测试共享
 Vendor/Simulator/         唯一 PC SDL 模拟器：SIM_BACKEND=Board（默认，共享应用 + AppPlatform + 固件 HAL_Power.cpp）或 Demo（Linux 演示后端）；配置用自身 lv_conf.h，使用 portable.cmake 链接便携目标
-Vendor/Linux/             RK3506 Linux 端口、Backends/Demo 演示后端与主机测试；配置用 config/lv_conf.h
+Vendor/Linux/Apps/Display/ RK3506 屏幕应用、Backends/Demo 演示后端与主机测试；配置用 config/lv_conf.h；独立逻辑应用位于相邻 Apps/Survey/
 ```
 
 构建组织遵循 [CMake 分层构建架构](build_architecture.md)。按阶段 3.3c 实施完整分层与解耦：`Frameworks/{DataBroker,DeviceManager,PageManager,ResourceManager}/CMakeLists.txt` 分别提供 `fw::databroker`、`fw::devicemanager`、`fw::pagemanager`、`fw::resourcemanager`；App 提供 `app::core`、`app::i18n`、`app::log`、`app::dialplate`、`app::ui`；编译选项统一通过 `proj::options` 提供；HC32 平台按 4.1–4.10 子层拆分并提供 `hc32::*` 别名。主机测试与模拟器通过 `Vendor/HC32/cmake/portable.cmake` 链接便携目标与替身接口，完全消除跨模块按路径编译源文件与全局包含路径。`tests/check_layers.py` 负责自动化分层架构校验。

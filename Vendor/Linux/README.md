@@ -1,6 +1,27 @@
-# RK3506J RM690A0 / LVGL 应用迁移
+# Linux 应用：Display 与 Survey
 
-共享应用已拆为独立事件框架、无 LVGL 的 `app_core` 与 UI；架构和无屏测试入口见 [ARCHITECTURE.md](../../App/ARCHITECTURE.md)。平台演示业务实现位于 `Backends/Demo`，由入口工程选择。
+`Vendor/Linux/CMakeLists.txt` 只负责公共设置及两个应用的构建选择；`LINUX_APP_DISPLAY`、`LINUX_APP_SURVEY` 默认均为 ON。`PLATFORM=Linux`、`linux-host` preset、既有目标名与 `RK3506_*` 选项保持可用。
+
+| 应用 | 职责与依赖 |
+| --- | --- |
+| `Apps/Display/` | RK3506 屏幕应用：入口 `main.cpp`、`Panel/` 屏驱动、`Platform/` SPI/GPIO/按键、`Backends/Demo/` 演示数据源、`config/` LVGL 配置、`Diagnostics/` 诊断入口、`demo/` benchmark、`tools/` 与 `tests/`；链接共享 App、Frameworks 和 LVGL。 |
+| `Apps/Survey/` | 独立逻辑与数据处理应用，先复刻 EG25-G 上的旧 Survey，再移植 RK3506；当前只打印启动信息并一次性退出，仅依赖标准库。规划模块、工具链待确认项见 [Survey README](Apps/Survey/README.md)。 |
+
+Survey 不依赖 Display、LVGL 或共享 UI；Display 保留现有演示行为。两个应用的数据接缝与通信方式待定，本轮不预选协议。`board/`、`docker/`、`docs/` 保留原位置，下面既有迁移与板端记录保留其历史语境。
+
+在仓库根目录仅构建和运行 Survey（不会加载 LVGL）：
+
+```sh
+cmake -S Vendor/Linux -B build/linux-survey -DLINUX_APP_DISPLAY=OFF
+cmake --build build/linux-survey -j
+ctest --test-dir build/linux-survey --output-on-failure
+build/linux-survey/Apps/Survey/survey_app
+```
+
+只构建 Display 时传入 `-DLINUX_APP_SURVEY=OFF`。默认构建的显示可执行文件位于 `build/linux-host/Vendor/Linux/Apps/Display/`，Survey 位于相邻 `Apps/Survey/`；独立 `-S Vendor/Linux` 构建省去输出路径中的 `Vendor/Linux/`。
+
+
+共享应用已拆为独立事件框架、无 LVGL 的 `app_core` 与 UI；架构和无屏测试入口见 [ARCHITECTURE.md](../../App/ARCHITECTURE.md)。平台演示业务实现位于 `Apps/Display/Backends/Demo`，由入口工程选择。
 
 目标：移除原 HC32，由 ATK RK3506J Linux 平台直接驱动现有 RM690A0 彩色屏，并迁移 HC32 工程的 294×126、RGB565、LVGL 8.3.11 应用。P3 已在测试板用 SPI mode 3 点亮测试图，颜色和方向经目视确认；LVGL benchmark 在 32 MHz 请求、8 ms 刷新配置下整轮平均 57.3 FPS，详见 [P3 实屏性能记录](docs/P3_DISPLAY.md#lvgl-benchmark-实屏性能2026-09-24)。P4 已完成原 PageManager、状态栏及九个页面的 View 布局迁移，已有 ARM/测试板运行记录；九页限时运行、evdev 四键导航、页面返回及 Debug FPS/CPU/内存监视器已复核。历史基线源码 `7b49532` 的主机默认测试 7/7、独立 benchmark 测试 1/1 通过，SDL 预览构建通过；最新动画、英俄逐页实屏回归及退出/长期稳定性归 P6，不能以旧板端记录代替新提交验证。业务数据与操作进入 P5，`rk3506_app` 当前每 200 ms 更新的是明确标为 `DEMO` 的合成状态。外壳遮挡部分边缘；物理波形、最高速率和 SGM3849 输出轨尚未实测。
 
@@ -16,8 +37,8 @@
 - [P4 应用迁移与实屏试运行](docs/P4_APPLICATION.md)：页面路由、状态栏、按键行为及试运行条件。
 - [UI 优化与页面结构](docs/UI_PAGES_OPTIMIZATION_PLAN.md)：`feature/page-ui-optimization` 上的 SystemDash 系统菜单、英俄预览、每页 Controller/View/Model、DataNode 数据层、两路 GPIO 输入与 RAM/电源模拟；真实后端及量产 GPIO line/有效电平仍待板端确认。
 - [Docker 编译环境](docs/BUILD_ENVIRONMENT.md)：镜像构建、启动、SDK 编译入口与验证边界。
-- `Vendor/Linux/`：已有 LVGL 基线、RM690A0/Linux IO、显示测试入口及 [P4 主界面来源记录](../../App/SOURCE.md)；原业务应用正在迁移。
-- `Vendor/Linux/tests/`：协议、显示模型、Linux IO/evdev、九页导航与占位状态的主机测试。
+- `Vendor/Linux/Apps/Display/`：已有 LVGL 基线、RM690A0/Linux IO、显示测试入口及 [P4 主界面来源记录](../../App/SOURCE.md)；原业务应用正在迁移。
+- `Vendor/Linux/Apps/Display/tests/`：协议、显示模型、Linux IO/evdev、九页导航与占位状态的主机测试。
 - `refer/01_lvgl_button/`：用户提供的已实屏运行参考程序源码；就地构建产物不入版本库。
 - `External/lvgl/`：固定原 MCU 的 LVGL 8.3.11。
 - `sdk/`：厂商 SDK 工作区，已由现有 `.gitignore` 排除；SDK 改动以补丁保存在主项目。
@@ -32,8 +53,8 @@ cmake --build --preset linux-host
 ctest --test-dir build/linux-host --output-on-failure
 ```
 
-benchmark 使用独立构建配置：`cmake -S Vendor/Linux -B build/linux-demo -DCMAKE_BUILD_TYPE=Debug -DRK3506_LVGL_DEMO=ON`，随后构建并运行该目录的 CTest。当前默认配置在 Linux 主机注册 11 项测试，benchmark 注册 1 项；远端 CI 结果需另行核实。
+benchmark 使用独立构建配置：`cmake -S Vendor/Linux -B build/linux-demo -DCMAKE_BUILD_TYPE=Debug -DRK3506_LVGL_DEMO=ON`，随后构建并运行该目录的 CTest。当前默认配置在 Linux 主机注册原 30 项显示测试及 1 项 Survey 冒烟测试，benchmark 注册原 1 项测试及 1 项 Survey 冒烟测试；远端 CI 结果需另行核实。
 
-离线单页预览可运行 `build/linux-host/Vendor/Linux/tests/app_navigation_preview Pages/StarMap build/linux-host/star-map.ppm`；不带页面名时检查九页导航。预览不包含真实业务状态或板端刷新性能。九页拼图见 `out/p4/screens.png`（历史本机生成文件，未在此次文档核对中重新生成）。
+离线单页预览可运行 `build/linux-host/Vendor/Linux/Apps/Display/tests/app_navigation_preview Pages/StarMap build/linux-host/star-map.ppm`；不带页面名时检查九页导航。预览不包含真实业务状态或板端刷新性能。九页拼图见 `out/p4/screens.png`（历史本机生成文件，未在此次文档核对中重新生成）。
 
 原始资料保留在 `docs/`；实际 SDK 位于 `sdk/atk_dlrk3506_linux6.1_release_v1.3.1_20260326/`。P3 代码检查点为提交 `20f7f1c`，本地标签为 `p3-display-bringup-2026-09-24`；标签不代表剩余物理验收项已完成。
