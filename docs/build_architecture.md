@@ -81,3 +81,19 @@ LVGL 内部通过 `Utils/lv_ext/LvglLog.h` 注册同一回调，使用 `LVGL` �
 | 模拟器按路径编译 HC32 的 `HAL_Power.cpp`、`SystemState.cpp`、`AppPlatform/*.cpp`，并把 HC32 多个目录加入包含路径 | `Vendor/Simulator/CMakeLists.txt` | 已完成（3.3c）：通过 `portable.cmake` 链接便携目标与 `sim::hardware_port` |
 | 主机测试按路径引用其他模块源文件约 38 处 | `tests/CMakeLists.txt` | 已完成（3.3c）：主机回归全部通过 `portable.cmake` 实例化目标并链接替身接口 |
 | LVGL 源文件在 HC32、模拟器、Linux、tests 四处手写收集 | 3.3b 处理 | 已完成（3.3b）：通过上游 CMake 与 `project_add_lvgl` 统一构建 |
+
+## 6. 构建入口与跨 preset 复用
+
+`build.py` 是统一入口，目标直接读取 `CMakePresets.json`，只为没有 preset 的 `tests/`、`App/tests/` 维护一张小表。它约定 preset 的构建目录为 `build/<preset 名>`，且存在同名 build preset；固件产物名取自 HC32 配置时写入的 `generated/firmware_name.txt`。目标按顺序编译：单个 Ninja 已占满 CPU，且后续目标要命中前一目标写入的缓存。
+
+每个 preset 一棵构建树，因此 LVGL、App 虽然本身就是静态库，仍会在每棵树里各编译一遍。按 2026-11-01 的实测，LVGL 占固件编译 CPU 时间的 74%～85%；X1Pro 与 XBase 约 700 个 Release 对象中只有 5 个内容不同，都来自 `AppPlatform`、`lv_port_disp`、`display_protocol`。
+
+复用由 `cmake/compiler_cache.cmake` 接入的 ccache 完成，不抽取预编译公共库：
+
+- ccache 按预处理结果判断，`product_config.h` 改变内容时受影响的对象自动重编；手工维护的公共库要靠人判断哪些目标与产品无关。`hc32_hal` 含产品开关，X1Pro 与 XBase 目前却编出相同对象，这类目标最容易误判。
+- 预编译库需要在产品构建树之外单独构建，直接运行 `cmake --build --preset` 时可能链接到陈旧的库，这些源文件也会从产品的 `compile_commands.json` 中消失，影响 `.clangd` 和 `tests/check_layers.py`。
+- 缓存同时覆盖清理重建、切换分支和不同 OEM 下未变化的对象。
+
+跨目录命中依赖 `-ffile-prefix-map=<构建目录>=.` 与 `-fno-working-directory`，否则 Debug 的工作目录会进入 ccache 哈希和 GCC 预处理输出。前者只映射构建目录下的路径，作用于调试信息和 `__FILE__` 等文件名宏；源码目录中的文件不受影响，放在构建目录里的生成源文件的 `__FILE__` 会变成相对路径。配置时先探测编译器是否支持，不支持时缓存只在同一构建目录内生效。CMake 不为 ASM 规则应用 launcher，汇编源不经过缓存。`-DPROJECT_USE_CCACHE=OFF` 可以关闭缓存。
+
+`mcu_config.h` 把 `__DATE__`、`__TIME__` 写入固件，所以两次构建的哈希本来就不同，引用这两个宏的文件也不会被长期复用。比较产物时需固定 `SOURCE_DATE_EPOCH`；上述改动的验证方法是在该条件下比较有缓存与无缓存构建的 `.bin`、`.hex`，六个固件变体的产物完全一致。
