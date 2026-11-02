@@ -8,6 +8,7 @@ enable_testing()
 set(ROOT ${CMAKE_CURRENT_LIST_DIR}/..)
 set(HC32 ${ROOT}/Vendor/HC32)
 
+include(${ROOT}/cmake/compiler_cache.cmake)
 include(${ROOT}/cmake/options.cmake)
 target_compile_options(project_options INTERFACE -Wall -Wextra -UNDEBUG -fsanitize=address,undefined -fno-omit-frame-pointer)
 target_link_options(project_options INTERFACE -fsanitize=address,undefined)
@@ -190,6 +191,8 @@ endforeach()
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 add_test(NAME state_ownership
     COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_LIST_DIR}/check_state_ownership.py ${ROOT})
+add_test(NAME build_script
+    COMMAND ${Python3_EXECUTABLE} -I -B ${CMAKE_CURRENT_LIST_DIR}/test_build_script.py)
 add_test(NAME check_layers
     COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_LIST_DIR}/check_layers.py ${ROOT})
 

@@ -17,6 +17,8 @@ set(PROJECT_VERSION ${PRODUCT_VERSION})
 configure_file(Platform/Config/mcu_version_config.h.in
     ${CMAKE_BINARY_DIR}/generated/Platform/Config/mcu_version_config.h @ONLY)
 set(TARGET_NAME ${PRODUCT_IMAGE_PREFIX}_${PRODUCT_VERSION})
+# build.py 据此定位本次产物：版本切换后构建目录里会残留其他版本的文件。
+file(CONFIGURE OUTPUT ${CMAKE_BINARY_DIR}/generated/firmware_name.txt CONTENT "${TARGET_NAME}\n")
 set(CMAKE_EXECUTABLE_SUFFIX .elf)
 set(LINKER_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/HC32F460xE.ld)
 include(${REPO_ROOT}/cmake/ProjectOptions.cmake)

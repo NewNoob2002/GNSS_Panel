@@ -87,7 +87,22 @@ X1Pro 与 XBase 当前发布版本为 **3.0.0**，X1 保持 **1.30**；变化见
 
 ## 🔨 构建
 
-顶层按 `PLATFORM=HC32|Simulator|Linux`（默认 `HC32`）分发到 `Vendor/<平台>`。每次配置 HC32 只构建一个产品，`<product>` 为 `x1`、`x1pro` 或 `xbase`：
+推荐使用统一脚本 `build.py`（目标取自 `CMakePresets.json`），可一次编译单个或多个固件，打印编译前的版本/工具链信息与编译后的体积、Flash/RAM 占用、产物 SHA-256、告警数和缓存命中率。完整日志与 `summary.json` 保存在 `build/logs/<时间>/`（`build/logs/latest` 指向最近一次，保留 20 次）：
+
+```bash
+./build.py --list                     # 列出目标；产品简写 x1/x1pro/xbase，分组 hc32/simulator/linux/tests/all
+./build.py x1pro                      # X1Pro Debug
+./build.py x1pro xbase -c release     # 多个固件的 Release
+./build.py hc32 -c all                # 全部固件的 Debug 与 Release
+./build.py tests linux-host --test    # 编译并运行主机测试
+./build.py x1pro-release -D OEM=demo  # 透传 CMake 变量（写入该构建目录的缓存，之后保持生效）
+```
+
+一个目标失败时默认继续编译其余目标（`--fail-fast` 可改为立即停止），最后统一汇总；有失败时退出码为 1。
+
+安装 `ccache` 后，各 preset 的构建目录共享编译结果：X1Pro 编译过后，XBase 只需编译约 3% 的产品专属文件。未安装时自动退回普通编译。
+
+底层 CMake 用法。顶层按 `PLATFORM=HC32|Simulator|Linux`（默认 `HC32`）分发到 `Vendor/<平台>`。每次配置 HC32 只构建一个产品，`<product>` 为 `x1`、`x1pro` 或 `xbase`：
 
 ```bash
 cmake --preset <product>-debug        # 或 <product>-release
@@ -105,9 +120,9 @@ cmake --build --preset simulator-x1pro
 ./build/simulator-x1pro/bin/main      # 输出在各自构建目录的 bin/，启动时打印按键说明
 
 # PC 模拟器（Demo 后端，可选 --random-status [seed]）
-cmake -S . -B build/sim-demo -DPLATFORM=Simulator -DSIM_BACKEND=Demo
-cmake --build build/sim-demo
-./build/sim-demo/bin/main --random-status 42
+cmake --preset simulator-demo
+cmake --build --preset simulator-demo
+./build/simulator-demo/bin/main --random-status 42
 
 # Linux 端口主机构建与测试
 cmake --preset linux-host && cmake --build --preset linux-host && ctest --test-dir build/linux-host --output-on-failure
