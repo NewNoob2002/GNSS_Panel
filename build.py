@@ -3,6 +3,7 @@
 
 目标来自 CMakePresets.json，新增产品或 preset 无需修改本脚本。
 
+    ./build.py                            终端内进入交互菜单，回车可重复上次命令
     ./build.py --list                     列出全部目标
     ./build.py x1pro                      X1Pro Debug
     ./build.py x1pro xbase -c release     两个固件的 Release
@@ -10,7 +11,7 @@
     ./build.py tests linux-host --test    编译并运行主机测试
     ./build.py x1pro-release -D OEM=demo  向 CMake 透传缓存变量
 
-退出码：全部成功为 0；有目标失败为 1；参数或环境错误为 2。
+退出码：全部成功为 0；有目标失败为 1；参数或环境错误为 2；Ctrl+C 中断为 130。
 """
 
 import argparse
@@ -20,6 +21,7 @@ import json
 import os
 import platform
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -32,6 +34,8 @@ KEEP_RUNS = 20  # 只清理本脚本创建的时间戳目录，避免日志无�
 MAX_ERRORS = 20  # 失败时终端只显示前若干条，完整内容见日志
 REPORT_NAME = ".build_report.json"
 FIRMWARE_NAME_FILE = "firmware_name.txt"  # 由 Vendor/HC32/CMakeLists.txt 在配置时写入
+LAST_COMMAND_NAME = "last_command.json"
+OEM_ROOT = ROOT / "App" / "UI" / "Resource" / "oem"
 
 # 没有 preset 的独立 CMake 工程：preset 的 sourceDir 固定为仓库根目录。
 STANDALONE = {
@@ -40,6 +44,9 @@ STANDALONE = {
 }
 # gcc-* 是 x1pro-* 的兼容别名，可显式指定，但不进入分组，否则同一固件会编译两次。
 ALIAS_PREFIX = "gcc-"
+GROUPS = ("hc32", "simulator", "linux", "tests", "all")
+MENU_OPTIONS = {"c": ("--clean", "先清理"), "t": ("--test", "运行测试"),
+                "f": ("--fail-fast", "失败即停"), "v": ("--verbose", "完整输出")}
 HOST_ARTIFACTS = (
     "bin/main",
     "Vendor/Linux/Apps/Display/rk3506_app",
@@ -105,10 +112,18 @@ def load_presets():
     return targets
 
 
+def firmware_targets(targets):
+    return [t for t in targets.values() if t.group == "hc32" and not t.name.startswith(ALIAS_PREFIX)]
+
+
+def product_names(targets):
+    return sorted({t.name.rsplit("-", 1)[0] for t in firmware_targets(targets)})
+
+
 def expand(names, config, targets):
     """把命令行名称展开为去重后的目标列表，保持输入顺序。"""
     configs = ("debug", "release") if config == "all" else (config,)
-    firmware = [t for t in targets.values() if t.group == "hc32" and not t.name.startswith(ALIAS_PREFIX)]
+    firmware = firmware_targets(targets)
     groups = {
         "hc32": [t.name for t in firmware if t.name.endswith(configs)],
         "simulator": [t.name for t in targets.values() if t.group == "simulator"],
@@ -116,7 +131,7 @@ def expand(names, config, targets):
         "tests": [t.name for t in targets.values() if t.group == "tests"],
     }
     groups["all"] = groups["hc32"] + groups["simulator"] + groups["linux"] + groups["tests"]
-    products = {t.name.rsplit("-", 1)[0] for t in firmware}
+    products = product_names(targets)
 
     selected = []
     for name in names:
@@ -202,10 +217,17 @@ class Step:
         except OSError as exc:
             self.errors.append(f"无法启动 {command[0]}：{exc}")
             return False, 0.0
-        for raw in process.stdout:
-            line = ANSI.sub("", raw).rstrip()
-            self.log.write(line + "\n")
-            self.scan(line, label)
+        try:
+            for raw in process.stdout:
+                line = ANSI.sub("", raw).rstrip()
+                self.log.write(line + "\n")
+                self.scan(line, label)
+        except KeyboardInterrupt:
+            # Ctrl+C 同时发给了子进程组：继续读管道等 Ninja 收尾，否则它写满管道会卡住。
+            process.communicate()
+            self.clear_progress()
+            self.log.write("# 用户中断\n")
+            raise
         code = process.wait()
         self.clear_progress()
         self.log.write(f"# 退出码 {code}，耗时 {time.monotonic() - started:.1f}s\n")
@@ -441,13 +463,119 @@ def print_list(targets):
     for target in targets.values():
         note = "  [x1pro 兼容别名]" if target.name.startswith(ALIAS_PREFIX) else ""
         print(f"  {target.name:<18}{target.group:<11}{target.title}{note}")
-    products = sorted({t.name.rsplit("-", 1)[0] for t in targets.values()
-                       if t.group == "hc32" and not t.name.startswith(ALIAS_PREFIX)})
-    print(f"产品简写：{' '.join(products)}（配合 -c 选择配置）")
-    print("分组：hc32 simulator linux tests all")
+    print(f"产品简写：{' '.join(product_names(targets))}（配合 -c 选择配置）")
+    print(f"分组：{' '.join(GROUPS)}")
 
 
-def parse_args():
+def command_text(argv):
+    return shlex.join(["./build.py", *argv])
+
+
+def load_last_command():
+    try:
+        argv = json.loads((LOG_ROOT / LAST_COMMAND_NAME).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return argv if isinstance(argv, list) and all(isinstance(item, str) for item in argv) else None
+
+
+def save_last_command(argv):
+    (LOG_ROOT / LAST_COMMAND_NAME).write_text(json.dumps(argv, ensure_ascii=False), encoding="utf-8")
+
+
+def oem_names():
+    """只列出 App/oem.cmake 会接受的目录：未生成资源的 OEM 选了也只会配置失败。"""
+    return sorted(p.parent.name for p in OEM_ROOT.glob("*/oem.toml")
+                  if all((p.parent / "generated" / name).is_file() for name in ("oem_config.h", "oem_logo.c")))
+
+
+def parse_choice(text, menu, targets):
+    """编号换成菜单里的名称，其余按命令行目标校验，返回（有效目标，无法识别的输入）。"""
+    known = {*targets, *GROUPS, *product_names(targets)}
+    chosen, unknown = [], []
+    for token in text.split():
+        name = menu[int(token) - 1] if token.isdecimal() and 0 < int(token) <= len(menu) else token
+        (chosen if name in known else unknown).append(name)
+    return chosen, unknown
+
+
+def ask(prompt, parse):
+    """重复询问直到 parse 返回非 None，无效输入由 parse 负责提示。"""
+    while True:
+        value = parse(input(prompt).strip())
+        if value is not None:
+            return value
+
+
+def prompt_argv(targets):
+    """逐项询问并拼成普通命令行参数：后续校验和编译与命令行共用同一条路径。"""
+    print("选择目标（Ctrl+C 退出）")
+    menu = []
+    for group in GROUPS[:-1]:
+        print(f"  {group}")
+        for target in firmware_targets(targets) if group == "hc32" else targets.values():
+            if target.group == group:
+                menu.append(target.name)
+                print(f"  {len(menu):>3}  {target.name:<18}{target.title}")
+    products = product_names(targets)
+    print(f"也可输入分组 {' '.join(GROUPS)} 或产品简写 {' '.join(products)}")
+    last = load_last_command()
+    if last:
+        print(f"上次：{command_text(last)}")
+
+    def parse_targets(text):
+        if not text and last:
+            return last
+        chosen, unknown = parse_choice(text, menu, targets)
+        if chosen and not unknown:
+            return chosen
+        print(f"无法识别：{' '.join(unknown)}" if unknown else "请至少选择一个目标")
+        return None
+
+    argv = ask(f"目标（编号或名称，空格分隔{'；回车重复上次' if last else ''}）> ", parse_targets)
+    if argv is last:
+        return argv
+
+    if {*argv} & {*products, "hc32", "all"}:
+        configs = {"": [], "d": [], "r": ["-c", "release"], "a": ["-c", "all"]}
+
+        def parse_config(text):
+            if text.lower() in configs:
+                return configs[text.lower()]
+            print("请输入 d、r 或 a")
+            return None
+
+        argv = argv + ask("配置 d=debug r=release a=全部（回车 debug）> ", parse_config)
+
+    def parse_options(text):
+        keys = "".join(dict.fromkeys(text.lower().replace(" ", "")))
+        unknown = [key for key in keys if key != "o" and key not in MENU_OPTIONS]
+        if unknown:
+            print(f"无法识别：{' '.join(unknown)}")
+            return None
+        return keys
+
+    names = "  ".join(f"{key}={label}" for key, (_, label) in MENU_OPTIONS.items())
+    keys = ask(f"选项 {names}  o=选择 OEM（可多选，回车跳过）> ", parse_options)
+    argv = argv + [MENU_OPTIONS[key][0] for key in keys if key != "o"]
+    if "o" in keys:
+        oems = oem_names()
+
+        def parse_oem(text):
+            if not text:
+                return []
+            name = oems[int(text) - 1] if text.isdecimal() and 0 < int(text) <= len(oems) else text
+            if name in oems:
+                return ["-D", f"OEM={name}"]
+            print(f"无法识别：{text}")
+            return None
+
+        listing = "  ".join(f"{index}={name}" for index, name in enumerate(oems, 1))
+        argv = argv + ask(f"OEM {listing}（写入构建目录缓存，之后保持生效；回车跳过）> ", parse_oem)
+    return argv
+
+
+def parse_args(argv):
     parser = argparse.ArgumentParser(
         description="编译单个或多个固件，输出编译前后信息并保存日志。",
         epilog="示例：./build.py x1pro xbase -c release；./build.py hc32 -c all；./build.py tests --test",
@@ -464,12 +592,21 @@ def parse_args():
     parser.add_argument("--fail-fast", action="store_true", help="首个失败后停止，默认继续编译其余目标")
     parser.add_argument("-v", "--verbose", action="store_true", help="实时显示完整编译输出")
     parser.add_argument("--dry-run", action="store_true", help="只显示将执行的命令")
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 def main():
-    args = parse_args()
+    argv = sys.argv[1:]
     targets = load_presets()
+    # 管道和 CI 里没有人应答，无参数时保持列出目标。
+    if not argv and sys.stdin.isatty() and sys.stdout.isatty():
+        try:
+            argv = prompt_argv(targets)
+        except (EOFError, KeyboardInterrupt):
+            print("\n已取消")
+            return 130
+        print(f"\n将执行：{command_text(argv)}\n")
+    args = parse_args(argv)
     if args.list or not args.targets:
         print_list(targets)
         return 0
@@ -485,27 +622,37 @@ def main():
         usage_error(f"缺少工具 {' '.join(missing)}，请检查 PATH")
 
     print_environment(selected, args)
-    run_dir = prepare_log_dir() if not args.dry_run else None
+    run_dir = None
+    if not args.dry_run:
+        run_dir = prepare_log_dir()
+        save_last_command(argv)
     started = time.monotonic()
     results = []
+    interrupted = False
     # 目标按顺序编译：Ninja 已占满 CPU，且后续目标能命中前一目标写入的缓存，并行反而都会未命中。
-    for index, target in enumerate(selected, 1):
-        print(f"\n[{index}/{len(selected)}] {target.name}（{target.title}）")
-        result = build_target(target, args, run_dir)
-        if result is None:
-            continue
-        results.append(result)
-        if result["status"] != "ok" and args.fail_fast:
-            results += [{"target": t.name, "status": "skipped"} for t in selected[index:]]
-            break
+    try:
+        for index, target in enumerate(selected, 1):
+            print(f"\n[{index}/{len(selected)}] {target.name}（{target.title}）")
+            result = build_target(target, args, run_dir)
+            if result is None:
+                continue
+            results.append(result)
+            if result["status"] != "ok" and args.fail_fast:
+                break
+    except KeyboardInterrupt:
+        interrupted = True
+        print("\n已中断")
     if args.dry_run:
         return 0
 
+    results += [{"target": t.name, "status": "skipped"} for t in selected[len(results):]]
     print()
     print_summary(results, run_dir, time.monotonic() - started)
     summary = {"finished": datetime.datetime.now().isoformat(timespec="seconds"),
                "commit": capture("git", "rev-parse", "HEAD"), "results": results}
     (run_dir / "summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
+    if interrupted:
+        return 130
     return 0 if all(item["status"] == "ok" for item in results) else 1
 
 

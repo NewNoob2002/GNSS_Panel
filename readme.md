@@ -90,6 +90,7 @@ X1Pro 与 XBase 当前发布版本为 **3.0.0**，X1 保持 **1.30**；变化见
 推荐使用统一脚本 `build.py`（目标取自 `CMakePresets.json`），可一次编译单个或多个固件，打印编译前的版本/工具链信息与编译后的体积、Flash/RAM 占用、产物 SHA-256、告警数和缓存命中率。完整日志与 `summary.json` 保存在 `build/logs/<时间>/`（`build/logs/latest` 指向最近一次，保留 20 次）：
 
 ```bash
+./build.py                            # 终端内进入交互菜单，回车重复上次命令；菜单选完会打印等效命令
 ./build.py --list                     # 列出目标；产品简写 x1/x1pro/xbase，分组 hc32/simulator/linux/tests/all
 ./build.py x1pro                      # X1Pro Debug
 ./build.py x1pro xbase -c release     # 多个固件的 Release
@@ -98,7 +99,9 @@ X1Pro 与 XBase 当前发布版本为 **3.0.0**，X1 保持 **1.30**；变化见
 ./build.py x1pro-release -D OEM=demo  # 透传 CMake 变量（写入该构建目录的缓存，之后保持生效）
 ```
 
-一个目标失败时默认继续编译其余目标（`--fail-fast` 可改为立即停止），最后统一汇总；有失败时退出码为 1。
+一个目标失败时默认继续编译其余目标（`--fail-fast` 可改为立即停止），最后统一汇总；有失败时退出码为 1。Ctrl+C 会等 Ninja 收尾后输出已完成目标的汇总，退出码为 130。
+
+无参数运行时，只有标准输入和输出都是终端才进入菜单；管道和 CI 中仍列出目标后退出。
 
 安装 `ccache` 后，各 preset 的构建目录共享编译结果：X1Pro 编译过后，XBase 只需编译约 3% 的产品专属文件。未安装时自动退回普通编译。
 

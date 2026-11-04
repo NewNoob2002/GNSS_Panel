@@ -28,7 +28,7 @@ Put a difference between HC32 products in `product_config.h` as a `PRODUCT_*` sw
 
 ## Build, Test, and Development Commands
 
-- `./build.py <targets> [-c debug|release|all] [--test] [--clean]` is the unified entry point: targets are preset names, product shorthands (`x1`, `x1pro`, `xbase`) or groups (`hc32`, `simulator`, `linux`, `tests`, `all`); `--list` shows them. Logs and `summary.json` go to `build/logs/<timestamp>/`. New presets are picked up from `CMakePresets.json`; standalone projects without a preset are listed in `STANDALONE` in `build.py`.
+- `./build.py <targets> [-c debug|release|all] [--test] [--clean]` is the unified entry point: targets are preset names, product shorthands (`x1`, `x1pro`, `xbase`) or groups (`hc32`, `simulator`, `linux`, `tests`, `all`); `--list` shows them; with no arguments on a terminal it opens a numbered menu that only assembles these same arguments. Logs and `summary.json` go to `build/logs/<timestamp>/`. New presets are picked up from `CMakePresets.json`; standalone projects without a preset are listed in `STANDALONE` in `build.py`.
 - `cmake --preset <product>-debug` / `<product>-release` configures one HC32 product, where `<product>` is `x1`, `x1pro` or `xbase`; build with `cmake --build --preset <same name>`. Outputs go to `build/<preset>/` (`.elf`, `.map`) and `build/<preset>/generated/` (`.hex`, `.bin`).
 - `gcc-debug` / `gcc-release` 仍为 X1Pro 的兼容别名；`.clangd` 默认使用 `build/x1pro-debug/compile_commands.json`，`Vendor/HC32/Products/X1/` 使用 `build/x1-debug`。
 - `cmake --preset simulator-x1pro` / `simulator-xbase` and `cmake --build --preset <same name>` build the PC simulator with the HC32 virtual board backend (`SIM_BACKEND=Board`).

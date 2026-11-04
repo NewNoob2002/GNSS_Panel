@@ -2,6 +2,7 @@
 """build.py 回归：python3 -B tests/test_build_script.py。"""
 import datetime
 import importlib.util
+import json
 import os
 import tempfile
 import unittest
@@ -96,6 +97,79 @@ class CacheStatsTests(unittest.TestCase):
     def test_no_compilation_has_no_stats(self):
         """无改动或未安装 ccache 时没有统计文件。"""
         self.assertIsNone(build.ccache_stats(Path("/nonexistent/stats")))
+
+
+def sample_targets():
+    names = ("gcc-debug", "x1pro-debug", "x1pro-release", "xbase-debug", "xbase-release")
+    targets = {name: build.Target(name, name, "hc32", Path(name)) for name in names}
+    targets["linux-host"] = build.Target("linux-host", "Linux", "linux", Path("linux-host"))
+    return targets
+
+
+class MenuTests(unittest.TestCase):
+    """菜单只负责拼出命令行参数。"""
+
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.root = Path(directory.name)
+        patcher = mock.patch.object(build, "LOG_ROOT", self.root)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def answer(self, *replies):
+        with mock.patch("builtins.input", side_effect=replies), mock.patch("builtins.print"):
+            return build.prompt_argv(sample_targets())
+
+    def test_numbers_map_to_menu_without_alias(self):
+        """编号按菜单顺序，兼容别名不进菜单；全是 preset 时不询问配置。"""
+        self.assertEqual(self.answer("1 5", ""), ["x1pro-debug", "linux-host"])
+
+    def test_alias_still_accepted_by_name(self):
+        self.assertEqual(self.answer("gcc-debug", ""), ["gcc-debug"])
+
+    def test_shorthand_asks_config(self):
+        self.assertEqual(self.answer("x1pro hc32", "r", "t c"), ["x1pro", "hc32", "-c", "release", "--test", "--clean"])
+
+    def test_invalid_input_reprompts(self):
+        """非法输入不退出，编号越界按未知名称处理。"""
+        self.assertEqual(self.answer("99", "nope 1", "1", "x", ""), ["x1pro-debug"])
+
+    def test_oem_option(self):
+        with mock.patch.object(build, "oem_names", return_value=["demo", "rgk"]):
+            self.assertEqual(self.answer("1", "o", "bad", "2"), ["x1pro-debug", "-D", "OEM=rgk"])
+
+    def test_enter_repeats_last_command(self):
+        """回车原样重复，不再追问其他选项。"""
+        build.save_last_command(["x1pro-release", "-D", "OEM=a b"])
+        self.assertEqual(self.answer(""), ["x1pro-release", "-D", "OEM=a b"])
+
+    def test_enter_without_last_reprompts(self):
+        self.assertEqual(self.answer("", "1", ""), ["x1pro-debug"])
+
+    def test_corrupt_last_command_is_ignored(self):
+        (self.root / build.LAST_COMMAND_NAME).write_text('{"not": "a list"}', encoding="utf-8")
+        self.assertIsNone(build.load_last_command())
+
+
+class InterruptTests(unittest.TestCase):
+    """Ctrl+C 后仍要写出汇总，已完成的结果不能丢。"""
+
+    def test_interrupt_writes_summary(self):
+        done = {"target": "x1pro-debug", "group": "hc32", "status": "ok", "seconds": {"total": 1.0}, "warnings": 0}
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with mock.patch.object(build, "LOG_ROOT", root), \
+                    mock.patch.object(build.sys, "argv", ["build.py", "x1pro-debug", "xbase-debug", "linux-host"]), \
+                    mock.patch.object(build, "load_presets", return_value=sample_targets()), \
+                    mock.patch.object(build.shutil, "which", return_value="/usr/bin/tool"), \
+                    mock.patch.object(build, "build_target", side_effect=[done, KeyboardInterrupt]), \
+                    mock.patch("builtins.print"):
+                self.assertEqual(build.main(), 130)
+            summary = json.loads((root / "latest" / "summary.json").read_text(encoding="utf-8"))
+            self.assertEqual([item["status"] for item in summary["results"]], ["ok", "skipped", "skipped"])
+            self.assertEqual(json.loads((root / build.LAST_COMMAND_NAME).read_text(encoding="utf-8")),
+                             ["x1pro-debug", "xbase-debug", "linux-host"])
 
 
 if __name__ == "__main__":
